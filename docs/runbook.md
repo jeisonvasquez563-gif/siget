@@ -192,7 +192,7 @@ sudo systemctl restart postgresql
 ### 8.3 Contraseña y datos de ejemplo
 
 ```bash
-sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'CheckpointCiber5_2026';"
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD '<PASSWORD_NO_PUBLICADA>';"
 sudo -u postgres psql -c "CREATE DATABASE tramites_demo;"
 sudo -u postgres psql -d tramites_demo -c \
   "CREATE TABLE demo_tramite (id SERIAL PRIMARY KEY, descripcion TEXT,
@@ -222,7 +222,7 @@ Configuración de la integración con Apache, en modo no interactivo:
 
 ```bash
 sudo PGADMIN_SETUP_EMAIL=admin@ciber5.com \
-     PGADMIN_SETUP_PASSWORD='CheckpointCiber5_2026' \
+     PGADMIN_SETUP_PASSWORD='<PASSWORD_NO_PUBLICADA>' \
      /usr/pgadmin4/bin/setup-web.sh --yes
 ```
 
@@ -244,7 +244,7 @@ Ambos booleans de SELinux quedaron en "on" automáticamente, configurados por el
 ### 9.2 Verificación end-to-end
 
 1. Se accedió desde el navegador a `http://<IP_NAT_VM1>/pgadmin4/`
-2. Login con `admin@ciber5.com` / `CheckpointCiber5_2026`
+2. Login con `admin@ciber5.com` / *(contraseña no publicada en el repo)*
 3. Se registró el servidor "db-server (VM2)" apuntando a `192.168.100.20:5432`, usuario `postgres`.
 4. Se abrió el Query Tool sobre la base `tramites_demo` y se ejecutó `SELECT * FROM demo_tramite;` obteniendo la fila de ejemplo cargada previamente.
 
@@ -278,7 +278,7 @@ sudo -u postgres psql -d tramites_demo -c \
 Se generó un usuario administrador semilla, con el hash de contraseña calculado con la misma función que usa la aplicación (bcrypt vía `password_hash` de PHP), para garantizar compatibilidad con `password_verify`:
 
 ```bash
-php -r "echo password_hash('Admin123!', PASSWORD_BCRYPT), PHP_EOL;"
+php -r "echo password_hash('<PASSWORD_NO_PUBLICADA>', PASSWORD_BCRYPT), PHP_EOL;"
 # Con el hash resultante:
 sudo -u postgres psql -d tramites_demo -c \
   "INSERT INTO app_usuarios (username, password_hash) VALUES ('admin', '<hash_generado>');"
@@ -313,7 +313,7 @@ sudo restorecon -Rv /var/www/html/gestion
 
 ### 10.5 Verificación end-to-end
 
-1. Login en `http://<IP_NAT_VM1>/gestion/` con `admin` / `Admin123!` → acceso concedido al dashboard.
+1. Login en `http://<IP_NAT_VM1>/gestion/` con `admin` / *(contraseña no publicada en el repo)* → acceso concedido al dashboard.
 2. Se creó el usuario "funcionario1" desde el formulario del dashboard → mensaje de éxito en pantalla.
 3. Se verificó por SELECT directo en `psql` (VM2) que el registro nuevo efectivamente llegó a la tabla `app_usuarios` — no solo el mensaje de la aplicación.
 4. Se eliminó "funcionario1" desde el botón de la tabla → mensaje de éxito en pantalla.
