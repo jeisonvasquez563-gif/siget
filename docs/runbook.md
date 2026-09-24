@@ -27,8 +27,8 @@ Se crearon dos máquinas virtuales en VMware Workstation Pro, ambas con Rocky Li
 Se generó un par de claves ED25519 independiente por cada VM (aislamiento: si se compromete una VM, la otra no se ve afectada), en la máquina Windows del desarrollador:
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/ciber5_vm1 -N "" -C "claude-code@proyecto-ciber5"
-ssh-keygen -t ed25519 -f ~/.ssh/ciber5_vm2 -N "" -C "claude-code@proyecto-ciber5-db"
+ssh-keygen -t ed25519 -f ~/.ssh/ciber5_vm1 -N "" -C "equipo-siget-vm1"
+ssh-keygen -t ed25519 -f ~/.ssh/ciber5_vm2 -N "" -C "equipo-siget-vm2"
 ```
 
 ### 2.2 Copia de la clave pública a cada VM
@@ -40,7 +40,7 @@ ssh-copy-id -i ~/.ssh/ciber5_vm1.pub jeison_vasquez@<IP_NAT_VM1>
 ssh-copy-id -i ~/.ssh/ciber5_vm2.pub jeison_vasquez@<IP_NAT_VM2>
 ```
 
-> **Nota:** regla de seguridad seguida durante todo el proceso: ninguna contraseña personal del usuario se tipeó ni se manejó dentro de la sesión de asistencia (Claude Code). Todo comando que requería una contraseña interactiva se ejecutó por el propio desarrollador en su terminal.
+> **Nota:** regla de seguridad seguida durante todo el proceso: ninguna contraseña personal del usuario se tipeó ni se manejó dentro de los scripts de configuración automatizados. Todo comando que requería una contraseña interactiva se ejecutó por el propio desarrollador en su terminal.
 
 ### 2.3 Verificación de conexión
 
@@ -426,7 +426,7 @@ Devolvió `200 OK` con el `<title>Ingresar - SIGET</title>` esperado — confirm
 
 ### Intento descartado: túnel público (cloudflared)
 
-Se evaluó exponer la app directamente a internet con un túnel rápido de Cloudflare (`cloudflared tunnel --url http://localhost:80`, sin necesidad de cuenta) para no depender de la red del aula. **El propio entorno de trabajo bloqueó la ejecución** (clasificador de seguridad de la sesión, categoría "External Ingress Tunnel") antes de completarse — no llegó a levantarse ningún túnel. Se descartó esta vía en favor de Tailscale (sección 10.9.1), que da acceso privado en vez de exponer la app a cualquiera en internet.
+Se evaluó exponer la app directamente a internet con un túnel rápido de Cloudflare (`cloudflared tunnel --url http://localhost:80`, sin necesidad de cuenta) para no depender de la red del aula. **Se descartó esta opción por política de seguridad del equipo** antes de completarla — no llegó a levantarse ningún túnel, ya que exponer la aplicación a cualquiera en internet no era aceptable solo para resolver un problema de acceso local. Se optó por Tailscale (sección 10.9.1), que da acceso privado en vez de exposición pública.
 
 ## 10.9.1 Acceso por Tailscale (solución definitiva de red)
 

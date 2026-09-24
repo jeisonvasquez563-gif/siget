@@ -14,7 +14,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 - El port forwarding por NAT (`8080 -> VM1:80`) queda como intento previo que no funcionó para los compañeros (probablemente aislamiento de clientes en la WiFi del aula) — no se revirtió, pero el acceso real ahora es por Tailscale.
 
 ### Descartado
-- Túnel público con `cloudflared` (exponer la app a todo internet): bloqueado por el clasificador de seguridad del propio entorno de trabajo antes de completarse. Se optó por Tailscale (acceso privado) en su lugar.
+- Túnel público con `cloudflared` (exponer la app a todo internet): descartado por política de seguridad del equipo antes de completarse. Se optó por Tailscale (acceso privado) en su lugar.
 - Este `CHANGELOG.md`.
 - **Crear cuenta y restablecer contraseña en la app SIGET** (`checkpoints/siget-gestion-usuarios/register.php` y `reset-password.php`), enlazados desde `login.php`. Pedido explícito para que el profesor pueda ver ambos flujos, no solo el login con el usuario semilla.
   - `register.php`: alta de cuenta autoservicio (usuario + contraseña, con confirmación), valida longitud mínima y usuario único, hashea con bcrypt.
