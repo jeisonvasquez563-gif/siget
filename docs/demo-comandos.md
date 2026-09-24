@@ -65,7 +65,7 @@ start http://localhost:8080/gestion/
 ```
 
 - **Usuario:** `admin`
-- **Contraseña:** `Admin123!`
+- **Contraseña:** *(no se publica en el repo — ver gestor de contraseñas / notas privadas del equipo)*
 
 Mostrar en vivo:
 
@@ -84,7 +84,7 @@ start http://localhost:8080/pgadmin4/
 ```
 
 - **Usuario:** `admin@ciber5.com`
-- **Contraseña:** `CheckpointCiber5_2026`
+- **Contraseña:** *(no se publica en el repo — ver gestor de contraseñas / notas privadas del equipo)*
 
 Navegar: `Servers → db-server (VM2) → Databases → tramites_demo → Query Tool`, y correr:
 
