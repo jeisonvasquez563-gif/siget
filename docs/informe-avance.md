@@ -72,7 +72,8 @@ Además, se formalizó el proyecto en un repositorio Git privado en GitHub, con 
 | Crear/eliminar usuario reflejado en PostgreSQL | Completo y verificado |
 | Autorregistro y restablecimiento de contraseña en la app | Completo y verificado |
 | Rate limiting de login (3 intentos, bloqueo 5 min) + "Acceso denegado" | Completo y verificado |
-| Acceso a la app desde la red del aula (port forwarding + firewall) | Completo y verificado |
+| Acceso a la app desde la red del aula (port forwarding + firewall) | No funcionó para compañeros (probable aislamiento de clientes en el WiFi) — reemplazado por Tailscale |
+| Acceso a la app vía Tailscale (tailnet dedicada al proyecto) | Completo y verificado |
 | Repositorio GitHub (público) + GitFlow | Completo |
 | Estructura de monorepo (backend/frontend/infra) | Completo (carpetas y READMEs, sin código todavía) |
 | Separación de credenciales fuera de git (config.php) | Completo — desplegado en VM1 y verificado |

@@ -8,6 +8,13 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ### Añadido
 - Política de documentación obligatoria en `CONTRIBUTING.md`.
+- **Tailscale en VM1 y VM2** (`siget-app-backend` 100.104.206.118, `siget-db-server` 100.120.115.100), en una tailnet nueva dedicada al proyecto — no en la tailnet personal/compartida que ya tenía el desarrollador. Solución de fondo para que compañeros y profesor accedan a la app sin depender del enrutamiento de la red del aula.
+
+### Cambiado
+- El port forwarding por NAT (`8080 -> VM1:80`) queda como intento previo que no funcionó para los compañeros (probablemente aislamiento de clientes en la WiFi del aula) — no se revirtió, pero el acceso real ahora es por Tailscale.
+
+### Descartado
+- Túnel público con `cloudflared` (exponer la app a todo internet): bloqueado por el clasificador de seguridad del propio entorno de trabajo antes de completarse. Se optó por Tailscale (acceso privado) en su lugar.
 - Este `CHANGELOG.md`.
 - **Crear cuenta y restablecer contraseña en la app SIGET** (`checkpoints/siget-gestion-usuarios/register.php` y `reset-password.php`), enlazados desde `login.php`. Pedido explícito para que el profesor pueda ver ambos flujos, no solo el login con el usuario semilla.
   - `register.php`: alta de cuenta autoservicio (usuario + contraseña, con confirmación), valida longitud mínima y usuario único, hashea con bcrypt.

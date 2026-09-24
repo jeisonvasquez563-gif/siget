@@ -424,6 +424,51 @@ Devolvió `200 OK` con el `<title>Ingresar - SIGET</title>` esperado — confirm
 
 > **Acceso para compañeros/profesor**: `http://172.29.31.48:8080/gestion/` (la IP puede cambiar si la laptop se reconecta a la WiFi y le asignan otra por DHCP — verificar con `ipconfig` antes de compartir el link si pasó tiempo).
 
+### Intento descartado: túnel público (cloudflared)
+
+Se evaluó exponer la app directamente a internet con un túnel rápido de Cloudflare (`cloudflared tunnel --url http://localhost:80`, sin necesidad de cuenta) para no depender de la red del aula. **El propio entorno de trabajo bloqueó la ejecución** (clasificador de seguridad de la sesión, categoría "External Ingress Tunnel") antes de completarse — no llegó a levantarse ningún túnel. Se descartó esta vía en favor de Tailscale (sección 10.9.1), que da acceso privado en vez de exponer la app a cualquiera en internet.
+
+## 10.9.1 Acceso por Tailscale (solución definitiva de red)
+
+El port forwarding por NAT (arriba) no funcionó para los compañeros — la hipótesis, no confirmada de forma concluyente pero consistente con la evidencia, es **aislamiento de clientes (AP/client isolation)** en la red WiFi del aula (`Hw_Estudiantes 2`, perfil `Public` en Windows), común en redes institucionales para evitar que los dispositivos conectados se vean entre sí. Ni el firewall de Windows ni el de la VM estaban bloqueando nada — ambos ya permitían el tráfico correctamente.
+
+**Solución adoptada**: red privada mesh con [Tailscale](https://tailscale.com), que no depende del enrutamiento de la red del aula — cada máquina se conecta directo a las demás por un túnel cifrado, sin importar detrás de qué NAT/firewall/aislamiento esté cada una.
+
+> **Importante**: la laptop del desarrollador ya tenía Tailscale instalado, pero conectado a una tailnet compartida con otras cuentas y dispositivos ajenos al proyecto (`kw-piopio-*`, otra cuenta de usuario). **Se decidió explícitamente NO sumar las VMs a esa tailnet** y crear una cuenta de Tailscale nueva y dedicada solo al proyecto SIGET, para no mezclar el acceso del grupo con infraestructura ajena.
+
+### Instalación en VM1 y VM2
+
+```bash
+# En cada VM:
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up --auth-key=<AUTH_KEY> --hostname=<nombre-descriptivo>
+```
+
+Se usó una **auth key** (generada desde el panel de la tailnet nueva) para automatizar el alta sin necesitar abrir un navegador dentro de la VM. `--hostname` se usó para que cada VM aparezca identificada claramente en la tailnet (`siget-app-backend`, `siget-db-server`) en vez del hostname genérico.
+
+> **Nota de seguridad sobre las auth keys**: las auth keys usadas acá se compartieron por chat durante la sesión de trabajo — quedaron registradas en el historial de la conversación (no en el repositorio de git, eso es distinto). Se recomienda **revocarlas/regenerarlas desde el panel de Tailscale** después del alta inicial, igual criterio que con cualquier secreto que pasó por texto plano en algún momento.
+
+### Verificación de firewall
+
+`firewalld` en ambas VMs asigna la interfaz `tailscale0` a la **zona por defecto** (no aparece en la lista explícita de interfaces de la zona `public`, pero cae ahí por ser la zona default):
+
+```bash
+sudo firewall-cmd --get-default-zone        # public
+sudo firewall-cmd --get-zone-of-interface=tailscale0   # "no zone" -> cae en la default
+```
+
+Como la zona `public` ya tenía `http` habilitado sin restricción de origen (de la sección 9.1), el tráfico por Tailscale hacia el puerto 80 de VM1 quedó permitido automáticamente, sin tocar reglas nuevas. **El firewall de VM2 no se modificó** — PostgreSQL sigue aceptando conexiones solo desde `192.168.100.10` (VM1), Tailscale ahí solo habilita SSH/gestión, no expone la base de datos directamente a la tailnet.
+
+### Verificación end-to-end
+
+```bash
+curl http://100.104.206.118/gestion/login.php   # IP Tailscale de VM1 (siget-app-backend)
+```
+
+`200 OK` con el `<title>` correcto, probado desde la laptop del desarrollador (que también está en la misma tailnet).
+
+> **Acceso definitivo para compañeros/profesor**: cada uno instala el cliente de Tailscale, se une a la tailnet del proyecto (invitación desde el panel de administración), y entra a `http://100.104.206.118/gestion/` — esta IP no cambia aunque cambien de red física, a diferencia de la IP de WiFi del port forwarding.
+
 ## 11. Estado final de acceso (referencia rápida)
 
 | Recurso | Valor |
