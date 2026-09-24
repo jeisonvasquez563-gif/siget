@@ -9,6 +9,17 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ### Añadido
 - Política de documentación obligatoria en `CONTRIBUTING.md`.
 - Este `CHANGELOG.md`.
+- **Crear cuenta y restablecer contraseña en la app SIGET** (`checkpoints/siget-gestion-usuarios/register.php` y `reset-password.php`), enlazados desde `login.php`. Pedido explícito para que el profesor pueda ver ambos flujos, no solo el login con el usuario semilla.
+  - `register.php`: alta de cuenta autoservicio (usuario + contraseña, con confirmación), valida longitud mínima y usuario único, hashea con bcrypt.
+  - `reset-password.php`: restablecimiento directo (usuario + contraseña nueva) — **sin verificación por email**, porque el entorno de laboratorio no tiene servidor de correo configurado. La página lo aclara explícitamente en pantalla. Devuelve el mismo mensaje exista o no el usuario, para no permitir enumeración de cuentas.
+  - Verificado end-to-end: cuenta creada → login con ella → contraseña restablecida → login con la nueva contraseña funciona, con la vieja ya no.
+- **Mensaje de "Acceso denegado" y rate limiting de 3 intentos en el login** de la app SIGET. Nuevas columnas `intentos_fallidos` y `bloqueado_hasta` en `app_usuarios`. Bloqueo de 5 minutos tras 3 intentos fallidos, incluso con la contraseña correcta mientras dure el bloqueo.
+- **Acceso a la app desde la red del aula** (compañeros y profesor, no solo la laptop del desarrollador): port forwarding TCP 8080 → VM1:80 configurado en VMware NAT (`vmnetnat.conf`), y regla de entrada en el Firewall de Windows restringida a la subred del aula (`172.29.16.0/20`).
+
+### Corregido
+- **Dos bugs en el rate limiting del login**, encontrados y corregidos antes de dar la funcionalidad por terminada:
+  1. La comparación de si una cuenta seguía bloqueada se hacía en PHP con `strtotime()`, que interpreta el timestamp con la zona horaria por defecto de PHP — podía no coincidir con la de PostgreSQL y hacer que el bloqueo pareciera vencido apenas se guardaba. Se movió la comparación a la propia consulta SQL (`bloqueado_hasta > now()`).
+  2. Se esperaba que PDO devolviera un `BOOLEAN` de Postgres como el string `'t'`, pero en este entorno lo devuelve como `bool` nativo de PHP — la comparación `=== 't'` era siempre falsa. Corregido a `=== true`.
 
 ## 2026-09-24
 
