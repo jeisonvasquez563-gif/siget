@@ -4,7 +4,8 @@ La documentación "viva" del proyecto vive acá en Markdown, versionada junto co
 
 | Documento | Contenido |
 |---|---|
-| [`architecture/handoff-original.md`](./architecture/handoff-original.md) | Diseño original del proyecto: problemática, infraestructura, stack, modelo de datos, orden de trabajo. La base de todas las decisiones. |
+| [`architecture/spec.md`](./architecture/spec.md) | Especificación técnica: problemática, infraestructura, stack, modelo de datos. La base de todas las decisiones. |
+| [`architecture/plan.md`](./architecture/plan.md) | Plan de trabajo: orden de ejecución por fases, estado real de cada punto, próximos pasos. |
 | [`runbook.md`](./runbook.md) | Paso a paso técnico completo de todo lo ejecutado: VMs, red, SSH, firewall, checkpoint de BD/Apache. |
 | [`informe-avance.md`](./informe-avance.md) | Resumen ejecutivo: qué se hizo, decisiones técnicas, estado actual, pendientes y riesgos. |
 | [`demo-comandos.md`](./demo-comandos.md) | Guion de comandos para hacer una demo en vivo (túnel SSH, verificación de infraestructura, app SIGET, pgAdmin). |

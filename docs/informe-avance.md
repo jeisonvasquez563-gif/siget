@@ -77,7 +77,7 @@ Además, se formalizó el proyecto en un repositorio Git privado en GitHub, con 
 
 ## 5. Qué queda pendiente
 
-Según el orden de trabajo original del handoff de arquitectura, lo que sigue después de este avance es:
+Según el [plan de trabajo](./architecture/plan.md), lo que sigue después de este avance es:
 
 - Redesplegar en VM1 el `db.php`/`config.php` con las credenciales separadas (cambio ya en el repo, pendiente de aplicar en el servidor real — VM1 estaba apagada al momento de subir el cambio).
 - Fase 2 — Instalar Podman rootless y configurar Quadlet (unidades systemd) en VM1 y VM2, migrando el despliegue de PostgreSQL de instalación nativa a contenedor gestionado.
