@@ -70,6 +70,9 @@ Además, se formalizó el proyecto en un repositorio Git privado en GitHub, con 
 | Apache + pgAdmin4 en VM1 (1ra iteración) | Completo y verificado |
 | Apache + PHP: app de login y gestión de usuarios (entrega real) | Completo y verificado |
 | Crear/eliminar usuario reflejado en PostgreSQL | Completo y verificado |
+| Autorregistro y restablecimiento de contraseña en la app | Completo y verificado |
+| Rate limiting de login (3 intentos, bloqueo 5 min) + "Acceso denegado" | Completo y verificado |
+| Acceso a la app desde la red del aula (port forwarding + firewall) | Completo y verificado |
 | Repositorio GitHub (público) + GitFlow | Completo |
 | Estructura de monorepo (backend/frontend/infra) | Completo (carpetas y READMEs, sin código todavía) |
 | Separación de credenciales fuera de git (config.php) | Completo — desplegado en VM1 y verificado |

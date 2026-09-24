@@ -325,6 +325,105 @@ Resultado: flujo completo de autenticación y gestión de usuarios (crear/elimin
 
 El nombre en las pantallas de login y dashboard de esta aplicación de checkpoint pasó por dos ajustes: primero se retiró la referencia al nombre de trabajo original ("Panamá Conecta") por uno neutro ("Sistema de Gestión de Usuarios"), y luego se reemplazó por el nombre definitivo del proyecto: **SIGET — Sistema de Gestión y Trazabilidad**.
 
+## 10.7 Crear cuenta y restablecer contraseña
+
+Pedido explícito para que la pantalla de login tenga, además del ingreso con el usuario semilla, las opciones de autorregistro y recuperación de contraseña visibles — el profesor también va a interactuar con esto.
+
+Dos archivos nuevos en `/var/www/html/gestion/`:
+
+```
+register.php        → formulario de alta de cuenta: usuario + contraseña + confirmación.
+                       Valida longitud mínima, usuario único, hashea con bcrypt.
+reset-password.php   → restablecimiento directo: usuario + contraseña nueva + confirmación.
+```
+
+`login.php` se actualizó con dos enlaces ("Crear cuenta" / "Olvidé mi contraseña") y mensajes de confirmación después de cada acción (`?registrado=1`, `?reset_ok=1`).
+
+> **Nota — limitación deliberada, documentada en la propia pantalla**: `reset-password.php` NO envía un correo con un enlace de un solo uso, porque el entorno de laboratorio no tiene servidor de correo (SMTP) configurado. El restablecimiento es directo: se pide el usuario y la contraseña nueva en el mismo formulario. La página lo aclara explícitamente al usuario. En la arquitectura final (Django + email transaccional) esto se reemplaza por un token de un solo uso enviado por correo, con expiración.
+
+> **Nota — mitigación de enumeración de usuarios**: `reset-password.php` redirige al mismo mensaje de éxito exista o no el usuario ingresado, para que el formulario no sirva para averiguar qué nombres de usuario están registrados.
+
+Despliegue:
+
+```bash
+sudo cp login.php register.php reset-password.php /var/www/html/gestion/
+sudo chown apache:apache /var/www/html/gestion/{login,register,reset-password}.php
+sudo restorecon /var/www/html/gestion/{login,register,reset-password}.php
+```
+
+Verificación end-to-end:
+
+1. Se creó una cuenta de prueba desde `register.php` → verificado con SELECT directo en `psql` (VM2) que el usuario quedó en `app_usuarios`.
+2. Login exitoso con esa cuenta recién creada.
+3. Se restableció la contraseña de esa cuenta desde `reset-password.php`.
+4. Login con la contraseña **nueva** → éxito. Login con la contraseña **vieja** → rechazado.
+5. Cuenta de prueba eliminada al terminar la verificación (dato de testing, no de producto).
+
+## 10.8 Control de acceso: mensaje de "Acceso denegado" y rate limiting (3 intentos)
+
+Pedido explícito: cuando la contraseña es incorrecta, el sistema debe decirlo claramente ("Acceso denegado") y bloquear la cuenta temporalmente tras varios intentos fallidos — protección básica contra fuerza bruta.
+
+### Cambios en la base de datos (VM2)
+
+```bash
+sudo -u postgres psql -d tramites_demo -c "ALTER TABLE app_usuarios ADD COLUMN IF NOT EXISTS intentos_fallidos INT NOT NULL DEFAULT 0;"
+sudo -u postgres psql -d tramites_demo -c "ALTER TABLE app_usuarios ADD COLUMN IF NOT EXISTS bloqueado_hasta TIMESTAMP NULL;"
+```
+
+### Lógica en `login.php`
+
+- Máximo **3 intentos** fallidos (`MAX_INTENTOS`), bloqueo de **5 minutos** (`MINUTOS_BLOQUEO`).
+- Cada intento fallido con un usuario que existe suma 1 a `intentos_fallidos` y muestra cuántos intentos quedan.
+- Al llegar a 3, se guarda `bloqueado_hasta = now() + 5 minutos` y el mensaje pasa a "Acceso denegado: superaste el máximo de intentos...".
+- Mientras `bloqueado_hasta` siga en el futuro, **ni siquiera la contraseña correcta funciona** — se rechaza con el mensaje de bloqueo.
+- Al vencer el bloqueo, un login exitoso resetea `intentos_fallidos` a 0 y `bloqueado_hasta` a `NULL`.
+- Usuario inexistente: mismo mensaje genérico de "Acceso denegado", sin distinguir si el usuario existe o no (evita enumeración de cuentas).
+
+### Gotcha — dos bugs encontrados y corregidos antes de dar el fix por bueno
+
+1. **Comparación de fechas hecha en PHP en vez de en la base**: la primera versión traía `bloqueado_hasta` a PHP y comparaba con `strtotime(...) > time()`. Esto rompía porque `strtotime()` interpreta el string del timestamp con la zona horaria por defecto de PHP, que no necesariamente coincide con la del servidor de PostgreSQL — el bloqueo parecía "ya vencido" apenas se guardaba. **Fix**: la comparación se mueve a la propia consulta SQL (`bloqueado_hasta > now()`), evitando el desajuste de zona horaria por completo.
+2. **Tipo de dato incorrecto al leer el booleano de Postgres**: se esperaba que PDO devolviera el `BOOLEAN` de Postgres como el string `'t'`/`'f'`, pero en este entorno (PHP 8.3 + PDO_PGSQL) lo devuelve como `bool` nativo de PHP. La comparación `=== 't'` era siempre falsa. Se detectó con un script de debug corriendo en el mismo contexto de Apache (`var_dump()` del resultado real). **Fix**: comparar contra `true` en vez de `'t'`.
+
+### Verificación end-to-end (tras corregir ambos bugs)
+
+1. 3 intentos con contraseña incorrecta → mensajes "Te queda(n) 2 / 1 intento(s)" y luego "Cuenta bloqueada por 5 minutos".
+2. Intento con la contraseña **correcta** mientras el bloqueo sigue activo → rechazado con el mensaje de bloqueo (no entra).
+3. Se simuló el vencimiento del bloqueo (`bloqueado_hasta` movido al pasado directamente en la BD, para no esperar 5 minutos reales) → login con contraseña correcta funciona y resetea `intentos_fallidos`/`bloqueado_hasta`.
+
+## 10.9 Acceso desde otras máquinas de la red del aula
+
+Pedido explícito: que compañeros y el profesor puedan entrar a la app desde sus propias computadoras, no solo desde la laptop donde corren las VMs.
+
+Las VMs solo tienen IP en redes virtuales de VMware (NAT `192.168.159.0/24` e interna `192.168.100.0/24`), no directamente alcanzables desde la red WiFi del aula. Se evaluaron dos opciones:
+
+| Opción | Descripción | Elegida |
+|---|---|---|
+| Adaptador puenteado (bridged) | VM1 obtiene IP propia en la red del aula, como una PC más de esa red | No — mayor superficie expuesta, y depende de que la red del aula permita DHCP a dispositivos nuevos (muchas redes institucionales lo bloquean) |
+| Port forwarding por NAT | La laptop reenvía un puerto propio hacia VM1, sin exponer la VM directamente a la red | **Sí** |
+
+### Configuración aplicada
+
+1. **VMware Workstation Pro** → `Edit → Virtual Network Editor → Change Settings` → seleccionar la red **NAT** → **NAT Settings...** → **Add** un reenvío: puerto de host `8080` (TCP) → `192.168.159.137:80` (VM1). Esto se guarda en `C:\ProgramData\VMware\vmnetnat.conf`, sección `[incomingtcp]`:
+   ```
+   8080 = 192.168.159.137:80
+   ```
+   (Este archivo solo lo puede editar una cuenta con permisos de administrador de Windows — por eso el cambio se hizo desde la UI de VMware, no por edición directa.)
+
+2. **Firewall de Windows**, regla de entrada restringida a la subred del aula (no abierta a cualquier IP de internet):
+   ```powershell
+   New-NetFirewallRule -DisplayName "SIGET app (VM1 port forward)" -Direction Inbound -Protocol TCP -LocalPort 8080 -RemoteAddress 172.29.16.0/20 -Action Allow
+   ```
+
+### Verificación
+
+```bash
+curl http://172.29.31.48:8080/gestion/login.php   # IP de la laptop en la red WiFi del aula
+```
+
+Devolvió `200 OK` con el `<title>Ingresar - SIGET</title>` esperado — confirma que el reenvío llega hasta Apache en VM1 pasando por NAT.
+
+> **Acceso para compañeros/profesor**: `http://172.29.31.48:8080/gestion/` (la IP puede cambiar si la laptop se reconecta a la WiFi y le asignan otra por DHCP — verificar con `ipconfig` antes de compartir el link si pasó tiempo).
+
 ## 11. Estado final de acceso (referencia rápida)
 
 | Recurso | Valor |
