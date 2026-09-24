@@ -1,0 +1,17 @@
+# Configuración con credenciales reales — nunca se sube
+checkpoints/**/config.php
+**/.env
+**/.env.*
+
+# SO / editores
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Node (por si se usan scripts auxiliares tipo generación de .docx)
+node_modules/
+
+# Logs
+*.log
