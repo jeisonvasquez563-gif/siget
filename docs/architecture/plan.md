@@ -50,5 +50,8 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 7. Cargar catálogo de `TipoTramite`, empezando por Permiso de Construcción Municipal.
 8. Validar flujo end-to-end completo (punto 7 del plan original).
 9. Decidir destino del checkpoint PHP actual (ahora con login, registro, reset de password y rate limiting) — conservar como referencia, migrar su lógica a Django, o retirarlo — requiere aprobación explícita antes de tocar nada.
-10. Revocar/regenerar las auth keys de Tailscale que se compartieron por chat durante el alta de VM1 y VM2 (pendiente de confirmar que se hizo).
-11. Evaluar si conviene remover el port forwarding por NAT que quedó configurado y sin uso (VMware NAT + regla de Firewall de Windows), ya que el acceso real es por Tailscale.
+10. Evaluar si conviene remover el port forwarding por NAT que quedó configurado y sin uso (VMware NAT + regla de Firewall de Windows), ya que el acceso real es por Tailscale.
+
+## Completado recientemente
+
+- ✅ **Auth keys de Tailscale revocadas** — las que se compartieron por chat durante el alta de VM1 y VM2 ya no son utilizables; los dispositivos siguen conectados con normalidad (revocar la key no afecta a dispositivos ya autenticados, solo impide su reuso).

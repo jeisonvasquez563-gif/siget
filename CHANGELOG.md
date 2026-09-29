@@ -11,6 +11,9 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 - `docs/capturas-evidencia.md`: comandos organizados por tema (red, SELinux, firewall, servicios, BD, app) para que cada integrante del grupo tome su propia captura de la configuración, con un reparto sugerido de tareas entre el equipo.
 - **Tailscale en VM1 y VM2** (`siget-app-backend` 100.104.206.118, `siget-db-server` 100.120.115.100), en una tailnet nueva dedicada al proyecto — no en la tailnet personal/compartida que ya tenía el desarrollador. Solución de fondo para que compañeros y profesor accedan a la app sin depender del enrutamiento de la red del aula.
 
+### Seguridad
+- **Auth keys de Tailscale revocadas** desde el panel de administración, ya que se habían compartido por chat durante el alta de VM1 y VM2. Verificado que ambas VMs siguen conectadas con normalidad tras la revocación.
+
 ### Cambiado
 - El port forwarding por NAT (`8080 -> VM1:80`) queda como intento previo que no funcionó para los compañeros (probablemente aislamiento de clientes en la WiFi del aula) — no se revirtió, pero el acceso real ahora es por Tailscale.
 
