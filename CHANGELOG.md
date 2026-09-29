@@ -8,6 +8,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ### Añadido
 - Política de documentación obligatoria en `CONTRIBUTING.md`.
+- `docs/capturas-evidencia.md`: comandos organizados por tema (red, SELinux, firewall, servicios, BD, app) para que cada integrante del grupo tome su propia captura de la configuración, con un reparto sugerido de tareas entre el equipo.
 - **Tailscale en VM1 y VM2** (`siget-app-backend` 100.104.206.118, `siget-db-server` 100.120.115.100), en una tailnet nueva dedicada al proyecto — no en la tailnet personal/compartida que ya tenía el desarrollador. Solución de fondo para que compañeros y profesor accedan a la app sin depender del enrutamiento de la red del aula.
 
 ### Cambiado
