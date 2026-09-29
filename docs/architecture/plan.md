@@ -31,9 +31,13 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 
 - ✅ **Checkpoint 1 — BD + panel de administración (pgAdmin4).** Primer intento, no era exactamente lo pedido.
 - ✅ **Checkpoint 2 — App de login y gestión de usuarios (PHP + Apache + PostgreSQL).** La entrega real, verificada de punta a punta.
+- ✅ **Crear cuenta y restablecer contraseña** en la app, enlazados desde el login (reset simplificado, sin email, porque el laboratorio no tiene SMTP — aclarado en la propia pantalla).
+- ✅ **Rate limiting de login**: 3 intentos fallidos, bloqueo de 5 minutos, mensajes de "Acceso denegado" claros. Dos bugs encontrados y corregidos en el proceso (comparación de fechas movida a SQL, tipo boolean de PDO_PGSQL).
 - ✅ **Repositorio Git + estructura de monorepo + GitFlow.** Formalización del proyecto para trabajo en equipo.
 - ✅ **Redacción de credenciales y rotación de contraseñas.** Tras hacer el repo público.
 - ✅ **Branch protection en `main` y `develop`.**
+- ✅ **Acceso de equipo por Tailscale**: tailnet dedicada al proyecto (no la personal del desarrollador), VM1 y VM2 sumadas. Reemplaza un intento previo de port forwarding por NAT que no funcionó (probable aislamiento de clientes en la WiFi del aula).
+- ✅ **Guía de capturas repartida entre el grupo** (`docs/capturas-evidencia.md`) para documentar la configuración con evidencia de cada integrante.
 
 ## Próximos pasos (en orden sugerido)
 
@@ -45,4 +49,6 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 6. Iniciar `frontend/` con React + Vite, consumiendo la API de Django.
 7. Cargar catálogo de `TipoTramite`, empezando por Permiso de Construcción Municipal.
 8. Validar flujo end-to-end completo (punto 7 del plan original).
-9. Decidir destino del checkpoint PHP actual (conservar como referencia, migrar su lógica, o retirarlo) — requiere aprobación explícita antes de tocar nada.
+9. Decidir destino del checkpoint PHP actual (ahora con login, registro, reset de password y rate limiting) — conservar como referencia, migrar su lógica a Django, o retirarlo — requiere aprobación explícita antes de tocar nada.
+10. Revocar/regenerar las auth keys de Tailscale que se compartieron por chat durante el alta de VM1 y VM2 (pendiente de confirmar que se hizo).
+11. Evaluar si conviene remover el port forwarding por NAT que quedó configurado y sin uso (VMware NAT + regla de Firewall de Windows), ya que el acceso real es por Tailscale.
