@@ -40,17 +40,19 @@ Además, se formalizó el proyecto en un repositorio Git privado en GitHub, con 
 
 ### 2.4 Repositorio Git y estructura de monorepo
 
-- Se creó un repositorio **privado** en GitHub bajo el perfil del usuario: `https://github.com/jeisonvasquez563-gif/siget`.
-- Se definió una estructura de monorepo alineada a la arquitectura final: `backend/` (Django + DRF, pendiente), `frontend/` (React + Vite + Tailwind + shadcn/ui, pendiente), `infra/` (notas de VM1/VM2 + `podman/` para las unidades Quadlet futuras), `database/` (esquema SQL), `checkpoints/` (entregas puntuales como la app PHP actual, deliberadamente separadas del código final), `docs/` (esta documentación).
-- Se armó el flujo **GitFlow**: rama `main` (estable) y `develop` (integración), con convención de `feature/*`, `release/*` y `hotfix/*` documentada en `CONTRIBUTING.md`.
+- Se creó un repositorio en GitHub bajo el perfil del usuario: `https://github.com/jeisonvasquez563-gif/siget`. Empezó **privado** y luego se pasó a **público** para compartirlo con los compañeros de grupo.
+- Se definió una estructura de monorepo alineada a la arquitectura final: `backend/` (Django + DRF, pendiente), `frontend/` (React + Vite + Tailwind + shadcn/ui, pendiente), `infra/` (notas de VM1/VM2 + `podman/` para las unidades Quadlet futuras), `database/` (esquema SQL), `checkpoints/` (entregas puntuales como la app PHP actual, deliberadamente separadas del código final), `docs/` (esta documentación, incluyendo `spec.md`/`plan.md` separados y este informe).
+- Se armó el flujo **GitFlow**: rama `main` (estable) y `develop` (integración), con convención de `feature/*`, `release/*` y `hotfix/*` documentada en `CONTRIBUTING.md`, que ahora incluye además una política de documentación obligatoria por cada PR (ver `CONTRIBUTING.md` y `CHANGELOG.md`).
 - Se corrigió una mala práctica antes de subir el código: `db.php` tenía la contraseña de PostgreSQL escrita directo en el código fuente. Se separó en `config.php` (credenciales reales, excluido por `.gitignore`, nunca se sube) y `config.example.php` (plantilla sin datos sensibles, sí versionada).
+- **Branch protection** configurada en `main` y `develop` al pasar el repo a público: 1 aprobación requerida por Pull Request, sin force-push, sin borrado de rama, conversaciones deben resolverse antes de mergear (el dueño del repo puede seguir pusheando directo si hace falta).
+- **Incidente de seguridad y remediación**: al redactar la documentación en Markdown se dejaron, por error, las contraseñas reales de PostgreSQL, pgAdmin y del usuario admin de la app en texto plano dentro de varios documentos (`runbook.md`, `demo-comandos.md`, y sus versiones `.docx`/`.txt`). Al pasar el repo a público, esto quedó expuesto. Se resolvió: (1) rotando las tres contraseñas directamente en las VMs, (2) redactando todos los documentos afectados, y (3) verificando que no quedó ningún rastro, incluyendo dentro del `.docx` binario. Detalle completo en `CHANGELOG.md`, entrada 2026-09-24.
 
 ## 3. Decisiones técnicas relevantes
 
 - **Checkpoint separado de la arquitectura final**: se decidió con el responsable del proyecto resolver el pedido del profesor sin usar todavía Podman/contenedores (PostgreSQL y Apache se instalaron nativos vía `dnf`), para priorizar velocidad de entrega. Esta instalación es temporal y deberá revisarse — no reemplazar sin aviso — al migrar a la arquitectura final con Podman rootless.
 - **Reinstalación de ambas VMs**: se detectó que el usuario administrativo no había quedado en el grupo `wheel` durante la instalación inicial (no se marcó la casilla de administrador en Anaconda), lo que impedía usar sudo. Sin contraseña de root disponible para recuperarlo, se optó por reinstalar las dos VMs en vez de ejecutar un procedimiento de recuperación por GRUB, priorizando simplicidad dado que aún no había datos de producción en juego.
 - **Restricción de PostgreSQL por rich rule en vez de puerto abierto**: como las interfaces NAT e interna de VM2 comparten la misma zona de firewalld, se usó una rich rule con IP de origen específica para que el puerto 5432 solo sea alcanzable desde VM1, en línea con el principio de mínimo privilegio de red que pide el diseño original.
-- **Ninguna contraseña personal del usuario fue manejada por el asistente**: todo comando que requería una contraseña interactiva (`ssh-copy-id`, configuración de sudoers) fue ejecutado directamente por el desarrollador en su propia terminal, nunca dentro de la sesión de automatización.
+- **Ninguna contraseña personal del usuario quedó en los scripts de automatización**: todo comando que requería una contraseña interactiva (`ssh-copy-id`, configuración de sudoers) fue ejecutado directamente por el desarrollador en su propia terminal.
 - **Pivote de pgAdmin a aplicación propia sin descartar lo ya hecho**: al aclararse que el pedido real era una aplicación de login y gestión de usuarios (no un panel de administración de base de datos), se optó por construir la nueva aplicación en una ruta separada (`/gestion/`) dejando pgAdmin intacto en su propia ruta (`/pgadmin4/`), evitando así rehacer trabajo o eliminar algo sin necesidad.
 - **Monorepo en vez de repos separados**: decisión explícita del responsable del proyecto — backend, frontend, infraestructura y documentación conviven en un solo repositorio, con carpetas dedicadas por dominio en vez de repos independientes.
 - **Sin CI/CD todavía**: se documentó la intención (lint + tests de backend/frontend, escaneo de seguridad) en `.github/workflows/README.md`, pero no se agregaron pipelines vacíos — un CI que no valida código real da una falsa sensación de seguridad.
@@ -68,18 +70,24 @@ Además, se formalizó el proyecto en un repositorio Git privado en GitHub, con 
 | Apache + pgAdmin4 en VM1 (1ra iteración) | Completo y verificado |
 | Apache + PHP: app de login y gestión de usuarios (entrega real) | Completo y verificado |
 | Crear/eliminar usuario reflejado en PostgreSQL | Completo y verificado |
-| Repositorio GitHub privado + GitFlow | Completo |
+| Autorregistro y restablecimiento de contraseña en la app | Completo y verificado |
+| Rate limiting de login (3 intentos, bloqueo 5 min) + "Acceso denegado" | Completo y verificado |
+| Acceso a la app desde la red del aula (port forwarding + firewall) | No funcionó para compañeros (probable aislamiento de clientes en el WiFi) — reemplazado por Tailscale |
+| Acceso a la app vía Tailscale (tailnet dedicada al proyecto) | Completo y verificado |
+| Repositorio GitHub (público) + GitFlow | Completo |
 | Estructura de monorepo (backend/frontend/infra) | Completo (carpetas y READMEs, sin código todavía) |
-| Separación de credenciales fuera de git (config.php) | Completo en el repo — **pendiente redeploy en VM1** (estaba apagada) |
+| Separación de credenciales fuera de git (config.php) | Completo — desplegado en VM1 y verificado |
+| Branch protection (main + develop) | Completo y verificado |
+| Redacción de credenciales en documentación + rotación de contraseñas | Completo y verificado (ver `CHANGELOG.md`) |
+| Política de documentación obligatoria por PR (CONTRIBUTING.md + CHANGELOG.md) | Completo |
 | Podman rootless + Quadlet (Fase 2) | No iniciado |
 | Django + DRF, modelo de datos, RBAC/MFA (Fase 2-3) | No iniciado |
 | Frontend React/Vite/Tailwind | No iniciado |
 
 ## 5. Qué queda pendiente
 
-Según el orden de trabajo original del handoff de arquitectura, lo que sigue después de este avance es:
+Según el [plan de trabajo](./architecture/plan.md), lo que sigue después de este avance es:
 
-- Redesplegar en VM1 el `db.php`/`config.php` con las credenciales separadas (cambio ya en el repo, pendiente de aplicar en el servidor real — VM1 estaba apagada al momento de subir el cambio).
 - Fase 2 — Instalar Podman rootless y configurar Quadlet (unidades systemd) en VM1 y VM2, migrando el despliegue de PostgreSQL de instalación nativa a contenedor gestionado.
 - Definir y ejecutar la política de secretos con `podman secret` (reemplazando la contraseña en texto plano usada para el checkpoint).
 - Desplegar Django + Django REST Framework en VM1 dentro de un pod junto con nginx (reverse proxy, TLS, HSTS/CSP), reemplazando o conviviendo temporalmente con el Apache instalado para el checkpoint — decisión pendiente de tomar con el responsable del proyecto.
@@ -94,7 +102,7 @@ Según el orden de trabajo original del handoff de arquitectura, lo que sigue de
 
 ## 6. Riesgos y puntos de atención
 
-- **Contraseñas en texto plano en el servidor**: aunque ya se corrigió en el código del repo (config.php separado), el servidor real (VM1) todavía corre con la versión vieja hasta que se redepliegue. Aceptable para un entorno de laboratorio, pero incompatible con el diseño final del proyecto, que exige `podman secret`.
+- **Contraseñas en texto plano en el servidor**: `config.php` en VM1 sigue teniendo la contraseña de PostgreSQL en texto plano dentro del archivo (aunque ya no en git). Aceptable para un entorno de laboratorio, pero incompatible con el diseño final del proyecto, que exige `podman secret`.
 - **Sin TLS entre app y BD todavía**: el tráfico PostgreSQL viaja sin cifrar por la red interna. No es explotable desde fuera del laboratorio (red host-only, sin salida), pero debe corregirse antes de cualquier despliegue con datos reales.
 - **Triple stack web temporal en VM1**: conviven, sin conflicto de rutas, pgAdmin4 (`/pgadmin4/`), la aplicación PHP de login y usuarios (`/gestion/`) y, a futuro, el nginx en contenedor que exige el diseño final — hay que definir qué se conserva y qué se retira al avanzar a Podman.
 - **Malentendido inicial de requerimiento**: la primera entrega (pgAdmin) no coincidía con lo pedido por el profesor; se corrigió a tiempo tras una aclaración directa. Vale la lección para futuras entregas: confirmar el alcance exacto antes de invertir tiempo de implementación.

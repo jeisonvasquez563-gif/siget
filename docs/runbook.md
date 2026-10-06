@@ -27,8 +27,8 @@ Se crearon dos máquinas virtuales en VMware Workstation Pro, ambas con Rocky Li
 Se generó un par de claves ED25519 independiente por cada VM (aislamiento: si se compromete una VM, la otra no se ve afectada), en la máquina Windows del desarrollador:
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/ciber5_vm1 -N "" -C "claude-code@proyecto-ciber5"
-ssh-keygen -t ed25519 -f ~/.ssh/ciber5_vm2 -N "" -C "claude-code@proyecto-ciber5-db"
+ssh-keygen -t ed25519 -f ~/.ssh/ciber5_vm1 -N "" -C "equipo-siget-vm1"
+ssh-keygen -t ed25519 -f ~/.ssh/ciber5_vm2 -N "" -C "equipo-siget-vm2"
 ```
 
 ### 2.2 Copia de la clave pública a cada VM
@@ -40,7 +40,7 @@ ssh-copy-id -i ~/.ssh/ciber5_vm1.pub jeison_vasquez@<IP_NAT_VM1>
 ssh-copy-id -i ~/.ssh/ciber5_vm2.pub jeison_vasquez@<IP_NAT_VM2>
 ```
 
-> **Nota:** regla de seguridad seguida durante todo el proceso: ninguna contraseña personal del usuario se tipeó ni se manejó dentro de la sesión de asistencia (Claude Code). Todo comando que requería una contraseña interactiva se ejecutó por el propio desarrollador en su terminal.
+> **Nota:** regla de seguridad seguida durante todo el proceso: ninguna contraseña personal del usuario se tipeó ni se manejó dentro de los scripts de configuración automatizados. Todo comando que requería una contraseña interactiva se ejecutó por el propio desarrollador en su terminal.
 
 ### 2.3 Verificación de conexión
 
@@ -192,7 +192,7 @@ sudo systemctl restart postgresql
 ### 8.3 Contraseña y datos de ejemplo
 
 ```bash
-sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'CheckpointCiber5_2026';"
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD '<PASSWORD_NO_PUBLICADA>';"
 sudo -u postgres psql -c "CREATE DATABASE tramites_demo;"
 sudo -u postgres psql -d tramites_demo -c \
   "CREATE TABLE demo_tramite (id SERIAL PRIMARY KEY, descripcion TEXT,
@@ -222,7 +222,7 @@ Configuración de la integración con Apache, en modo no interactivo:
 
 ```bash
 sudo PGADMIN_SETUP_EMAIL=admin@ciber5.com \
-     PGADMIN_SETUP_PASSWORD='CheckpointCiber5_2026' \
+     PGADMIN_SETUP_PASSWORD='<PASSWORD_NO_PUBLICADA>' \
      /usr/pgadmin4/bin/setup-web.sh --yes
 ```
 
@@ -244,7 +244,7 @@ Ambos booleans de SELinux quedaron en "on" automáticamente, configurados por el
 ### 9.2 Verificación end-to-end
 
 1. Se accedió desde el navegador a `http://<IP_NAT_VM1>/pgadmin4/`
-2. Login con `admin@ciber5.com` / `CheckpointCiber5_2026`
+2. Login con `admin@ciber5.com` / *(contraseña no publicada en el repo)*
 3. Se registró el servidor "db-server (VM2)" apuntando a `192.168.100.20:5432`, usuario `postgres`.
 4. Se abrió el Query Tool sobre la base `tramites_demo` y se ejecutó `SELECT * FROM demo_tramite;` obteniendo la fila de ejemplo cargada previamente.
 
@@ -278,7 +278,7 @@ sudo -u postgres psql -d tramites_demo -c \
 Se generó un usuario administrador semilla, con el hash de contraseña calculado con la misma función que usa la aplicación (bcrypt vía `password_hash` de PHP), para garantizar compatibilidad con `password_verify`:
 
 ```bash
-php -r "echo password_hash('Admin123!', PASSWORD_BCRYPT), PHP_EOL;"
+php -r "echo password_hash('<PASSWORD_NO_PUBLICADA>', PASSWORD_BCRYPT), PHP_EOL;"
 # Con el hash resultante:
 sudo -u postgres psql -d tramites_demo -c \
   "INSERT INTO app_usuarios (username, password_hash) VALUES ('admin', '<hash_generado>');"
@@ -313,7 +313,7 @@ sudo restorecon -Rv /var/www/html/gestion
 
 ### 10.5 Verificación end-to-end
 
-1. Login en `http://<IP_NAT_VM1>/gestion/` con `admin` / `Admin123!` → acceso concedido al dashboard.
+1. Login en `http://<IP_NAT_VM1>/gestion/` con `admin` / *(contraseña no publicada en el repo)* → acceso concedido al dashboard.
 2. Se creó el usuario "funcionario1" desde el formulario del dashboard → mensaje de éxito en pantalla.
 3. Se verificó por SELECT directo en `psql` (VM2) que el registro nuevo efectivamente llegó a la tabla `app_usuarios` — no solo el mensaje de la aplicación.
 4. Se eliminó "funcionario1" desde el botón de la tabla → mensaje de éxito en pantalla.
@@ -324,6 +324,150 @@ Resultado: flujo completo de autenticación y gestión de usuarios (crear/elimin
 ### 10.6 Ajuste de nombre en pantalla
 
 El nombre en las pantallas de login y dashboard de esta aplicación de checkpoint pasó por dos ajustes: primero se retiró la referencia al nombre de trabajo original ("Panamá Conecta") por uno neutro ("Sistema de Gestión de Usuarios"), y luego se reemplazó por el nombre definitivo del proyecto: **SIGET — Sistema de Gestión y Trazabilidad**.
+
+## 10.7 Crear cuenta y restablecer contraseña
+
+Pedido explícito para que la pantalla de login tenga, además del ingreso con el usuario semilla, las opciones de autorregistro y recuperación de contraseña visibles — el profesor también va a interactuar con esto.
+
+Dos archivos nuevos en `/var/www/html/gestion/`:
+
+```
+register.php        → formulario de alta de cuenta: usuario + contraseña + confirmación.
+                       Valida longitud mínima, usuario único, hashea con bcrypt.
+reset-password.php   → restablecimiento directo: usuario + contraseña nueva + confirmación.
+```
+
+`login.php` se actualizó con dos enlaces ("Crear cuenta" / "Olvidé mi contraseña") y mensajes de confirmación después de cada acción (`?registrado=1`, `?reset_ok=1`).
+
+> **Nota — limitación deliberada, documentada en la propia pantalla**: `reset-password.php` NO envía un correo con un enlace de un solo uso, porque el entorno de laboratorio no tiene servidor de correo (SMTP) configurado. El restablecimiento es directo: se pide el usuario y la contraseña nueva en el mismo formulario. La página lo aclara explícitamente al usuario. En la arquitectura final (Django + email transaccional) esto se reemplaza por un token de un solo uso enviado por correo, con expiración.
+
+> **Nota — mitigación de enumeración de usuarios**: `reset-password.php` redirige al mismo mensaje de éxito exista o no el usuario ingresado, para que el formulario no sirva para averiguar qué nombres de usuario están registrados.
+
+Despliegue:
+
+```bash
+sudo cp login.php register.php reset-password.php /var/www/html/gestion/
+sudo chown apache:apache /var/www/html/gestion/{login,register,reset-password}.php
+sudo restorecon /var/www/html/gestion/{login,register,reset-password}.php
+```
+
+Verificación end-to-end:
+
+1. Se creó una cuenta de prueba desde `register.php` → verificado con SELECT directo en `psql` (VM2) que el usuario quedó en `app_usuarios`.
+2. Login exitoso con esa cuenta recién creada.
+3. Se restableció la contraseña de esa cuenta desde `reset-password.php`.
+4. Login con la contraseña **nueva** → éxito. Login con la contraseña **vieja** → rechazado.
+5. Cuenta de prueba eliminada al terminar la verificación (dato de testing, no de producto).
+
+## 10.8 Control de acceso: mensaje de "Acceso denegado" y rate limiting (3 intentos)
+
+Pedido explícito: cuando la contraseña es incorrecta, el sistema debe decirlo claramente ("Acceso denegado") y bloquear la cuenta temporalmente tras varios intentos fallidos — protección básica contra fuerza bruta.
+
+### Cambios en la base de datos (VM2)
+
+```bash
+sudo -u postgres psql -d tramites_demo -c "ALTER TABLE app_usuarios ADD COLUMN IF NOT EXISTS intentos_fallidos INT NOT NULL DEFAULT 0;"
+sudo -u postgres psql -d tramites_demo -c "ALTER TABLE app_usuarios ADD COLUMN IF NOT EXISTS bloqueado_hasta TIMESTAMP NULL;"
+```
+
+### Lógica en `login.php`
+
+- Máximo **3 intentos** fallidos (`MAX_INTENTOS`), bloqueo de **5 minutos** (`MINUTOS_BLOQUEO`).
+- Cada intento fallido con un usuario que existe suma 1 a `intentos_fallidos` y muestra cuántos intentos quedan.
+- Al llegar a 3, se guarda `bloqueado_hasta = now() + 5 minutos` y el mensaje pasa a "Acceso denegado: superaste el máximo de intentos...".
+- Mientras `bloqueado_hasta` siga en el futuro, **ni siquiera la contraseña correcta funciona** — se rechaza con el mensaje de bloqueo.
+- Al vencer el bloqueo, un login exitoso resetea `intentos_fallidos` a 0 y `bloqueado_hasta` a `NULL`.
+- Usuario inexistente: mismo mensaje genérico de "Acceso denegado", sin distinguir si el usuario existe o no (evita enumeración de cuentas).
+
+### Gotcha — dos bugs encontrados y corregidos antes de dar el fix por bueno
+
+1. **Comparación de fechas hecha en PHP en vez de en la base**: la primera versión traía `bloqueado_hasta` a PHP y comparaba con `strtotime(...) > time()`. Esto rompía porque `strtotime()` interpreta el string del timestamp con la zona horaria por defecto de PHP, que no necesariamente coincide con la del servidor de PostgreSQL — el bloqueo parecía "ya vencido" apenas se guardaba. **Fix**: la comparación se mueve a la propia consulta SQL (`bloqueado_hasta > now()`), evitando el desajuste de zona horaria por completo.
+2. **Tipo de dato incorrecto al leer el booleano de Postgres**: se esperaba que PDO devolviera el `BOOLEAN` de Postgres como el string `'t'`/`'f'`, pero en este entorno (PHP 8.3 + PDO_PGSQL) lo devuelve como `bool` nativo de PHP. La comparación `=== 't'` era siempre falsa. Se detectó con un script de debug corriendo en el mismo contexto de Apache (`var_dump()` del resultado real). **Fix**: comparar contra `true` en vez de `'t'`.
+
+### Verificación end-to-end (tras corregir ambos bugs)
+
+1. 3 intentos con contraseña incorrecta → mensajes "Te queda(n) 2 / 1 intento(s)" y luego "Cuenta bloqueada por 5 minutos".
+2. Intento con la contraseña **correcta** mientras el bloqueo sigue activo → rechazado con el mensaje de bloqueo (no entra).
+3. Se simuló el vencimiento del bloqueo (`bloqueado_hasta` movido al pasado directamente en la BD, para no esperar 5 minutos reales) → login con contraseña correcta funciona y resetea `intentos_fallidos`/`bloqueado_hasta`.
+
+## 10.9 Acceso desde otras máquinas de la red del aula
+
+Pedido explícito: que compañeros y el profesor puedan entrar a la app desde sus propias computadoras, no solo desde la laptop donde corren las VMs.
+
+Las VMs solo tienen IP en redes virtuales de VMware (NAT `192.168.159.0/24` e interna `192.168.100.0/24`), no directamente alcanzables desde la red WiFi del aula. Se evaluaron dos opciones:
+
+| Opción | Descripción | Elegida |
+|---|---|---|
+| Adaptador puenteado (bridged) | VM1 obtiene IP propia en la red del aula, como una PC más de esa red | No — mayor superficie expuesta, y depende de que la red del aula permita DHCP a dispositivos nuevos (muchas redes institucionales lo bloquean) |
+| Port forwarding por NAT | La laptop reenvía un puerto propio hacia VM1, sin exponer la VM directamente a la red | **Sí** |
+
+### Configuración aplicada
+
+1. **VMware Workstation Pro** → `Edit → Virtual Network Editor → Change Settings` → seleccionar la red **NAT** → **NAT Settings...** → **Add** un reenvío: puerto de host `8080` (TCP) → `192.168.159.137:80` (VM1). Esto se guarda en `C:\ProgramData\VMware\vmnetnat.conf`, sección `[incomingtcp]`:
+   ```
+   8080 = 192.168.159.137:80
+   ```
+   (Este archivo solo lo puede editar una cuenta con permisos de administrador de Windows — por eso el cambio se hizo desde la UI de VMware, no por edición directa.)
+
+2. **Firewall de Windows**, regla de entrada restringida a la subred del aula (no abierta a cualquier IP de internet):
+   ```powershell
+   New-NetFirewallRule -DisplayName "SIGET app (VM1 port forward)" -Direction Inbound -Protocol TCP -LocalPort 8080 -RemoteAddress 172.29.16.0/20 -Action Allow
+   ```
+
+### Verificación
+
+```bash
+curl http://172.29.31.48:8080/gestion/login.php   # IP de la laptop en la red WiFi del aula
+```
+
+Devolvió `200 OK` con el `<title>Ingresar - SIGET</title>` esperado — confirma que el reenvío llega hasta Apache en VM1 pasando por NAT.
+
+> **Acceso para compañeros/profesor**: `http://172.29.31.48:8080/gestion/` (la IP puede cambiar si la laptop se reconecta a la WiFi y le asignan otra por DHCP — verificar con `ipconfig` antes de compartir el link si pasó tiempo).
+
+### Intento descartado: túnel público (cloudflared)
+
+Se evaluó exponer la app directamente a internet con un túnel rápido de Cloudflare (`cloudflared tunnel --url http://localhost:80`, sin necesidad de cuenta) para no depender de la red del aula. **Se descartó esta opción por política de seguridad del equipo** antes de completarla — no llegó a levantarse ningún túnel, ya que exponer la aplicación a cualquiera en internet no era aceptable solo para resolver un problema de acceso local. Se optó por Tailscale (sección 10.9.1), que da acceso privado en vez de exposición pública.
+
+## 10.9.1 Acceso por Tailscale (solución definitiva de red)
+
+El port forwarding por NAT (arriba) no funcionó para los compañeros — la hipótesis, no confirmada de forma concluyente pero consistente con la evidencia, es **aislamiento de clientes (AP/client isolation)** en la red WiFi del aula (`Hw_Estudiantes 2`, perfil `Public` en Windows), común en redes institucionales para evitar que los dispositivos conectados se vean entre sí. Ni el firewall de Windows ni el de la VM estaban bloqueando nada — ambos ya permitían el tráfico correctamente.
+
+**Solución adoptada**: red privada mesh con [Tailscale](https://tailscale.com), que no depende del enrutamiento de la red del aula — cada máquina se conecta directo a las demás por un túnel cifrado, sin importar detrás de qué NAT/firewall/aislamiento esté cada una.
+
+> **Importante**: la laptop del desarrollador ya tenía Tailscale instalado, pero conectado a una tailnet compartida con otras cuentas y dispositivos ajenos al proyecto (`kw-piopio-*`, otra cuenta de usuario). **Se decidió explícitamente NO sumar las VMs a esa tailnet** y crear una cuenta de Tailscale nueva y dedicada solo al proyecto SIGET, para no mezclar el acceso del grupo con infraestructura ajena.
+
+### Instalación en VM1 y VM2
+
+```bash
+# En cada VM:
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up --auth-key=<AUTH_KEY> --hostname=<nombre-descriptivo>
+```
+
+Se usó una **auth key** (generada desde el panel de la tailnet nueva) para automatizar el alta sin necesitar abrir un navegador dentro de la VM. `--hostname` se usó para que cada VM aparezca identificada claramente en la tailnet (`siget-app-backend`, `siget-db-server`) en vez del hostname genérico.
+
+> **Nota de seguridad sobre las auth keys**: las auth keys usadas acá se compartieron por chat durante la sesión de trabajo — quedaron registradas en el historial de la conversación (no en el repositorio de git, eso es distinto). Se recomienda **revocarlas/regenerarlas desde el panel de Tailscale** después del alta inicial, igual criterio que con cualquier secreto que pasó por texto plano en algún momento.
+
+### Verificación de firewall
+
+`firewalld` en ambas VMs asigna la interfaz `tailscale0` a la **zona por defecto** (no aparece en la lista explícita de interfaces de la zona `public`, pero cae ahí por ser la zona default):
+
+```bash
+sudo firewall-cmd --get-default-zone        # public
+sudo firewall-cmd --get-zone-of-interface=tailscale0   # "no zone" -> cae en la default
+```
+
+Como la zona `public` ya tenía `http` habilitado sin restricción de origen (de la sección 9.1), el tráfico por Tailscale hacia el puerto 80 de VM1 quedó permitido automáticamente, sin tocar reglas nuevas. **El firewall de VM2 no se modificó** — PostgreSQL sigue aceptando conexiones solo desde `192.168.100.10` (VM1), Tailscale ahí solo habilita SSH/gestión, no expone la base de datos directamente a la tailnet.
+
+### Verificación end-to-end
+
+```bash
+curl http://100.104.206.118/gestion/login.php   # IP Tailscale de VM1 (siget-app-backend)
+```
+
+`200 OK` con el `<title>` correcto, probado desde la laptop del desarrollador (que también está en la misma tailnet).
+
+> **Acceso definitivo para compañeros/profesor**: cada uno instala el cliente de Tailscale, se une a la tailnet del proyecto (invitación desde el panel de administración), y entra a `http://100.104.206.118/gestion/` — esta IP no cambia aunque cambien de red física, a diferencia de la IP de WiFi del port forwarding.
 
 ## 11. Estado final de acceso (referencia rápida)
 

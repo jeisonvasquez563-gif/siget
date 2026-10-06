@@ -57,7 +57,7 @@ PASO 3 — Aplicación SIGET (login + gestión de usuarios)
 start http://localhost:8080/gestion/
 
   Usuario:    admin
-  Contraseña: Admin123!
+  Contraseña: (no publicada en el repo)
 
   Mostrar en vivo:
    1. Login.
@@ -73,7 +73,7 @@ PASO 4 — Respaldo: ver la misma base de datos desde pgAdmin
 start http://localhost:8080/pgadmin4/
 
   Usuario:    admin@ciber5.com
-  Contraseña: CheckpointCiber5_2026
+  Contraseña: (no publicada en el repo)
 
   Navegar: Servers -> db-server (VM2) -> Databases -> tramites_demo
            -> Query Tool, y correr:
