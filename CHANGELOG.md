@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- `docs/documento-introductorio.md`, `docs/antecedentes.md` y `docs/datos-clave-investigacion.md`: la investigación y el documento de entrega pasados a Markdown para el equipo, más una ficha rápida con cifras, artículos de ley verificados y advertencias sobre las fuentes.
 - Política de documentación obligatoria en `CONTRIBUTING.md`.
 - `docs/Antecedentes_SIGET.docx`: documento de antecedentes del proyecto solicitado por el profesor (16 páginas, 8 tablas). Recoge la evidencia sobre la complejidad y el seguimiento de los trámites en Panamá (BID, permisos de construcción 2015–2026, sistema 311), el marco normativo (Leyes 38 de 2000, 83 de 2012, 144 de 2020, 81 de 2019, entre otras, con artículos verificados contra el texto), la transformación digital del Estado (Panamá Conecta, Panamá Digital, Alcaldía Digital), los incidentes de ciberseguridad en instituciones públicas de 2025–2026, las brechas identificadas y la justificación de SIGET. Bibliografía en formato APA con 30 fuentes, mayoritariamente panameñas, y fecha de consulta del 6 de octubre de 2026. Incluye una sección de limitaciones de la revisión.
 - `docs/capturas-evidencia.md`: comandos organizados por tema (red, SELinux, firewall, servicios, BD, app) para que cada integrante del grupo tome su propia captura de la configuración, con un reparto sugerido de tareas entre el equipo.
