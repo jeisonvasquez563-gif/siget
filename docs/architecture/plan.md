@@ -38,6 +38,7 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 - ✅ **Branch protection en `main` y `develop`.**
 - ✅ **Acceso de equipo por Tailscale**: tailnet dedicada al proyecto (no la personal del desarrollador), VM1 y VM2 sumadas. Reemplaza un intento previo de port forwarding por NAT que no funcionó (probable aislamiento de clientes en la WiFi del aula).
 - ✅ **Guía de capturas repartida entre el grupo** (`docs/capturas-evidencia.md`) para documentar la configuración con evidencia de cada integrante.
+- ✅ **Documento de antecedentes del proyecto** (`docs/Antecedentes_SIGET.docx`), solicitado por el profesor: investigación documental con fuentes panameñas, marco normativo, brechas y justificación de SIGET, con bibliografía APA.
 
 ## Próximos pasos (en orden sugerido)
 
