@@ -6,6 +6,7 @@ La documentación "viva" del proyecto vive acá en Markdown, versionada junto co
 |---|---|
 | [`architecture/spec.md`](./architecture/spec.md) | Especificación técnica: problemática, infraestructura, stack, modelo de datos. La base de todas las decisiones. |
 | [`architecture/plan.md`](./architecture/plan.md) | Plan de trabajo: orden de ejecución por fases, estado real de cada punto, próximos pasos. |
+| [`superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md`](./superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md) | **Diseño de arquitectura Zero Trust**: identidad y atributos (ABAC), capas, matriz de roles y permisos, mapa de instituciones, modelo de amenazas y verificación. Versión de entrega: `SIGET_Arquitectura_Zero_Trust.docx`. |
 | [`runbook.md`](./runbook.md) | Paso a paso técnico completo de todo lo ejecutado: VMs, red, SSH, firewall, checkpoint de BD/Apache. |
 | [`informe-avance.md`](./informe-avance.md) | Resumen ejecutivo: qué se hizo, decisiones técnicas, estado actual, pendientes y riesgos. |
 | [`demo-comandos.md`](./demo-comandos.md) | Guion de comandos para hacer una demo en vivo (túnel SSH, verificación de infraestructura, app SIGET, pgAdmin). |
