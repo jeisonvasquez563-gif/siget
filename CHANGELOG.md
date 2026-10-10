@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- **Cuentas de Linux para el equipo** en VM1 y VM2 (8 integrantes, formato `nombre_apellido`, grupo `ciber5`, sin sudo y sin contraseña: acceso solo por clave pública SSH vía Tailscale). Pendiente: cargar las claves públicas de cada integrante. Ver [`docs/acceso-equipo.md`](./docs/acceso-equipo.md).
 - **Diseño de arquitectura Zero Trust** (`docs/superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md` y `docs/SIGET_Arquitectura_Zero_Trust.docx`): respuesta a "qué deseo hacer / a quién deseo llegar", autorización ABAC con membresías (institución, rol), PEP/PDP en Django más RLS en PostgreSQL, matriz de 6 roles, mapa de 6 instituciones (3 reales y 3 de demostración), modelo de amenazas STRIDE y plan de verificación. El motor ABAC tendrá especificación y plan propios (pendiente).
 - `docs/documento-introductorio.md`, `docs/antecedentes.md` y `docs/datos-clave-investigacion.md`: la investigación y el documento de entrega pasados a Markdown para el equipo, más una ficha rápida con cifras, artículos de ley verificados y advertencias sobre las fuentes.
 - Política de documentación obligatoria en `CONTRIBUTING.md`.
