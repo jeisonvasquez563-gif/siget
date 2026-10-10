@@ -14,7 +14,7 @@ Cada integrante tiene una cuenta de Linux propia en VM1 (`app-backend`) y VM2 (`
 | Walter Sanjur | `walter_sanjur` |
 | Jeison Vásquez | `jeison_vasquez` (administrador, con sudo) |
 
-Todas las cuentas del equipo (salvo la administradora) pertenecen al grupo `ciber5` y **no tienen sudo**. Si alguien necesita privilegios, se pide a Jeison y se registra en el [`CHANGELOG.md`](../CHANGELOG.md).
+Todas las cuentas del equipo pertenecen al grupo `ciber5`. **Sudo (NOPASSWD, vía `/etc/sudoers.d/`):** `jeison_vasquez` en VM1 y VM2, y `andy_martinez` solo en VM1 (para instalar Podman, autorizado por Jeison el 10-oct-2026). El resto no tiene sudo. Si alguien necesita privilegios, se pide a Jeison y se registra en el [`CHANGELOG.md`](../CHANGELOG.md).
 
 ## Cómo entrar (cada integrante)
 
