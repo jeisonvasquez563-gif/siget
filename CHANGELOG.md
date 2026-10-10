@@ -7,6 +7,9 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+
+- **Podman 5.8.2 rootless + primera unidad Quadlet en VM1 (`app-backend`)**, con aprobación de Jeison. Contenedor de prueba `siget-prueba` gestionado por `systemctl --user`, sin root y sin denegaciones de SELinux. Documentado en `docs/runbook.md` sección 12; unidad en `infra/podman/vm1-app-backend/siget-prueba.container`. Pendiente: VM2, linger y puertos 80/443.
+- `infra/podman/plan-podman-quadlet.md`: borrador del plan para instalar Podman rootless + Quadlet en VM1 y VM2, con el estado verificado de VM1, los pasos propuestos, los riesgos y las decisiones pendientes de Jeison (usuario que corre los contenedores, puertos 80/443 y permisos de sudo).
 - `docs/documento-introductorio.md`, `docs/antecedentes.md` y `docs/datos-clave-investigacion.md`: la investigación y el documento de entrega pasados a Markdown para el equipo, más una ficha rápida con cifras, artículos de ley verificados y advertencias sobre las fuentes.
 - Política de documentación obligatoria en `CONTRIBUTING.md`.
 - `docs/Antecedentes_SIGET.docx`: documento de antecedentes del proyecto solicitado por el profesor (16 páginas, 8 tablas). Recoge la evidencia sobre la complejidad y el seguimiento de los trámites en Panamá (BID, permisos de construcción 2015–2026, sistema 311), el marco normativo (Leyes 38 de 2000, 83 de 2012, 144 de 2020, 81 de 2019, entre otras, con artículos verificados contra el texto), la transformación digital del Estado (Panamá Conecta, Panamá Digital, Alcaldía Digital), los incidentes de ciberseguridad en instituciones públicas de 2025–2026, las brechas identificadas y la justificación de SIGET. Bibliografía en formato APA con 30 fuentes, mayoritariamente panameñas, y fecha de consulta del 6 de octubre de 2026. Incluye una sección de limitaciones de la revisión.
