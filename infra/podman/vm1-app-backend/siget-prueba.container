@@ -1,0 +1,7 @@
+[Unit]
+Description=Contenedor de prueba SIGET (Quadlet)
+
+[Container]
+Image=registry.access.redhat.com/ubi9/ubi-minimal:latest
+ContainerName=siget-prueba
+Exec=sleep infinity
