@@ -24,6 +24,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 - **Auth keys de Tailscale revocadas** desde el panel de administración, ya que se habían compartido por chat durante el alta de VM1 y VM2. Verificado que ambas VMs siguen conectadas con normalidad tras la revocación.
 
 ### Cambiado
+- `docs/architecture/spec.md` y `docs/architecture/plan.md`: se incorpora el diseño de seguridad Zero Trust (Jeison Vásquez, octubre de 2026). La autorización pasa de RBAC con grupos de Django a ABAC con Row Level Security en PostgreSQL; se pasa de 4 a 6 roles (administrador institucional y de plataforma separados, más auditor); se agrega la entidad `Membresia`, el registro de decisiones del PDP y 3 instituciones de demostración (MINSA, MOP, MiAmbiente). El plan suma la especificación del motor ABAC como próximo entregable de diseño. Solo documentación, sin cambios en las VMs.
 - El port forwarding por NAT (`8080 -> VM1:80`) queda como intento previo que no funcionó para los compañeros (probablemente aislamiento de clientes en la WiFi del aula) — no se revirtió, pero el acceso real ahora es por Tailscale.
 
 ### Descartado
