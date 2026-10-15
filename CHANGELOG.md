@@ -7,7 +7,11 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
-
+- `docs/revisiones/2026-10-15-revision-prs-3-y-4.md`: revisión de los PRs 3 (Podman/Quadlet) y 4 (Zero Trust) contra el estado real de VM1 y VM2, auditoría de estándares de seguridad y tabla de pendientes abiertos.
+- **Endurecimiento de SSH y firewall en VM1 y VM2** (`docs/endurecimiento-vms.md`): `PasswordAuthentication no` (acceso solo por clave) y Cockpit retirado de firewalld, tras una auditoría que los detectó como desvíos preexistentes. Pendiente: bind de PostgreSQL a la IP interna al migrar a contenedor.
+- `andy_martinez` recibe sudo `NOPASSWD` en VM1 (archivo `/etc/sudoers.d/andy_martinez`, validado con `visudo`) para instalar Podman. Autorizado por Jeison. No tiene sudo en VM2.
+- **Cuentas de Linux para el equipo** en VM1 y VM2 (8 integrantes, formato `nombre_apellido`, grupo `ciber5`, sin sudo y sin contraseña: acceso solo por clave pública SSH vía Tailscale). Pendiente: cargar las claves públicas de cada integrante. Ver [`docs/acceso-equipo.md`](./docs/acceso-equipo.md).
+- **Diseño de arquitectura Zero Trust** (`docs/superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md` y `docs/SIGET_Arquitectura_Zero_Trust.docx`): respuesta a "qué deseo hacer / a quién deseo llegar", autorización ABAC con membresías (institución, rol), PEP/PDP en Django más RLS en PostgreSQL, matriz de 6 roles, mapa de 6 instituciones (3 reales y 3 de demostración), modelo de amenazas STRIDE y plan de verificación. El motor ABAC tendrá especificación y plan propios (pendiente).
 - **Podman 5.8.2 rootless + primera unidad Quadlet en VM1 (`app-backend`)**, con aprobación de Jeison. Contenedor de prueba `siget-prueba` gestionado por `systemctl --user`, sin root y sin denegaciones de SELinux. Documentado en `docs/runbook.md` sección 12; unidad en `infra/podman/vm1-app-backend/siget-prueba.container`. Pendiente: VM2, linger y puertos 80/443.
 - `infra/podman/plan-podman-quadlet.md`: borrador del plan para instalar Podman rootless + Quadlet en VM1 y VM2, con el estado verificado de VM1, los pasos propuestos, los riesgos y las decisiones pendientes de Jeison (usuario que corre los contenedores, puertos 80/443 y permisos de sudo).
 - `docs/documento-introductorio.md`, `docs/antecedentes.md` y `docs/datos-clave-investigacion.md`: la investigación y el documento de entrega pasados a Markdown para el equipo, más una ficha rápida con cifras, artículos de ley verificados y advertencias sobre las fuentes.
