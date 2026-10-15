@@ -477,7 +477,9 @@ curl http://100.104.206.118/gestion/login.php   # IP Tailscale de VM1 (siget-app
 | VM1 (app-backend) IP interna | 192.168.100.10 |
 | VM2 (db-server) IP NAT | 192.168.159.138 |
 | VM2 (db-server) IP interna | 192.168.100.20 |
-| Usuario Linux (ambas VMs) | jeison_vasquez |
+| Usuario Linux administrador (ambas VMs) | jeison_vasquez |
+| Usuarios Linux del equipo (ambas VMs) | `nombre_apellido`, ver sección 13 |
+| Acceso del equipo (recomendado) | Tailscale: VM1 `100.104.206.118`, VM2 `100.120.115.100` (las IP NAT solo sirven desde la máquina del anfitrión) |
 | App de gestión de usuarios (entrega real) | http://192.168.159.137/gestion/ |
 | Usuario de la app (semilla) | admin |
 | pgAdmin4 URL (capacidad adicional) | http://192.168.159.137/pgadmin4/ |
@@ -487,3 +489,182 @@ curl http://100.104.206.118/gestion/login.php   # IP Tailscale de VM1 (siget-app
 | Tabla de usuarios de la app | app_usuarios |
 
 > **Nota:** las contraseñas de servicio (PostgreSQL, pgAdmin) no se incluyen en este documento por buena práctica documental; están registradas en el informe interno del proyecto y deben rotarse antes de cualquier entrega pública o despliegue fuera del laboratorio.
+
+## 12. Podman rootless + Quadlet en VM1 (primer bloque de la Fase 2)
+
+Fecha de ejecución: 10 de octubre de 2026. Ejecutado por Andy Martínez (usuario `andy_martinez`) en VM1 (`app-backend`), con la aprobación explícita de Jeison. El plan completo, con los riesgos y las decisiones pendientes, está en [`infra/podman/plan-podman-quadlet.md`](../infra/podman/plan-podman-quadlet.md).
+
+### 12.1 Estado previo
+
+Comprobado por SSH (por la IP de Tailscale de VM1) con comandos de solo lectura:
+
+- Rocky Linux 9.7 (Blue Onyx).
+- `podman` y `git` no instalados (`orden no encontrada`).
+- El usuario `andy_martinez` pertenece al grupo `ciber5` y requiere contraseña para usar `sudo`.
+
+### 12.2 Instalación de Podman
+
+```bash
+sudo dnf install podman
+```
+
+Instaló `podman 5.8.2` y sus dependencias (`container-selinux`, `crun`, `netavark`, `aardvark-dns`, `passt`, `fuse-overlayfs`, entre otras) y actualizó `selinux-policy` y `selinux-policy-targeted`, necesarios para `container-selinux`. La sesión SSH se cortó durante la instalación (`client_loop: send disconnect: Connection reset`); al reconectar se verificó que Podman quedó instalado:
+
+```bash
+podman --version      # podman version 5.8.2
+getenforce            # Enforcing
+```
+
+SELinux se mantuvo en `Enforcing` en todo momento.
+
+### 12.3 Verificación del modo rootless
+
+```bash
+grep andy_martinez /etc/subuid /etc/subgid
+# /etc/subuid:andy_martinez:296608:65536
+# /etc/subgid:andy_martinez:296608:65536
+podman info --format '{{.Host.Security.Rootless}}'    # true
+```
+
+El usuario ya tenía un rango de 65536 UIDs/GIDs asignado, por lo que no hizo falta modificar `/etc/subuid` ni `/etc/subgid`.
+
+### 12.4 Contenedor de prueba
+
+```bash
+podman run --rm quay.io/podman/hello
+podman ps -a        # vacío (--rm eliminó el contenedor)
+podman images       # quay.io/podman/hello  latest
+```
+
+Descargó la imagen y mostró el mensaje "Hello Podman World". Quedó solo la imagen descargada, en `~/.local/share/containers` del usuario.
+
+### 12.5 Verificación de SELinux
+
+```bash
+sudo ausearch -m avc -ts today
+# <no matches>
+```
+
+Sin denegaciones de SELinux durante la instalación ni las pruebas.
+
+### 12.6 Primera unidad Quadlet
+
+Archivo `~/.config/containers/systemd/siget-prueba.container` (copia en `infra/podman/vm1-app-backend/siget-prueba.container`):
+
+```ini
+[Unit]
+Description=Contenedor de prueba SIGET (Quadlet)
+
+[Container]
+Image=registry.access.redhat.com/ubi9/ubi-minimal:latest
+ContainerName=siget-prueba
+Exec=sleep infinity
+```
+
+Es un contenedor de prueba que solo espera: no abre puertos y no toca Apache ni la app del checkpoint.
+
+```bash
+systemctl --user daemon-reload
+systemctl --user list-unit-files | grep siget-prueba     # siget-prueba.service  generated
+systemctl --user start siget-prueba.service
+systemctl --user status siget-prueba.service --no-pager  # active (running)
+podman ps                                                # siget-prueba, Up
+systemctl --user restart siget-prueba.service
+podman ps                                                # nuevo ID de contenedor: se recreó
+```
+
+Resultado: Quadlet generó `siget-prueba.service` a partir del archivo; el servicio corre bajo `user-1003.slice`, es decir, sin root. Tras el `restart`, el ID del contenedor cambió (`f6b70addf2d0` → `41c2ef63c58e`), lo que confirma que systemd lo detuvo y lo volvió a crear.
+
+```bash
+loginctl show-user andy_martinez | grep Linger     # Linger=no
+```
+
+Con `Linger=no`, los contenedores del usuario se detienen al cerrar su última sesión. Activar el linger queda pendiente (ver 12.8).
+
+### 12.7 Gotcha: bloques multilínea pegados en la terminal SSH
+
+Pegar de una vez un bloque con `cat > archivo << 'EOF' ... EOF` en la terminal SSH aplastó todo en una sola línea y no se pudo ejecutar. Solución: crear el archivo con un `echo "..." > archivo` para la primera línea y `echo "..." >> archivo` para cada línea siguiente, y comprobar el resultado con `cat`.
+
+### 12.8 Pendiente de este bloque
+
+- Instalar Podman en VM2 (`db-server`) y repetir las verificaciones.
+- Decidir qué usuario corre los contenedores del proyecto (usuario de servicio dedicado o el de cada integrante) y activar el linger en ese usuario: `sudo loginctl enable-linger <usuario>`.
+- Resolver los puertos 80 y 443 en VM1 (Apache los ocupa y los contenedores rootless no pueden usar puertos menores a 1024 por defecto).
+- Decidir qué se hace con el contenedor de prueba `siget-prueba`. Con `Linger=no` solo corre mientras `andy_martinez` tiene una sesión abierta; al cerrarla systemd lo detiene. No se elimina sin aprobación de Jeison.
+- Git no está instalado en las VMs; no es necesario, porque el código se trabaja desde la PC de cada integrante.
+
+## 13. Cuentas de Linux del equipo y sudo
+
+Fecha: 10 y 15 de octubre de 2026. Ejecutado por Jeison, en VM1 y VM2. Detalle y guía de uso en [`acceso-equipo.md`](./acceso-equipo.md).
+
+### 13.1 Creación de las cuentas
+
+Se creó una cuenta por integrante con formato `nombre_apellido` (`simna_degracia`, `gabriel_gonzalez`, `andy_martinez`, `joel_medina`, `jorge_medina`, `bradley_morales`, `anyurie_sanchez`, `walter_sanjur`), todas en el grupo `ciber5`, sin contraseña utilizable y con el directorio `~/.ssh` preparado:
+
+```bash
+sudo groupadd ciber5
+sudo useradd -m -s /bin/bash -c "Nombre Apellido" -G ciber5 nombre_apellido
+sudo passwd -l nombre_apellido
+sudo install -d -m 700 -o nombre_apellido -g nombre_apellido /home/nombre_apellido/.ssh
+sudo install -m 600 -o nombre_apellido -g nombre_apellido /dev/null /home/nombre_apellido/.ssh/authorized_keys
+sudo restorecon -R /home/nombre_apellido/.ssh
+```
+
+Verificación: `getent group ciber5` lista las 8 cuentas en ambas VMs y `sudo -l -U joel_medina` responde "not allowed to run sudo".
+
+### 13.2 Carga de claves públicas
+
+Cada integrante genera su clave con `ssh-keygen -t ed25519` y entrega **solo la pública**. Antes de cargarla se valida su formato y huella con `ssh-keygen -l -f`, y se agrega a `authorized_keys` en ambas VMs con propietario y permisos correctos (`.ssh` en 700, `authorized_keys` en 600) y el contexto SELinux `ssh_home_t` (`restorecon`). Estado al 15-oct: solo `andy_martinez` tiene su clave cargada; faltan los otros siete integrantes.
+
+### 13.3 Sudo de `andy_martinez`
+
+Autorizado por Jeison el 10-oct para poder instalar Podman. Como su cuenta no tiene contraseña, la regla es `NOPASSWD`, solo en VM1:
+
+```bash
+echo "andy_martinez ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/andy_martinez
+sudo chmod 440 /etc/sudoers.d/andy_martinez
+sudo visudo -cf /etc/sudoers.d/andy_martinez    # parsed OK
+```
+
+Es sudo completo. Para revocarlo: `sudo rm /etc/sudoers.d/andy_martinez`. No tiene sudo en VM2.
+
+### 13.4 Gotcha: el sudo de Andy no dejó registro consultable
+
+El journal de las VMs no conservó los comandos `sudo` ejecutados por Andy el 10-oct (no hay persistencia o se perdió tras un reinicio). La instalación de Podman se verificó por `dnf history` y `rpm -q`. Pendiente: habilitar journal persistente o auditd para que el uso de sudo quede trazable.
+
+## 14. Endurecimiento de SSH y firewall
+
+Fecha: 15 de octubre de 2026, con aprobación explícita de Jeison. Detalle completo en [`endurecimiento-vms.md`](./endurecimiento-vms.md).
+
+### 14.1 Origen
+
+La auditoría de los cambios de Podman contra los estándares del proyecto encontró desvíos preexistentes: SSH aceptaba contraseña en ambas VMs, `cockpit` estaba permitido en firewalld y PostgreSQL escucha en `0.0.0.0:5432`.
+
+### 14.2 SSH solo por clave (VM1 y VM2)
+
+```bash
+printf 'PasswordAuthentication no
+KbdInteractiveAuthentication no
+' | sudo tee /etc/ssh/sshd_config.d/40-siget-hardening.conf
+sudo sshd -t && sudo systemctl reload sshd
+sudo sshd -T | grep -iE '^(passwordauthentication|kbdinteractiveauthentication)'
+```
+
+Se aplicó con la sesión abierta, validando con `sshd -t` y probando una conexión nueva por clave antes de cerrar. Verificación: sesión por clave correcta y el intento por contraseña responde `Permission denied (publickey,gssapi-keyex,gssapi-with-mic)`.
+
+### 14.3 Cockpit fuera del firewall
+
+```bash
+sudo firewall-cmd --permanent --remove-service=cockpit && sudo firewall-cmd --reload
+```
+
+Resultado: VM1 expone `dhcpv6-client http ssh`; VM2 `dhcpv6-client ssh`, más la regla del 5432 solo desde `192.168.100.10`, que sigue intacta.
+
+### 14.4 Reversión
+
+Borrar `/etc/ssh/sshd_config.d/40-siget-hardening.conf` y recargar sshd. Para Cockpit: `sudo firewall-cmd --permanent --add-service=cockpit && sudo firewall-cmd --reload`.
+
+### 14.5 Pendiente
+
+- PostgreSQL escucha en `0.0.0.0:5432` (contenido por el firewall). El spec pide bind solo a la IP interna; se corrige al migrar a contenedor.
+- Las cuentas sin clave cargada ya no tienen ninguna vía de acceso por SSH.
