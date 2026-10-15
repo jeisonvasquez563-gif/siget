@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- `docs/revisiones/2026-10-15-revision-prs-3-y-4.md`: revisión de los PRs 3 (Podman/Quadlet) y 4 (Zero Trust) contra el estado real de VM1 y VM2, auditoría de estándares de seguridad y tabla de pendientes abiertos.
 - **Endurecimiento de SSH y firewall en VM1 y VM2** (`docs/endurecimiento-vms.md`): `PasswordAuthentication no` (acceso solo por clave) y Cockpit retirado de firewalld, tras una auditoría que los detectó como desvíos preexistentes. Pendiente: bind de PostgreSQL a la IP interna al migrar a contenedor.
 - `andy_martinez` recibe sudo `NOPASSWD` en VM1 (archivo `/etc/sudoers.d/andy_martinez`, validado con `visudo`) para instalar Podman. Autorizado por Jeison. No tiene sudo en VM2.
 - **Cuentas de Linux para el equipo** en VM1 y VM2 (8 integrantes, formato `nombre_apellido`, grupo `ciber5`, sin sudo y sin contraseña: acceso solo por clave pública SSH vía Tailscale). Pendiente: cargar las claves públicas de cada integrante. Ver [`docs/acceso-equipo.md`](./docs/acceso-equipo.md).
