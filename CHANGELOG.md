@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- `docs/architecture/plan-semanas-1-2.md`: plan operativo de las semanas 1 y 2 del cronograma (Podman en VM2, PostgreSQL en contenedor con `app_role` y `podman secret`, esqueletos de backend y frontend, especificación del ABAC), con decisiones previas, responsables propuestos, camino crítico y riesgos.
 - `docs/Runbook_SIGET.docx` regenerado desde `docs/runbook.md` (19 páginas): incluye las secciones 12 (Podman/Quadlet), 13 (cuentas y sudo del equipo) y 14 (endurecimiento de SSH y firewall).
 - `docs/runbook.md`: secciones 13 (cuentas de Linux del equipo y sudo) y 14 (endurecimiento de SSH y firewall); se corrigió la tabla de la sección 11 (usuarios del equipo y acceso por Tailscale) y el estado de `siget-prueba` en 12.8.
 - `docs/revisiones/2026-10-15-revision-prs-3-y-4.md`: revisión de los PRs 3 (Podman/Quadlet) y 4 (Zero Trust) contra el estado real de VM1 y VM2, auditoría de estándares de seguridad y tabla de pendientes abiertos.
