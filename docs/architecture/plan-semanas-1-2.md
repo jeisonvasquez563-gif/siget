@@ -29,11 +29,11 @@ Dejar listos los cimientos de la Fase 2 para que Django tenga dónde correr desd
 | 1.1 | Crear el usuario de servicio `siget` con rango subuid/subgid y linger | Jeison | D1 | `loginctl show-user siget` muestra `Linger=yes`; documentado en el runbook |
 | 1.2 | Instalar Podman en VM2 y repetir las verificaciones de VM1 (rootless, SELinux, sin AVC) | Andy | D3 | `podman info` rootless=true; `ausearch -m avc` sin resultados; runbook sección 12 actualizada |
 | 1.3 | Cargar las claves públicas de los 7 compañeros restantes en VM1 y VM2 | Jeison (con las claves de cada uno) | — | Cada integrante entra por SSH con su usuario |
-| 1.4 | Habilitar journal persistente o `auditd` para trazar el uso de sudo | Jeison | — | `journalctl _COMM=sudo` conserva datos tras un reinicio |
+| 1.4 ✅ | Habilitar journal persistente o `auditd` para trazar el uso de sudo | Jeison | — | **Hecho el 15-oct** (runbook 14.6): journal persistente en VM1 y VM2 |
 | 1.5 | Escribir la **especificación del motor ABAC**: catálogo de atributos, lenguaje de políticas, interfaz del PDP, estructura del registro de decisiones | Dos integrantes (por asignar) | Diseño Zero Trust aprobado | Documento en `docs/superpowers/specs/` revisado por Jeison |
 | 1.6 | Esqueleto de **backend**: proyecto Django + DRF en `backend/`, apps y modelos `Institucion`, `Membresia`, `TipoTramite`, `Tramite`, `EventoAuditoria`, migraciones | Dos integrantes (por asignar) | — | `python manage.py migrate` corre en limpio en una PC |
 | 1.7 | Esqueleto de **frontend**: React + Vite + Tailwind + shadcn/ui en `frontend/`, pantalla de login contra datos simulados | Dos integrantes (por asignar) | — | `npm run dev` levanta y muestra el login |
-| 1.8 | Verificar los DOI de las referencias NIST y corregir la bibliografía | Cualquiera | — | DOI abiertos y confirmados |
+| 1.8 ✅ | Verificar los DOI de las referencias NIST y corregir la bibliografía | Cualquiera | — | **Hecho el 15-oct**: ambos DOI resuelven a NIST y coinciden títulos, autores y años |
 
 **Cierre de semana 1:** Podman rootless en las dos VMs, usuario `siget` con linger, todos los compañeros con acceso SSH, y la especificación del ABAC en borrador.
 

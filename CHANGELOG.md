@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- **Journal persistente en VM1 y VM2** (`runbook.md` 14.6): los comandos `sudo` ya no se pierden al reiniciar. Se verificaron los DOI de NIST SP 800-207 y SP 800-162 contra los PDF oficiales (tareas 1.4 y 1.8 del plan de las semanas 1 y 2).
 - `docs/architecture/plan-semanas-1-2.md`: plan operativo de las semanas 1 y 2 del cronograma (Podman en VM2, PostgreSQL en contenedor con `app_role` y `podman secret`, esqueletos de backend y frontend, especificación del ABAC), con decisiones previas, responsables propuestos, camino crítico y riesgos.
 - `docs/Runbook_SIGET.docx` regenerado desde `docs/runbook.md` (19 páginas): incluye las secciones 12 (Podman/Quadlet), 13 (cuentas y sudo del equipo) y 14 (endurecimiento de SSH y firewall).
 - `docs/runbook.md`: secciones 13 (cuentas de Linux del equipo y sudo) y 14 (endurecimiento de SSH y firewall); se corrigió la tabla de la sección 11 (usuarios del equipo y acceso por Tailscale) y el estado de `siget-prueba` en 12.8.

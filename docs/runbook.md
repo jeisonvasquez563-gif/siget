@@ -630,7 +630,7 @@ Es sudo completo. Para revocarlo: `sudo rm /etc/sudoers.d/andy_martinez`. No tie
 
 ### 13.4 Gotcha: el sudo de Andy no dejó registro consultable
 
-El journal de las VMs no conservó los comandos `sudo` ejecutados por Andy el 10-oct (no hay persistencia o se perdió tras un reinicio). La instalación de Podman se verificó por `dnf history` y `rpm -q`. Pendiente: habilitar journal persistente o auditd para que el uso de sudo quede trazable.
+El journal de las VMs no conservó los comandos `sudo` ejecutados por Andy el 10-oct (no hay persistencia o se perdió tras un reinicio). La instalación de Podman se verificó por `dnf history` y `rpm -q`. Resuelto el 15-oct con el journal persistente (ver 14.6); `auditd` queda como mejora opcional.
 
 ## 14. Endurecimiento de SSH y firewall
 
@@ -668,3 +668,21 @@ Borrar `/etc/ssh/sshd_config.d/40-siget-hardening.conf` y recargar sshd. Para Co
 
 - PostgreSQL escucha en `0.0.0.0:5432` (contenido por el firewall). El spec pide bind solo a la IP interna; se corrige al migrar a contenedor.
 - Las cuentas sin clave cargada ya no tienen ninguna vía de acceso por SSH.
+
+### 14.6 Journal persistente (trazabilidad del uso de sudo)
+
+Antes, el journal de las VMs era volátil (no existía `/var/log/journal`) y se perdía al reiniciar, por eso no había registro de los `sudo` de Andy (13.4). El 15 de octubre se activó el almacenamiento persistente en VM1 y VM2:
+
+```bash
+sudo mkdir -p /var/log/journal
+printf '[Journal]
+Storage=persistent
+SystemMaxUse=200M
+' | sudo tee /etc/systemd/journald.conf.d/40-siget-persistente.conf
+sudo systemd-tmpfiles --create --prefix /var/log/journal
+sudo systemctl restart systemd-journald && sudo journalctl --flush
+```
+
+Verificación: `/var/log/journal` existe con contexto SELinux `var_log_t`, `systemd-journald` activo y `journalctl --disk-usage` informa 16 MB en ambas VMs. Desde ahora `sudo journalctl _COMM=sudo` conserva el historial entre reinicios. El tope de 200 MB evita que el journal crezca sin control.
+
+**Gotcha:** el primer script se colgó al final (la sesión SSH no volvió) aunque la configuración ya estaba aplicada. Se repitió con `timeout` en los comandos de recarga y funcionó. Conviene usar siempre `timeout` al reiniciar servicios de logging por SSH.
