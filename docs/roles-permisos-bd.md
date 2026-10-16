@@ -6,11 +6,11 @@ Material para mostrar al profesor. Resume qué roles, permisos y módulos define
 
 | Elemento | Estado | Dónde |
 |---|---|---|
-| Esquema `siget`, 3 roles, 8 tablas, triggers, permisos y RLS | **Diseñado y validado con 19 pruebas**, en una transacción que se revierte. **No está aplicado** en la base | `database/diseno-*.sql` |
+| Esquema `siget`, 3 roles, 8 tablas, 6 políticas RLS y 5 triggers | **Aplicado el 15-oct en `tramites_demo` (VM2) y validado con 19 pruebas** contra el esquema real | `database/diseno-*.sql`, runbook 17 |
 | Base del checkpoint (`tramites_demo`): tablas `app_usuarios` y `demo_tramite` | **Implementado** | VM2 |
-| La app PHP del checkpoint | Se conecta como `postgres` (**superusuario**). Es una brecha frente al principio Zero Trust | `checkpoints/` |
+| La app PHP del checkpoint | **Brecha cerrada**: ya no usa `postgres`; se conecta como `checkpoint_app` (solo `app_usuarios`). `postgres` quedó sin contraseña y rechazado por red | `checkpoints/`, runbook 17 |
 
-Estado real de la base hoy, consultado en VM2: un único rol (`postgres`, superusuario), 2 tablas propiedad de `postgres`, 0 políticas RLS y 0 triggers. Lo demás es diseño probado, todavía sin desplegar.
+Estado real de la base hoy, consultado en VM2: 6 roles (`postgres` es el único superusuario, sin contraseña y rechazado por red; `siget_owner`, `app_role` y `auditor_role` sin privilegios especiales; `checkpoint_app` y `pgadmin_lectura` con `LOGIN`), 6 políticas RLS y 5 triggers. **Todavía no hay datos reales en el esquema `siget`**: `app_role` está `NOLOGIN` hasta que exista el backend, y la base sigue siendo la instalación nativa (la migración a contenedor es la tarea 2.2).
 
 ## 2. Principio: no hay superusuario en la operación
 
@@ -89,8 +89,10 @@ Muestra primero el **estado real** de la base (un solo rol, sin RLS) y luego las
 
 ## 9. Brechas conocidas y siguiente paso
 
-| Brecha | Plan |
+| Brecha | Estado |
 |---|---|
-| La app PHP del checkpoint usa `postgres` (superusuario) | Reemplazarla por un rol de mínimo privilegio cuando se migre la base a contenedor (tareas 2.2 a 2.4 del [plan de las semanas 1 y 2](./architecture/plan-semanas-1-2.md)). Requiere aprobación de Jeison, porque toca el login ya entregado |
-| `postgres` conserva acceso local sin restricción adicional | Limitar en `pg_hba.conf` a socket local y sin acceso por red, y sin contraseña en uso |
-| El esquema aún no se aplica | Se aplica al desplegar PostgreSQL en contenedor, con `app_role` con `LOGIN` y contraseña desde `podman secret` |
+| La app PHP del checkpoint usaba `postgres` (superusuario) | **Cerrada el 15-oct** (runbook 17): usa `checkpoint_app`, de mínimo privilegio |
+| `postgres` conservaba acceso por red con contraseña | **Cerrada**: sin contraseña y `reject` en `pg_hba.conf` |
+| pgAdmin se conectaba como `postgres` | **Cerrada**: ahora usa `pgadmin_lectura` (solo lectura) |
+| `app_role` sin `LOGIN` | Pendiente: se activa con `podman secret` cuando exista el backend |
+| La base sigue siendo la instalación nativa | Pendiente: migrar a contenedor y repetir esta configuración (tareas 2.2 y 2.3) |

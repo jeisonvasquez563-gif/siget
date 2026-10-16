@@ -1,9 +1,11 @@
 -- ============================================================================
 -- SIGET: diseno de roles, permisos y aislamiento a nivel de base de datos
 -- ============================================================================
--- ESTADO: DISENO. No esta aplicado en la base del checkpoint.
--- Se valida con database/diseno-pruebas.sql dentro de una transaccion que se
--- revierte (ROLLBACK). Ver docs/superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md
+-- ESTADO: APLICADO el 15-oct-2026 en la base tramites_demo de VM2 (esquema siget,
+-- roles siget_owner, app_role y auditor_role). Se verifica con
+-- database/diseno-pruebas.sql, cuyos datos de prueba se revierten (ROLLBACK).
+-- Para una base nueva este archivo es el script de arranque (lo corre una vez
+-- el superusuario, que despues deja de usarse). Ver docs/superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md
 --
 -- ZERO TRUST: ninguna pieza del sistema opera como superusuario.
 --   * postgres (superusuario) solo ejecuta el arranque inicial (seccion 1) y
