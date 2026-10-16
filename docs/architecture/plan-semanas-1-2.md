@@ -83,7 +83,7 @@ El camino crítico es **D1 → 1.1 → 2.2 → 2.3 → 2.4**: sin el usuario `si
 | ID | Tarea | Semana |
 |---|---|---|
 | ZT-1 | Inventario de recursos con clasificación | S2 |
-| ZT-2 | TLS entre la aplicación y la base (el checkpoint pasa a `sslmode=verify-full`) | S2 |
+| ZT-2 ✅ | TLS entre la aplicación y la base (el checkpoint pasa a `sslmode=verify-full`): **hecho el 15-oct**, runbook 18 | S2 |
 | ZT-4 | Sudo de mínimo privilegio para `andy_martinez` (hoy tiene `NOPASSWD: ALL` en VM1) | S2 |
 
 **Nombres de roles:** ningún rol del sistema lleva el nombre "administrador". Los roles de gestión son `coordinador_institucional` y `operador_plataforma`.
