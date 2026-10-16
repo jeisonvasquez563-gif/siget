@@ -35,12 +35,16 @@ El diseño de seguridad Zero Trust (*Arquitectura Zero Trust*, Jeison Vásquez, 
 |---|---|---|
 | Autorización | RBAC con grupos de Django | ABAC (NIST SP 800-162): PEP en middleware de Django y PDP como módulo de políticas; denegar por defecto y *fail closed* |
 | Aislamiento entre instituciones | No definido | Dos barreras independientes: ABAC más Row Level Security en PostgreSQL |
-| Roles | 4 (ciudadano, funcionario, supervisor, administrador) | 6: se separan administrador institucional y de plataforma (sin acceso a trámites) y se agrega el auditor |
+| Roles | 4 (ciudadano, funcionario, supervisor y un rol de gestión único) | 6: se separan el coordinador institucional y el operador de plataforma (sin acceso a trámites) y se agrega el auditor |
 | Identidad | Usuario y rol | Membresías (institución, rol) y atributo `nivel_aseguramiento`; la identidad ciudadana no se verifica contra el Registro Civil (límite declarado) |
 | Auditoría | Eventos de cambio de estado | Además, registro de las decisiones del PDP, permitidas y negadas |
 | Catálogo | 3 trámites reales | 3 reales más 3 de demostración (MINSA, MOP, MiAmbiente) |
 
 Un motor externo (OPA) queda como fase futura: el PDP integrado en Django se diseña para poder migrarlo sin reescribir.
+
+## Cobertura de Zero Trust
+
+Cada principio de Zero Trust tiene tareas y semanas asignadas en [`../zero-trust-cobertura.md`](../zero-trust-cobertura.md) (ZT-1 a ZT-10). Esa matriz es la lista de control para afirmar, con evidencia, que el sistema aplica los 7 principios de NIST SP 800-207.
 
 ## Checkpoints intermedios (fuera del orden original, resueltos por pedidos puntuales del profesor)
 
@@ -69,7 +73,7 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 8. Iniciar `frontend/` con React + Vite, consumiendo la API de Django.
 9. Cargar catálogo de `TipoTramite` e instituciones, empezando por Permiso de Construcción Municipal.
 10. Validar flujo end-to-end completo y las verificaciones de seguridad (punto 7 del plan original).
-11. Decidir destino del checkpoint PHP actual (ahora con login, registro, reset de password y rate limiting) — conservar como referencia, migrar su lógica a Django, o retirarlo — requiere aprobación explícita antes de tocar nada.
+11. **Retirar el checkpoint PHP** (login, registro, reset de password y rate limiting sobre Apache + PHP-FPM). **Decisión: el PHP no forma parte del sistema final**; fue un entregable intermedio pedido por el profesor y vive aislado en `checkpoints/`. El sistema final es Django + DRF y React. **Fecha objetivo: semana 6 (16–22 de noviembre de 2026)**, cuando Django y React ofrezcan registro, login, restablecimiento de contraseña y bloqueo por intentos equivalentes. Hasta entonces se mantiene **sin funciones nuevas**, solo con correcciones de seguridad. El retiro (apagar la app, quitar `/gestion` de Apache y revocar `checkpoint_app`) requiere aprobación explícita de Jeison y se documenta en el runbook. Ver [`../zero-trust-cobertura.md`](../zero-trust-cobertura.md) (ZT-9).
 12. Evaluar si conviene remover el port forwarding por NAT que quedó configurado y sin uso (VMware NAT + regla de Firewall de Windows), ya que el acceso real es por Tailscale.
 
 ## Completado recientemente

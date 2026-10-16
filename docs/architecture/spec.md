@@ -16,7 +16,7 @@ Problema real que resuelve el proyecto (no es un proyecto "de ciberseguridad" te
 
 La seguridad (SELinux, Podman rootless, autorización ABAC con Zero Trust, Row Level Security, auditoría inmutable) es el mecanismo que garantiza que la trazabilidad sea confiable, no el tema del proyecto en sí.
 
-El objetivo es un sistema donde cada actuación sobre un trámite queda registrada de forma que nadie pueda alterarla, ni siquiera un administrador, con plazos exigibles y escalamiento automático cuando se vencen. Como SIGET integra trámites de varias instituciones, el desafío central es que **ninguna institución pueda ver ni modificar lo que pertenece a otra**, y que cada decisión de acceso se tome y se registre en cada petición.
+El objetivo es un sistema donde cada actuación sobre un trámite queda registrada de forma que nadie pueda alterarla, ni siquiera quien opera la plataforma, con plazos exigibles y escalamiento automático cuando se vencen. Como SIGET integra trámites de varias instituciones, el desafío central es que **ninguna institución pueda ver ni modificar lo que pertenece a otra**, y que cada decisión de acceso se tome y se registre en cada petición.
 
 | Público | Qué necesita | Qué se le da |
 |---|---|---|
@@ -75,7 +75,7 @@ Sigue el modelo de NIST SP 800-207 (Rose et al., 2020): no confiar por ubicació
 
 El rol es un atributo más. Esto permite que una capa de roles por institución sea la base y se enriquezca con reglas contextuales.
 
-- **Sujeto:** `nivel_aseguramiento` (bajo, medio o alto), `mfa_verificado_en`, `membresias` (lista de institución y rol; una persona puede tener roles distintos en instituciones distintas), `estado_cuenta` (activa, bloqueada, suspendida). Roles de plataforma sin acceso a trámites: administrador de plataforma y auditor.
+- **Sujeto:** `nivel_aseguramiento` (bajo, medio o alto), `mfa_verificado_en`, `membresias` (lista de institución y rol; una persona puede tener roles distintos en instituciones distintas), `estado_cuenta` (activa, bloqueada, suspendida). Roles de plataforma sin acceso a trámites: operador de plataforma y auditor.
 - **Recurso (trámite):** institución dueña, tipo de trámite, estado, solicitante, funcionario asignado, sensibilidad y si está vencido.
 - **Acción:** ver, crear, cambiar estado, reasignar, escalar, consultar auditoría, administrar catálogo y administrar usuarios.
 - **Entorno:** MFA reciente (por ejemplo, ≤15 minutos para cambiar estados), red de origen, hora, intentos fallidos recientes y estado de la cuenta.
@@ -114,8 +114,8 @@ Todo lo que no está permitido queda denegado.
 | Ciudadano | Crear trámite; ver y adjuntar documentos a sus propios trámites | Solo los suyos; MFA activo |
 | Funcionario | Ver trámites de su institución; cambiar estado; pedir subsanación | Misma institución; trámite asignado a él o en su cola; MFA ≤15 min; transición válida |
 | Supervisor | Lo del funcionario; reasignar; atender escalados | Solo su institución; MFA ≤15 min |
-| Administrador institucional | Gestionar usuarios, membresías, tipos de trámite y SLA | Solo su institución; no cambia estados ni lee documentos |
-| Administrador de plataforma | Alta de instituciones, infraestructura, catálogo base | Sin acceso a trámites ni a documentos |
+| Coordinador institucional | Gestionar usuarios, membresías, tipos de trámite y SLA | Solo su institución; no cambia estados ni lee documentos |
+| Operador de plataforma | Alta de instituciones, infraestructura, catálogo base | Sin acceso a trámites ni a documentos |
 | Auditor | Leer eventos de auditoría y decisiones del PDP | Solo lectura, transversal; nivel de aseguramiento alto y MFA obligatorio |
 
 **Reglas cruzadas:**
