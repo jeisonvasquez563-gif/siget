@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- **Diseño de roles, permisos y módulos a nivel de base de datos** (`database/diseno-roles-permisos.sql`, `database/diseno-pruebas.sql`, `database/demo-roles.sh` y `docs/roles-permisos-bd.md`): esquema `siget` con 8 tablas, roles `siget_owner`, `app_role` y `auditor_role`, permisos mínimos, RLS, triggers de integridad y auditoría inmutable. **Sin superusuario en la operación** (nuevo principio Zero Trust). Validado con 19 pruebas dentro de una transacción con ROLLBACK; no está aplicado en la base. Brecha registrada: la app del checkpoint sigue conectándose como `postgres`.
 - **Respaldo de `tramites_demo`** antes de la migración a contenedor (tarea 2.1; `runbook.md` sección 16): volcado en VM2 verificado con una restauración de prueba y copiado fuera de la VM con hash comprobado. Los respaldos no se versionan: `.gitignore` ahora excluye `*.dump`, `globals-*.sql` y `respaldos-siget/`.
 - **Podman 5.8.2 rootless en VM2** (tarea 1.2; `runbook.md` 12.9): instalado desde la cuenta de Jeison, sin dar sudo adicional a nadie. Verificado con el usuario `siget`: rootless, SELinux en Enforcing sin denegaciones, contenedor de prueba correcto. El PostgreSQL nativo y el firewall no cambiaron.
 - **Usuario de servicio `siget` en VM1 y VM2** (decisión D1, tarea 1.1; `runbook.md` sección 15): cuenta dedicada para los contenedores, sin contraseña, sin SSH y sin sudo, con rango subuid/subgid y linger activo. Podman rootless verificado en VM1.

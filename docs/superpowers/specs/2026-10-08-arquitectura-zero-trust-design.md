@@ -32,6 +32,7 @@ Se sigue el modelo de NIST SP 800-207 (Rose et al., 2020): nunca confiar por ubi
 | Asumir la brecha | Segmentación de red y de contenedores, dos barreras independientes de aislamiento de datos, auditoría inalterable |
 | Denegar por defecto | Si ninguna política permite la acción, se niega; si el motor de decisión falla, se niega (*fail closed*) |
 | Separación de funciones | Quien administra la plataforma no ve trámites; nadie modifica la auditoría |
+| Sin superusuario | Ninguna pieza opera como superusuario: `postgres` solo hace el arranque inicial; los objetos son de `siget_owner` y la aplicación usa `app_role`, sin `BYPASSRLS` ni capacidad de crear roles. Ver [`roles-permisos-bd.md`](../../roles-permisos-bd.md) |
 
 ## 3. Modelo de identidad y atributos
 
