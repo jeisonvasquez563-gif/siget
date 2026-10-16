@@ -48,3 +48,7 @@ sudo restorecon -R /home/USUARIO/.ssh
 - Si se pierde o filtra una clave privada, avisar de inmediato para retirarla de `authorized_keys`.
 - Dar de baja a alguien: `sudo userdel -r USUARIO` (siempre con aprobación explícita).
 - No guardar contraseñas ni claves en el repositorio.
+
+## Cuenta de servicio `siget`
+
+`siget` es una cuenta de servicio para los contenedores del proyecto (ver [`runbook.md`](./runbook.md) sección 15). **No es una cuenta de persona**: no tiene contraseña, no admite SSH y no se le cargan claves. Se opera con `sudo -u siget` desde una cuenta autorizada.

@@ -686,3 +686,46 @@ sudo systemctl restart systemd-journald && sudo journalctl --flush
 Verificación: `/var/log/journal` existe con contexto SELinux `var_log_t`, `systemd-journald` activo y `journalctl --disk-usage` informa 16 MB en ambas VMs. Desde ahora `sudo journalctl _COMM=sudo` conserva el historial entre reinicios. El tope de 200 MB evita que el journal crezca sin control.
 
 **Gotcha:** el primer script se colgó al final (la sesión SSH no volvió) aunque la configuración ya estaba aplicada. Se repitió con `timeout` en los comandos de recarga y funcionó. Conviene usar siempre `timeout` al reiniciar servicios de logging por SSH.
+
+## 15. Usuario de servicio `siget` para los contenedores
+
+Fecha: 15 de octubre de 2026. Decisión D1 del [plan de las semanas 1 y 2](./architecture/plan-semanas-1-2.md), tomada por Jeison: los contenedores del proyecto corren bajo un usuario de servicio dedicado y no bajo la cuenta de un integrante, para que el sistema no dependa de una persona. Tarea 1.1 del plan.
+
+### 15.1 Creación (VM1 y VM2)
+
+```bash
+sudo useradd -m -s /bin/bash -c "Usuario de servicio SIGET (contenedores)" siget
+sudo passwd -l siget
+sudo chmod 750 /home/siget
+sudo loginctl enable-linger siget
+```
+
+Resultado en ambas VMs: `uid=1009(siget)`, rango subuid/subgid `689824:65536` asignado automáticamente por `useradd`, contraseña bloqueada, sin directorio `~/.ssh` y sin sudo.
+
+### 15.2 Verificación
+
+- `loginctl show-user siget` informa `Linger=yes` y `State=lingering`, y existe `/run/user/1009`: el gestor de usuario de systemd arranca con el sistema, así que sus contenedores sobreviven al cierre de cualquier sesión.
+- En VM1, `podman info` como `siget` informa `rootless=true` y `systemctl --user is-system-running` responde `running`.
+- En VM2 el usuario existe y tiene linger, pero Podman aún no está instalado (tarea 1.2).
+
+### 15.3 Cómo se usa
+
+`siget` **no admite acceso por SSH** (sin contraseña ni claves). Se opera desde una cuenta con sudo:
+
+```bash
+sudo -H -u siget bash -c 'cd ~ && XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user status'
+```
+
+Las unidades Quadlet del proyecto van en `/home/siget/.config/containers/systemd/`.
+
+### 15.4 Gotchas
+
+- Ejecutar `sudo -u siget podman …` desde un directorio que `siget` no puede leer (por ejemplo el home de otro usuario) falla con `Error: setting up the process`. Hay que hacer `cd ~` antes, como en el comando de arriba.
+- Hay que fijar `XDG_RUNTIME_DIR=/run/user/<uid>` para que `systemctl --user` y Podman encuentren el bus del usuario.
+- El script de creación se colgó en VM2 pasados los 90 segundos aunque todo ya estaba aplicado; conviene usar `timeout` y verificar el estado por separado.
+
+### 15.5 Pendiente
+
+- Retirar el contenedor de prueba de `andy_martinez` y recrearlo bajo `siget` (decisión D4, requiere aprobación de Jeison).
+- Instalar Podman en VM2 (tarea 1.2).
+- El acceso a los puertos 80/443 en VM1 sigue pendiente de la decisión D2.
