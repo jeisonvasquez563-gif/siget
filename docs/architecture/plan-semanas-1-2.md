@@ -27,7 +27,7 @@ Dejar listos los cimientos de la Fase 2 para que Django tenga dónde correr desd
 | ID | Tarea | Responsable (propuesto) | Depende de | Criterio de terminado |
 |---|---|---|---|---|
 | 1.1 ✅ | Crear el usuario de servicio `siget` con rango subuid/subgid y linger | Jeison | D1 | **Hecho el 15-oct** (runbook 15): `Linger=yes` en VM1 y VM2, Podman rootless verificado en VM1 |
-| 1.2 | Instalar Podman en VM2 y repetir las verificaciones de VM1 (rootless, SELinux, sin AVC) | Andy | D3 | `podman info` rootless=true; `ausearch -m avc` sin resultados; runbook sección 12 actualizada |
+| 1.2 ✅ | Instalar Podman en VM2 y repetir las verificaciones de VM1 (rootless, SELinux, sin AVC) | Jeison (D3: sin sudo adicional para Andy) | D3 | **Hecho el 15-oct** (runbook 12.9): Podman 5.8.2, rootless, SELinux Enforcing sin AVC |
 | 1.3 | Cargar las claves públicas de los 7 compañeros restantes en VM1 y VM2 | Jeison (con las claves de cada uno) | — | Cada integrante entra por SSH con su usuario |
 | 1.4 ✅ | Habilitar journal persistente o `auditd` para trazar el uso de sudo | Jeison | — | **Hecho el 15-oct** (runbook 14.6): journal persistente en VM1 y VM2 |
 | 1.5 | Escribir la **especificación del motor ABAC**: catálogo de atributos, lenguaje de políticas, interfaz del PDP, estructura del registro de decisiones | Dos integrantes (por asignar) | Diseño Zero Trust aprobado | Documento en `docs/superpowers/specs/` revisado por Jeison |

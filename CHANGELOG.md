@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- **Podman 5.8.2 rootless en VM2** (tarea 1.2; `runbook.md` 12.9): instalado desde la cuenta de Jeison, sin dar sudo adicional a nadie. Verificado con el usuario `siget`: rootless, SELinux en Enforcing sin denegaciones, contenedor de prueba correcto. El PostgreSQL nativo y el firewall no cambiaron.
 - **Usuario de servicio `siget` en VM1 y VM2** (decisión D1, tarea 1.1; `runbook.md` sección 15): cuenta dedicada para los contenedores, sin contraseña, sin SSH y sin sudo, con rango subuid/subgid y linger activo. Podman rootless verificado en VM1.
 - **Journal persistente en VM1 y VM2** (`runbook.md` 14.6): los comandos `sudo` ya no se pierden al reiniciar. Se verificaron los DOI de NIST SP 800-207 y SP 800-162 contra los PDF oficiales (tareas 1.4 y 1.8 del plan de las semanas 1 y 2).
 - `docs/architecture/plan-semanas-1-2.md`: plan operativo de las semanas 1 y 2 del cronograma (Podman en VM2, PostgreSQL en contenedor con `app_role` y `podman secret`, esqueletos de backend y frontend, especificación del ABAC), con decisiones previas, responsables propuestos, camino crítico y riesgos.
