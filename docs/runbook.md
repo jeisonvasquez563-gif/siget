@@ -587,11 +587,30 @@ Pegar de una vez un bloque con `cat > archivo << 'EOF' ... EOF` en la terminal S
 
 ### 12.8 Pendiente de este bloque
 
-- Instalar Podman en VM2 (`db-server`) y repetir las verificaciones.
+- ~~Instalar Podman en VM2 (`db-server`) y repetir las verificaciones.~~ Hecho el 15-oct, ver 12.9.
 - Decidir qué usuario corre los contenedores del proyecto (usuario de servicio dedicado o el de cada integrante) y activar el linger en ese usuario: `sudo loginctl enable-linger <usuario>`.
 - Resolver los puertos 80 y 443 en VM1 (Apache los ocupa y los contenedores rootless no pueden usar puertos menores a 1024 por defecto).
 - Decidir qué se hace con el contenedor de prueba `siget-prueba`. Con `Linger=no` solo corre mientras `andy_martinez` tiene una sesión abierta; al cerrarla systemd lo detiene. No se elimina sin aprobación de Jeison.
 - Git no está instalado en las VMs; no es necesario, porque el código se trabaja desde la PC de cada integrante.
+
+### 12.9 Podman rootless en VM2 (`db-server`)
+
+Fecha: 15 de octubre de 2026, tarea 1.2 del plan de las semanas 1 y 2. Ejecutado por Jeison desde su cuenta con sudo (decisión D3: no se dio sudo adicional a nadie).
+
+```bash
+sudo nohup bash -c "dnf install -y podman > /tmp/dnf-podman.log 2>&1; echo EXIT=\$? >> /tmp/dnf-podman.log" &
+```
+
+Se lanzó con `nohup` dentro de la VM porque en VM1 la sesión SSH se cortó durante la instalación (se actualiza `selinux-policy`). Resultado: `EXIT=0`, sin cortes.
+
+Verificación:
+
+- `podman --version` informa 5.8.2, con `container-selinux`, `crun`, `netavark`, `aardvark-dns` y `passt` instalados. Es la misma versión que en VM1.
+- SELinux sigue en `Enforcing` y `ausearch -m avc` no registra denegaciones.
+- Como `siget`: `podman info` informa `rootless=true`, driver `overlay` y red `netavark`; `podman run --rm quay.io/podman/hello` funciona.
+- El firewall no cambió (`dhcpv6-client ssh` y la regla del 5432 solo desde `192.168.100.10`) y el PostgreSQL nativo sigue activo, así que el checkpoint no se tocó.
+
+Gotcha: el servicio de PostgreSQL se llama `postgresql`, no `postgresql-16`; `systemctl is-active postgresql-16` responde `inactive` aunque la base esté funcionando.
 
 ## 13. Cuentas de Linux del equipo y sudo
 
