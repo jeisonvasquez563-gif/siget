@@ -22,8 +22,9 @@ Matriz que contrasta cada principio de Zero Trust con lo que SIGET implementa ho
 
 ## 2. Lo que ya está verificado hoy
 
+- **Separación de funciones en la base:** el rol de plataforma se divide en cinco por función; una persona tiene uno solo, no puede mezclarlo con membresías y las altas sensibles exigen control dual (runbook 19).
 - Ningún rol del proyecto es superusuario ni evita RLS; `postgres` no tiene contraseña y se rechaza por red (runbook 17).
-- Aislamiento entre instituciones por RLS, auditoría de solo inserción, transiciones de estado válidas y que nadie se auto-asigne un rol: 19 pruebas contra el esquema real (`bash ~/siget-diseno/demo.sh`).
+- Aislamiento entre instituciones por RLS, auditoría de solo inserción, transiciones de estado válidas y que nadie se auto-asigne un rol: 24 pruebas contra el esquema real (`bash ~/siget-diseno/demo.sh`).
 - SSH solo por clave, firewall restrictivo, SELinux en Enforcing y journal persistente en las dos VMs (runbook 14).
 - La app del checkpoint usa un rol de mínimo privilegio y pgAdmin uno de solo lectura.
 - La conexión entre la app y la base va cifrada con TLS 1.3 verificando el certificado del servidor, y la base rechaza las conexiones sin TLS (runbook 18).

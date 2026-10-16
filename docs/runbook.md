@@ -938,3 +938,45 @@ La conexión de `pgadmin_lectura` ahora **debe usar SSL**: en pgAdmin, pestaña 
 - Renovar el certificado del servidor antes de su vencimiento (octubre de 2027) y definir la rotación.
 - Repetir esta configuración en el PostgreSQL en contenedor y guardar la clave del servidor con `podman secret`.
 - Cifrado del login HTTP (nginx con TLS): ZT-3, semana 5.
+
+## 19. División del rol de plataforma en cinco roles y control dual
+
+Fecha: 15 de octubre de 2026. Decisión de Jeison: un único "operador de plataforma" era un rol todopoderoso, contrario a Zero Trust (separación de funciones). Se aplicó sobre el esquema `siget` de la base nativa con la migración [`database/migraciones/002-dividir-rol-plataforma.sql`](../database/migraciones/002-dividir-rol-plataforma.sql), ejecutada como `siget_owner` y no como superusuario.
+
+### 19.1 Los cinco roles
+
+| Rol | Hace | No puede |
+|---|---|---|
+| `operador_infraestructura` | Servidores, contenedores, despliegues y parches | Ver datos de la aplicación; crear usuarios; tocar secretos |
+| `operador_identidades` | Altas de coordinadores y restablecer el segundo factor | Tocar infraestructura; ver trámites; crear instituciones |
+| `operador_catalogo` | Alta de instituciones y de los tipos de trámite base | Crear usuarios; tocar infraestructura |
+| `operador_seguridad` | Bloquear cuentas y revocar sesiones ante incidentes | Crear cuentas; leer trámites; modificar la auditoría |
+| `custodio_secretos` | Rotar contraseñas, claves y certificados | Desplegar; crear usuarios; leer datos |
+
+El `auditor` sigue aparte. `operador_plataforma` se renombró a `operador_infraestructura`.
+
+### 19.2 Reglas impuestas en la base
+
+- **Un solo rol de plataforma por persona** (columna única `usuario.rol_plataforma`).
+- **Quien tiene un rol de plataforma no puede tener membresías de institución, ni al revés**: dos triggers (`membresia_valida_rol_plataforma` y `usuario_valida_membresias`).
+- **Control dual:** nueva tabla `siget.aprobacion` con `CHECK (aprobado_por <> propuesto_por)`: quien propone un alta (institución o coordinador) no puede aprobarla. `app_role` solo puede completar `aprobado_por`, `estado` y `resuelto_en`; no puede cambiar quién propuso.
+
+### 19.3 Procedimiento
+
+1. Respaldo previo (`pre-002-AAAAMMDD-HHMM.dump` en `/var/backups/siget/` de VM2).
+2. Ensayo: la migración completa dentro de `BEGIN … ROLLBACK`, que confirmó que no falla y no deja cambios.
+3. Aplicación con `COMMIT`.
+4. Verificación: `rol_plataforma` tiene los 7 valores (ninguno, los 5 nuevos y auditor), el esquema pasó a 9 tablas y 7 triggers.
+
+### 19.4 Verificación
+
+Las pruebas pasaron de 19 a **24, todas contra el esquema real** (`bash ~/siget-diseno/demo.sh`). Las nuevas: 20 y 21 (un operador no recibe membresías y un funcionario no recibe rol de plataforma), 22 y 23 (nadie aprueba su propia solicitud; una segunda persona sí puede) y 24 (no se puede cambiar quién propuso). Los 8 usuarios del checkpoint siguen intactos y no quedan datos de prueba.
+
+### 19.5 Gotcha
+
+`ALTER TYPE … ADD VALUE` permite agregar valores a una enumeración dentro de una transacción (PostgreSQL 12 o posterior), pero **no se pueden usar en esa misma transacción**; por eso la migración no los usa y las pruebas corren en una transacción posterior.
+
+### 19.6 Pendiente
+
+- El control dual se aplica hoy a nivel de datos; falta que el backend lo exija en el flujo de altas.
+- Definir cómo se otorga el primer rol de cada operador (arranque inicial) sin romper la separación de funciones.

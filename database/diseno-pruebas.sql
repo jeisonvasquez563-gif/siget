@@ -10,6 +10,8 @@ INSERT INTO siget.institucion (nombre, tipo) VALUES
   ('Alcaldia', 'real'), ('MINSA', 'demostracion'), ('MOP', 'demostracion');
 INSERT INTO siget.usuario (username, password_hash) VALUES
   ('ciudadana1', 'x'), ('ciudadano2', 'x'), ('func_minsa', 'x'), ('func_mop', 'x'), ('jefe', 'x');
+INSERT INTO siget.usuario (username, password_hash, rol_plataforma) VALUES
+  ('op_infra', 'x', 'operador_infraestructura'), ('op_ident', 'x', 'operador_identidades'), ('op_catalogo', 'x', 'operador_catalogo');
 INSERT INTO siget.tipo_tramite (institucion_id, nombre, sla_dias)
   SELECT id, 'Tramite demo ' || nombre, 10 FROM siget.institucion;
 INSERT INTO siget.tramite (tipo_tramite_id, institucion_id, solicitante_id)
@@ -22,7 +24,7 @@ RESET ROLE;
 
 DO $$
 DECLARE
-  n int; v_minsa int; v_mop int; v_t_minsa bigint; v_ciud1 int; v_ciud2 int; v_jefe int; v_func int;
+  n int; v_minsa int; v_mop int; v_t_minsa bigint; v_ciud1 int; v_ciud2 int; v_jefe int; v_func int; v_infra int; v_ident int; v_cat int; v_apr bigint;
 BEGIN
   SELECT id INTO v_minsa FROM siget.institucion WHERE nombre = 'MINSA';
   SELECT id INTO v_mop   FROM siget.institucion WHERE nombre = 'MOP';
@@ -30,6 +32,9 @@ BEGIN
   SELECT id INTO v_ciud2 FROM siget.usuario WHERE username = 'ciudadano2';
   SELECT id INTO v_jefe  FROM siget.usuario WHERE username = 'jefe';
   SELECT id INTO v_func  FROM siget.usuario WHERE username = 'func_mop';
+  SELECT id INTO v_infra FROM siget.usuario WHERE username = 'op_infra';
+  SELECT id INTO v_ident FROM siget.usuario WHERE username = 'op_ident';
+  SELECT id INTO v_cat   FROM siget.usuario WHERE username = 'op_catalogo';
   SELECT id INTO v_t_minsa FROM siget.tramite WHERE institucion_id = v_minsa;
 
   -- 1. Aislamiento: un funcionario del MOP solo ve tramites del MOP
@@ -110,10 +115,10 @@ BEGIN
 
   -- 13. app_role no puede tocar columnas que no le corresponden (rol_plataforma)
   BEGIN
-    UPDATE siget.usuario SET rol_plataforma = 'operador_plataforma' WHERE id = v_func;
-    RAISE NOTICE 'PRUEBA 13 app_role se sube a operador_plataforma: FALLA';
+    UPDATE siget.usuario SET rol_plataforma = 'operador_infraestructura' WHERE id = v_func;
+    RAISE NOTICE 'PRUEBA 13 app_role se sube a operador_infraestructura: FALLA';
   EXCEPTION WHEN insufficient_privilege THEN
-    RAISE NOTICE 'PRUEBA 13 app_role se sube a operador_plataforma: PASA (permission denied)';
+    RAISE NOTICE 'PRUEBA 13 app_role se sube a operador_infraestructura: PASA (permission denied)';
   END;
 
   -- 14. El trigger protege la auditoria incluso del duenio (que si tiene UPDATE)
@@ -152,4 +157,46 @@ BEGIN
    JOIN pg_roles r ON r.oid = c.relowner
    WHERE ns.nspname = 'siget' AND c.relkind = 'r' AND r.rolsuper;
   RAISE NOTICE 'PRUEBA 19 tablas del esquema cuyo duenio es superusuario: % (esperado 0): %', n, CASE WHEN n = 0 THEN 'PASA' ELSE 'FALLA' END;
+  -- 20. SEPARACION DE FUNCIONES: quien tiene rol de plataforma no puede recibir membresias
+  SET LOCAL ROLE app_role;
+  BEGIN
+    INSERT INTO siget.membresia (usuario_id, institucion_id, rol, asignado_por) VALUES (v_infra, v_mop, 'funcionario', v_jefe);
+    RAISE NOTICE 'PRUEBA 20 operador con membresia de institucion: FALLA';
+  EXCEPTION WHEN raise_exception THEN
+    RAISE NOTICE 'PRUEBA 20 operador con membresia de institucion: PASA (trigger)';
+  END;
+
+  -- 21. ...ni al reves: quien tiene membresia no puede recibir un rol de plataforma
+  INSERT INTO siget.membresia (usuario_id, institucion_id, rol, asignado_por) VALUES (v_func, v_mop, 'funcionario', v_jefe);
+  SET LOCAL ROLE siget_owner;
+  BEGIN
+    UPDATE siget.usuario SET rol_plataforma = 'operador_seguridad' WHERE id = v_func;
+    RAISE NOTICE 'PRUEBA 21 funcionario con rol de plataforma: FALLA';
+  EXCEPTION WHEN raise_exception THEN
+    RAISE NOTICE 'PRUEBA 21 funcionario con rol de plataforma: PASA (trigger)';
+  END;
+
+  -- 22. CONTROL DUAL: quien propone no puede aprobar su propia solicitud
+  SET LOCAL ROLE app_role;
+  INSERT INTO siget.aprobacion (accion, objetivo, propuesto_por) VALUES ('alta_institucion', 'MiAmbiente', v_cat) RETURNING id INTO v_apr;
+  BEGIN
+    UPDATE siget.aprobacion SET aprobado_por = v_cat, estado = 'aprobada', resuelto_en = now() WHERE id = v_apr;
+    RAISE NOTICE 'PRUEBA 22 auto-aprobacion: FALLA';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'PRUEBA 22 auto-aprobacion: PASA (control dual)';
+  END;
+
+  -- 23. ...y otra persona distinta si puede aprobarla
+  UPDATE siget.aprobacion SET aprobado_por = v_ident, estado = 'aprobada', resuelto_en = now() WHERE id = v_apr;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RAISE NOTICE 'PRUEBA 23 aprobacion por una segunda persona (% fila): %', n, CASE WHEN n = 1 THEN 'PASA' ELSE 'FALLA' END;
+
+  -- 24. No se puede cambiar despues quien propuso
+  BEGIN
+    UPDATE siget.aprobacion SET propuesto_por = v_ident WHERE id = v_apr;
+    RAISE NOTICE 'PRUEBA 24 cambiar quien propuso: FALLA';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PRUEBA 24 cambiar quien propuso: PASA (permission denied)';
+  END;
+  RESET ROLE;
 END $$;

@@ -75,7 +75,7 @@ Sigue el modelo de NIST SP 800-207 (Rose et al., 2020): no confiar por ubicació
 
 El rol es un atributo más. Esto permite que una capa de roles por institución sea la base y se enriquezca con reglas contextuales.
 
-- **Sujeto:** `nivel_aseguramiento` (bajo, medio o alto), `mfa_verificado_en`, `membresias` (lista de institución y rol; una persona puede tener roles distintos en instituciones distintas), `estado_cuenta` (activa, bloqueada, suspendida). Roles de plataforma sin acceso a trámites: operador de plataforma y auditor.
+- **Sujeto:** `nivel_aseguramiento` (bajo, medio o alto), `mfa_verificado_en`, `membresias` (lista de institución y rol; una persona puede tener roles distintos en instituciones distintas), `estado_cuenta` (activa, bloqueada, suspendida). Roles de plataforma sin acceso a trámites: operador de infraestructura, de identidades, de catálogo, de seguridad, custodio de secretos y auditor.
 - **Recurso (trámite):** institución dueña, tipo de trámite, estado, solicitante, funcionario asignado, sensibilidad y si está vencido.
 - **Acción:** ver, crear, cambiar estado, reasignar, escalar, consultar auditoría, administrar catálogo y administrar usuarios.
 - **Entorno:** MFA reciente (por ejemplo, ≤15 minutos para cambiar estados), red de origen, hora, intentos fallidos recientes y estado de la cuenta.
@@ -115,7 +115,11 @@ Todo lo que no está permitido queda denegado.
 | Funcionario | Ver trámites de su institución; cambiar estado; pedir subsanación | Misma institución; trámite asignado a él o en su cola; MFA ≤15 min; transición válida |
 | Supervisor | Lo del funcionario; reasignar; atender escalados | Solo su institución; MFA ≤15 min |
 | Coordinador institucional | Gestionar usuarios, membresías, tipos de trámite y SLA | Solo su institución; no cambia estados ni lee documentos |
-| Operador de plataforma | Alta de instituciones, infraestructura, catálogo base | Sin acceso a trámites ni a documentos |
+| Operador de infraestructura | Servidores, contenedores, despliegues y parches | Sin acceso a trámites, documentos ni gestión de usuarios |
+| Operador de identidades | Altas de coordinadores institucionales y restablecer el segundo factor | Alta con control dual; sin acceso a trámites ni a infraestructura |
+| Operador de catálogo | Alta de instituciones y de los tipos de trámite base | Alta con control dual; sin acceso a usuarios ni a infraestructura |
+| Operador de seguridad | Bloquear cuentas y revocar sesiones ante incidentes | No crea cuentas, no lee trámites y no modifica la auditoría |
+| Custodio de secretos | Rotar contraseñas, claves y certificados | No despliega, no crea usuarios y no lee datos |
 | Auditor | Leer eventos de auditoría y decisiones del PDP | Solo lectura, transversal; nivel de aseguramiento alto y MFA obligatorio |
 
 **Reglas cruzadas:**
@@ -123,6 +127,8 @@ Todo lo que no está permitido queda denegado.
 - Un funcionario no puede cambiar el estado de un trámite que él mismo creó como ciudadano (conflicto de interés).
 - Nadie se otorga permisos a sí mismo: las membresías las asigna otro rol y todo cambio queda en la auditoría.
 - Los estados finales (Aprobado, Rechazado) no admiten más transiciones.
+- Una persona tiene un solo rol de plataforma, y quien lo tiene no puede tener membresías de institución (ni al revés): lo impone la base con triggers.
+- Control dual: dar de alta una institución o un coordinador requiere dos personas distintas; quien propone no puede aprobar (`aprobacion_control_dual`).
 
 ### 4.6 Modelo de amenazas (STRIDE)
 

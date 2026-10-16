@@ -15,8 +15,8 @@
 --
 -- Dos capas de roles:
 --   1) Roles de PostgreSQL (este archivo): siget_owner, app_role y auditor_role.
---   2) Roles de aplicacion (ciudadano, funcionario, supervisor, admin
---      institucional, operador de plataforma, auditor): viven como DATOS en
+--   2) Roles de aplicacion (ciudadano, funcionario, supervisor, coordinador
+--      institucional, 5 roles de operacion de plataforma, auditor): viven como DATOS en
 --      usuario / membresia y los evalua el PDP de Django (ABAC).
 -- Row Level Security es la segunda barrera, independiente del PDP.
 -- ============================================================================
@@ -39,7 +39,7 @@ SET LOCAL ROLE siget_owner;
 -- 2. Tipos
 -- ---------------------------------------------------------------------------
 CREATE TYPE siget.rol_membresia  AS ENUM ('ciudadano', 'funcionario', 'supervisor', 'coordinador_institucional');
-CREATE TYPE siget.rol_plataforma AS ENUM ('ninguno', 'operador_plataforma', 'auditor');
+CREATE TYPE siget.rol_plataforma AS ENUM ('ninguno', 'operador_infraestructura', 'operador_identidades', 'operador_catalogo', 'operador_seguridad', 'custodio_secretos', 'auditor');
 CREATE TYPE siget.estado_tramite AS ENUM ('Pendiente', 'En Tramitacion', 'En Subsanacion', 'Aprobado', 'Rechazado');
 
 -- ---------------------------------------------------------------------------
@@ -137,6 +137,21 @@ CREATE TABLE siget.decision_pdp (
   creado_en  timestamptz NOT NULL DEFAULT now()
 );
 
+-- Modulo control dual: una aprobacion no la puede proponer y aprobar la misma persona
+CREATE TABLE siget.aprobacion (
+  id             bigserial PRIMARY KEY,
+  accion         text NOT NULL CHECK (accion IN ('alta_institucion', 'alta_coordinador')),
+  objetivo       text NOT NULL,
+  propuesto_por  int NOT NULL REFERENCES siget.usuario(id),
+  aprobado_por   int REFERENCES siget.usuario(id),
+  estado         text NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'aprobada', 'rechazada')),
+  creado_en      timestamptz NOT NULL DEFAULT now(),
+  resuelto_en    timestamptz,
+  CONSTRAINT aprobacion_control_dual CHECK (aprobado_por IS NULL OR aprobado_por <> propuesto_por),
+  CONSTRAINT aprobacion_estado_coherente CHECK (
+    (estado = 'pendiente' AND aprobado_por IS NULL) OR (estado <> 'pendiente' AND aprobado_por IS NOT NULL))
+);
+
 -- ---------------------------------------------------------------------------
 -- 4. Funciones del contexto de sesion (las fija Django en cada transaccion)
 --    app.usuario_id = id del sujeto; app.instituciones = '1,3' (sus membresias)
@@ -187,6 +202,29 @@ END $$;
 CREATE TRIGGER tramite_audita_estado AFTER UPDATE OF estado ON siget.tramite
   FOR EACH ROW EXECUTE FUNCTION siget.registrar_cambio_estado();
 
+-- Quien tiene rol de plataforma no tiene membresias de institucion, ni al reves
+CREATE FUNCTION siget.membresia_sin_rol_plataforma() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = siget, pg_temp AS $$
+BEGIN
+  IF (SELECT rol_plataforma FROM siget.usuario WHERE id = NEW.usuario_id) <> 'ninguno' THEN
+    RAISE EXCEPTION 'El usuario % tiene un rol de plataforma: no puede tener membresias de institucion', NEW.usuario_id;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER membresia_valida_rol_plataforma BEFORE INSERT ON siget.membresia
+  FOR EACH ROW EXECUTE FUNCTION siget.membresia_sin_rol_plataforma();
+
+CREATE FUNCTION siget.rol_plataforma_sin_membresia() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = siget, pg_temp AS $$
+BEGIN
+  IF NEW.rol_plataforma <> 'ninguno' AND EXISTS (SELECT 1 FROM siget.membresia WHERE usuario_id = NEW.id) THEN
+    RAISE EXCEPTION 'El usuario % tiene membresias de institucion: no puede tener un rol de plataforma', NEW.id;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER usuario_valida_membresias BEFORE UPDATE OF rol_plataforma ON siget.usuario
+  FOR EACH ROW EXECUTE FUNCTION siget.rol_plataforma_sin_membresia();
+
 -- ---------------------------------------------------------------------------
 -- 6. Permisos (minimo privilegio, denegar por defecto)
 -- ---------------------------------------------------------------------------
@@ -209,7 +247,9 @@ GRANT SELECT, INSERT ON siget.evento_auditoria, siget.decision_pdp TO app_role; 
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA siget TO app_role;
 
 -- auditor_role: solo lectura de auditoria y decisiones
-GRANT SELECT ON siget.evento_auditoria, siget.decision_pdp TO auditor_role;
+GRANT SELECT ON siget.evento_auditoria, siget.decision_pdp, siget.aprobacion TO auditor_role;
+GRANT SELECT, INSERT ON siget.aprobacion TO app_role;
+GRANT UPDATE (aprobado_por, estado, resuelto_en) ON siget.aprobacion TO app_role;
 
 -- ---------------------------------------------------------------------------
 -- 7. Row Level Security: aislamiento entre instituciones
