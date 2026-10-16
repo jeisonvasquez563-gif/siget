@@ -17,7 +17,7 @@ psqlp -c "select tablename as tabla, tableowner as duenio, rowsecurity as rls fr
 echo "--- Politicas RLS y triggers hoy:"
 psqlp -At -c "select 'politicas RLS: '||count(*) from pg_policies" -c "select 'triggers de usuario: '||count(*) from pg_trigger where not tgisinternal"
 
-echo; echo "################ 2. 19 PRUEBAS DE ROLES Y PERMISOS (los datos de prueba se revierten) ################"
+echo; echo "################ 2. 24 PRUEBAS DE ROLES Y PERMISOS (los datos de prueba se revierten) ################"
 echo
 EXISTE=$(psqlp -At -c "select count(*) from pg_namespace where nspname='siget'")
 { echo "BEGIN;"; [ "$EXISTE" = "0" ] && cat "$D/diseno-roles-permisos.sql"; cat "$D/diseno-pruebas.sql"; echo "ROLLBACK;"; } \

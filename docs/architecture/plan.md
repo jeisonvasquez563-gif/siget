@@ -35,7 +35,7 @@ El diseño de seguridad Zero Trust (*Arquitectura Zero Trust*, Jeison Vásquez, 
 |---|---|---|
 | Autorización | RBAC con grupos de Django | ABAC (NIST SP 800-162): PEP en middleware de Django y PDP como módulo de políticas; denegar por defecto y *fail closed* |
 | Aislamiento entre instituciones | No definido | Dos barreras independientes: ABAC más Row Level Security en PostgreSQL |
-| Roles | 4 (ciudadano, funcionario, supervisor y un rol de gestión único) | 6: se separan el coordinador institucional y el operador de plataforma (sin acceso a trámites) y se agrega el auditor |
+| Roles | 4 (ciudadano, funcionario, supervisor y un rol de gestión único) | 10: ciudadano, funcionario, supervisor, coordinador institucional, cinco roles de operación de plataforma sin acceso a trámites (infraestructura, identidades, catálogo, seguridad y custodio de secretos) y auditor. Control dual y un solo rol de plataforma por persona |
 | Identidad | Usuario y rol | Membresías (institución, rol) y atributo `nivel_aseguramiento`; la identidad ciudadana no se verifica contra el Registro Civil (límite declarado) |
 | Auditoría | Eventos de cambio de estado | Además, registro de las decisiones del PDP, permitidas y negadas |
 | Catálogo | 3 trámites reales | 3 reales más 3 de demostración (MINSA, MOP, MiAmbiente) |
@@ -79,5 +79,5 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 ## Completado recientemente
 
 - ✅ **Auth keys de Tailscale revocadas** — las que se compartieron por chat durante el alta de VM1 y VM2 ya no son utilizables; los dispositivos siguen conectados con normalidad (revocar la key no afecta a dispositivos ya autenticados, solo impide su reuso).
-- ✅ **Diseño de arquitectura Zero Trust** (octubre de 2026): modelo ABAC, matriz de 6 roles, capas, modelo de amenazas STRIDE y mapa de instituciones. Incorporado a `spec.md` y a este plan el 11 de octubre de 2026.
+- ✅ **Diseño de arquitectura Zero Trust** (octubre de 2026): modelo ABAC, matriz de 10 roles, capas, modelo de amenazas STRIDE y mapa de instituciones. Incorporado a `spec.md` y a este plan el 11 de octubre de 2026.
 - ✅ **Podman rootless + primera unidad Quadlet en VM1** (10 de octubre de 2026), documentado en `runbook.md` sección 12. Falta VM2.

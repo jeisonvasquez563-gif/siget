@@ -8,14 +8,14 @@ Los nombres de las apps de Django y las vistas de React son una **propuesta** qu
 
 | Capa | Módulos | Implementados hoy | Planificados |
 |---|---|---|---|
-| Base de datos | 10 | **8** (aplicados y probados) | 2 (documentos y notificaciones) |
+| Base de datos | 11 | **9** (aplicados y probados) | 2 (documentos y notificaciones) |
 | Seguridad de infraestructura | 6 | **5** | 1 (TLS en el borde, nginx) |
 | Backend (Django) | 7 | **0** | 7 |
 | Frontend (React) | 6 vistas | **0** | 6 |
 
 ## 2. Módulos de base de datos
 
-Esquema `siget` aplicado el 15 de octubre de 2026, con 19 pruebas que pasan (`bash ~/siget-diseno/demo.sh`). Detalle en [`roles-permisos-bd.md`](./roles-permisos-bd.md).
+Esquema `siget` aplicado el 15 de octubre de 2026, con 24 pruebas que pasan (`bash ~/siget-diseno/demo.sh`). Detalle en [`roles-permisos-bd.md`](./roles-permisos-bd.md).
 
 | # | Módulo | Tabla | Estado |
 |---|---|---|---|
@@ -27,8 +27,9 @@ Esquema `siget` aplicado el 15 de octubre de 2026, con 19 pruebas que pasan (`ba
 | 6 | Máquina de estados | `transicion` | ✅ |
 | 7 | Auditoría de solo inserción | `evento_auditoria` | ✅ |
 | 8 | Decisiones del PDP | `decision_pdp` | ✅ |
-| 9 | Documentos adjuntos | `documento` | ⏳ por modelar |
-| 10 | Notificaciones | `notificacion` | ⏳ por modelar |
+| 9 | Control dual (altas sensibles con dos personas) | `aprobacion` | ✅ |
+| 10 | Documentos adjuntos | `documento` | ⏳ por modelar |
+| 11 | Notificaciones | `notificacion` | ⏳ por modelar |
 
 ## 3. Seguridad de la infraestructura
 
@@ -49,7 +50,7 @@ Contenedores Podman rootless con Quadlet: instalados en las dos VMs; el desplieg
 |---|---|---|---|
 | 1 | Identidad y autenticación | Registro, Argon2, JWT de vida corta, MFA TOTP | S4–S6 |
 | 2 | Autorización (PEP y PDP) | Decide cada petición con atributos; deniega por defecto | S4–S6 |
-| 3 | Instituciones y catálogo | Instituciones y tipos de trámite con su SLA | S3–S5 |
+| 3 | Instituciones y catálogo | Instituciones y tipos de trámite con su SLA; altas con control dual | S3–S5 |
 | 4 | Trámites | Crear, consultar y cambiar de estado con transiciones válidas | S3–S5 |
 | 5 | Auditoría y decisiones | Registra cada actuación y cada decisión del PDP | S5–S7 |
 | 6 | Plazos y escalamiento | Calcula la fecha límite y escala los vencidos (systemd timer) | S5–S7 |
@@ -66,11 +67,11 @@ Contenedores Podman rootless con Quadlet: instalados en las dos VMs; el desplieg
 | 5 | Usuarios, membresías y catálogo de su institución | Coordinador institucional | S8–S9 |
 | 6 | Auditoría y decisiones del PDP | Auditor | S8–S9 |
 
-El operador de plataforma trabaja sobre la infraestructura y no tiene vista de trámites.
+Los cinco roles de operación de plataforma (infraestructura, identidades, catálogo, seguridad y custodio de secretos) trabajan sobre sus funciones y ninguno tiene vista de trámites.
 
 ## 6. Qué decir y qué no decir
 
-**Se puede afirmar con evidencia:** el modelo de datos completo de los 8 módulos centrales está aplicado y probado, con roles sin superusuario, aislamiento por institución, auditoría inalterable y cifrado de la conexión con la base.
+**Se puede afirmar con evidencia:** el modelo de datos completo de los 9 módulos centrales está aplicado y probado, con roles sin superusuario, aislamiento por institución, auditoría inalterable y cifrado de la conexión con la base.
 
 **No se debe afirmar:** que existe el backend, el frontend o el control de acceso por atributos en funcionamiento. Existe el diseño, el esquema que lo respalda y el plan con fechas.
 
