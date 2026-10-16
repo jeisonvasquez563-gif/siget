@@ -809,3 +809,68 @@ sudo -u postgres pg_restore -d tramites_demo /var/backups/siget/tramites_demo-AA
 
 - Mantener este respaldo hasta verificar la migración (tarea 2.3). El PostgreSQL nativo **no se apaga** hasta entonces.
 - Definir una retención y un respaldo periódico (por ejemplo, con un systemd timer) cuando la base esté en contenedor.
+
+## 17. Roles de base de datos en marcha y cierre de la brecha del superusuario
+
+Fecha: 15 de octubre de 2026, parte de la tarea 2.4 del plan de las semanas 1 y 2. Ejecutado por Jeison en VM2 y VM1, con su aprobación explícita. Se aplicó sobre la base nativa actual; la migración a contenedor (tareas 2.2 y 2.3) queda pendiente. Detalle del diseño en [`roles-permisos-bd.md`](./roles-permisos-bd.md).
+
+### 17.1 Antes
+
+La base tenía un único rol (`postgres`, superusuario), dueño de todo, y la app PHP del checkpoint se conectaba con él. Contradecía el principio Zero Trust de no operar con superusuario.
+
+### 17.2 Respaldo previo
+
+`pg_dump` (`pre-roles-AAAAMMDD-HHMM.dump`) y copia de `pg_hba.conf` en `/var/backups/siget/` de VM2, antes de tocar nada. La contraseña de `postgres` no se modificó hasta verificar el login.
+
+### 17.3 Qué se aplicó (una sola transacción)
+
+Ejecutado por `postgres` como arranque inicial, a partir de [`database/diseno-roles-permisos.sql`](../database/diseno-roles-permisos.sql):
+
+- Esquema `siget` (8 tablas, 6 políticas RLS, 5 triggers) y roles `siget_owner`, `app_role` y `auditor_role` (los tres `NOLOGIN` por ahora: `app_role` se activará con su secret cuando exista Django).
+- `checkpoint_app`: rol `LOGIN` de la app PHP, con `SELECT, INSERT, UPDATE, DELETE` **solo** sobre `app_usuarios` y `USAGE` de su secuencia. No puede leer `demo_tramite`, borrar tablas, crear objetos ni roles.
+- `pgadmin_lectura`: rol `LOGIN` de solo lectura (`pg_read_all_data`, `pg_monitor`) para pgAdmin. No puede escribir y RLS le oculta los trámites.
+- La base y las tablas del checkpoint pasaron a ser propiedad de `siget_owner`. `REVOKE ALL … FROM PUBLIC` sobre la base y las tablas.
+
+### 17.4 Cambio en la app (VM1)
+
+Se cambió `DB_USER` y `DB_PASSWORD` en `/var/www/html/gestion/config.php` por los de `checkpoint_app` (archivo local, fuera de git, `apache:apache` 640, contexto `httpd_sys_content_t`). La contraseña se generó al vuelo (28 caracteres aleatorios) y se escribió sin mostrarse. El respaldo del `config.php` anterior se movió a `/root/siget-backups/` (700), fuera del directorio web.
+
+### 17.5 Cierre de la brecha: `postgres` ya no se usa
+
+En `pg_hba.conf`, la regla `host all all 192.168.100.10/32` se reemplazó por:
+
+```
+host    all             postgres        192.168.100.10/32       reject
+host    tramites_demo   checkpoint_app  192.168.100.10/32       scram-sha-256
+host    all             pgadmin_lectura 192.168.100.10/32       scram-sha-256
+```
+
+`pg_hba_file_rules` no informa errores. Además se anuló la contraseña de `postgres` (`ALTER ROLE postgres PASSWORD NULL`): solo se entra con el usuario del sistema por socket local.
+
+### 17.6 Verificación
+
+- Registro, login (302 al dashboard, dashboard 200) y "Acceso denegado" con el contador de intentos funcionan igual que antes, ya con `checkpoint_app`. El bloqueo tras 3 intentos también (el `UPDATE` funciona con el rol nuevo).
+- `checkpoint_app`: puede leer `app_usuarios`, pero `demo_tramite` y `siget.*` responden permiso denegado; no puede borrar ni crear tablas ni crear roles.
+- Las 19 pruebas de `diseno-pruebas.sql` pasan contra el esquema real (`bash ~/siget-diseno/demo.sh`), con `ROLLBACK` de los datos de prueba.
+- Los 8 usuarios del checkpoint siguen intactos. Se crearon y se borraron 3 usuarios de prueba (`zz_*`).
+- El único rol superusuario es `postgres`, sin contraseña y rechazado por red.
+
+### 17.7 pgAdmin: cambio de conexión
+
+pgAdmin se conectaba como `postgres`; ya no puede. Hay que cambiar la conexión del servidor a **usuario `pgadmin_lectura`**. Su contraseña se guardó **solo en el equipo de Jeison**, fuera del repositorio (`Desktop/respaldos-siget/credencial-pgadmin-lectura.txt`). Es de solo lectura: no sirve para escribir en la base.
+
+### 17.8 Incidente: contraseña expuesta en una salida
+
+Al inspeccionar `config.php`, el filtro que enmascaraba contraseñas no coincidió con la línea `DB_PASSWORD` y la contraseña **anterior** de `postgres` quedó impresa en el registro de la sesión de trabajo. Está anulada (17.5), así que no es utilizable. Lección: para mostrar un archivo de configuración se filtra por el nombre exacto de la constante o no se muestra su contenido.
+
+### 17.9 Gotchas
+
+- Un `tee /dev/stderr` dentro de una sustitución de comandos se traga la salida: no usarlo para mostrar resultados.
+- Los campos del formulario de registro son `username`, `password` y `password2`; una prueba con otro nombre devuelve 200 sin crear nada.
+- `pg_hba_file_rules` devuelve arreglos en `database` y `user_name`: hay que usar `array_to_string`.
+
+### 17.10 Pendiente
+
+- Activar `LOGIN` de `app_role` con `podman secret` cuando exista el backend.
+- Repetir esta configuración en el PostgreSQL en contenedor (tarea 2.2) y aplicar allí el esquema con el mismo script.
+- Retirar la app PHP cuando Django la reemplace.
