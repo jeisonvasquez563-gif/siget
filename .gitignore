@@ -15,3 +15,8 @@ node_modules/
 
 # Logs
 *.log
+
+# Respaldos de base de datos (contienen hashes de contraseña)
+*.dump
+globals-*.sql
+respaldos-siget/

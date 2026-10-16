@@ -41,7 +41,7 @@ Dejar listos los cimientos de la Fase 2 para que Django tenga dónde correr desd
 
 | ID | Tarea | Responsable (propuesto) | Depende de | Criterio de terminado |
 |---|---|---|---|---|
-| 2.1 | **Respaldo** de `tramites_demo` y `app_usuarios` antes de tocar la base (volcado con `pg_dump`) | Jeison | — | Archivo de respaldo guardado fuera de la VM |
+| 2.1 ✅ | **Respaldo** de `tramites_demo` y `app_usuarios` antes de tocar la base (volcado con `pg_dump`) | Jeison | — | **Hecho el 15-oct** (runbook 16): restauración de prueba correcta y copia fuera de la VM con hash verificado |
 | 2.2 | **PostgreSQL 16 en contenedor** en VM2 con Quadlet, bind solo a `192.168.100.20`, `pg_hba.conf` restringido a `192.168.100.10` | Jeison | 1.1, 1.2 | Contenedor activo con `systemctl --user`; el 5432 solo responde desde VM1 |
 | 2.3 | Migrar los datos del PostgreSQL nativo al contenedor y comprobar que la app PHP sigue funcionando | Jeison | 2.1, 2.2 | Login del checkpoint responde 200 y entra con el usuario semilla |
 | 2.4 | Crear el rol `app_role` (SELECT/INSERT en `evento_auditoria`, `REVOKE UPDATE, DELETE`, permisos mínimos en el resto) | Jeison | 2.2 | Intento de UPDATE y DELETE sobre `evento_auditoria` falla |
