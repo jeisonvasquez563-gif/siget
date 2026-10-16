@@ -11,7 +11,7 @@ Matriz que contrasta cada principio de Zero Trust con lo que SIGET implementa ho
 | # | Principio (NIST SP 800-207, sec. 2.1) | Cómo lo cubre SIGET | Estado | Falta |
 |---|---|---|---|---|
 | 1 | Todas las fuentes de datos y servicios de cómputo son recursos | Recursos clasificados: trámites (con `sensibilidad`), auditoría, decisiones del PDP, catálogo, secretos, VMs y contenedores. Cada uno con su dueño y sus reglas de acceso | 🔄 | Inventario formal de recursos con clasificación (ZT-1) |
-| 2 | Toda la comunicación se asegura sin importar la ubicación de red | SSH solo por clave ✅ · Tailscale (WireGuard) para el equipo ✅ · TLS entre aplicación y base ⏳ · TLS en el borde con HSTS ⏳ · red interna aislada ✅ | 🔄 | TLS app↔BD (ZT-2); TLS en nginx (ZT-3). **Hoy el checkpoint sirve el login por HTTP y la base acepta conexiones sin TLS: es el desvío más visible** |
+| 2 | Toda la comunicación se asegura sin importar la ubicación de red | SSH solo por clave ✅ · Tailscale (WireGuard) para el equipo ✅ · **TLS 1.3 entre aplicación y base con verificación del certificado ✅** (runbook 18) · TLS en el borde con HSTS ⏳ · red interna aislada ✅ | 🔄 | TLS en nginx (ZT-3). **Hoy el checkpoint sirve el login por HTTP: es el desvío más visible** |
 | 3 | El acceso a cada recurso se concede por sesión y con el mínimo privilegio | Roles de base sin superusuario ✅ · `app_role` sin `UPDATE/DELETE` en auditoría ✅ · membresías por institución ✅ · JWT de vida corta ⏳ · contexto fijado por transacción (`SET LOCAL`) ⏳ | 🔄 | JWT corto y refresh (ZT-5); mínimo privilegio de `sudo` (ZT-4) |
 | 4 | El acceso lo decide una política dinámica con atributos de identidad, recurso y entorno | Modelo ABAC diseñado ✅ (nivel de aseguramiento, MFA reciente, institución, hora, intentos) · RLS activo ✅ · PDP en Django ⏳ | 🔄 | PDP con deniega-por-defecto y *fail closed* (ZT-6) |
 | 5 | Se monitorea la integridad y la postura de seguridad de todos los activos | SELinux en Enforcing ✅ · journal persistente ✅ · parches con `dnf` (manual) · integridad de archivos ⏳ · postura de los dispositivos de los ciudadanos ➖ | 🔄 | Reporte periódico de parches y AIDE (ZT-7). El dispositivo del ciudadano queda fuera: declarado en la sección 4 |
@@ -26,6 +26,7 @@ Matriz que contrasta cada principio de Zero Trust con lo que SIGET implementa ho
 - Aislamiento entre instituciones por RLS, auditoría de solo inserción, transiciones de estado válidas y que nadie se auto-asigne un rol: 19 pruebas contra el esquema real (`bash ~/siget-diseno/demo.sh`).
 - SSH solo por clave, firewall restrictivo, SELinux en Enforcing y journal persistente en las dos VMs (runbook 14).
 - La app del checkpoint usa un rol de mínimo privilegio y pgAdmin uno de solo lectura.
+- La conexión entre la app y la base va cifrada con TLS 1.3 verificando el certificado del servidor, y la base rechaza las conexiones sin TLS (runbook 18).
 
 ## 3. Plan de implementación
 
@@ -34,7 +35,7 @@ Semanas del [cronograma](./documento-introductorio.md): S1 = 12 oct. Los respons
 | ID | Tarea | Principio | Semana | Criterio de terminado |
 |---|---|---|---|---|
 | ZT-1 | Inventario de recursos con clasificación (dueño, sensibilidad, quién accede) | 1 | S2 | Tabla en `docs/` y campo `sensibilidad` poblado en el catálogo |
-| ZT-2 | **TLS entre la aplicación y la base** con certificado propio, `hostssl` y verificación del servidor; el checkpoint PHP pasa a `sslmode=verify-full` | 2 | S2 | `pg_stat_ssl` muestra `ssl = t` para `checkpoint_app`; una conexión sin TLS es rechazada |
+| ZT-2 ✅ | **TLS entre la aplicación y la base** con certificado propio, `hostssl` y verificación del servidor; el checkpoint PHP pasa a `sslmode=verify-full` | 2 | S2 | **Hecho el 15-oct** (runbook 18): `ssl = true` TLSv1.3 y la conexión sin TLS es rechazada |
 | ZT-3 | TLS en el borde (nginx) con HSTS, CSP y redirección de HTTP a HTTPS | 2 | S5 | `curl -I` devuelve HSTS y el HTTP no sirve contenido |
 | ZT-4 | **Sudo de mínimo privilegio**: reemplazar el `NOPASSWD: ALL` de `andy_martinez` por una lista de comandos | 3 | S2 | `sudo -l -U andy_martinez` lista solo comandos acotados |
 | ZT-5 | Argon2, JWT de vida corta con refresh, MFA TOTP y reautenticación para cambiar estados | 3 y 6 | S4–S6 | Pruebas de login, expiración, MFA y reautenticación |
@@ -57,7 +58,6 @@ Honestidad antes que cumplimiento aparente:
 | Desvío | Principio | Plan |
 |---|---|---|
 | El login del checkpoint se sirve por HTTP (sin TLS) | 2 | ZT-3 y ZT-9 |
-| La conexión app↔BD viaja sin cifrar por la red interna | 2 | ZT-2 |
 | `andy_martinez` tiene `sudo` completo en VM1 | 3 | ZT-4 |
 | PostgreSQL sigue siendo la instalación nativa | 3 | Tareas 2.2 y 2.3 del plan de las semanas 1 y 2 |
 | El MFA todavía no existe | 6 | ZT-5 |

@@ -874,3 +874,67 @@ Al inspeccionar `config.php`, el filtro que enmascaraba contraseñas no coincidi
 - Activar `LOGIN` de `app_role` con `podman secret` cuando exista el backend.
 - Repetir esta configuración en el PostgreSQL en contenedor (tarea 2.2) y aplicar allí el esquema con el mismo script.
 - Retirar la app PHP cuando Django la reemplace.
+
+## 18. TLS entre la aplicación y la base de datos
+
+Fecha: 15 de octubre de 2026, tarea ZT-2 de la [matriz de cobertura de Zero Trust](./zero-trust-cobertura.md) (principio 2: toda la comunicación se asegura sin importar la ubicación de red). Ejecutado por Jeison en VM2 y VM1, con su aprobación. Se aplicó al PostgreSQL nativo; se repetirá en el contenedor (tarea 2.2).
+
+### 18.1 Antes
+
+La conexión entre la app y la base viajaba sin cifrar por la red interna. Se comprobó con una prueba desde VM1: `sslmode=disable` conectaba con `ssl=false`.
+
+### 18.2 Autoridad certificadora y certificado del servidor (VM2)
+
+CA interna propia (`SIGET CA interna`, ECDSA P-256, 5 años) y certificado del servidor (1 año) con `subjectAltName` de la IP `192.168.100.20` y `db-server`. La **clave privada de la CA queda solo en `/root/siget-ca/` (700) de VM2**, para emitir futuros certificados; la clave del servidor está en `/var/lib/pgsql/data/tls/` (600, `postgres`, contexto `postgresql_db_t`).
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out ca.key
+openssl req -x509 -new -key ca.key -sha256 -days 1825 -subj '/O=SIGET/OU=Ciberseguridad 5 UTP/CN=SIGET CA interna' -out ca.crt
+# servidor: clave, CSR y firma con la CA, con SAN IP:192.168.100.20,DNS:db-server
+```
+
+PostgreSQL (`ALTER SYSTEM`, recarga sin reinicio): `ssl = on`, `ssl_cert_file`, `ssl_key_file` y `ssl_min_protocol_version = 'TLSv1.3'`.
+
+### 18.3 Cliente (VM1)
+
+La CA **pública** se instaló en `/etc/pki/siget/ca.crt` (contexto `cert_t`). El `db.php` del checkpoint pasó a `sslmode=verify-full;sslrootcert=/etc/pki/siget/ca.crt`, así que el PHP verifica que el servidor es quien dice ser, no solo cifra. El `db.php` anterior se guardó en `/root/siget-backups/`.
+
+### 18.4 Exigir TLS en la base
+
+En `pg_hba.conf`, las reglas de `checkpoint_app` y `pgadmin_lectura` pasaron de `host` a `hostssl`:
+
+```
+host     all             postgres        192.168.100.10/32       reject
+hostssl  tramites_demo   checkpoint_app  192.168.100.10/32       scram-sha-256
+hostssl  all             pgadmin_lectura 192.168.100.10/32       scram-sha-256
+```
+
+Una conexión sin TLS ya no encuentra ninguna regla y es rechazada. Respaldo de la regla anterior en `/var/backups/siget/pg_hba.conf.antes-hostssl`.
+
+### 18.5 Verificación
+
+Prueba desde VM1 con el rol de la app (consulta `pg_stat_ssl` dentro de la propia sesión):
+
+| Intento | Antes de `hostssl` | Después de `hostssl` |
+|---|---|---|
+| `verify-full` con la CA de SIGET | Conecta: `ssl=true`, TLSv1.3, `TLS_AES_256_GCM_SHA384` | Conecta: igual |
+| `verify-full` sin confiar en la CA | Rechazada (certificado no verificable) | Rechazada |
+| `sslmode=disable` (sin TLS) | **Conectaba** (`ssl=false`) | **Rechazada**: no hay línea en `pg_hba.conf` |
+
+El login real de la app (registro, login, dashboard) siguió funcionando con la base exigiendo TLS. Usuario de prueba creado y borrado; los 8 usuarios reales intactos.
+
+### 18.6 pgAdmin
+
+La conexión de `pgadmin_lectura` ahora **debe usar SSL**: en pgAdmin, pestaña *SSL*, modo `require` (o `verify-full` con el certificado de la CA).
+
+### 18.7 Gotchas
+
+- `ssl` se activa con recarga (`pg_reload_conf()`), sin reiniciar PostgreSQL.
+- Con `verify-full` el nombre del servidor debe estar en el `subjectAltName`; por eso el certificado incluye la IP, porque la app se conecta por IP.
+- `hostssl` no rechaza explícitamente lo que no es TLS: simplemente no hay regla que lo acepte, y el error es "no hay una línea en pg_hba.conf".
+
+### 18.8 Pendiente
+
+- Renovar el certificado del servidor antes de su vencimiento (octubre de 2027) y definir la rotación.
+- Repetir esta configuración en el PostgreSQL en contenedor y guardar la clave del servidor con `podman secret`.
+- Cifrado del login HTTP (nginx con TLS): ZT-3, semana 5.
