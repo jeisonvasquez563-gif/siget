@@ -587,11 +587,30 @@ Pegar de una vez un bloque con `cat > archivo << 'EOF' ... EOF` en la terminal S
 
 ### 12.8 Pendiente de este bloque
 
-- Instalar Podman en VM2 (`db-server`) y repetir las verificaciones.
+- ~~Instalar Podman en VM2 (`db-server`) y repetir las verificaciones.~~ Hecho el 15-oct, ver 12.9.
 - Decidir qué usuario corre los contenedores del proyecto (usuario de servicio dedicado o el de cada integrante) y activar el linger en ese usuario: `sudo loginctl enable-linger <usuario>`.
 - Resolver los puertos 80 y 443 en VM1 (Apache los ocupa y los contenedores rootless no pueden usar puertos menores a 1024 por defecto).
 - Decidir qué se hace con el contenedor de prueba `siget-prueba`. Con `Linger=no` solo corre mientras `andy_martinez` tiene una sesión abierta; al cerrarla systemd lo detiene. No se elimina sin aprobación de Jeison.
 - Git no está instalado en las VMs; no es necesario, porque el código se trabaja desde la PC de cada integrante.
+
+### 12.9 Podman rootless en VM2 (`db-server`)
+
+Fecha: 15 de octubre de 2026, tarea 1.2 del plan de las semanas 1 y 2. Ejecutado por Jeison desde su cuenta con sudo (decisión D3: no se dio sudo adicional a nadie).
+
+```bash
+sudo nohup bash -c "dnf install -y podman > /tmp/dnf-podman.log 2>&1; echo EXIT=\$? >> /tmp/dnf-podman.log" &
+```
+
+Se lanzó con `nohup` dentro de la VM porque en VM1 la sesión SSH se cortó durante la instalación (se actualiza `selinux-policy`). Resultado: `EXIT=0`, sin cortes.
+
+Verificación:
+
+- `podman --version` informa 5.8.2, con `container-selinux`, `crun`, `netavark`, `aardvark-dns` y `passt` instalados. Es la misma versión que en VM1.
+- SELinux sigue en `Enforcing` y `ausearch -m avc` no registra denegaciones.
+- Como `siget`: `podman info` informa `rootless=true`, driver `overlay` y red `netavark`; `podman run --rm quay.io/podman/hello` funciona.
+- El firewall no cambió (`dhcpv6-client ssh` y la regla del 5432 solo desde `192.168.100.10`) y el PostgreSQL nativo sigue activo, así que el checkpoint no se tocó.
+
+Gotcha: el servicio de PostgreSQL se llama `postgresql`, no `postgresql-16`; `systemctl is-active postgresql-16` responde `inactive` aunque la base esté funcionando.
 
 ## 13. Cuentas de Linux del equipo y sudo
 
@@ -630,7 +649,7 @@ Es sudo completo. Para revocarlo: `sudo rm /etc/sudoers.d/andy_martinez`. No tie
 
 ### 13.4 Gotcha: el sudo de Andy no dejó registro consultable
 
-El journal de las VMs no conservó los comandos `sudo` ejecutados por Andy el 10-oct (no hay persistencia o se perdió tras un reinicio). La instalación de Podman se verificó por `dnf history` y `rpm -q`. Pendiente: habilitar journal persistente o auditd para que el uso de sudo quede trazable.
+El journal de las VMs no conservó los comandos `sudo` ejecutados por Andy el 10-oct (no hay persistencia o se perdió tras un reinicio). La instalación de Podman se verificó por `dnf history` y `rpm -q`. Resuelto el 15-oct con el journal persistente (ver 14.6); `auditd` queda como mejora opcional.
 
 ## 14. Endurecimiento de SSH y firewall
 
@@ -668,3 +687,296 @@ Borrar `/etc/ssh/sshd_config.d/40-siget-hardening.conf` y recargar sshd. Para Co
 
 - PostgreSQL escucha en `0.0.0.0:5432` (contenido por el firewall). El spec pide bind solo a la IP interna; se corrige al migrar a contenedor.
 - Las cuentas sin clave cargada ya no tienen ninguna vía de acceso por SSH.
+
+### 14.6 Journal persistente (trazabilidad del uso de sudo)
+
+Antes, el journal de las VMs era volátil (no existía `/var/log/journal`) y se perdía al reiniciar, por eso no había registro de los `sudo` de Andy (13.4). El 15 de octubre se activó el almacenamiento persistente en VM1 y VM2:
+
+```bash
+sudo mkdir -p /var/log/journal
+printf '[Journal]
+Storage=persistent
+SystemMaxUse=200M
+' | sudo tee /etc/systemd/journald.conf.d/40-siget-persistente.conf
+sudo systemd-tmpfiles --create --prefix /var/log/journal
+sudo systemctl restart systemd-journald && sudo journalctl --flush
+```
+
+Verificación: `/var/log/journal` existe con contexto SELinux `var_log_t`, `systemd-journald` activo y `journalctl --disk-usage` informa 16 MB en ambas VMs. Desde ahora `sudo journalctl _COMM=sudo` conserva el historial entre reinicios. El tope de 200 MB evita que el journal crezca sin control.
+
+**Gotcha:** el primer script se colgó al final (la sesión SSH no volvió) aunque la configuración ya estaba aplicada. Se repitió con `timeout` en los comandos de recarga y funcionó. Conviene usar siempre `timeout` al reiniciar servicios de logging por SSH.
+
+## 15. Usuario de servicio `siget` para los contenedores
+
+Fecha: 15 de octubre de 2026. Decisión D1 del [plan de las semanas 1 y 2](./architecture/plan-semanas-1-2.md), tomada por Jeison: los contenedores del proyecto corren bajo un usuario de servicio dedicado y no bajo la cuenta de un integrante, para que el sistema no dependa de una persona. Tarea 1.1 del plan.
+
+### 15.1 Creación (VM1 y VM2)
+
+```bash
+sudo useradd -m -s /bin/bash -c "Usuario de servicio SIGET (contenedores)" siget
+sudo passwd -l siget
+sudo chmod 750 /home/siget
+sudo loginctl enable-linger siget
+```
+
+Resultado en ambas VMs: `uid=1009(siget)`, rango subuid/subgid `689824:65536` asignado automáticamente por `useradd`, contraseña bloqueada, sin directorio `~/.ssh` y sin sudo.
+
+### 15.2 Verificación
+
+- `loginctl show-user siget` informa `Linger=yes` y `State=lingering`, y existe `/run/user/1009`: el gestor de usuario de systemd arranca con el sistema, así que sus contenedores sobreviven al cierre de cualquier sesión.
+- En VM1, `podman info` como `siget` informa `rootless=true` y `systemctl --user is-system-running` responde `running`.
+- En VM2 el usuario existe y tiene linger, pero Podman aún no está instalado (tarea 1.2).
+
+### 15.3 Cómo se usa
+
+`siget` **no admite acceso por SSH** (sin contraseña ni claves). Se opera desde una cuenta con sudo:
+
+```bash
+sudo -H -u siget bash -c 'cd ~ && XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user status'
+```
+
+Las unidades Quadlet del proyecto van en `/home/siget/.config/containers/systemd/`.
+
+### 15.4 Gotchas
+
+- Ejecutar `sudo -u siget podman …` desde un directorio que `siget` no puede leer (por ejemplo el home de otro usuario) falla con `Error: setting up the process`. Hay que hacer `cd ~` antes, como en el comando de arriba.
+- Hay que fijar `XDG_RUNTIME_DIR=/run/user/<uid>` para que `systemctl --user` y Podman encuentren el bus del usuario.
+- El script de creación se colgó en VM2 pasados los 90 segundos aunque todo ya estaba aplicado; conviene usar `timeout` y verificar el estado por separado.
+
+### 15.5 Pendiente
+
+- Retirar el contenedor de prueba de `andy_martinez` y recrearlo bajo `siget` (decisión D4, requiere aprobación de Jeison).
+- Instalar Podman en VM2 (tarea 1.2).
+- El acceso a los puertos 80/443 en VM1 sigue pendiente de la decisión D2.
+
+## 16. Respaldo de la base de datos antes de la migración a contenedor
+
+Fecha: 15 de octubre de 2026, tarea 2.1 del plan de las semanas 1 y 2. Ejecutado por Jeison en VM2 (`db-server`), PostgreSQL 16.15 nativo. Es de solo lectura: no modifica la base.
+
+### 16.1 Contenido respaldado
+
+| Base | Tamaño | Datos |
+|---|---|---|
+| `tramites_demo` | 7,9 MB | `app_usuarios` (8 filas) y `demo_tramite` (1 fila) |
+| `postgres` | 7,7 MB | Sin datos del proyecto (no se respalda) |
+
+### 16.2 Comandos
+
+```bash
+sudo install -d -m 700 -o postgres -g postgres /var/backups/siget
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.dump
+sudo -u postgres pg_dump -Fp --no-owner -d tramites_demo -f /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.sql
+sudo -u postgres pg_dumpall --globals-only -f /var/backups/siget/globals-AAAAMMDD-HHMM.sql
+```
+
+Se generaron tres archivos con permisos 600 en un directorio 700: el volcado en formato personalizado (`.dump`, 6 KB), el mismo contenido en SQL plano (4,6 KB) y los roles de PostgreSQL (`globals`, 671 bytes). El sello de este respaldo es `20261015-1608`.
+
+### 16.3 Verificación
+
+- `pg_restore --list` muestra los datos de `app_usuarios` y `demo_tramite`.
+- **Prueba de restauración:** se restauró el `.dump` en una base temporal `restore_test`, que devolvió `app_usuarios=8` y `demo_tramite=1` (los mismos conteos que el original). Después se eliminó y se comprobó que no quedó rastro.
+- La base original quedó intacta.
+
+### 16.4 Copia fuera de la VM
+
+Los archivos `.dump` y `.sql` de `tramites_demo` se copiaron al equipo de Jeison, **fuera del repositorio** (`Desktop/respaldos-siget/`), y sus hashes SHA-256 coinciden con los de la VM:
+
+| Archivo | SHA-256 |
+|---|---|
+| `tramites_demo-20261015-1608.dump` | `eaed2ed5732c0871bf3025f13fbc2a10440484640958918c933d72fdb2c6e065` |
+| `tramites_demo-20261015-1608.sql` | `16e31a9ac000c3c033d4234bb11b259d4557ea7da0882328580c3d1e2b541a9b` |
+
+El archivo de roles (`globals`) **no se copió** fuera de la VM: contiene los hashes de contraseña de los roles de PostgreSQL.
+
+### 16.5 Seguridad: estos archivos no van al repositorio
+
+Los respaldos contienen los hashes bcrypt de las cuentas de la app, así que nunca se commitean. Se agregó `*.dump` y `globals-*.sql` a `.gitignore` como protección. `database/schema.sql` sigue versionado, porque es el esquema sin datos.
+
+### 16.6 Cómo restaurar
+
+```bash
+sudo -u postgres createdb tramites_demo
+sudo -u postgres pg_restore -d tramites_demo /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+### 16.7 Gotchas
+
+- Un comodín como `chmod 600 /var/backups/siget/*` falla si el directorio es 700 y no pertenece a quien lo ejecuta, porque el shell lo expande antes de `sudo`. Hay que usar `sudo bash -c "chmod 600 …/*"`.
+- Las VMs no tienen `rg`: los scripts remotos deben usar `grep`.
+- `pg_stat_user_tables.n_live_tup` mostró 0 filas aunque había datos (las estadísticas no estaban actualizadas); para contar hay que usar `select count(*)`.
+
+### 16.8 Pendiente
+
+- Mantener este respaldo hasta verificar la migración (tarea 2.3). El PostgreSQL nativo **no se apaga** hasta entonces.
+- Definir una retención y un respaldo periódico (por ejemplo, con un systemd timer) cuando la base esté en contenedor.
+
+## 17. Roles de base de datos en marcha y cierre de la brecha del superusuario
+
+Fecha: 15 de octubre de 2026, parte de la tarea 2.4 del plan de las semanas 1 y 2. Ejecutado por Jeison en VM2 y VM1, con su aprobación explícita. Se aplicó sobre la base nativa actual; la migración a contenedor (tareas 2.2 y 2.3) queda pendiente. Detalle del diseño en [`roles-permisos-bd.md`](./roles-permisos-bd.md).
+
+### 17.1 Antes
+
+La base tenía un único rol (`postgres`, superusuario), dueño de todo, y la app PHP del checkpoint se conectaba con él. Contradecía el principio Zero Trust de no operar con superusuario.
+
+### 17.2 Respaldo previo
+
+`pg_dump` (`pre-roles-AAAAMMDD-HHMM.dump`) y copia de `pg_hba.conf` en `/var/backups/siget/` de VM2, antes de tocar nada. La contraseña de `postgres` no se modificó hasta verificar el login.
+
+### 17.3 Qué se aplicó (una sola transacción)
+
+Ejecutado por `postgres` como arranque inicial, a partir de [`database/diseno-roles-permisos.sql`](../database/diseno-roles-permisos.sql):
+
+- Esquema `siget` (8 tablas, 6 políticas RLS, 5 triggers) y roles `siget_owner`, `app_role` y `auditor_role` (los tres `NOLOGIN` por ahora: `app_role` se activará con su secret cuando exista Django).
+- `checkpoint_app`: rol `LOGIN` de la app PHP, con `SELECT, INSERT, UPDATE, DELETE` **solo** sobre `app_usuarios` y `USAGE` de su secuencia. No puede leer `demo_tramite`, borrar tablas, crear objetos ni roles.
+- `pgadmin_lectura`: rol `LOGIN` de solo lectura (`pg_read_all_data`, `pg_monitor`) para pgAdmin. No puede escribir y RLS le oculta los trámites.
+- La base y las tablas del checkpoint pasaron a ser propiedad de `siget_owner`. `REVOKE ALL … FROM PUBLIC` sobre la base y las tablas.
+
+### 17.4 Cambio en la app (VM1)
+
+Se cambió `DB_USER` y `DB_PASSWORD` en `/var/www/html/gestion/config.php` por los de `checkpoint_app` (archivo local, fuera de git, `apache:apache` 640, contexto `httpd_sys_content_t`). La contraseña se generó al vuelo (28 caracteres aleatorios) y se escribió sin mostrarse. El respaldo del `config.php` anterior se movió a `/root/siget-backups/` (700), fuera del directorio web.
+
+### 17.5 Cierre de la brecha: `postgres` ya no se usa
+
+En `pg_hba.conf`, la regla `host all all 192.168.100.10/32` se reemplazó por:
+
+```
+host    all             postgres        192.168.100.10/32       reject
+host    tramites_demo   checkpoint_app  192.168.100.10/32       scram-sha-256
+host    all             pgadmin_lectura 192.168.100.10/32       scram-sha-256
+```
+
+`pg_hba_file_rules` no informa errores. Además se anuló la contraseña de `postgres` (`ALTER ROLE postgres PASSWORD NULL`): solo se entra con el usuario del sistema por socket local.
+
+### 17.6 Verificación
+
+- Registro, login (302 al dashboard, dashboard 200) y "Acceso denegado" con el contador de intentos funcionan igual que antes, ya con `checkpoint_app`. El bloqueo tras 3 intentos también (el `UPDATE` funciona con el rol nuevo).
+- `checkpoint_app`: puede leer `app_usuarios`, pero `demo_tramite` y `siget.*` responden permiso denegado; no puede borrar ni crear tablas ni crear roles.
+- Las 19 pruebas de `diseno-pruebas.sql` pasan contra el esquema real (`bash ~/siget-diseno/demo.sh`), con `ROLLBACK` de los datos de prueba.
+- Los 8 usuarios del checkpoint siguen intactos. Se crearon y se borraron 3 usuarios de prueba (`zz_*`).
+- El único rol superusuario es `postgres`, sin contraseña y rechazado por red.
+
+### 17.7 pgAdmin: cambio de conexión
+
+pgAdmin se conectaba como `postgres`; ya no puede. Hay que cambiar la conexión del servidor a **usuario `pgadmin_lectura`**. Su contraseña se guardó **solo en el equipo de Jeison**, fuera del repositorio (`Desktop/respaldos-siget/credencial-pgadmin-lectura.txt`). Es de solo lectura: no sirve para escribir en la base.
+
+### 17.8 Incidente: contraseña expuesta en una salida
+
+Al inspeccionar `config.php`, el filtro que enmascaraba contraseñas no coincidió con la línea `DB_PASSWORD` y la contraseña **anterior** de `postgres` quedó impresa en el registro de la sesión de trabajo. Está anulada (17.5), así que no es utilizable. Lección: para mostrar un archivo de configuración se filtra por el nombre exacto de la constante o no se muestra su contenido.
+
+### 17.9 Gotchas
+
+- Un `tee /dev/stderr` dentro de una sustitución de comandos se traga la salida: no usarlo para mostrar resultados.
+- Los campos del formulario de registro son `username`, `password` y `password2`; una prueba con otro nombre devuelve 200 sin crear nada.
+- `pg_hba_file_rules` devuelve arreglos en `database` y `user_name`: hay que usar `array_to_string`.
+
+### 17.10 Pendiente
+
+- Activar `LOGIN` de `app_role` con `podman secret` cuando exista el backend.
+- Repetir esta configuración en el PostgreSQL en contenedor (tarea 2.2) y aplicar allí el esquema con el mismo script.
+- Retirar la app PHP cuando Django la reemplace.
+
+## 18. TLS entre la aplicación y la base de datos
+
+Fecha: 15 de octubre de 2026, tarea ZT-2 de la [matriz de cobertura de Zero Trust](./zero-trust-cobertura.md) (principio 2: toda la comunicación se asegura sin importar la ubicación de red). Ejecutado por Jeison en VM2 y VM1, con su aprobación. Se aplicó al PostgreSQL nativo; se repetirá en el contenedor (tarea 2.2).
+
+### 18.1 Antes
+
+La conexión entre la app y la base viajaba sin cifrar por la red interna. Se comprobó con una prueba desde VM1: `sslmode=disable` conectaba con `ssl=false`.
+
+### 18.2 Autoridad certificadora y certificado del servidor (VM2)
+
+CA interna propia (`SIGET CA interna`, ECDSA P-256, 5 años) y certificado del servidor (1 año) con `subjectAltName` de la IP `192.168.100.20` y `db-server`. La **clave privada de la CA queda solo en `/root/siget-ca/` (700) de VM2**, para emitir futuros certificados; la clave del servidor está en `/var/lib/pgsql/data/tls/` (600, `postgres`, contexto `postgresql_db_t`).
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out ca.key
+openssl req -x509 -new -key ca.key -sha256 -days 1825 -subj '/O=SIGET/OU=Ciberseguridad 5 UTP/CN=SIGET CA interna' -out ca.crt
+# servidor: clave, CSR y firma con la CA, con SAN IP:192.168.100.20,DNS:db-server
+```
+
+PostgreSQL (`ALTER SYSTEM`, recarga sin reinicio): `ssl = on`, `ssl_cert_file`, `ssl_key_file` y `ssl_min_protocol_version = 'TLSv1.3'`.
+
+### 18.3 Cliente (VM1)
+
+La CA **pública** se instaló en `/etc/pki/siget/ca.crt` (contexto `cert_t`). El `db.php` del checkpoint pasó a `sslmode=verify-full;sslrootcert=/etc/pki/siget/ca.crt`, así que el PHP verifica que el servidor es quien dice ser, no solo cifra. El `db.php` anterior se guardó en `/root/siget-backups/`.
+
+### 18.4 Exigir TLS en la base
+
+En `pg_hba.conf`, las reglas de `checkpoint_app` y `pgadmin_lectura` pasaron de `host` a `hostssl`:
+
+```
+host     all             postgres        192.168.100.10/32       reject
+hostssl  tramites_demo   checkpoint_app  192.168.100.10/32       scram-sha-256
+hostssl  all             pgadmin_lectura 192.168.100.10/32       scram-sha-256
+```
+
+Una conexión sin TLS ya no encuentra ninguna regla y es rechazada. Respaldo de la regla anterior en `/var/backups/siget/pg_hba.conf.antes-hostssl`.
+
+### 18.5 Verificación
+
+Prueba desde VM1 con el rol de la app (consulta `pg_stat_ssl` dentro de la propia sesión):
+
+| Intento | Antes de `hostssl` | Después de `hostssl` |
+|---|---|---|
+| `verify-full` con la CA de SIGET | Conecta: `ssl=true`, TLSv1.3, `TLS_AES_256_GCM_SHA384` | Conecta: igual |
+| `verify-full` sin confiar en la CA | Rechazada (certificado no verificable) | Rechazada |
+| `sslmode=disable` (sin TLS) | **Conectaba** (`ssl=false`) | **Rechazada**: no hay línea en `pg_hba.conf` |
+
+El login real de la app (registro, login, dashboard) siguió funcionando con la base exigiendo TLS. Usuario de prueba creado y borrado; los 8 usuarios reales intactos.
+
+### 18.6 pgAdmin
+
+La conexión de `pgadmin_lectura` ahora **debe usar SSL**: en pgAdmin, pestaña *SSL*, modo `require` (o `verify-full` con el certificado de la CA).
+
+### 18.7 Gotchas
+
+- `ssl` se activa con recarga (`pg_reload_conf()`), sin reiniciar PostgreSQL.
+- Con `verify-full` el nombre del servidor debe estar en el `subjectAltName`; por eso el certificado incluye la IP, porque la app se conecta por IP.
+- `hostssl` no rechaza explícitamente lo que no es TLS: simplemente no hay regla que lo acepte, y el error es "no hay una línea en pg_hba.conf".
+
+### 18.8 Pendiente
+
+- Renovar el certificado del servidor antes de su vencimiento (octubre de 2027) y definir la rotación.
+- Repetir esta configuración en el PostgreSQL en contenedor y guardar la clave del servidor con `podman secret`.
+- Cifrado del login HTTP (nginx con TLS): ZT-3, semana 5.
+
+## 19. División del rol de plataforma en cinco roles y control dual
+
+Fecha: 15 de octubre de 2026. Decisión de Jeison: un único "operador de plataforma" era un rol todopoderoso, contrario a Zero Trust (separación de funciones). Se aplicó sobre el esquema `siget` de la base nativa con la migración [`database/migraciones/002-dividir-rol-plataforma.sql`](../database/migraciones/002-dividir-rol-plataforma.sql), ejecutada como `siget_owner` y no como superusuario.
+
+### 19.1 Los cinco roles
+
+| Rol | Hace | No puede |
+|---|---|---|
+| `operador_infraestructura` | Servidores, contenedores, despliegues y parches | Ver datos de la aplicación; crear usuarios; tocar secretos |
+| `operador_identidades` | Altas de coordinadores y restablecer el segundo factor | Tocar infraestructura; ver trámites; crear instituciones |
+| `operador_catalogo` | Alta de instituciones y de los tipos de trámite base | Crear usuarios; tocar infraestructura |
+| `operador_seguridad` | Bloquear cuentas y revocar sesiones ante incidentes | Crear cuentas; leer trámites; modificar la auditoría |
+| `custodio_secretos` | Rotar contraseñas, claves y certificados | Desplegar; crear usuarios; leer datos |
+
+El `auditor` sigue aparte. `operador_plataforma` se renombró a `operador_infraestructura`.
+
+### 19.2 Reglas impuestas en la base
+
+- **Un solo rol de plataforma por persona** (columna única `usuario.rol_plataforma`).
+- **Quien tiene un rol de plataforma no puede tener membresías de institución, ni al revés**: dos triggers (`membresia_valida_rol_plataforma` y `usuario_valida_membresias`).
+- **Control dual:** nueva tabla `siget.aprobacion` con `CHECK (aprobado_por <> propuesto_por)`: quien propone un alta (institución o coordinador) no puede aprobarla. `app_role` solo puede completar `aprobado_por`, `estado` y `resuelto_en`; no puede cambiar quién propuso.
+
+### 19.3 Procedimiento
+
+1. Respaldo previo (`pre-002-AAAAMMDD-HHMM.dump` en `/var/backups/siget/` de VM2).
+2. Ensayo: la migración completa dentro de `BEGIN … ROLLBACK`, que confirmó que no falla y no deja cambios.
+3. Aplicación con `COMMIT`.
+4. Verificación: `rol_plataforma` tiene los 7 valores (ninguno, los 5 nuevos y auditor), el esquema pasó a 9 tablas y 7 triggers.
+
+### 19.4 Verificación
+
+Las pruebas pasaron de 19 a **24, todas contra el esquema real** (`bash ~/siget-diseno/demo.sh`). Las nuevas: 20 y 21 (un operador no recibe membresías y un funcionario no recibe rol de plataforma), 22 y 23 (nadie aprueba su propia solicitud; una segunda persona sí puede) y 24 (no se puede cambiar quién propuso). Los 8 usuarios del checkpoint siguen intactos y no quedan datos de prueba.
+
+### 19.5 Gotcha
+
+`ALTER TYPE … ADD VALUE` permite agregar valores a una enumeración dentro de una transacción (PostgreSQL 12 o posterior), pero **no se pueden usar en esa misma transacción**; por eso la migración no los usa y las pruebas corren en una transacción posterior.
+
+### 19.6 Pendiente
+
+- El control dual se aplica hoy a nivel de datos; falta que el backend lo exija en el flujo de altas.
+- Definir cómo se otorga el primer rol de cada operador (arranque inicial) sin romper la separación de funciones.

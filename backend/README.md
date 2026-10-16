@@ -7,8 +7,8 @@ Django + Django REST Framework (API-first). Pendiente de implementación — Fas
 - Django + DRF
 - Hash de contraseñas: Argon2
 - Auth: JWT de corta duración (`djangorestframework-simplejwt`) + refresh token
-- MFA: `django-otp` (TOTP), obligatorio para funcionario/supervisor/administrador
-- RBAC: grupos y permisos nativos de Django (ciudadano, funcionario, supervisor, administrador)
+- MFA: `django-otp` (TOTP), obligatorio para funcionario, supervisor, coordinador institucional, los cinco roles de operación de plataforma y auditor
+- Autorización: ABAC con membresías (institución, rol), ver `docs/architecture/spec.md` sección 4 (roles: ciudadano, funcionario, supervisor, coordinador institucional, los cinco roles de operación de plataforma y auditor)
 - Corre en contenedor Podman rootless (VM1), gestionado por Quadlet, junto a nginx en el mismo pod
 
 ## Estructura esperada (convención estándar Django)

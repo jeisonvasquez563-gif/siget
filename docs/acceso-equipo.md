@@ -12,7 +12,7 @@ Cada integrante tiene una cuenta de Linux propia en VM1 (`app-backend`) y VM2 (`
 | Bradley Morales | `bradley_morales` |
 | Anyurie Sánchez | `anyurie_sanchez` |
 | Walter Sanjur | `walter_sanjur` |
-| Jeison Vásquez | `jeison_vasquez` (administrador, con sudo) |
+| Jeison Vásquez | `jeison_vasquez` (responsable de la infraestructura, con sudo) |
 
 Todas las cuentas del equipo pertenecen al grupo `ciber5`. **Sudo (NOPASSWD, vía `/etc/sudoers.d/`):** `jeison_vasquez` en VM1 y VM2, y `andy_martinez` solo en VM1 (para instalar Podman, autorizado por Jeison el 10-oct-2026). El resto no tiene sudo. Si alguien necesita privilegios, se pide a Jeison y se registra en el [`CHANGELOG.md`](../CHANGELOG.md).
 
@@ -48,3 +48,7 @@ sudo restorecon -R /home/USUARIO/.ssh
 - Si se pierde o filtra una clave privada, avisar de inmediato para retirarla de `authorized_keys`.
 - Dar de baja a alguien: `sudo userdel -r USUARIO` (siempre con aprobación explícita).
 - No guardar contraseñas ni claves en el repositorio.
+
+## Cuenta de servicio `siget`
+
+`siget` es una cuenta de servicio para los contenedores del proyecto (ver [`runbook.md`](./runbook.md) sección 15). **No es una cuenta de persona**: no tiene contraseña, no admite SSH y no se le cargan claves. Se opera con `sudo -u siget` desde una cuenta autorizada.
