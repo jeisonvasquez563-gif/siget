@@ -748,3 +748,64 @@ Las unidades Quadlet del proyecto van en `/home/siget/.config/containers/systemd
 - Retirar el contenedor de prueba de `andy_martinez` y recrearlo bajo `siget` (decisión D4, requiere aprobación de Jeison).
 - Instalar Podman en VM2 (tarea 1.2).
 - El acceso a los puertos 80/443 en VM1 sigue pendiente de la decisión D2.
+
+## 16. Respaldo de la base de datos antes de la migración a contenedor
+
+Fecha: 15 de octubre de 2026, tarea 2.1 del plan de las semanas 1 y 2. Ejecutado por Jeison en VM2 (`db-server`), PostgreSQL 16.15 nativo. Es de solo lectura: no modifica la base.
+
+### 16.1 Contenido respaldado
+
+| Base | Tamaño | Datos |
+|---|---|---|
+| `tramites_demo` | 7,9 MB | `app_usuarios` (8 filas) y `demo_tramite` (1 fila) |
+| `postgres` | 7,7 MB | Sin datos del proyecto (no se respalda) |
+
+### 16.2 Comandos
+
+```bash
+sudo install -d -m 700 -o postgres -g postgres /var/backups/siget
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.dump
+sudo -u postgres pg_dump -Fp --no-owner -d tramites_demo -f /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.sql
+sudo -u postgres pg_dumpall --globals-only -f /var/backups/siget/globals-AAAAMMDD-HHMM.sql
+```
+
+Se generaron tres archivos con permisos 600 en un directorio 700: el volcado en formato personalizado (`.dump`, 6 KB), el mismo contenido en SQL plano (4,6 KB) y los roles de PostgreSQL (`globals`, 671 bytes). El sello de este respaldo es `20261015-1608`.
+
+### 16.3 Verificación
+
+- `pg_restore --list` muestra los datos de `app_usuarios` y `demo_tramite`.
+- **Prueba de restauración:** se restauró el `.dump` en una base temporal `restore_test`, que devolvió `app_usuarios=8` y `demo_tramite=1` (los mismos conteos que el original). Después se eliminó y se comprobó que no quedó rastro.
+- La base original quedó intacta.
+
+### 16.4 Copia fuera de la VM
+
+Los archivos `.dump` y `.sql` de `tramites_demo` se copiaron al equipo de Jeison, **fuera del repositorio** (`Desktop/respaldos-siget/`), y sus hashes SHA-256 coinciden con los de la VM:
+
+| Archivo | SHA-256 |
+|---|---|
+| `tramites_demo-20261015-1608.dump` | `eaed2ed5732c0871bf3025f13fbc2a10440484640958918c933d72fdb2c6e065` |
+| `tramites_demo-20261015-1608.sql` | `16e31a9ac000c3c033d4234bb11b259d4557ea7da0882328580c3d1e2b541a9b` |
+
+El archivo de roles (`globals`) **no se copió** fuera de la VM: contiene los hashes de contraseña de los roles de PostgreSQL.
+
+### 16.5 Seguridad: estos archivos no van al repositorio
+
+Los respaldos contienen los hashes bcrypt de las cuentas de la app, así que nunca se commitean. Se agregó `*.dump` y `globals-*.sql` a `.gitignore` como protección. `database/schema.sql` sigue versionado, porque es el esquema sin datos.
+
+### 16.6 Cómo restaurar
+
+```bash
+sudo -u postgres createdb tramites_demo
+sudo -u postgres pg_restore -d tramites_demo /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+### 16.7 Gotchas
+
+- Un comodín como `chmod 600 /var/backups/siget/*` falla si el directorio es 700 y no pertenece a quien lo ejecuta, porque el shell lo expande antes de `sudo`. Hay que usar `sudo bash -c "chmod 600 …/*"`.
+- Las VMs no tienen `rg`: los scripts remotos deben usar `grep`.
+- `pg_stat_user_tables.n_live_tup` mostró 0 filas aunque había datos (las estadísticas no estaban actualizadas); para contar hay que usar `select count(*)`.
+
+### 16.8 Pendiente
+
+- Mantener este respaldo hasta verificar la migración (tarea 2.3). El PostgreSQL nativo **no se apaga** hasta entonces.
+- Definir una retención y un respaldo periódico (por ejemplo, con un systemd timer) cuando la base esté en contenedor.
