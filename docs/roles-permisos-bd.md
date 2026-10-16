@@ -34,8 +34,8 @@ Los 6 roles del diseño no son roles de PostgreSQL: se guardan en `usuario.rol_p
 
 | Rol de aplicación | Dónde se representa |
 |---|---|
-| Ciudadano, funcionario, supervisor, administrador institucional | `membresia.rol` (por institución) |
-| Administrador de plataforma, auditor | `usuario.rol_plataforma` |
+| Ciudadano, funcionario, supervisor, coordinador institucional, operador de plataforma, auditor institucional | `membresia.rol` (por institución) |
+| Operador de plataforma, auditor | `usuario.rol_plataforma` |
 
 ## 5. Módulos (tablas)
 
@@ -70,7 +70,7 @@ Los 6 roles del diseño no son roles de PostgreSQL: se guardan en `usuario.rol_p
 | 9-10 | `app_role` no puede `UPDATE` ni `DELETE` la auditoría | PASA |
 | 11 | `app_role` no puede borrar trámites | PASA |
 | 12 | Nadie se asigna un rol a sí mismo | PASA |
-| 13 | `app_role` no puede subirse a administrador de plataforma | PASA |
+| 13 | `app_role` no puede subirse a operador de plataforma | PASA |
 | 14 | El trigger bloquea el `UPDATE` de la auditoría incluso al propietario | PASA |
 | 15-17 | El auditor lee la auditoría, pero no los trámites ni puede escribir | PASA |
 | 18-19 | Ningún rol ni tabla del proyecto depende de un superusuario | PASA |

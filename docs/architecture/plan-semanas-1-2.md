@@ -73,3 +73,17 @@ El camino crítico es **D1 → 1.1 → 2.2 → 2.3 → 2.4**: sin el usuario `si
 - Nada se apaga ni se elimina en las VMs sin aprobación explícita de Jeison.
 - Ningún secreto en el repositorio.
 - Las asignaciones de la tabla son una propuesta; en el cierre de cada semana se actualiza el estado real en [`plan.md`](./plan.md).
+
+## 7. Retiro del checkpoint PHP y cobertura de Zero Trust
+
+**El PHP no es parte del sistema final.** Es el checkpoint que se entregó al profesor y se mantiene solo como referencia hasta que Django y React lo reemplacen. Fecha objetivo de retiro: **semana 6 (16–22 de noviembre de 2026)**, con aprobación de Jeison. Mientras tanto no recibe funciones nuevas, solo correcciones de seguridad (por ejemplo, ya no se conecta como superusuario; ver `runbook.md` sección 17). Ningún trabajo de estas dos semanas debe depender de PHP.
+
+**Zero Trust:** las tareas para cubrir los 7 principios están en [`../zero-trust-cobertura.md`](../zero-trust-cobertura.md). Las que caen en estas dos semanas:
+
+| ID | Tarea | Semana |
+|---|---|---|
+| ZT-1 | Inventario de recursos con clasificación | S2 |
+| ZT-2 | TLS entre la aplicación y la base (el checkpoint pasa a `sslmode=verify-full`) | S2 |
+| ZT-4 | Sudo de mínimo privilegio para `andy_martinez` (hoy tiene `NOPASSWD: ALL` en VM1) | S2 |
+
+**Nombres de roles:** ningún rol del sistema lleva el nombre "administrador". Los roles de gestión son `coordinador_institucional` y `operador_plataforma`.

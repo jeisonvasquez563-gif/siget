@@ -8,7 +8,7 @@
 
 ### 1.1 ¿Qué deseo hacer?
 
-Construir un sistema donde **cada actuación sobre un trámite ante el Estado queda registrada de forma que nadie pueda alterarla, ni siquiera un administrador**, con plazos exigibles y escalamiento automático cuando se vencen. La seguridad no es un adorno: es el mecanismo que hace confiable la trazabilidad. Como SIGET integra trámites de varias instituciones, el desafío central es que **ninguna institución pueda ver ni modificar lo que pertenece a otra**, y que cada decisión de acceso se tome y se registre en cada petición (Zero Trust).
+Construir un sistema donde **cada actuación sobre un trámite ante el Estado queda registrada de forma que nadie pueda alterarla, ni siquiera quien opera la plataforma**, con plazos exigibles y escalamiento automático cuando se vencen. La seguridad no es un adorno: es el mecanismo que hace confiable la trazabilidad. Como SIGET integra trámites de varias instituciones, el desafío central es que **ninguna institución pueda ver ni modificar lo que pertenece a otra**, y que cada decisión de acceso se tome y se registre en cada petición (Zero Trust).
 
 ### 1.2 ¿A quién deseo llegar?
 
@@ -44,7 +44,7 @@ La autorización es **ABAC** (control de acceso basado en atributos, NIST SP 800
 - `mfa_verificado_en`: momento del último segundo factor.
 - `membresías`: lista de `(institución, rol)`. Una persona puede tener roles distintos en instituciones distintas.
 - `estado_cuenta`: activa, bloqueada, suspendida.
-- Roles de plataforma (sin acceso a trámites): administrador de plataforma y auditor.
+- Roles de plataforma (sin acceso a trámites): operador de plataforma y auditor.
 
 ### 3.2 Recurso (sobre qué actúa)
 
@@ -94,8 +94,8 @@ Todo lo que no está permitido queda denegado.
 | Ciudadano | Crear trámite; ver y adjuntar documentos a sus propios trámites | Solo los suyos; MFA activo |
 | Funcionario | Ver trámites de su institución; cambiar estado; pedir subsanación | Misma institución; trámite asignado a él o en su cola; MFA ≤15 min; transición válida |
 | Supervisor | Lo del funcionario; reasignar; atender escalados | Solo su institución; MFA ≤15 min |
-| Administrador institucional | Gestionar usuarios, membresías, tipos de trámite y SLA | Solo su institución; no cambia estados ni lee documentos |
-| Administrador de plataforma | Alta de instituciones, infraestructura, catálogo base | Sin acceso a trámites ni a documentos |
+| Coordinador institucional | Gestionar usuarios, membresías, tipos de trámite y SLA | Solo su institución; no cambia estados ni lee documentos |
+| Operador de plataforma | Alta de instituciones, infraestructura, catálogo base | Sin acceso a trámites ni a documentos |
 | Auditor | Leer eventos de auditoría y decisiones del PDP | Solo lectura, transversal; nivel de aseguramiento alto y MFA obligatorio |
 
 ### 5.1 Reglas cruzadas

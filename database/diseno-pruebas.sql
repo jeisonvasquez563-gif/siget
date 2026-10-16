@@ -110,10 +110,10 @@ BEGIN
 
   -- 13. app_role no puede tocar columnas que no le corresponden (rol_plataforma)
   BEGIN
-    UPDATE siget.usuario SET rol_plataforma = 'admin_plataforma' WHERE id = v_func;
-    RAISE NOTICE 'PRUEBA 13 app_role se sube a admin_plataforma: FALLA';
+    UPDATE siget.usuario SET rol_plataforma = 'operador_plataforma' WHERE id = v_func;
+    RAISE NOTICE 'PRUEBA 13 app_role se sube a operador_plataforma: FALLA';
   EXCEPTION WHEN insufficient_privilege THEN
-    RAISE NOTICE 'PRUEBA 13 app_role se sube a admin_plataforma: PASA (permission denied)';
+    RAISE NOTICE 'PRUEBA 13 app_role se sube a operador_plataforma: PASA (permission denied)';
   END;
 
   -- 14. El trigger protege la auditoria incluso del duenio (que si tiene UPDATE)

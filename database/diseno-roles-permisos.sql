@@ -16,7 +16,7 @@
 -- Dos capas de roles:
 --   1) Roles de PostgreSQL (este archivo): siget_owner, app_role y auditor_role.
 --   2) Roles de aplicacion (ciudadano, funcionario, supervisor, admin
---      institucional, admin de plataforma, auditor): viven como DATOS en
+--      institucional, operador de plataforma, auditor): viven como DATOS en
 --      usuario / membresia y los evalua el PDP de Django (ABAC).
 -- Row Level Security es la segunda barrera, independiente del PDP.
 -- ============================================================================
@@ -38,8 +38,8 @@ SET LOCAL ROLE siget_owner;
 -- ---------------------------------------------------------------------------
 -- 2. Tipos
 -- ---------------------------------------------------------------------------
-CREATE TYPE siget.rol_membresia  AS ENUM ('ciudadano', 'funcionario', 'supervisor', 'admin_institucional');
-CREATE TYPE siget.rol_plataforma AS ENUM ('ninguno', 'admin_plataforma', 'auditor');
+CREATE TYPE siget.rol_membresia  AS ENUM ('ciudadano', 'funcionario', 'supervisor', 'coordinador_institucional');
+CREATE TYPE siget.rol_plataforma AS ENUM ('ninguno', 'operador_plataforma', 'auditor');
 CREATE TYPE siget.estado_tramite AS ENUM ('Pendiente', 'En Tramitacion', 'En Subsanacion', 'Aprobado', 'Rechazado');
 
 -- ---------------------------------------------------------------------------
