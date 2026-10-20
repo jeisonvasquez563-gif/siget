@@ -7,7 +7,7 @@ Unidades Quadlet que corren `nginx` y el backend Django como el pod `siget`, baj
 | `siget.pod`, `siget-backend.container`, `siget-nginx.container` | `/home/siget/.config/containers/systemd/` |
 | `nginx.conf` | `/home/siget/config/` |
 
-**No hay secretos en estos archivos.** Todo llega como `podman secret`: `siget-nginx-crt` y `siget-nginx-key` (TLS), `siget-db-app-password`, `siget-django-key` y `siget-ca`. Se crean desde una cuenta con sudo, sin mostrar los valores. La imagen del backend se construye con [`backend/Containerfile`](../../../backend/Containerfile).
+**No hay secretos en estos archivos.** Todo llega como `podman secret`: `siget-nginx-crt` y `siget-nginx-key` (TLS), `siget-db-app-password`, `siget-django-key`, `siget-ca`, `siget-jwt-key` y `siget-mfa-key`. Se crean desde una cuenta con sudo, sin mostrar los valores. La imagen del backend se construye con [`backend/Containerfile`](../../../backend/Containerfile).
 
 Se activa con `systemctl --user daemon-reload` y `systemctl --user start siget-pod.service siget-backend.service siget-nginx.service`, ejecutados como `siget`.
 

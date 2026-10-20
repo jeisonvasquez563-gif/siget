@@ -1,7 +1,7 @@
 """Comparación entre los modelos y el esquema real de la base (la base es la autoridad)."""
 from django.apps import apps as registro_apps
 
-APPS_DE_DOMINIO = {"catalogo", "identidad", "tramites", "auditoria"}
+APPS_DE_DOMINIO = {"catalogo", "identidad", "tramites", "auditoria", "autenticacion"}
 
 
 def columnas_del_modelo(modelo):

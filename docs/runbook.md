@@ -1254,3 +1254,48 @@ F4:F4:15:F6:E5:4F:93:A7:77:7B:83:16:E3:97:87:17:31:AB:3B:08:6B:88:B9:C4:AD:77:C7
 - Pasar a los puertos 80 y 443 cuando se retire Apache (por ejemplo, con `net.ipv4.ip_unprivileged_port_start` o una redirección de firewalld).
 - Renovar el certificado de nginx antes de octubre de 2027.
 - La imagen del backend se llama `:dev` y se construye a mano en VM1; falta fijarla por versión o resumen y automatizar la construcción.
+
+## 25. Autenticación del backend (login, MFA y sesiones)
+
+Fecha: 20 de octubre de 2026, parte de la tarea ZT-5 de la [matriz de Zero Trust](./zero-trust-cobertura.md) (principio 6). Diseño en [`2026-10-20-autenticacion-design.md`](./superpowers/specs/2026-10-20-autenticacion-design.md). Ejecutado por Jeison en VM2 y VM1.
+
+### 25.1 Qué se hizo
+
+- **Migración 004** ([`database/migraciones/004-autenticacion.sql`](../database/migraciones/004-autenticacion.sql)) aplicada en la base real, con respaldo previo: columnas del segundo factor y del bloqueo en `usuario`, tabla `sesion` (el refresco solo como hash) y tabla `evento_seguridad` de solo inserción (dos triggers). `app_role` recibió solo lo necesario: no puede borrar eventos ni tocar `rol_plataforma`.
+- **Módulo `apps/autenticacion/`:** registro, login con Argon2, TOTP con el secreto cifrado, tokens de acceso de 10 minutos y de refresco de un solo uso, reautenticación escalonada, bloqueo por intentos y registro de eventos de seguridad.
+- **Secretos nuevos** en VM1 como `podman secret`: `siget-jwt-key` y `siget-mfa-key` (clave Fernet), generados al vuelo sin mostrarse. La unidad `siget-backend.container` los monta.
+- **Imagen reconstruida** y pod reiniciado con el código nuevo.
+
+### 25.2 Verificación
+
+Desde un contenedor de VM1, como `app_role`, por TLS 1.3, contra la base real:
+
+- `verificar_esquema`: **11 de 11** tablas coinciden con los modelos.
+- `verificar_integracion`: **15 de 15** pasos (RLS, triggers, auditoría, permisos).
+- `verificar_autenticacion`: **47 de 47** pasos, en una transacción que se revierte y con el reloj controlado. No quedó ningún dato.
+- Además, **188 pruebas unitarias** en el PC.
+
+A través de `nginx` con TLS: `/salud/` 200; `/auth/yo/` sin token 401 con `WWW-Authenticate`; `GET` sobre el login 405; login con un usuario inexistente, respuesta genérica 401; cuerpo que no es JSON 415; refresco sin la cabecera anti-CSRF 403; contraseña débil 400.
+
+### 25.3 Errores encontrados y corregidos en el camino
+
+1. **Dígitos Unicode en el código MFA.** `"１２３４５６"` (ancho completo) pasa `isdigit()` y hace fallar a `hmac.compare_digest` con `TypeError`: cualquiera podía provocar un error 500 en el login, sin que se contara el intento. Ahora se exige `isascii()`. Lo detectó una prueba unitaria.
+2. **Contraseñas débiles que la política dejaba pasar:** `passwordpassword` y `qwertyuiopasdf`. La lista de Django solo compara contraseñas exactas; ahora se detectan repeticiones de una palabra común y secuencias de teclado o alfabeto. Lo detectaron las pruebas.
+3. **Tokens "del futuro".** La librería de JWT comparaba `iat` con el reloj real, lo que rechaza tokens válidos si el reloj se ajusta (como pasó con las VMs). Ahora se valida con el reloj inyectado y una tolerancia de 120 segundos.
+4. **La prueba de integración se rompía a mitad del recorrido** ("an error occurred in the current transaction"). Causa: DRF marca la transacción para revertirla (`set_rollback`) al lanzar una excepción de API, y mi arnés corre todo dentro de una transacción exterior. No era un fallo del código de producción, pero confirmó dos decisiones de diseño: las vistas de autenticación son `non_atomic_requests` y las decisiones del PDP se guardan por una conexión aparte.
+
+### 25.4 Gotchas
+
+- `str.isdigit()` acepta dígitos de otros alfabetos; para códigos numéricos hay que comprobar también `isascii()`.
+- Con `ATOMIC_REQUESTS = True`, DRF revierte la transacción de la petición ante cualquier excepción de API (401, 403, 429): todo lo que deba sobrevivir a un rechazo (contadores, eventos, decisiones) necesita otra transacción u otra conexión.
+- Los registros de seguridad son inalterables: **las pruebas de integración no deben escribir datos reales** (por eso corren en una transacción que se revierte); un evento escrito de verdad ya no se puede borrar.
+- El `tail` de un registro largo oculta el principio del error: para depurar, guardar la salida completa y leer desde la primera traza.
+- Un `with transaction.atomic()` dentro de otro es un punto de guardado: un error dentro revierte solo el interior, siempre que la excepción se capture **fuera** del bloque.
+
+### 25.5 Pendiente
+
+- Recuperación de contraseña (no hay servidor de correo en el laboratorio) y procedimiento del primer rol de cada operador.
+- Pantallas del frontend: login, enrolamiento del segundo factor (código QR a partir de la URI) y reautenticación.
+- Decisión de Jeison sobre el MFA obligatorio u opcional del ciudadano.
+- Rotación de las claves JWT y Fernet.
+- Conectar `PermisoPDP` a las vistas de trámites y de auditoría.

@@ -24,6 +24,12 @@ class Usuario(ModeloDeEsquema):
     estado_cuenta = models.TextField(choices=ESTADOS_CUENTA, default="activa")
     rol_plataforma = models.TextField(choices=ROLES_PLATAFORMA, default="ninguno")
     mfa_verificado_en = models.DateTimeField(null=True, blank=True)
+    # Segundo factor y bloqueo por intentos (migración 004). El secreto TOTP se guarda CIFRADO.
+    mfa_secreto = models.TextField(null=True, blank=True)
+    mfa_activo = models.BooleanField(default=False)
+    mfa_ultimo_paso = models.BigIntegerField(null=True, blank=True)
+    intentos_fallidos = models.IntegerField(default=0)
+    bloqueado_hasta = models.DateTimeField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta(ModeloDeEsquema.Meta):

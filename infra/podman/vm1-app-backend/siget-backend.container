@@ -9,9 +9,13 @@ Pod=siget.pod
 Secret=siget-db-app-password,mode=0444
 Secret=siget-django-key,mode=0444
 Secret=siget-ca,mode=0444
+Secret=siget-jwt-key,mode=0444
+Secret=siget-mfa-key,mode=0444
 Environment=SIGET_DB_PASSWORD_FILE=/run/secrets/siget-db-app-password
 Environment=SIGET_SECRET_KEY_FILE=/run/secrets/siget-django-key
 Environment=SIGET_DB_SSLROOTCERT=/run/secrets/siget-ca
+Environment=SIGET_JWT_KEY_FILE=/run/secrets/siget-jwt-key
+Environment=SIGET_MFA_KEY_FILE=/run/secrets/siget-mfa-key
 # El sistema de archivos es de solo lectura: gunicorn escribe su socket de control en /tmp (tmpfs)
 Environment=HOME=/tmp
 Environment=SIGET_ALLOWED_HOSTS=192.168.159.137,192.168.100.10,100.104.206.118,app-backend,localhost
