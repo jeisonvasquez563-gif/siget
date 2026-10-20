@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import pytest
 
 from apps.auditoria.models import DecisionPdp, EventoAuditoria
+from apps.autenticacion.models import EventoSeguridad, Sesion
 from apps.catalogo.models import Institucion, TipoTramite
 from apps.identidad.models import Aprobacion, Membresia, Usuario
 from apps.identidad.sujeto import construir_sujeto
@@ -14,6 +15,7 @@ TABLAS = {
     Institucion: "institucion", TipoTramite: "tipo_tramite", Usuario: "usuario", Membresia: "membresia",
     Aprobacion: "aprobacion", Tramite: "tramite", Transicion: "transicion",
     EventoAuditoria: "evento_auditoria", DecisionPdp: "decision_pdp",
+    Sesion: "sesion", EventoSeguridad: "evento_seguridad",
 }
 
 
@@ -23,7 +25,7 @@ def test_ningun_modelo_crea_ni_migra_tablas(modelo, tabla):
     assert modelo._meta.db_table == tabla
 
 
-def test_estan_los_nueve_modelos_del_esquema():
+def test_estan_los_once_modelos_del_esquema():
     assert {m._meta.db_table for m in modelos_de_dominio()} == set(TABLAS.values())
 
 
@@ -43,7 +45,7 @@ def test_diferencias_distingue_lo_que_falta_de_lo_que_sobra():
     assert diferencias({"a", "b", "z"}, {"a", "b"}) == (["z"], [])
 
 
-@pytest.mark.parametrize("modelo", [EventoAuditoria, DecisionPdp])
+@pytest.mark.parametrize("modelo", [EventoAuditoria, DecisionPdp, EventoSeguridad])
 def test_la_auditoria_no_se_modifica_ni_se_borra(modelo):
     existente = modelo(pk=1)
     existente._state.adding = False

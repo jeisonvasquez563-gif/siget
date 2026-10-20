@@ -10,7 +10,7 @@ Los nombres de las apps de Django y las vistas de React son una **propuesta** qu
 |---|---|---|---|
 | Base de datos | 11 | **9** (aplicados y probados) | 2 (documentos y notificaciones) |
 | Seguridad de infraestructura | 6 | **6** | 0 |
-| Backend (Django) | 7 | **0 completos** (el PDP del módulo 2 está implementado y probado) | 7 |
+| Backend (Django) | 7 | **1 completo** (autenticación) y el PDP del módulo 2 hecho | 6 |
 | Frontend (React) | 6 vistas | **0** | 6 |
 
 ## 2. Módulos de base de datos
@@ -48,7 +48,7 @@ El backend y `nginx` corren como un pod rootless (`siget`) en VM1. Contenedores 
 
 | # | Módulo | Qué hace | Semana |
 |---|---|---|---|
-| 1 | Identidad y autenticación | Registro, Argon2, JWT de vida corta, MFA TOTP | S4–S6 |
+| 1 | Identidad y autenticación | Registro, Argon2, JWT de vida corta, MFA TOTP, bloqueo y eventos de seguridad. **Hecho el 20-oct** (runbook 25) | ✅ |
 | 2 | Autorización (PEP y PDP) | Decide cada petición con atributos; deniega por defecto. **El PDP ya está hecho y probado (84 pruebas)**; falta el PEP que lo conecta a las vistas | S4–S6 |
 | 3 | Instituciones y catálogo | Instituciones y tipos de trámite con su SLA; altas con control dual | S3–S5 |
 | 4 | Trámites | Crear, consultar y cambiar de estado con transiciones válidas | S3–S5 |

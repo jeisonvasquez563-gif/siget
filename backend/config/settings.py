@@ -31,6 +31,16 @@ DEBUG = _bool("SIGET_DEBUG", False)
 SECRET_KEY = _leer("SIGET_SECRET_KEY", obligatorio=True)
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("SIGET_ALLOWED_HOSTS", "").split(",") if h.strip()]
 
+# --- Autenticación ---
+SIGET_JWT_KEY = _leer("SIGET_JWT_KEY", obligatorio=True)
+if len(SIGET_JWT_KEY) < 32:
+    raise ImproperlyConfigured("SIGET_JWT_KEY debe tener al menos 32 caracteres.")
+SIGET_MFA_KEY = _leer("SIGET_MFA_KEY", obligatorio=True)  # clave Fernet (urlsafe base64 de 32 bytes) que cifra los secretos TOTP
+SIGET_EMISOR = "siget"
+SIGET_ACCESS_TTL_SEGUNDOS = int(os.environ.get("SIGET_ACCESS_TTL_SEGUNDOS", "600"))  # 10 minutos
+SIGET_REFRESH_TTL_SEGUNDOS = int(os.environ.get("SIGET_REFRESH_TTL_SEGUNDOS", "28800"))  # 8 horas
+SIGET_COOKIE_REFRESH = "siget_refresh"
+
 INSTALLED_APPS = [
     "rest_framework",
     "apps.nucleo",
@@ -39,6 +49,7 @@ INSTALLED_APPS = [
     "apps.tramites",
     "apps.auditoria",
     "apps.autorizacion",
+    "apps.autenticacion",
 ]
 
 MIDDLEWARE = [
@@ -70,16 +81,21 @@ DATABASES = {
     }
 }
 
+# Conexión aparte, en autocommit y sin transacción por petición: las decisiones de acceso (sobre todo las
+# NEGADAS) deben quedar registradas aunque la petición se revierta (DRF revierte la transacción al denegar).
+DATABASES["decisiones"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False}
+
 # --- Contraseñas: Argon2 primero ---
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
 
 # --- API: se deniega todo salvo lo que una política permita explícitamente ---
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["apps.autenticacion.autenticacion.AutenticacionJWT"],
     "DEFAULT_PERMISSION_CLASSES": ["apps.autorizacion.permisos.DenegarPorDefecto"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"anon": "60/min"},
+    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "registro": "10/hour", "login": "10/min", "refresh": "60/min", "mfa": "10/min"},
     "UNAUTHENTICATED_USER": None,
 }
 

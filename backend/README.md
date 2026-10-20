@@ -11,14 +11,14 @@ Django 5.2 LTS + Django REST Framework (API-first). Corre en un contenedor Podma
 | Contexto RLS por transacción e integración con la base real | ✅ 15 pasos contra la base real |
 | Imagen del contenedor (`Containerfile`) | ✅ construida en VM1 |
 | Modelos de las tablas del esquema `siget` | ✅ 9 modelos verificados contra la base real |
-| Autenticación (Argon2, JWT corto, MFA TOTP) | ⏳ |
+| Autenticación (Argon2, JWT corto, MFA TOTP, reautenticación, bloqueo) | ✅ 188 pruebas y 47 pasos contra la base real |
 | Trámites, catálogo, auditoría, plazos y escalamiento | ⏳ |
 
 ## Stack
 
 - Django 5.2 LTS + DRF; hash de contraseñas Argon2.
-- Auth: JWT de corta duración (`djangorestframework-simplejwt`) + refresh token. Pendiente.
-- MFA: `django-otp` (TOTP). Pendiente.
+- Auth: JWT de acceso de 10 minutos y refresco opaco de un solo uso, con PyJWT (no `simplejwt`: nuestro usuario no es el de Django). Ver [`docs/superpowers/specs/2026-10-20-autenticacion-design.md`](../docs/superpowers/specs/2026-10-20-autenticacion-design.md).
+- MFA: TOTP con `pyotp`; el secreto se guarda cifrado con Fernet.
 - Autorización: ABAC con membresías (ver [`docs/superpowers/specs/2026-10-20-motor-abac-design.md`](../docs/superpowers/specs/2026-10-20-motor-abac-design.md)).
 - Base de datos: PostgreSQL 16 en contenedor, por TLS con `verify-full`, esquema `siget`, rol `app_role` (sin superusuario).
 
@@ -32,12 +32,13 @@ backend/
 ├── config/                 # settings, urls y wsgi
 │   └── settings_test.py    # solo para las pruebas
 ├── apps/
+│   ├── autenticacion/      # login, MFA, sesiones, tokens y eventos de seguridad
 │   ├── autorizacion/       # PDP (pdp.py) y permisos de DRF
 │   ├── catalogo/           # Institucion, TipoTramite
 │   ├── identidad/          # Usuario, Membresia, Aprobacion y el adaptador al PDP
 │   ├── tramites/           # Tramite, Transicion
 │   ├── auditoria/          # EventoAuditoria, DecisionPdp (solo inserción)
-│   └── nucleo/             # salud, contexto RLS y comandos verificar_esquema / verificar_integracion
+│   └── nucleo/             # salud, contexto RLS y comandos verificar_esquema / verificar_integracion / verificar_autenticacion
 └── tests/
 ```
 
@@ -54,6 +55,7 @@ Las pruebas de `pytest` no necesitan la base de datos. Para probar contra la bas
 
 - `python manage.py verificar_esquema`: compara cada modelo con su tabla real.
 - `python manage.py verificar_integracion`: recorrido por el ORM (RLS, triggers, auditoría, permisos) en una transacción que se revierte.
+- `python manage.py verificar_autenticacion`: recorrido HTTP de la autenticación (registro, login, MFA, refresco, bloqueo, límites) en una transacción que se revierte, con el reloj controlado.
 
 Se ejecutan en VM1 con la imagen del `Containerfile` y los secretos como `podman secret`; el comando exacto está en [`docs/runbook.md`](../docs/runbook.md) sección 23.
 
@@ -67,6 +69,9 @@ Todo se lee de variables de entorno. Los secretos pueden venir de un archivo con
 | `SIGET_DB_HOST`, `SIGET_DB_PORT` | Base de datos | `192.168.100.20`, `5433` |
 | `SIGET_DB_NAME`, `SIGET_DB_USER` | Base y rol | `tramites_demo`, `app_role` |
 | `SIGET_DB_PASSWORD` o `SIGET_DB_PASSWORD_FILE` | Contraseña de `app_role` | vacía |
+| `SIGET_JWT_KEY` o `SIGET_JWT_KEY_FILE` | Clave que firma los tokens de acceso (mínimo 32 caracteres) | **Obligatoria** |
+| `SIGET_MFA_KEY` o `SIGET_MFA_KEY_FILE` | Clave Fernet que cifra los secretos TOTP | **Obligatoria** |
+| `SIGET_ACCESS_TTL_SEGUNDOS`, `SIGET_REFRESH_TTL_SEGUNDOS` | Vigencia del acceso y del refresco | `600`, `28800` |
 | `SIGET_DB_SSLROOTCERT` | CA que verifica el certificado del servidor | `/etc/pki/siget/ca.crt` |
 | `SIGET_ALLOWED_HOSTS` | Hosts permitidos, separados por coma | vacío |
 | `SIGET_MFA_RECIENTE_MINUTOS` | Vigencia del segundo factor para acciones sensibles | `15` |
