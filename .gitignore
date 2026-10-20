@@ -20,3 +20,9 @@ node_modules/
 *.dump
 globals-*.sql
 respaldos-siget/
+
+# Python / Django
+.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
