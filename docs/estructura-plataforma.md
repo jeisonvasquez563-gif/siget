@@ -34,9 +34,9 @@ Hay **dos barreras independientes**: el decisor de la aplicación y la base de d
 
 | Parte | Estado | Detalle |
 |---|---|---|
-| Base de datos (VM2) | ✅ Existe | Esquema `siget`, roles sin superusuario, RLS, auditoría de solo inserción, TLS con la aplicación. Sigue siendo la instalación nativa; falta migrarla a contenedor |
+| Base de datos (VM2) | ✅ Existe | Esquema `siget`, roles sin superusuario, RLS, auditoría de solo inserción, TLS con la aplicación. **Corre en un contenedor Podman rootless** (desde el 20-oct); la instalación nativa antigua sigue encendida y se apagará con aprobación |
 | Aislamiento y acceso (las dos VMs) | ✅ Existe | Red interna, firewall, SELinux, SSH solo por clave, Tailscale, registro persistente |
-| Podman rootless | ✅ Instalado | En VM1 y VM2, con el usuario de servicio `siget`; sin los servicios finales desplegados |
+| Podman rootless | ✅ En uso en VM2 | Instalado en VM1 y VM2 con el usuario de servicio `siget`; en VM2 ya ejecuta PostgreSQL; en VM1 faltan `nginx` y Django |
 | Aplicación de VM1 | ⏳ No existe | Hoy corre Apache + PHP (el checkpoint intermedio, que se retira en la semana 6), no `nginx` + Django |
 | `nginx`, Django, plazos y SLA | ⏳ No existen | Se construyen en las semanas 3 a 7 |
 | Frontend (React) | ⏳ No existe | Se construye en las semanas 6 a 9 |

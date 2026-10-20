@@ -27,6 +27,7 @@ Matriz que contrasta cada principio de Zero Trust con lo que SIGET implementa ho
 - Aislamiento entre instituciones por RLS, auditoría de solo inserción, transiciones de estado válidas y que nadie se auto-asigne un rol: 24 pruebas contra el esquema real (`bash ~/siget-diseno/demo.sh`).
 - SSH solo por clave, firewall restrictivo, SELinux en Enforcing y journal persistente en las dos VMs (runbook 14).
 - La app del checkpoint usa un rol de mínimo privilegio y pgAdmin uno de solo lectura.
+- PostgreSQL corre en un contenedor rootless del usuario de servicio `siget`, con TLS 1.3, sin contraseña de superusuario y sin privilegios (runbook 21).
 - La conexión entre la app y la base va cifrada con TLS 1.3 verificando el certificado del servidor, y la base rechaza las conexiones sin TLS (runbook 18).
 
 ## 3. Plan de implementación
@@ -59,7 +60,6 @@ Honestidad antes que cumplimiento aparente:
 | Desvío | Principio | Plan |
 |---|---|---|
 | El login del checkpoint se sirve por HTTP (sin TLS) | 2 | ZT-3 y ZT-9 |
-| PostgreSQL sigue siendo la instalación nativa | 3 | Tareas 2.2 y 2.3 del plan de las semanas 1 y 2 |
 | El MFA todavía no existe | 6 | ZT-5 |
 
 ## Referencia

@@ -42,7 +42,7 @@ Esquema `siget` aplicado el 15 de octubre de 2026, con 24 pruebas que pasan (`ba
 | 5 | Registro del sistema (journal persistente) | ✅ |
 | 6 | TLS en el borde con HSTS y CSP (nginx) | ⏳ semana 5 |
 
-Contenedores Podman rootless con Quadlet: instalados en las dos VMs; el despliegue de los servicios es la tarea 2.2.
+Contenedores Podman rootless con Quadlet: instalados en las dos VMs. **PostgreSQL ya corre en un contenedor** (20-oct, runbook 21); falta desplegar `nginx` y Django.
 
 ## 4. Módulos de backend (Django) planificados
 

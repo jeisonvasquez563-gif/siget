@@ -1009,3 +1009,64 @@ Se validó con `visudo -cf` antes de instalarla (permisos 440, root). La regla a
 
 - Aplicar el mismo criterio a cualquier compañero que reciba sudo en el futuro.
 - Jeison conserva `NOPASSWD: ALL`; es la única cuenta con sudo completo, y el journal persistente registra su uso.
+
+## 21. PostgreSQL en contenedor rootless (Podman + Quadlet)
+
+Fecha: 20 de octubre de 2026, tareas 2.2 y 2.3 del [plan de las semanas 1 y 2](./architecture/plan-semanas-1-2.md) y parte de 2.5. Ejecutado por Jeison en VM2, con su aprobación (puerto 5433 mientras conviven las dos bases, imagen oficial fijada a 16.15). La base nativa **no se apagó**: sigue encendida, pero ya sin uso.
+
+### 21.1 Resultado
+
+PostgreSQL 16.15 corre en un contenedor rootless del usuario de servicio `siget`, gestionado por una unidad Quadlet, con TLS 1.3, el esquema `siget` y los datos migrados. La app PHP del checkpoint ya trabaja contra él.
+
+| Elemento | Valor |
+|---|---|
+| Imagen | `docker.io/library/postgres:16.15` (oficial, 160 MB comprimida) |
+| Usuario | `siget` (sin sudo, sin contraseña, sin SSH) |
+| Puerto | `192.168.100.20:5433` → 5432 del contenedor; solo en la IP interna |
+| Datos | Volumen `siget-pgdata` (etiqueta SELinux `container_file_t`) |
+| Cifrado | TLS 1.3 mínimo; certificado y clave como `podman secret` |
+| Configuración de acceso | `pg_hba.conf` propio: `local peer`, `postgres` rechazado por red, `hostssl` solo para `checkpoint_app` y `pgadmin_lectura` desde `192.168.100.10` |
+| Archivos versionados | [`infra/podman/vm2-db-server/`](../infra/podman/vm2-db-server/) |
+
+### 21.2 Procedimiento
+
+1. **Preparar:** carpetas de `siget`, `pg_hba.conf`, unidad `siget-postgres.container` y volumen `siget-pgdata.volume` (Quadlet).
+2. **Secretos con `podman secret`:** certificado y clave TLS del servidor (los mismos de la sección 18) y una contraseña de arranque aleatoria que no se mostró. Los valores nunca pasaron por argumentos ni por un archivo.
+3. **Descargar la imagen y arrancar** con `systemctl --user start siget-postgres.service`.
+4. **Firewall:** regla rica para `5433` solo desde `192.168.100.10`.
+5. **Migrar:** volcado fresco de la base nativa (`pg_dump -Fc` y `pg_dumpall --globals-only`); los roles entraron con sus hashes (la contraseña de `checkpoint_app` no cambió), se creó la base con dueño `siget_owner` y se restauró con `pg_restore`.
+6. **Verificar, cambiar la app y limpiar** (ver 21.3 y 21.4).
+
+### 21.3 Verificación
+
+- Dentro del contenedor: 9 tablas del esquema `siget`, 6 políticas RLS, 7 triggers, `app_usuarios` = 8, los 7 valores de `rol_plataforma` y `siget_owner` como dueño. Idéntico a la base nativa.
+- Desde VM1 con el rol de la app: conecta con TLS 1.3 y `verify-full`; **el servidor ve la IP real `192.168.100.10`**, así que la regla `hostssl … 192.168.100.10/32` funciona con el modo de red del contenedor (pasta); sin TLS se rechaza.
+- Login real de la app contra el contenedor: registro, login (302 al dashboard) y dashboard 200. El usuario de prueba apareció en el contenedor y no en la base nativa; se borró.
+- Las **24 pruebas** de roles y permisos pasan contra el contenedor (`bash ~/siget-diseno/demo.sh`, que ahora apunta al contenedor por defecto).
+- El contenedor reinició con `systemctl --user restart` y conservó los datos.
+
+### 21.4 Zero Trust en el contenedor
+
+- Sin contraseña para el superusuario: `ALTER ROLE postgres PASSWORD NULL`, y el secreto de arranque se quitó de la unidad y del almacén (`podman secret rm`). El superusuario solo entra por el socket local con `podman exec -u postgres` (script [`database/psql-contenedor.sh`](../database/psql-contenedor.sh)).
+- No privilegiado, `no-new-privileges` activo, rootless y con SELinux de contenedor.
+- El único superusuario del contenedor es `postgres`, rechazado por red.
+
+### 21.5 Cambios en la app (VM1)
+
+`DB_PORT` de `config.php` pasó de `5432` a `5433` (la contraseña y el rol no cambian). Se guardó una copia previa en `/root/siget-backups/`.
+
+### 21.6 Gotchas
+
+- `podman exec` no pasa la entrada estándar si no se usa `-i`: un volcado de roles enviado sin `-i` se pierde en silencio y la creación de la base falla con "role does not exist".
+- El comodín `chmod 600 /var/backups/siget/*` falla si el directorio es 700; hay que usar `sudo bash -c "chmod 600 …/*"` (mismo gotcha de la sección 16).
+- Un archivo de respaldo en `/root/siget-backups/` solo existe en VM1; en VM2 esa carpeta no existe y `cp` falla sin avisar si no se verifica.
+- Con `Secret=…,type=mount` y `target=` absoluto, `uid`, `gid` y `mode` permiten que el usuario `postgres` del contenedor (999) lea la clave TLS con permisos 0600.
+- `DropCapability=ALL` no se aplicó: el entrypoint de la imagen necesita `chown` y cambiar de usuario al arrancar.
+
+### 21.7 Pendiente
+
+- **Apagar la base nativa.** Sigue encendida y a partir de ahora **desactualizada**: todo lo nuevo se escribe en el contenedor. Requiere aprobación de Jeison. Hasta entonces, **pgAdmin debe apuntar al puerto 5433**, o leerá datos viejos.
+- Quitar del firewall la regla del puerto 5432 y pasar el contenedor al 5432 cuando se retire la base nativa.
+- `app_role` con `LOGIN` y su contraseña como `podman secret`, cuando exista el backend.
+- La contraseña de `checkpoint_app` sigue en el `config.php` del PHP, no en un secreto; desaparece con el retiro del checkpoint (semana 6).
+- Respaldo periódico del contenedor (`pg_dump` por un timer de systemd) y rotación del certificado (octubre de 2027).

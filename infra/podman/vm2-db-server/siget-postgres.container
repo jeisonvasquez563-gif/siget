@@ -1,0 +1,21 @@
+[Unit]
+Description=PostgreSQL 16 de SIGET (contenedor rootless)
+After=network-online.target
+
+[Container]
+Image=docker.io/library/postgres:16.15
+ContainerName=siget-postgres
+PublishPort=192.168.100.20:5433:5432
+Volume=siget-pgdata.volume:/var/lib/postgresql/data:Z
+Volume=/home/siget/config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro,Z
+Secret=siget-pg-tls-crt,type=mount,uid=999,gid=999,mode=0644,target=/tls/server.crt
+Secret=siget-pg-tls-key,type=mount,uid=999,gid=999,mode=0600,target=/tls/server.key
+Exec=postgres -c ssl=on -c ssl_cert_file=/tls/server.crt -c ssl_key_file=/tls/server.key -c ssl_min_protocol_version=TLSv1.3 -c hba_file=/etc/postgresql/pg_hba.conf -c listen_addresses=*
+NoNewPrivileges=true
+
+[Service]
+Restart=always
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target
