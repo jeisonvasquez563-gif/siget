@@ -6,7 +6,10 @@
 # Uso (en VM2): bash ~/siget-diseno/demo.sh
 D="$(cd "$(dirname "$0")" && pwd)"
 DB=tramites_demo
-psqlp() { sudo -u postgres psql -d "$DB" -P pager=off "$@"; }
+# Por defecto usa el contenedor siget-postgres (la base viva desde el 20-oct). Para la base nativa antigua:
+#   SIGET_PSQL="sudo -u postgres psql" bash demo.sh
+PSQL="${SIGET_PSQL:-$D/psql-contenedor.sh}"
+psqlp() { $PSQL -d "$DB" -P pager=off "$@"; }
 cd /tmp
 
 echo; echo "################ 1. ESTADO REAL DE LA BASE ################"
@@ -21,7 +24,7 @@ echo; echo "################ 2. 24 PRUEBAS DE ROLES Y PERMISOS (los datos de pru
 echo
 EXISTE=$(psqlp -At -c "select count(*) from pg_namespace where nspname='siget'")
 { echo "BEGIN;"; [ "$EXISTE" = "0" ] && cat "$D/diseno-roles-permisos.sql"; cat "$D/diseno-pruebas.sql"; echo "ROLLBACK;"; } \
-  | sudo -u postgres psql -d "$DB" -v ON_ERROR_STOP=1 -P pager=off -f - 2>&1 \
+  | $PSQL -d "$DB" -v ON_ERROR_STOP=1 -P pager=off -f - 2>&1 \
   | grep -E "PRUEBA|ERROR|ERRO" | sed -E 's/^psql:[^ ]+ NOTICE:  //'
 
 echo; echo "################ 3. COMPROBACION: LOS DATOS DE PRUEBA NO QUEDARON ################"
