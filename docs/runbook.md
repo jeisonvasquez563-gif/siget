@@ -1065,8 +1065,31 @@ PostgreSQL 16.15 corre en un contenedor rootless del usuario de servicio `siget`
 
 ### 21.7 Pendiente
 
-- **Apagar la base nativa.** Sigue encendida y a partir de ahora **desactualizada**: todo lo nuevo se escribe en el contenedor. Requiere aprobación de Jeison. Hasta entonces, **pgAdmin debe apuntar al puerto 5433**, o leerá datos viejos.
-- Quitar del firewall la regla del puerto 5432 y pasar el contenedor al 5432 cuando se retire la base nativa.
+- ~~Apagar la base nativa~~: hecho el 20-oct, ver 21.8.
+- **pgAdmin debe apuntar al puerto 5433** (con SSL); el 5432 ya no escucha.
+- Quitar del firewall la regla del puerto 5432 (hoy sin servicio detrás) y decidir si el contenedor pasa al 5432.
 - `app_role` con `LOGIN` y su contraseña como `podman secret`, cuando exista el backend.
 - La contraseña de `checkpoint_app` sigue en el `config.php` del PHP, no en un secreto; desaparece con el retiro del checkpoint (semana 6).
 - Respaldo periódico del contenedor (`pg_dump` por un timer de systemd) y rotación del certificado (octubre de 2027).
+
+### 21.8 Apagado de la base nativa
+
+Fecha: 20 de octubre de 2026, con aprobación de Jeison. Cierra la tarea 2.3: la base viva es solo el contenedor.
+
+```bash
+sudo systemctl stop postgresql
+sudo systemctl disable postgresql
+```
+
+Antes de apagar se comprobó que **no había ninguna conexión de clientes** a la nativa (0). Después:
+
+- `postgresql` queda `inactive` y `disabled`: no arranca con el sistema. El puerto 5432 ya no escucha y el 5433 sí.
+- Desde VM1, la app conecta al contenedor (`app_usuarios = 8`) y el puerto 5432 es **inalcanzable**.
+- El login web responde 200. El contenedor sigue activo.
+- **No se borró nada:** los datos nativos siguen en `/var/lib/pgsql/data` (64 MB), junto con los respaldos de `/var/backups/siget/`.
+
+**Volver atrás** (solo en caso de emergencia, y los datos nuevos del contenedor no estarían en la nativa): `sudo systemctl enable --now postgresql`, y devolver `DB_PORT` a `5432` en el `config.php` de VM1.
+
+**Gotcha:** `systemctl --user` como `siget` desde una sesión sin entorno de usuario responde "Failed to connect to bus"; hay que fijar `XDG_RUNTIME_DIR=/run/user/<uid>`, como en la sección 15.
+
+**Pendiente de este paso:** decidir cuándo se desinstala el paquete y se borran los datos nativos (requiere aprobación explícita; hoy se conservan).

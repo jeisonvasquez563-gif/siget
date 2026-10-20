@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- **Base de datos nativa apagada y deshabilitada** (tarea 2.3 cerrada; `runbook.md` 21.8): sin conexiones de clientes al momento de apagarla, el puerto 5432 ya no escucha y la app trabaja solo contra el contenedor. Sus datos se conservan en disco; no se desinstaló nada. Pendientes: apuntar pgAdmin al puerto 5433 con SSL y quitar la regla del 5432 del firewall.
 - **PostgreSQL en contenedor rootless** (tareas 2.2 y 2.3; `runbook.md` sección 21): imagen oficial `postgres:16.15` bajo el usuario `siget`, unidad Quadlet versionada en `infra/podman/vm2-db-server/`, puerto 5433 solo en la IP interna, TLS 1.3 con `podman secret`, `pg_hba.conf` propio y sin contraseña de superusuario. Roles, esquema y datos migrados desde la base nativa; la app del checkpoint ya trabaja contra el contenedor y las 24 pruebas pasan. La base nativa sigue encendida pero desactualizada, pendiente de apagar con aprobación.
 - `database/psql-contenedor.sh` y la demo (`database/demo-roles.sh`) apuntan por defecto al contenedor.
 - **Sudo de mínimo privilegio para `andy_martinez`** (ZT-4; `runbook.md` sección 20): de `NOPASSWD: ALL` a poder operar como `siget` y ejecutar comandos de diagnóstico de solo lectura como root. Verificado: ya no puede ser root ni instalar paquetes.
