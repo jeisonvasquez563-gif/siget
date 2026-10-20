@@ -1093,3 +1093,92 @@ Antes de apagar se comprobó que **no había ninguna conexión de clientes** a l
 **Gotcha:** `systemctl --user` como `siget` desde una sesión sin entorno de usuario responde "Failed to connect to bus"; hay que fijar `XDG_RUNTIME_DIR=/run/user/<uid>`, como en la sección 15.
 
 **Pendiente de este paso:** decidir cuándo se desinstala el paquete y se borran los datos nativos (requiere aprobación explícita; hoy se conservan).
+
+## 22. Corrección de la hora de las VMs
+
+Fecha: 20 de octubre de 2026, con aprobación de Jeison. Hallazgo hecho al construir la imagen del backend: `tar` avisó de archivos con fecha "en el futuro".
+
+### 22.1 Hallazgo
+
+Los relojes de VM1 y VM2 iban **1 h 45 min atrasados** (21:26 UTC cuando eran las 23:11 UTC), aunque `timedatectl` decía "System clock synchronized: yes". No era un problema de tu equipo ni de VMware: se contrastó con **cuatro sitios independientes** (GitHub, Cloudflare, Google y Red Hat), consultados desde el PC y desde la propia VM, y todos coincidían con el PC.
+
+**Causa:** la red del laboratorio bloquea casi todo el NTP público (UDP 123 a Cloudflare y TCP 4460 de NTS agotaron el tiempo, y todas las fuentes `pool` figuraban sin respuesta). La única que contestaba, `154.6.3.7` (estrato 4), tenía la hora equivocada, y `chrony` se fiaba de ella.
+
+**Por qué importa:** los sellos de la auditoría, los vencimientos de los plazos (SLA), la vigencia del MFA (15 minutos), los tokens JWT y la validez de los certificados dependen del reloj. Una auditoría con la hora mal pone en duda justo la promesa del sistema: la evidencia confiable.
+
+### 22.2 Corrección
+
+La fuente de hora fiable disponible es el anfitrión (el PC de Jeison) a través de VMware:
+
+```bash
+sudo dnf install -y open-vm-tools
+sudo systemctl enable --now vmtoolsd
+sudo vmware-toolbox-cmd timesync enable
+sudo systemctl disable --now chronyd      # se fiaba de la fuente con hora mala
+```
+
+### 22.3 Verificación
+
+- La hora de ambas VMs saltó +1 h 45 min y quedó a **1 o 2 segundos** del PC y de GitHub.
+- Tras el salto: PostgreSQL responde con la hora correcta, el contenedor sigue activo (sin reiniciarse), `sshd`, `firewalld`, `tailscaled`, `httpd` y `php-fpm` activos y el login web responde 200.
+- Un salto **hacia adelante** es el seguro: los certificados siguen vigentes y no se repiten marcas de tiempo.
+
+### 22.4 Limitación (declarada)
+
+Las VMs dependen ahora de que el **PC anfitrión tenga la hora correcta**. Si el PC se desfasa, las VMs lo siguen. Con una red que permita NTP público, lo correcto sería volver a `chrony` con NTS (`time.cloudflare.com`).
+
+### 22.5 Gotchas
+
+- `timedatectl` dice "synchronized: yes" aunque la fuente esté mal: significa que sigue a su fuente, no que la fuente sea correcta. Hay que contrastarla con una referencia externa.
+- Un solo servidor de hora alcanzable es un punto único de fallo de confianza: no se puede detectar que miente.
+- Contrastar la hora con la cabecera HTTP `Date` de varios sitios HTTPS es un método rápido y sin NTP: `curl -sI https://github.com | grep -i ^date`.
+
+### 22.6 Pendiente
+
+- Los registros anteriores al 20-oct (auditoría de prueba, journal, `dnf history`) llevan la hora atrasada: no hay datos reales de trámites afectados.
+- Decidir una fuente de hora definitiva cuando el servidor se despliegue fuera de este laboratorio.
+
+## 23. Backend en contenedor y prueba contra la base real
+
+Fecha: 20 de octubre de 2026, parte de las tareas 1.6 y 2.5 del [plan](./architecture/plan-semanas-1-2.md) y ZT-6 de la [matriz de Zero Trust](./zero-trust-cobertura.md).
+
+### 23.1 Qué se hizo
+
+- **Modelos** de las 9 tablas del esquema `siget` (`managed = False`: la base es la autoridad; Django no crea ni migra nada).
+- **Contexto RLS** (`apps/nucleo/contexto.py`): tras permitir el PDP, se fija `app.usuario_id` y `app.instituciones` solo para la transacción (`set_config(..., true)`); con `ATOMIC_REQUESTS` el contexto muere al terminar la petición.
+- **Imagen** del backend (`backend/Containerfile`, UBI 9 con Python 3.12, usuario sin privilegios, 1,16 GB), construida por `siget` en VM1. No contiene secretos.
+- **`app_role` con LOGIN** (migración [`003-login-app-role.sql`](../database/migraciones/003-login-app-role.sql)): sin superusuario, sin `BYPASSRLS`, límite de 20 conexiones y contraseña aleatoria. Regla `hostssl` propia en `pg_hba.conf`.
+- **Secretos como `podman secret`** en VM1: `siget-db-app-password`, `siget-django-key` y `siget-ca`. Ningún valor pasó por argumentos ni quedó en un archivo.
+
+### 23.2 Verificación contra la base real
+
+Desde un contenedor de VM1, como `app_role`, por TLS 1.3 con `verify-full`:
+
+- **`verificar_esquema`:** los 9 modelos coinciden con las tablas reales (columnas incluidas).
+- **`verificar_integracion`:** 15 de 15 pasos a través del ORM, en una transacción que se revierte: conexión sin superusuario y por TLS; RLS por institución (el funcionario del MOP ve solo lo del MOP, la ciudadana solo lo propio, otra institución no ve la auditoría); la base escribe la auditoría en la misma transacción; transición inválida rechazada; ni el ORM ni la base dejan modificar la auditoría ni borrar trámites; `app_role` no se sube a un rol de plataforma; y el contexto no sobrevive a la transacción. Después de la prueba no quedó ningún dato.
+
+```bash
+sudo -H -u siget bash -lc 'cd /tmp && export XDG_RUNTIME_DIR=/run/user/$(id -u) && podman run --rm \
+  --secret siget-db-app-password,mode=0444 --secret siget-django-key,mode=0444 --secret siget-ca,mode=0444 \
+  -e SIGET_DB_PASSWORD_FILE=/run/secrets/siget-db-app-password \
+  -e SIGET_SECRET_KEY_FILE=/run/secrets/siget-django-key \
+  -e SIGET_DB_SSLROOTCERT=/run/secrets/siget-ca \
+  localhost/siget-backend:dev python manage.py verificar_integracion'
+```
+
+### 23.3 Incidente: el login del checkpoint cayó unos minutos
+
+La migración 003 hizo `REVOKE ALL ON DATABASE … FROM PUBLIC`. Los permisos de conexión **no viajaron con `pg_restore`** al migrar al contenedor: hasta entonces la app del checkpoint funcionaba solo porque `PUBLIC` tenía acceso. Al quitarlo, `checkpoint_app` quedó sin `CONNECT` y el login respondió **HTTP 500** ("permission denied for database"). Se detectó con la prueba de login, se devolvió `CONNECT` a `checkpoint_app`, `pgadmin_lectura` y `siget_owner`, y se verificó el flujo completo (302 al dashboard, 8 usuarios intactos). La migración 003 ahora concede `CONNECT` a los cinco roles. Lección: al quitar `PUBLIC`, conceder primero y verificar después con un login real.
+
+### 23.4 Gotchas
+
+- Una vista "que no toca la base" **sí abre una conexión** con `ATOMIC_REQUESTS = True`. `/salud/` se exentó con `@transaction.non_atomic_requests`; así responde aunque la base esté caída.
+- Los permisos a nivel de base de datos (`GRANT CONNECT`) no se restauran con `pg_restore` si la base se crea con `createdb`.
+- Con `psql -f` por ruta de archivo, un `cat` que falla por permisos no detiene el script: se envió por la entrada estándar y se comprobó el estado real, no el mensaje del script.
+- Las comillas dobles en SQL son identificadores: las cadenas llevan comillas simples.
+
+### 23.5 Pendiente
+
+- Servicio permanente del backend: unidad Quadlet con `gunicorn` y `nginx` en el mismo pod, con TLS en el borde (ZT-3).
+- Autenticación (Argon2, JWT corto, MFA TOTP) y vistas con el motor de acceso conectado.
+- Cargar el catálogo inicial de instituciones y trámites.

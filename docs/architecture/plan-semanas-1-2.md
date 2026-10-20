@@ -31,7 +31,7 @@ Dejar listos los cimientos de la Fase 2 para que Django tenga dónde correr desd
 | 1.3 | Cargar las claves públicas de los 7 compañeros restantes en VM1 y VM2 | Jeison (con las claves de cada uno) | — | Cada integrante entra por SSH con su usuario |
 | 1.4 ✅ | Habilitar journal persistente o `auditd` para trazar el uso de sudo | Jeison | — | **Hecho el 15-oct** (runbook 14.6): journal persistente en VM1 y VM2 |
 | 1.5 ✅ | Escribir la **especificación del motor ABAC**: atributos, reglas, interfaz del PDP | Equipo ABAC (por asignar) | Diseño Zero Trust aprobado | **Hecho el 20-oct**: [`2026-10-20-motor-abac-design.md`](../superpowers/specs/2026-10-20-motor-abac-design.md), implementado en `backend/apps/autorizacion/` con 84 pruebas |
-| 1.6 🔄 | Esqueleto de **backend**: proyecto Django + DRF en `backend/`, apps y modelos, migraciones | Equipo backend (por asignar) | — | **Esqueleto, configuración segura y PDP hechos el 20-oct** (84 pruebas). Faltan los modelos de las tablas del esquema `siget` y la autenticación |
+| 1.6 🔄 | Esqueleto de **backend**: proyecto Django + DRF en `backend/`, apps y modelos, migraciones | Equipo backend (por asignar) | — | **Hecho el 20-oct**: esqueleto, PDP y los 9 modelos del esquema, verificados contra la base real (runbook 23). Faltan la autenticación y las vistas |
 | 1.7 | Esqueleto de **frontend**: React + Vite + Tailwind + shadcn/ui en `frontend/`, pantalla de login contra datos simulados | Dos integrantes (por asignar) | — | `npm run dev` levanta y muestra el login |
 | 1.8 ✅ | Verificar los DOI de las referencias NIST y corregir la bibliografía | Cualquiera | — | **Hecho el 15-oct**: ambos DOI resuelven a NIST y coinciden títulos, autores y años |
 
