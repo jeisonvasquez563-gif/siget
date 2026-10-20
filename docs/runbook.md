@@ -1182,3 +1182,75 @@ La migración 003 hizo `REVOKE ALL ON DATABASE … FROM PUBLIC`. Los permisos de
 - Servicio permanente del backend: unidad Quadlet con `gunicorn` y `nginx` en el mismo pod, con TLS en el borde (ZT-3).
 - Autenticación (Argon2, JWT corto, MFA TOTP) y vistas con el motor de acceso conectado.
 - Cargar el catálogo inicial de instituciones y trámites.
+
+## 24. nginx con TLS 1.3 y el backend como servicio permanente (pod `siget`)
+
+Fecha: 20 de octubre de 2026, tarea ZT-3 de la [matriz de Zero Trust](./zero-trust-cobertura.md) (principio 2: toda la comunicación se asegura) y parte de la decisión D2 del plan (puertos altos para los contenedores rootless). Ejecutado por Jeison en VM1, con su aprobación.
+
+### 24.1 Resultado
+
+Un pod rootless `siget` del usuario de servicio `siget`, gestionado por Quadlet, con dos contenedores. **Solo `nginx` está expuesto**; el backend escucha únicamente dentro del pod.
+
+| Pieza | Detalle |
+|---|---|
+| Pod `siget` | Publica `8443` (HTTPS) y `8080` (redirige a HTTPS). Archivos en [`infra/podman/vm1-app-backend/`](../infra/podman/vm1-app-backend/) |
+| `siget-nginx` | `registry.access.redhat.com/ubi9/nginx-126:1-1777855212` (UBI 9, 116 MB comprimida), TLS 1.3, sin root, sistema de archivos de solo lectura, `DropCapability=ALL` |
+| `siget-backend` | `localhost/siget-backend:dev` con `gunicorn` en `127.0.0.1:8000` **dentro del pod**, solo lectura, `DropCapability=ALL` |
+| Secretos | `siget-nginx-crt` y `siget-nginx-key` (nginx); `siget-db-app-password`, `siget-django-key` y `siget-ca` (backend). Nada en el repositorio ni en las imágenes |
+| Firewall | `8443/tcp` y `8080/tcp` abiertos en VM1 |
+| Acceso | `https://192.168.159.137:8443` (red del anfitrión) o `https://100.104.206.118:8443` (Tailscale) |
+
+El checkpoint PHP sigue en Apache (puerto 80) hasta que se retire (semana 6): por eso nginx usa los puertos altos 8443 y 8080.
+
+### 24.2 Certificado de nginx
+
+La clave privada se generó **en VM1 y pasó directo a un `podman secret`**: el archivo se destruyó con `shred` y nunca salió de la VM. Solo viajó la solicitud de firma (pública) a la CA de VM2, que emitió un certificado de 1 año con `subjectAltName` de `192.168.159.137`, `192.168.100.10`, `100.104.206.118`, `127.0.0.1`, `app-backend` y `localhost`. La CA pública está en [`infra/pki/siget-ca.crt`](../infra/pki/siget-ca.crt).
+
+**Huella SHA-256 de la CA** (para verificarla antes de instalarla en un equipo; instrucciones en [`infra/pki/README.md`](../infra/pki/README.md)):
+
+```
+F4:F4:15:F6:E5:4F:93:A7:77:7B:83:16:E3:97:87:17:31:AB:3B:08:6B:88:B9:C4:AD:77:C7:78:AD:8A:CC:E0
+```
+
+### 24.3 Configuración de seguridad de nginx
+
+- **TLS 1.3 únicamente** (TLS 1.2 recibe el aviso "protocol version"), sin tickets de sesión.
+- **Cabeceras:** `Strict-Transport-Security` (1 año), `Content-Security-Policy` (`default-src 'self'; frame-ancestors 'none'`), `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` y `Cross-Origin-Opener-Policy`. nginx es la **única fuente**: descarta las que repite Django.
+- **Solo los métodos que usa la API** (el resto responde 405) y `server_tokens off`.
+- **Límite de tasa** de 20 peticiones por segundo por origen, con ráfaga de 40.
+- **HTTP (`8080`)** no sirve contenido: responde 301 a HTTPS.
+- `client_max_body_size` de 10 MB y plazos cortos de cabecera y cuerpo.
+
+### 24.4 Verificación (desde el PC contra `https://192.168.159.137:8443`)
+
+| Prueba | Resultado |
+|---|---|
+| Certificado con la CA interna | HTTP 200 `{"estado":"ok"}`, verificación correcta |
+| Cliente sin confiar en la CA | Rechazado (curl 60) |
+| TLS 1.3 / TLS 1.2 | Negocia TLS 1.3 con `TLS_AES_256_GCM_SHA384`; TLS 1.2 rechazado |
+| Cabeceras de seguridad | Las siete presentes, **una sola vez cada una** |
+| `http://…:8080/salud/` | 301 a `https://…:8443/salud/` |
+| `Host` falso (`evil.example.com`) | HTTP 400 (rechazado por Django) |
+| `/api/tramites/`, `/admin/`, `/.env`, `/salud/../etc/passwd` | HTTP 404, sin revelar nada |
+| `TRACE` y `DELETE` | HTTP 405 |
+| Ráfaga de 150 peticiones simultáneas | 132 con 200 y **18 con 429** |
+| Puerto 8000 desde fuera | Sin conexión (el backend solo escucha dentro del pod) |
+| Denegaciones de SELinux | Ninguna |
+| Checkpoint PHP (Apache :80) | Sigue en 200 |
+| `podman kill siget-backend` | El servicio vuelve solo en segundos (`Restart=always`) |
+
+### 24.5 Gotchas
+
+- **`curl` en Windows (Schannel) falla con una CA privada** con "the revocation status is unknown" (código 60): hay que usar `--ssl-no-revoke`. Es un problema del cliente, no del servidor; los navegadores no lo sufren una vez instalada la CA.
+- Con el sistema de archivos de solo lectura hay que dar escritura explícita donde hace falta: `Tmpfs=/tmp` para ambos, `Tmpfs=/var/log/nginx` para nginx y `HOME=/tmp` para `gunicorn`, que escribe un socket de control en su carpeta personal.
+- Si Django y nginx agregan la misma cabecera, sale duplicada. Se resolvió con `proxy_hide_header` en nginx.
+- Un archivo montado por `Volume=` (como `nginx.conf`) se debe actualizar escribiendo sobre el mismo archivo (`tee`), no reemplazándolo (`sed -i` crea otro archivo y el contenedor sigue viendo el antiguo).
+- Un pod rootless publica los puertos a través de `pasta`: el proceso que escucha en el host es `pasta`, no `nginx`.
+
+### 24.6 Pendiente
+
+- **Todavía no hay interfaz ni API de trámites detrás de nginx**: solo `/salud/`. Cuando existan las vistas, nginx servirá también el frontend (React).
+- El login del checkpoint PHP sigue por HTTP (Apache, puerto 80) hasta su retiro en la semana 6.
+- Pasar a los puertos 80 y 443 cuando se retire Apache (por ejemplo, con `net.ipv4.ip_unprivileged_port_start` o una redirección de firewalld).
+- Renovar el certificado de nginx antes de octubre de 2027.
+- La imagen del backend se llama `:dev` y se construye a mano en VM1; falta fijarla por versión o resumen y automatizar la construcción.
