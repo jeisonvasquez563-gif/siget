@@ -7,10 +7,12 @@ Cambios incrementales sobre el esquema `siget` que ya está aplicado. Se ejecuta
 | 002 | `002-dividir-rol-plataforma.sql` | Divide el rol de plataforma en cinco y agrega el control dual | 15-oct-2026 |
 | 003 | `003-login-app-role.sql` | Permite el `LOGIN` de `app_role` y concede `CONNECT` a los cinco roles | 20-oct-2026 |
 | 004 | `004-autenticacion.sql` | Segundo factor, bloqueo por intentos, sesiones y eventos de seguridad | 20-oct-2026 |
+| 005 | `005-catalogo-inicial.sql` | Siembra 6 instituciones y 6 tipos de trámite con su plazo | 20-oct-2026 |
+| 006 | `006-historial-solicitante.sql` | Política RLS: el solicitante ve el historial de sus trámites | 20-oct-2026 |
 
 ## Para una base nueva
 
-`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 y 004**.
+`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 006**.
 
 ## Reglas
 

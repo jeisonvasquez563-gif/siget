@@ -234,7 +234,7 @@ class VistaDePrueba:
 
 
 def peticion(scope="completo", mfa_en=None):
-    usuario = SimpleNamespace(pk=7, id=7, estado_cuenta="activa", nivel_aseguramiento=1, rol_plataforma="ninguno", mfa_verificado_en=mfa_en)
+    usuario = SimpleNamespace(pk=7, id=7, estado_cuenta="activa", nivel_aseguramiento=1, rol_plataforma="ninguno", mfa_verificado_en=mfa_en, mfa_activo=True)
     return SimpleNamespace(user=SimpleNamespace(usuario=usuario, claims=SimpleNamespace(scope=scope)))
 
 

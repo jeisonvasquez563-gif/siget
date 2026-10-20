@@ -1299,3 +1299,40 @@ A través de `nginx` con TLS: `/salud/` 200; `/auth/yo/` sin token 401 con `WWW-
 - Decisión de Jeison sobre el MFA obligatorio u opcional del ciudadano.
 - Rotación de las claves JWT y Fernet.
 - Conectar `PermisoPDP` a las vistas de trámites y de auditoría.
+
+## 26. API de trámites y catálogo
+
+Fecha: 20 de octubre de 2026. Primera API de negocio del backend; conecta el PDP (ABAC) con las vistas y con la base (RLS). Ejecutado por Jeison en el PC, VM1 y VM2.
+
+### 26.1 Qué se hizo
+
+- **Migraciones aplicadas** ([`005-catalogo-inicial.sql`](../database/migraciones/005-catalogo-inicial.sql), [`006-historial-solicitante.sql`](../database/migraciones/006-historial-solicitante.sql)): 6 instituciones y 6 tipos de trámite con su plazo (SLA); política RLS para que el solicitante vea el historial de sus propios trámites.
+- **Endpoints** (todos exigen token con scope completo): `GET/POST /tramites/`, `GET /tramites/<id>/`, `POST /tramites/<id>/estado/`, `POST /tramites/<id>/reasignar/`, `GET /tramites/<id>/historial/`, `GET /catalogo/instituciones/`, `GET /catalogo/tipos-tramite/?institucion=`.
+- **Defensa en capas por petición:** autenticación y sesión vigente → contexto RLS fijado (`app.usuario_id`, `app.instituciones`) → decisión del PDP (también las negadas quedan registradas, por una conexión aparte) → la base valida de nuevo las transiciones y escribe la auditoría en la misma transacción.
+- **Lo ajeno no existe:** un trámite que la persona no puede ver responde 404, igual que uno inexistente.
+- **Qué se muestra depende de quién mira:** la ciudadanía ve institución, estado y fechas; el personal además los identificadores y el detalle interno.
+- **Auditoría de rutas** (prueba unitaria): falla si alguna vista es pública fuera de `salud`, `registro`, `login` y `refresh`.
+- Módulo nuevo `apps/nucleo/errores.py`: el cuerpo de un acceso denegado conserva los tipos reales.
+
+### 26.2 Verificación
+
+Desde un contenedor de VM1, como `app_role`, contra la base real, en una transacción que se revierte:
+
+- `verificar_esquema`: **11 de 11**.
+- `verificar_tramites`: **47 de 47** pasos (visibilidad por rol e institución, conflicto de interés, segundo factor vencido, saltos de estado, reasignación, historial, decisiones registradas, sin superusuario). No quedó ningún dato.
+- **239 pruebas unitarias** en el PC.
+- Por nginx con TLS: `/tramites/` y `/catalogo/instituciones/` sin token responden 401.
+
+### 26.3 Errores encontrados y corregidos
+
+1. **Booleanos convertidos en texto.** DRF convierte a texto los valores del `detail` de una excepción: `reautenticacion_sugerida` llegaba como `"True"` (y `"False"` sería verdadero para una interfaz). Se creó `AccesoDenegado` y un manejador de excepciones que devuelve el cuerpo con sus tipos reales.
+2. **Historial desordenado.** Los eventos de una misma transacción comparten `now()`, así que `creado_en` no ordena; se ordena por `id`.
+3. **Prueba que no veía las denegaciones.** El arnés escribía las decisiones en la conexión principal, que DRF revierte al responder 403. Ahora se capturan en memoria y se verifica que producción use una conexión distinta en autocommit.
+4. **Importación circular** al poner el manejador: DRF carga los permisos por defecto al importar `rest_framework.views`; la importación en `errores.py` es diferida.
+
+### 26.4 Pendiente
+
+- Plazos en días hábiles (hoy días calendario), vencimiento y escalamiento automático (temporizador de systemd).
+- Documentos adjuntos y notificaciones.
+- Frontend (React): lista, detalle e historial.
+

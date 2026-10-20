@@ -94,8 +94,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["apps.autorizacion.permisos.DenegarPorDefecto"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "EXCEPTION_HANDLER": "apps.nucleo.errores.manejador",
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "registro": "10/hour", "login": "10/min", "refresh": "60/min", "mfa": "10/min"},
+    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "registro": "10/hour", "login": "10/min", "refresh": "60/min", "mfa": "10/min", "api": "120/min"},
     "UNAUTHENTICATED_USER": None,
 }
 
