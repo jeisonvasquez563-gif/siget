@@ -1,0 +1,30 @@
+[Unit]
+Description=Backend Django de SIGET (gunicorn) en el pod siget
+
+[Container]
+Image=localhost/siget-backend:dev
+ContainerName=siget-backend
+Pod=siget.pod
+# Los secretos llegan montados; nada de esto está en el repositorio ni en la imagen
+Secret=siget-db-app-password,mode=0444
+Secret=siget-django-key,mode=0444
+Secret=siget-ca,mode=0444
+Environment=SIGET_DB_PASSWORD_FILE=/run/secrets/siget-db-app-password
+Environment=SIGET_SECRET_KEY_FILE=/run/secrets/siget-django-key
+Environment=SIGET_DB_SSLROOTCERT=/run/secrets/siget-ca
+# El sistema de archivos es de solo lectura: gunicorn escribe su socket de control en /tmp (tmpfs)
+Environment=HOME=/tmp
+Environment=SIGET_ALLOWED_HOSTS=192.168.159.137,192.168.100.10,100.104.206.118,app-backend,localhost
+# Escucha solo dentro del pod: únicamente nginx (mismo pod) puede alcanzarlo
+Exec=gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --access-logfile -
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+Tmpfs=/tmp
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

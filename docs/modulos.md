@@ -9,7 +9,7 @@ Los nombres de las apps de Django y las vistas de React son una **propuesta** qu
 | Capa | Módulos | Implementados hoy | Planificados |
 |---|---|---|---|
 | Base de datos | 11 | **9** (aplicados y probados) | 2 (documentos y notificaciones) |
-| Seguridad de infraestructura | 6 | **5** | 1 (TLS en el borde, nginx) |
+| Seguridad de infraestructura | 6 | **6** | 0 |
 | Backend (Django) | 7 | **0 completos** (el PDP del módulo 2 está implementado y probado) | 7 |
 | Frontend (React) | 6 vistas | **0** | 6 |
 
@@ -40,9 +40,9 @@ Esquema `siget` aplicado el 15 de octubre de 2026, con 24 pruebas que pasan (`ba
 | 3 | Roles de base de datos sin superusuario y RLS | ✅ |
 | 4 | Cifrado app ↔ base de datos (TLS 1.3 con verificación del certificado) | ✅ (checkpoint) |
 | 5 | Registro del sistema (journal persistente) | ✅ |
-| 6 | TLS en el borde con HSTS y CSP (nginx) | ⏳ semana 5 |
+| 6 | TLS en el borde con HSTS, CSP y límite de tasa (nginx) | ✅ (20-oct) |
 
-Contenedores Podman rootless con Quadlet: instalados en las dos VMs. **PostgreSQL ya corre en un contenedor** (20-oct, runbook 21); falta desplegar `nginx` y Django.
+El backend y `nginx` corren como un pod rootless (`siget`) en VM1. Contenedores Podman rootless con Quadlet: instalados en las dos VMs. **PostgreSQL ya corre en un contenedor** (20-oct, runbook 21); falta desplegar `nginx` y Django.
 
 ## 4. Módulos de backend (Django) planificados
 

@@ -1,0 +1,6 @@
+[Pod]
+PodName=siget
+# nginx es la única puerta de entrada. Los puertos son altos porque los contenedores rootless no pueden usar
+# los menores a 1024 (y Apache del checkpoint PHP sigue ocupando el 80 hasta que se retire, semana 6).
+PublishPort=8443:8443
+PublishPort=8080:8080
