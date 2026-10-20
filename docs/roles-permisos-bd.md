@@ -10,7 +10,7 @@ Material para mostrar al profesor. Resume qué roles, permisos y módulos define
 | Base del checkpoint (`tramites_demo`): tablas `app_usuarios` y `demo_tramite` | **Implementado** | VM2 |
 | La app PHP del checkpoint | **Brecha cerrada**: ya no usa `postgres`; se conecta como `checkpoint_app` (solo `app_usuarios`). `postgres` quedó sin contraseña y rechazado por red | `checkpoints/`, runbook 17 |
 
-Estado real de la base hoy, consultado en VM2: 6 roles (`postgres` es el único superusuario, sin contraseña y rechazado por red; `siget_owner`, `app_role` y `auditor_role` sin privilegios especiales; `checkpoint_app` y `pgadmin_lectura` con `LOGIN`), 6 políticas RLS y 7 triggers. **Todavía no hay datos reales en el esquema `siget`**: `app_role` está `NOLOGIN` hasta que exista el backend, y la base **corre desde el 20-oct en un contenedor Podman rootless** (runbook 21); la instalación nativa antigua sigue encendida pero sin uso.
+Estado real de la base hoy, consultado en VM2: 6 roles (`postgres` es el único superusuario, sin contraseña y rechazado por red; `siget_owner`, `app_role` y `auditor_role` sin privilegios especiales; `checkpoint_app` y `pgadmin_lectura` con `LOGIN`), 6 políticas RLS y 7 triggers. **Todavía no hay datos reales en el esquema `siget`**: `app_role` está `NOLOGIN` hasta que exista el backend, y la base **corre desde el 20-oct en un contenedor Podman rootless** (runbook 21); la instalación nativa antigua está **apagada y deshabilitada** desde el 20-oct (sus datos se conservan en disco).
 
 ## 2. Principio: no hay superusuario en la operación
 
@@ -116,4 +116,4 @@ Muestra primero el **estado real** de la base (un solo rol, sin RLS) y luego las
 | `postgres` conservaba acceso por red con contraseña | **Cerrada**: sin contraseña y `reject` en `pg_hba.conf` |
 | pgAdmin se conectaba como `postgres` | **Cerrada**: ahora usa `pgadmin_lectura` (solo lectura) |
 | `app_role` sin `LOGIN` | Pendiente: se activa con `podman secret` cuando exista el backend |
-| La base era la instalación nativa | **Cerrada el 20-oct**: migrada a un contenedor rootless con la misma configuración. Pendiente: apagar la base nativa |
+| La base era la instalación nativa | **Cerrada el 20-oct**: migrada a un contenedor rootless con la misma configuración. La base nativa está apagada y deshabilitada |

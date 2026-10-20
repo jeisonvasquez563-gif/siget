@@ -6,8 +6,8 @@
 # Uso (en VM2): bash ~/siget-diseno/demo.sh
 D="$(cd "$(dirname "$0")" && pwd)"
 DB=tramites_demo
-# Por defecto usa el contenedor siget-postgres (la base viva desde el 20-oct). Para la base nativa antigua:
-#   SIGET_PSQL="sudo -u postgres psql" bash demo.sh
+# Usa el contenedor siget-postgres (la base viva desde el 20-oct). La base nativa antigua esta apagada;
+# si se volviera a encender: SIGET_PSQL="sudo -u postgres psql" bash demo.sh
 PSQL="${SIGET_PSQL:-$D/psql-contenedor.sh}"
 psqlp() { $PSQL -d "$DB" -P pager=off "$@"; }
 cd /tmp
