@@ -7,6 +7,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 ## [Sin liberar] — en desarrollo
 
 ### Añadido
+- **Sudo de mínimo privilegio para `andy_martinez`** (ZT-4; `runbook.md` sección 20): de `NOPASSWD: ALL` a poder operar como `siget` y ejecutar comandos de diagnóstico de solo lectura como root. Verificado: ya no puede ser root ni instalar paquetes.
 - `docs/estructura-plataforma.md` y `docs/img/estructura-plataforma.svg`: explicación de la estructura de la plataforma con diagrama (aplicación en VM1, base de datos en VM2, TLS entre ambas), flujo de una petición, estado real frente al plan y carpetas del repositorio.
 - **Rol de plataforma dividido en cinco** (`operador_infraestructura`, `operador_identidades`, `operador_catalogo`, `operador_seguridad` y `custodio_secretos`) con **control dual** (`siget.aprobacion`) y la regla de un solo rol de plataforma por persona, sin membresías de institución (ni al revés). Migración `database/migraciones/002-dividir-rol-plataforma.sql` aplicada en la base real; pruebas de 19 a 24, todas contra el esquema real (`runbook.md` sección 19). Los roles de la aplicación pasan de 6 a 10. Los módulos de base de datos pasan de 10 a 11 (se suma el control dual).
 - **TLS 1.3 entre la aplicación y la base de datos** (ZT-2; `runbook.md` sección 18): CA interna, certificado del servidor con verificación `verify-full` en el PHP del checkpoint y `hostssl` en `pg_hba.conf`; una conexión sin TLS ahora es rechazada. Nuevo `docs/modulos.md` con el conteo de módulos implementados y planificados.

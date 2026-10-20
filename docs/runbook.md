@@ -980,3 +980,32 @@ Las pruebas pasaron de 19 a **24, todas contra el esquema real** (`bash ~/siget-
 
 - El control dual se aplica hoy a nivel de datos; falta que el backend lo exija en el flujo de altas.
 - Definir cómo se otorga el primer rol de cada operador (arranque inicial) sin romper la separación de funciones.
+
+## 20. Sudo de mínimo privilegio para `andy_martinez` (ZT-4)
+
+Fecha: 15 de octubre de 2026. Aprobado por Jeison. Principio 3 de Zero Trust (acceso con el mínimo privilegio): el `NOPASSWD: ALL` de Andy en VM1 era el desvío que la [matriz de cobertura](./zero-trust-cobertura.md) tenía marcado. Podman ya estaba instalado, así que ya no necesitaba root completo.
+
+### 20.1 Regla nueva (`/etc/sudoers.d/andy_martinez`, VM1)
+
+```
+andy_martinez ALL=(siget) NOPASSWD: ALL
+andy_martinez ALL=(root) NOPASSWD: /usr/bin/journalctl --no-pager *,     /usr/bin/systemctl --no-pager status *, /usr/sbin/ausearch -m avc *,     /usr/sbin/ss -tlnp, /usr/bin/dnf check-update, /usr/bin/dnf --quiet check-update, /usr/bin/dnf info *
+```
+
+Se validó con `visudo -cf` antes de instalarla (permisos 440, root). La regla anterior se guardó en `/root/siget-backups/sudoers-andy_martinez.antes-ZT4`.
+
+### 20.2 Verificación
+
+- `sudo -l -U andy_martinez` lista solo esas reglas.
+- Como Andy: `sudo -u siget id` funciona; `sudo whoami` y `sudo dnf install` piden contraseña (que no tiene), es decir, quedan denegados.
+
+### 20.3 Decisiones de diseño
+
+- Los comandos de lectura llevan `--no-pager` fijado como primer argumento: sin eso, `journalctl` y `systemctl status` abren un paginador desde el que se puede obtener una shell de root.
+- Operar como `siget` es suficiente para trabajar con los contenedores del proyecto sin tocar el sistema.
+- Si Andy necesita algo más, se agrega a la lista y queda en el `CHANGELOG.md`; no se vuelve a dar `ALL`.
+
+### 20.4 Pendiente
+
+- Aplicar el mismo criterio a cualquier compañero que reciba sudo en el futuro.
+- Jeison conserva `NOPASSWD: ALL`; es la única cuenta con sudo completo, y el journal persistente registra su uso.

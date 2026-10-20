@@ -38,7 +38,7 @@ Semanas del [cronograma](./documento-introductorio.md): S1 = 12 oct. Los respons
 | ZT-1 | Inventario de recursos con clasificación (dueño, sensibilidad, quién accede) | 1 | S2 | Tabla en `docs/` y campo `sensibilidad` poblado en el catálogo |
 | ZT-2 ✅ | **TLS entre la aplicación y la base** con certificado propio, `hostssl` y verificación del servidor; el checkpoint PHP pasa a `sslmode=verify-full` | 2 | S2 | **Hecho el 15-oct** (runbook 18): `ssl = true` TLSv1.3 y la conexión sin TLS es rechazada |
 | ZT-3 | TLS en el borde (nginx) con HSTS, CSP y redirección de HTTP a HTTPS | 2 | S5 | `curl -I` devuelve HSTS y el HTTP no sirve contenido |
-| ZT-4 | **Sudo de mínimo privilegio**: reemplazar el `NOPASSWD: ALL` de `andy_martinez` por una lista de comandos | 3 | S2 | `sudo -l -U andy_martinez` lista solo comandos acotados |
+| ZT-4 ✅ | **Sudo de mínimo privilegio**: reemplazar el `NOPASSWD: ALL` de `andy_martinez` por una lista de comandos | 3 | S2 | **Hecho el 15-oct** (runbook 20): `sudo -l -U andy_martinez` lista solo comandos acotados |
 | ZT-5 | Argon2, JWT de vida corta con refresh, MFA TOTP y reautenticación para cambiar estados | 3 y 6 | S4–S6 | Pruebas de login, expiración, MFA y reautenticación |
 | ZT-6 | PDP: deniega por defecto, *fail closed*, contexto fijado por transacción | 3 y 4 | S4–S6 | Un caso permitido y uno denegado por cada fila de la matriz |
 | ZT-7 | Postura de los activos: reporte semanal de parches pendientes y AIDE (integridad de archivos) con un timer de systemd | 5 | S5 | Reporte generado y alerta ante un archivo modificado |
@@ -59,7 +59,6 @@ Honestidad antes que cumplimiento aparente:
 | Desvío | Principio | Plan |
 |---|---|---|
 | El login del checkpoint se sirve por HTTP (sin TLS) | 2 | ZT-3 y ZT-9 |
-| `andy_martinez` tiene `sudo` completo en VM1 | 3 | ZT-4 |
 | PostgreSQL sigue siendo la instalación nativa | 3 | Tareas 2.2 y 2.3 del plan de las semanas 1 y 2 |
 | El MFA todavía no existe | 6 | ZT-5 |
 
