@@ -33,8 +33,12 @@ ALLOWED_HOSTS = [h.strip() for h in os.environ.get("SIGET_ALLOWED_HOSTS", "").sp
 
 INSTALLED_APPS = [
     "rest_framework",
-    "apps.autorizacion",
     "apps.nucleo",
+    "apps.catalogo",
+    "apps.identidad",
+    "apps.tramites",
+    "apps.auditoria",
+    "apps.autorizacion",
 ]
 
 MIDDLEWARE = [
@@ -56,6 +60,8 @@ DATABASES = {
         "HOST": os.environ.get("SIGET_DB_HOST", "192.168.100.20"),
         "PORT": os.environ.get("SIGET_DB_PORT", "5433"),
         "CONN_MAX_AGE": 0,
+        # Cada petición es una transacción: el contexto RLS (set_config local) muere con ella.
+        "ATOMIC_REQUESTS": True,
         "OPTIONS": {
             "sslmode": "verify-full",
             "sslrootcert": os.environ.get("SIGET_DB_SSLROOTCERT", "/etc/pki/siget/ca.crt"),

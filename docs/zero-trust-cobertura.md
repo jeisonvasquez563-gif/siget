@@ -28,6 +28,7 @@ Matriz que contrasta cada principio de Zero Trust con lo que SIGET implementa ho
 - SSH solo por clave, firewall restrictivo, SELinux en Enforcing y journal persistente en las dos VMs (runbook 14).
 - La app del checkpoint usa un rol de mínimo privilegio y pgAdmin uno de solo lectura.
 - El PDP del backend deniega por defecto y ante fallos (*fail closed*); toda la API de DRF nace denegada (`backend/`, especificación en [`2026-10-20-motor-abac-design.md`](./superpowers/specs/2026-10-20-motor-abac-design.md)).
+- La hora de los servidores se corrigió el 20-oct (iba 1 h 45 min atrasada) y se contrastó con cuatro referencias externas (runbook 22). La auditoría y los vencimientos dependen de un reloj correcto.
 - PostgreSQL corre en un contenedor rootless del usuario de servicio `siget`, con TLS 1.3, sin contraseña de superusuario y sin privilegios (runbook 21).
 - La conexión entre la app y la base va cifrada con TLS 1.3 verificando el certificado del servidor, y la base rechaza las conexiones sin TLS (runbook 18).
 
@@ -42,7 +43,7 @@ Semanas del [cronograma](./documento-introductorio.md): S1 = 12 oct. Los respons
 | ZT-3 | TLS en el borde (nginx) con HSTS, CSP y redirección de HTTP a HTTPS | 2 | S5 | `curl -I` devuelve HSTS y el HTTP no sirve contenido |
 | ZT-4 ✅ | **Sudo de mínimo privilegio**: reemplazar el `NOPASSWD: ALL` de `andy_martinez` por una lista de comandos | 3 | S2 | **Hecho el 15-oct** (runbook 20): `sudo -l -U andy_martinez` lista solo comandos acotados |
 | ZT-5 | Argon2, JWT de vida corta con refresh, MFA TOTP y reautenticación para cambiar estados | 3 y 6 | S4–S6 | Pruebas de login, expiración, MFA y reautenticación |
-| ZT-6 🔄 | PDP: deniega por defecto, *fail closed*, contexto fijado por transacción | 3 y 4 | S4–S6 | **PDP hecho el 20-oct** (84 pruebas con un caso permitido y uno denegado por fila; 6 mutaciones detectadas). Falta conectarlo a las vistas y fijar el contexto en la base |
+| ZT-6 🔄 | PDP: deniega por defecto, *fail closed*, contexto fijado por transacción | 3 y 4 | S4–S6 | **PDP hecho el 20-oct** (84 pruebas con un caso permitido y uno denegado por fila; 6 mutaciones detectadas). El contexto RLS por transacción ya se fija y se verificó contra la base real (runbook 23); falta conectar el PDP a las vistas |
 | ZT-7 | Postura de los activos: reporte semanal de parches pendientes y AIDE (integridad de archivos) con un timer de systemd | 5 | S5 | Reporte generado y alerta ante un archivo modificado |
 | ZT-8 | Registro real de decisiones del PDP, reporte de denegaciones y bloqueo ante patrones anómalos | 6 y 7 | S7 | Consulta de denegaciones por actor; una ráfaga de intentos dispara el bloqueo |
 | ZT-9 | Retirar el checkpoint PHP (ver el [plan](./architecture/plan.md), punto 11) | 2 y 6 | S6 | Apache sin la app PHP; Django con login equivalente |

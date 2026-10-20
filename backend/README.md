@@ -8,7 +8,9 @@ Django 5.2 LTS + Django REST Framework (API-first). Corre en un contenedor Podma
 |---|---|
 | Esqueleto del proyecto (`config/`), configuración segura | ✅ |
 | Motor de decisión de acceso (PDP) y denegar por defecto en DRF | ✅ 84 pruebas |
-| Modelos de las tablas del esquema `siget` | ⏳ |
+| Contexto RLS por transacción e integración con la base real | ✅ 15 pasos contra la base real |
+| Imagen del contenedor (`Containerfile`) | ✅ construida en VM1 |
+| Modelos de las tablas del esquema `siget` | ✅ 9 modelos verificados contra la base real |
 | Autenticación (Argon2, JWT corto, MFA TOTP) | ⏳ |
 | Trámites, catálogo, auditoría, plazos y escalamiento | ⏳ |
 
@@ -31,7 +33,11 @@ backend/
 │   └── settings_test.py    # solo para las pruebas
 ├── apps/
 │   ├── autorizacion/       # PDP (pdp.py) y permisos de DRF
-│   └── nucleo/             # vista de salud
+│   ├── catalogo/           # Institucion, TipoTramite
+│   ├── identidad/          # Usuario, Membresia, Aprobacion y el adaptador al PDP
+│   ├── tramites/           # Tramite, Transicion
+│   ├── auditoria/          # EventoAuditoria, DecisionPdp (solo inserción)
+│   └── nucleo/             # salud, contexto RLS y comandos verificar_esquema / verificar_integracion
 └── tests/
 ```
 
@@ -44,7 +50,12 @@ python -m venv .venv
 .venv/Scripts/python -m pytest
 ```
 
-Las pruebas actuales no necesitan la base de datos.
+Las pruebas de `pytest` no necesitan la base de datos. Para probar contra la base real hay un contenedor y dos comandos de gestión:
+
+- `python manage.py verificar_esquema`: compara cada modelo con su tabla real.
+- `python manage.py verificar_integracion`: recorrido por el ORM (RLS, triggers, auditoría, permisos) en una transacción que se revierte.
+
+Se ejecutan en VM1 con la imagen del `Containerfile` y los secretos como `podman secret`; el comando exacto está en [`docs/runbook.md`](../docs/runbook.md) sección 23.
 
 ## Configuración (sin secretos en el código)
 
