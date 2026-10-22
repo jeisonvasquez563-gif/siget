@@ -323,7 +323,7 @@ describe('acceso y sesión', () => {
 
   it('el aviso del bloqueo por intentos fallidos se ve al ingresar, no al crear cuenta', async () => {
     const { user } = await abrirComo(null)
-    expect(await screen.findByText(/tras 3 intentos fallidos.*se bloquea 5 minutos/)).toBeInTheDocument()
+    expect(await screen.findByText(/tras 3 intentos fallidos.*5 minutos la primera vez, 15 la segunda y 60/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Crear una cuenta' }))
     expect(screen.queryByText(/tras 3 intentos fallidos/)).not.toBeInTheDocument()
   })

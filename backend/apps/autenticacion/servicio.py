@@ -70,12 +70,23 @@ def _crear_sesion(usuario, scope, ip, ahora, evento, vencimiento_anterior=None) 
     return Resultado(True, evento, access=access, refresh=refresh, scope=scope, expira_en=settings.SIGET_ACCESS_TTL_SEGUNDOS)
 
 
+def _bloqueos_recientes(usuario_id, ahora) -> int:
+    """Bloqueos de la cuenta desde su último inicio de sesión exitoso (con tope de 24 h): define el escalón del próximo."""
+    desde = ahora - bloqueo.MEMORIA
+    ultimo_ok = (EventoSeguridad.objects.filter(actor_id=usuario_id, evento="login_ok")
+                 .order_by("-creado_en").values_list("creado_en", flat=True).first())
+    if ultimo_ok is not None and ultimo_ok > desde:
+        desde = ultimo_ok
+    return EventoSeguridad.objects.filter(actor_id=usuario_id, evento="cuenta_bloqueada", creado_en__gt=desde).count()
+
+
 def _registrar_fallo(usuario, ip, ahora, motivo) -> Resultado:
-    intentos, hasta = bloqueo.tras_fallo(usuario.intentos_fallidos, ahora)
+    previos = _bloqueos_recientes(usuario.pk, ahora) if usuario.intentos_fallidos + 1 >= bloqueo.MAX_INTENTOS else 0
+    intentos, hasta = bloqueo.tras_fallo(usuario.intentos_fallidos, ahora, previos)
     Usuario.objects.filter(pk=usuario.pk).update(intentos_fallidos=intentos, bloqueado_hasta=hasta)
     registrar_evento(usuario.pk, "login_fallido", ip, {"motivo": motivo, "bloqueada": hasta is not None})
     if hasta is not None:
-        registrar_evento(usuario.pk, "cuenta_bloqueada", ip, {"hasta": hasta.isoformat()})
+        registrar_evento(usuario.pk, "cuenta_bloqueada", ip, {"hasta": hasta.isoformat(), "minutos": int((hasta - ahora).total_seconds() // 60), "bloqueos_previos": previos})
     return Resultado(False, "credenciales_invalidas")
 
 

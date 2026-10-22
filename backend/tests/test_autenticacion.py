@@ -285,3 +285,23 @@ def test_las_decisiones_usan_la_conexion_aparte_en_autocommit():
     from django.conf import settings
     assert settings.DATABASES["decisiones"]["ATOMIC_REQUESTS"] is False
     assert settings.DATABASES["default"]["ATOMIC_REQUESTS"] is True
+
+
+# --------------------------------------------------------------------------- bloqueo progresivo
+
+@pytest.mark.parametrize("previos,minutos", [(0, 5), (1, 15), (2, 60), (3, 60), (10, 60), (-1, 5)])
+def test_cada_bloqueo_seguido_dura_mas_y_el_ultimo_escalon_se_repite(previos, minutos):
+    assert bloqueo.duracion(previos) == timedelta(minutes=minutos)
+    assert bloqueo.tras_fallo(2, AHORA, previos) == (0, AHORA + timedelta(minutes=minutos))
+
+
+def test_el_escalon_solo_cuenta_al_bloquear_no_en_los_fallos_intermedios():
+    assert bloqueo.tras_fallo(0, AHORA, 5) == (1, None)
+    assert bloqueo.tras_fallo(1, AHORA, 5) == (2, None)
+
+
+def test_los_escalones_son_estrictamente_crecientes_y_empiezan_en_cinco_minutos():
+    assert bloqueo.ESCALONES[0] == timedelta(minutes=5) == bloqueo.DURACION
+    assert all(a < b for a, b in zip(bloqueo.ESCALONES, bloqueo.ESCALONES[1:]))
+    assert bloqueo.ESCALONES[-1] <= timedelta(hours=1)  # tope: una espera eterna sería un ataque de denegación para la víctima
+    assert bloqueo.MEMORIA == timedelta(hours=24)

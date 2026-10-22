@@ -235,6 +235,38 @@ class Command(BaseCommand):
         beto = Usuario.objects.get(username="int_beto")
         self._paso("al entrar se reinicia el contador de intentos", beto.intentos_fallidos == 0 and beto.bloqueado_hasta is None)
 
+        # ---------------------------------------------------------------- bloqueo progresivo: 5 -> 15 -> 60 minutos
+        self._http("post", "/auth/registro/", {"username": "int_dani", "password": CLAVE_BUENA, **personales(4)})
+        dani = Usuario.objects.get(username="int_dani")
+        mala_dani = {"username": "int_dani", "password": "mala-mala-mala-1"}
+        buena_dani = {"username": "int_dani", "password": CLAVE_BUENA}
+
+        def tres_fallos(instante):
+            with mock.patch("django.utils.timezone.now", return_value=instante):
+                for _ in range(3):
+                    self._http("post", "/auth/login/", mala_dani)
+            dani.refresh_from_db()
+            return dani.bloqueado_hasta
+
+        def entrar(instante):
+            with mock.patch("django.utils.timezone.now", return_value=instante):
+                return self._http("post", "/auth/login/", buena_dani).status_code
+
+        t1 = timezone.now()
+        self._paso("el primer bloqueo dura 5 minutos", tres_fallos(t1) == t1 + timedelta(minutes=5))
+        t2 = t1 + timedelta(seconds=301)  # el primer bloqueo ya venció, pero se vuelve a fallar
+        self._paso("el segundo bloqueo seguido dura 15 minutos", tres_fallos(t2) == t2 + timedelta(minutes=15))
+        self._paso("a los 5 minutos del segundo bloqueo sigue bloqueada (ni la contraseña correcta entra)", entrar(t2 + timedelta(seconds=301)) == 401)
+        t3 = t2 + timedelta(seconds=901)
+        self._paso("el tercer bloqueo seguido dura 60 minutos", tres_fallos(t3) == t3 + timedelta(minutes=60))
+        self._paso("a los 59 minutos del tercer bloqueo sigue bloqueada", entrar(t3 + timedelta(minutes=59)) == 401)
+        minutos = list(EventoSeguridad.objects.filter(actor=dani, evento="cuenta_bloqueada").order_by("id").values_list("detalle__minutos", flat=True))
+        self._paso("cada bloqueo quedó registrado con su duración", minutos == [5, 15, 60], minutos)
+        t4 = t3 + timedelta(minutes=60, seconds=1)
+        self._paso("pasada la hora vuelve a poder entrar", entrar(t4) == 200)
+        t5 = t4 + timedelta(seconds=1)
+        self._paso("un inicio de sesión exitoso reinicia la escalera: el siguiente bloqueo vuelve a durar 5 minutos", tres_fallos(t5) == t5 + timedelta(minutes=5))
+
         # ---------------------------------------------------------------- cuenta suspendida
         self._http("post", "/auth/registro/", {"username": "int_carla", "password": CLAVE_BUENA, **personales(3)})
         r = self._http("post", "/auth/login/", {"username": "int_carla", "password": CLAVE_BUENA})
