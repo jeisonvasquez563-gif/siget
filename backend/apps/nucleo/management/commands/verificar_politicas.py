@@ -88,6 +88,13 @@ class Command(BaseCommand):
 
         # ---------------------------------------------------------------- base de datos
         self._paso("una ciudadana NO ve los permisos de la base: es información técnica de seguridad (403)", self._http("/politicas/base-de-datos/", t[ana.username]).status_code == 403)
+        # Las dos formas de ser ciudadano: sin ninguna membresía (arriba) y con una membresía de rol «ciudadano» en una institución
+        from apps.catalogo.models import Institucion
+        from apps.identidad.models import Membresia
+        con_membresia = self._persona("ciudadano_con_membresia")
+        asignadora = self._persona("quien_asigna")
+        Membresia.objects.create(usuario=con_membresia, institucion=Institucion.objects.order_by("id").first(), rol="ciudadano", asignado_por=asignadora)
+        self._paso("tampoco la ve una persona con membresía de rol «ciudadano» en una institución (403)", self._http("/politicas/base-de-datos/", self._token(con_membresia)).status_code == 403)
         r = self._http("/politicas/base-de-datos/", t[operador.username])
         d = r.json() if r.status_code == 200 else {}
         self._paso("el personal (aquí, un operador de plataforma) sí los ve", r.status_code == 200 and len(d.get("roles", [])) == 5, r.status_code)

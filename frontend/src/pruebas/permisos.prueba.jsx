@@ -47,6 +47,7 @@ describe('datos reales: lo que dice la política', () => {
   it('rolDeMatriz elige el rol que corresponde a cada persona', () => {
     expect(rolDeMatriz({ rol_plataforma: 'auditor', membresias: [] })).toBe('auditor')
     expect(rolDeMatriz({ rol_plataforma: 'ninguno', membresias: [] })).toBe('ciudadano')
+    expect(rolDeMatriz({ rol_plataforma: 'ninguno', membresias: [{ rol: 'ciudadano' }] })).toBe('ciudadano') // ciudadanía con membresía en una institución
     expect(rolDeMatriz({ rol_plataforma: 'ninguno', membresias: [{ rol: 'funcionario' }, { rol: 'supervisor' }] })).toBe('supervisor')
     expect(rolDeMatriz({ rol_plataforma: 'ninguno', membresias: [{ rol: 'coordinador_institucional' }] })).toBe('coordinador_institucional')
   })
