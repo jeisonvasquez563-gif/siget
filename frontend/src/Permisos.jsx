@@ -37,8 +37,12 @@ export function rolDeMatriz(yo) {
 }
 
 const PESTANAS = [['roles', 'Roles y módulos'], ['modulos', 'Módulos por rol'], ['matriz', 'Matriz de permisos'], ['simulador', '¿Qué pasaría si…?'], ['bd', 'Base de datos'], ['capas', 'Cómo se decide']]
+// La matriz completa y los permisos de la base son información técnica de seguridad: no son para la ciudadanía (el servidor también lo niega)
+const SOLO_PERSONAL = ['matriz', 'bd']
 
 export function RolesPermisos({ yo }) {
+  const esCiudadania = rolDeMatriz(yo) === 'ciudadano'
+  const pestanas = PESTANAS.filter(([k]) => !(esCiudadania && SOLO_PERSONAL.includes(k)))
   const [pestana, setPestana] = useState('roles')
   const [matriz, setMatriz] = useState(null)
   const [bd, setBd] = useState(null)
@@ -46,8 +50,8 @@ export function RolesPermisos({ yo }) {
 
   useEffect(() => {
     api('/politicas/matriz/').then(setMatriz).catch((e) => setError(mensajeDe(e)))
-    api('/politicas/base-de-datos/').then(setBd).catch((e) => setError(mensajeDe(e)))
-  }, [])
+    if (!esCiudadania) api('/politicas/base-de-datos/').then(setBd).catch((e) => setError(mensajeDe(e)))
+  }, [esCiudadania])
 
   return (
     <>
@@ -59,7 +63,7 @@ export function RolesPermisos({ yo }) {
       </div>
       <Alerta>{error}</Alerta>
       <div className="pestanas" role="tablist" aria-label="Secciones">
-        {PESTANAS.map(([k, n]) => <button key={k} role="tab" aria-selected={pestana === k} onClick={() => setPestana(k)}>{n}</button>)}
+        {pestanas.map(([k, n]) => <button key={k} role="tab" aria-selected={pestana === k} onClick={() => setPestana(k)}>{n}</button>)}
       </div>
       {pestana === 'roles' && (matriz ? <Roles datos={matriz} yo={yo} irAMatriz={() => setPestana('matriz')} /> : <BloquesEsqueleto n={3} />)}
       {pestana === 'modulos' && (matriz ? <ModulosPorRol datos={matriz} yo={yo} /> : <BloquesEsqueleto n={3} />)}
