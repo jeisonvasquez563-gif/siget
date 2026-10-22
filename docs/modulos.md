@@ -63,19 +63,28 @@ Además, `nucleo` trae la prueba de salud, el contexto RLS por transacción y lo
 
 El servidor calcula el menú de cada persona (`/auth/yo/` → `modulos`); la interfaz solo lo dibuja. **Cada petición se vuelve a autorizar**: un módulo mostrado de más no abre ningún acceso.
 
-| Módulo | Qué hace | Ciudadanía | Funcionario | Supervisor | Coordinación | Plataforma | Auditor |
-|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| Mis trámites | Seguimiento con el recorrido por esclusas | ✅ | ✅ | ✅ | ✅ | — | — |
-| Iniciar un trámite | Institución y trámite del catálogo, con su plazo | ✅ | ✅ | ✅ | ✅ | — | — |
-| Bandeja de la institución | Lista y tablero; cambio de estado con confirmación | — | ✅ | ✅ | — | — | — |
-| Supervisión | Vencidos, sin asignar y reasignación | — | — | ✅ | — | — | — |
-| Equipo de la institución | Personal y roles | — | — | ✅ | ✅ | — | — |
-| Auditoría | Decisiones, eventos de seguridad y actuaciones | — | — | — | — | — | ✅ |
-| Acceso a trámites | Demuestra en vivo que un rol de plataforma no ve trámites | — | — | — | — | ✅ | ✅ |
-| Consola de su área | Infraestructura, identidades, catálogo, seguridad o secretos | — | — | — | — | ⏳ (una por rol) | — |
-| Mi seguridad | Credencial, ventana del segundo factor, lo que el rol puede y no puede | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Segundo factor (MFA) | Cómo funciona, prueba en vivo con anti-repetición, actividad propia | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Roles y permisos | Roles y módulos, matriz, **simulador**, base de datos, capas de defensa | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ módulo anunciado, aún sin construir). Se genera desde `modulos_para()` y se comprueba en `test_matriz.py` (la vista por módulo es la inversa exacta de la vista por rol), y la misma tabla está en la pantalla **Roles y permisos → Módulos por rol**.
+
+| Módulo | Estado | Ciudadanía | Funcionario | Supervisor | Coordinación | Infraest. | Identid. | Catálogo | Seguridad | Secretos | Auditor | Roles |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| **Mis trámites** | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | 4 |
+| **Iniciar un trámite** | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | 4 |
+| **Bandeja de la institución** | ✅ | — | ✅ | ✅ | — | — | — | — | — | — | — | 2 |
+| **Supervisión** | ✅ | — | — | ✅ | — | — | — | — | — | — | — | 1 |
+| **Equipo de la institución** | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | 2 |
+| **Mi seguridad** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
+| **Segundo factor (MFA)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
+| **Roles y permisos** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
+| **Acceso a trámites** | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 6 |
+| **Infraestructura** | ⏳ | — | — | — | — | ✅ | — | — | — | — | — | 1 |
+| **Identidades** | ⏳ | — | — | — | — | — | ✅ | — | — | — | — | 1 |
+| **Catálogo** | ⏳ | — | — | — | — | — | — | ✅ | — | — | — | 1 |
+| **Respuesta a incidentes** | ⏳ | — | — | — | — | — | — | — | ✅ | — | — | 1 |
+| **Custodia de secretos** | ⏳ | — | — | — | — | — | — | — | — | ✅ | — | 1 |
+| **Auditoría** | ✅ | — | — | — | — | — | — | — | — | — | ✅ | 1 |
+| **Módulos que ve** | | 5 | 6 | 8 | 6 | 5 | 5 | 5 | 5 | 5 | 5 | |
+
+Lectura rápida: un rol llega a varios módulos (el supervisor ve 8) y un módulo lo comparten varios roles (los tres de transparencia —Mi seguridad, Segundo factor y Roles y permisos— los ven los diez). Los cinco roles de plataforma comparten el mismo patrón: su consola + «Acceso a trámites» + transparencia, y ninguno ve trámites.
 
 Los cinco roles de plataforma (infraestructura, identidades, catálogo, seguridad y custodio de secretos) tienen cada uno su consola, y ninguno ve trámites. El auditor es un sexto rol de plataforma de solo lectura.
 

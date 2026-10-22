@@ -20,6 +20,8 @@ La documentación "viva" del proyecto vive acá en Markdown, versionada junto co
 | [`estructura-plataforma.md`](./estructura-plataforma.md) | Cómo está organizada la plataforma: piezas, qué pasa en cada petición, qué existe hoy, carpetas del repositorio |
 | [`modulos.md`](./modulos.md) | Módulos de base de datos, infraestructura, backend y frontend con su estado, y qué módulos ve cada rol |
 | [`roles-permisos-bd.md`](./roles-permisos-bd.md) | Roles, permisos y módulos a nivel de base de datos: roles de PostgreSQL, 10 roles de aplicación, RLS y pruebas |
+| [`revision-seguridad-2026-10-22.md`](./revision-seguridad-2026-10-22.md) | **Revisión de seguridad** con evidencia en vivo: veredicto por área, 13 hallazgos con gravedad y orden de corrección |
+| [`estado-base-de-datos.md`](./estado-base-de-datos.md) | **Estado de la base de datos** hoy: roles, tablas, RLS, datos, defensas verificadas y pendientes |
 | [`zero-trust-cobertura.md`](./zero-trust-cobertura.md) | Matriz de cobertura de los 7 principios de Zero Trust (NIST SP 800-207): qué está implementado, tareas ZT-1 a ZT-10 y límites declarados |
 | [`api.md`](./api.md) | **Contrato de la API**: rutas, formatos, errores y reglas para cambiarlo; es la frontera entre backend y frontend |
 | [`superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md`](./superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md) | Diseño de arquitectura Zero Trust: identidad y atributos (ABAC), capas, matriz de roles y permisos, mapa de instituciones y modelo de amenazas. Versión de entrega: `SIGET_Arquitectura_Zero_Trust.docx` |

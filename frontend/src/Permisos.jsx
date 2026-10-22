@@ -36,7 +36,7 @@ export function rolDeMatriz(yo) {
   return ['supervisor', 'coordinador_institucional', 'funcionario'].find((r) => roles.includes(r)) || 'ciudadano'
 }
 
-const PESTANAS = [['roles', 'Roles y módulos'], ['matriz', 'Matriz de permisos'], ['simulador', '¿Qué pasaría si…?'], ['bd', 'Base de datos'], ['capas', 'Cómo se decide']]
+const PESTANAS = [['roles', 'Roles y módulos'], ['modulos', 'Módulos por rol'], ['matriz', 'Matriz de permisos'], ['simulador', '¿Qué pasaría si…?'], ['bd', 'Base de datos'], ['capas', 'Cómo se decide']]
 
 export function RolesPermisos({ yo }) {
   const [pestana, setPestana] = useState('roles')
@@ -62,6 +62,7 @@ export function RolesPermisos({ yo }) {
         {PESTANAS.map(([k, n]) => <button key={k} role="tab" aria-selected={pestana === k} onClick={() => setPestana(k)}>{n}</button>)}
       </div>
       {pestana === 'roles' && (matriz ? <Roles datos={matriz} yo={yo} irAMatriz={() => setPestana('matriz')} /> : <BloquesEsqueleto n={3} />)}
+      {pestana === 'modulos' && (matriz ? <ModulosPorRol datos={matriz} yo={yo} /> : <BloquesEsqueleto n={3} />)}
       {pestana === 'matriz' && (matriz ? <Matriz datos={matriz} yo={yo} /> : <BloquesEsqueleto n={3} />)}
       {pestana === 'simulador' && (matriz ? <Simulador matriz={matriz} explicar={(p) => explicarPolitica(p, matriz.denegaciones)} /> : <BloquesEsqueleto n={3} />)}
       {pestana === 'bd' && (bd ? <BaseDeDatos datos={bd} /> : <BloquesEsqueleto n={3} />)}
@@ -106,6 +107,59 @@ function Roles({ datos, yo, irAMatriz }) {
             </ul>
           </article>
         ))}
+      </div>
+    </>
+  )
+}
+
+/* ---------------------------------------------------------------- módulos por rol */
+
+function ModulosPorRol({ datos, yo }) {
+  const mio = rolDeMatriz(yo)
+  const modulos = datos.modulos || []
+  return (
+    <>
+      <p className="suave">Un rol llega a varios módulos y un módulo lo comparten varios roles. Esta tabla sale del mismo catálogo que arma el menú de cada persona; la interfaz solo muestra, y cada petición vuelve a pasar por el motor de decisiones y por la base de datos.</p>
+      <ul className="leyenda-matriz" aria-label="Leyenda">
+        <li><span className="celda-ejemplo ok"><Icono nombre="check" /></span>El rol ve el módulo</li>
+        <li><span className="celda-ejemplo no"><Icono nombre="x" /></span>No lo ve</li>
+      </ul>
+      <div className="tabla-caja">
+        <table className="tabla matriz">
+          <caption className="solo-lector">Módulos por rol: filas son módulos, columnas son roles</caption>
+          <thead>
+            <tr>
+              <th scope="col">Módulo</th>
+              {datos.roles.map((r) => <th key={r.id} scope="col" className={r.id === mio ? 'col-tuya' : ''} title={r.nombre}>{CORTO[r.id]}{r.id === mio && <span className="tu">tú</span>}</th>)}
+              <th scope="col">Roles</th>
+            </tr>
+          </thead>
+          <tbody>
+            {modulos.map((m) => (
+              <tr key={m.id}>
+                <th scope="row">{m.nombre}{m.estado === 'proximamente' && <small>Próximamente</small>}</th>
+                {datos.roles.map((r) => {
+                  const ve = m.roles.includes(r.id)
+                  return (
+                    <td key={r.id} className={r.id === mio ? 'col-tuya' : ''}>
+                      <span className={`celda ${ve ? 'ok' : 'no'}`} role="img" aria-label={`${r.nombre} · ${m.nombre}: ${ve ? 've el módulo' : 'no lo ve'}`}>
+                        <Icono nombre={ve ? 'check' : 'x'} />
+                      </span>
+                    </td>
+                  )
+                })}
+                <td>{m.roles.length}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Módulos que ve</th>
+              {datos.roles.map((r) => <td key={r.id}>{r.modulos.length}</td>)}
+              <td />
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </>
   )

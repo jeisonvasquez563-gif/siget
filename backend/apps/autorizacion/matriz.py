@@ -6,7 +6,8 @@ Python puro, sin base de datos.
 """
 from datetime import datetime, timedelta
 
-from apps.autorizacion.modulos import modulos_para
+from apps.autorizacion.modulos import CATALOGO, modulos_para
+from apps.autorizacion.modulos import _entrada as modulo_entrada
 from apps.autorizacion.pdp import Accion, Entorno, Recurso, Sujeto, decidir
 
 PROPIA, AJENA = 10, 99  # instituciones de ejemplo: la de la persona y otra distinta
@@ -129,8 +130,13 @@ def construir(ahora=None, ventana=15):
         roles.append({"id": rol, "nombre": nombre, "ambito": ambito, "descripcion": descripcion, "modulos": modulos,
                       "acciones_permitidas": permitidas, "acciones_totales": len(ACCIONES)})
     acciones = [{"id": a.value, "nombre": etiqueta, "grupo": grupo, "casos": list(casos) if casos else None} for a, etiqueta, grupo, casos in ACCIONES]
+    # Vista inversa (módulo → roles): sale de los mismos módulos de cada rol, así que no puede contradecirlos
+    modulos = []
+    for identificador in CATALOGO:
+        quienes = [r["id"] for r in roles if any(m["id"] == identificador for m in r["modulos"])]
+        modulos.append({**modulo_entrada(identificador), "roles": quienes})
     return {
-        "roles": roles, "acciones": acciones, "matriz": matriz,
+        "roles": roles, "acciones": acciones, "matriz": matriz, "modulos": modulos,
         "denegaciones": [{"politica": p, "descripcion": d} for p, d in REGLAS_DE_DENEGACION],
         "ventana_minutos": ventana,
         "ningun_rol_puede_todo": all(r["acciones_permitidas"] < r["acciones_totales"] for r in roles),

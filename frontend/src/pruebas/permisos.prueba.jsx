@@ -72,6 +72,20 @@ describe('roles y módulos', () => {
   })
 })
 
+describe('módulos por rol', () => {
+  it('la tabla cruza los 15 módulos con los 10 roles y cuadra con la vista por rol', async () => {
+    const { user } = await abrirComo('ana.ciudadana', 'Roles y permisos')
+    await user.click(await screen.findByRole('tab', { name: 'Módulos por rol' }))
+    const tabla = await screen.findByRole('table', { name: /Módulos por rol/ })
+    expect(within(tabla).getAllByRole('columnheader')).toHaveLength(12)
+    expect(within(tabla).getAllByRole('row')).toHaveLength(1 + matriz.modulos.length + 1)
+    const supervision = within(tabla).getByRole('row', { name: /^Supervisión/ })
+    expect(within(supervision).getByRole('img', { name: 'Supervisor · Supervisión: ve el módulo' })).toBeInTheDocument()
+    expect(within(supervision).getByRole('img', { name: 'Funcionario · Supervisión: no lo ve' })).toBeInTheDocument()
+    for (const m of matriz.modulos) expect(m.roles.length).toBeGreaterThan(0)
+  })
+})
+
 describe('matriz de permisos', () => {
   async function abrirMatriz(usuario = 'fabio.mop') {
     const o = await abrirComo(usuario, 'Roles y permisos')
