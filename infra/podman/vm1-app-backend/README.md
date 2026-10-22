@@ -22,4 +22,6 @@ Para actualizar `nginx.conf` hay que escribir **sobre el mismo archivo** (`tee`)
 sudo -H -u siget bash -lc 'export XDG_RUNTIME_DIR=/run/user/1009; systemctl --user daemon-reload; systemctl --user stop siget-nginx.service siget-backend.service siget-pod.service; systemctl --user start siget-pod.service; sleep 3; systemctl --user start siget-backend.service siget-nginx.service'
 ```
 
+**Scripts operativos** ([`scripts/`](./scripts/)): `ejecutar-comando.sh` (reconstruye la imagen y corre un comando de `manage.py`, p. ej. `verificar_*`) y `desplegar.sh` (copia la interfaz y la configuración y reinicia el pod en orden). Tal como se usaron hasta el 21-oct; `desplegar.sh` escribe con `sudo` y debe adaptarse a `sudo -u siget` para quien no es root (tarea PT-0 del [plan de pendientes](../../../docs/architecture/plan-pendientes-andy.md)).
+
 Cómo abrir la plataforma: [`docs/como-abrir-la-plataforma.md`](../../../docs/como-abrir-la-plataforma.md).
