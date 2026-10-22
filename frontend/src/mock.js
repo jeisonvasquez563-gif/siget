@@ -8,6 +8,7 @@
 
 import matrizEjemplo from './mock-datos/matriz.json'
 import bdEjemplo from './mock-datos/base-de-datos.json'
+import simuladorEjemplo from './mock-datos/simulador.json'
 
 const DIA = 86400000
 const hace = (ms) => new Date(Date.now() - ms).toISOString()
@@ -186,6 +187,14 @@ export function instalarMock(inicial, opciones = {}) {
 
     if (camino === '/politicas/matriz/') return resp(200, matrizEjemplo)
     if (camino === '/politicas/base-de-datos/') return resp(200, bdEjemplo)
+    if (camino === '/politicas/simular/') {
+      if (metodo === 'GET') return resp(200, simuladorEjemplo.meta)
+      // Solo responde a los escenarios capturados de la plataforma real; para lo demás avisa que es un ejemplo
+      const clave = (e) => JSON.stringify(Object.entries(e).sort())
+      const caso = simuladorEjemplo.casos.find((c) => clave(c.entrada) === clave(cuerpo))
+      if (caso) return resp(200, caso.respuesta)
+      return resp(200, { entrada: cuerpo, decision: { permitido: false, politica: 'sin_regla_que_permita', motivo: 'ejemplo' }, traza: [], alternativas: [], hipotetico: true, ejemplo: true })
+    }
     if (camino === '/auth/actividad/') {
       const eventos = [['mfa_verificado', 9], ['login_ok', 9], ['refresh_ok', 40], ['login_fallido', 300], ['login_ok', 1500], ['logout', 1620]]
       return resp(200, { eventos: eventos.map(([evento, min], i) => ({ id: 100 - i, evento, creado_en: hace(min * 60000), ip: '192.168.100.10' })) })

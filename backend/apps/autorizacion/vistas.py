@@ -1,6 +1,8 @@
 """Transparencia: qué puede hacer cada rol, calculado por el propio sistema.
 
 - `/politicas/matriz/`: la matriz de roles y permisos, generada evaluando el PDP (no está escrita a mano).
+- `/politicas/simular/`: el simulador de «qué pasaría si…» (GET: el formulario; POST: evalúa una situación hipotética con el PDP real).
+  Es puro: no toca la base ni registra decisiones (no es una acción real y no debe ensuciar la auditoría).
 - `/politicas/base-de-datos/`: los privilegios REALES de cada rol de PostgreSQL por tabla (`has_table_privilege`), con las
   protecciones de la base (RLS, triggers). Es información de metadatos: no lee datos de nadie.
 
@@ -14,7 +16,7 @@ from rest_framework.views import APIView
 from apps.autenticacion.autenticacion import exige_scope
 from apps.autenticacion.tokens import SCOPE_COMPLETO
 
-from . import matriz
+from . import matriz, simulador
 
 ROLES_BD = [
     ("app_role", "El backend (Django): solo lo que la aplicación necesita para trabajar"),
@@ -91,3 +93,14 @@ class PermisosBaseDeDatos(_Transparencia):
             # Ningún rol de la aplicación puede saltarse la seguridad de la base
             "ningun_rol_de_aplicacion_es_superusuario": not any(r["superusuario"] or r["omite_rls"] for r in roles),
         })
+
+
+class Simulador(_Transparencia):
+    def get(self, request):
+        return Response(simulador.meta())
+
+    def post(self, request):
+        entrada, errores = simulador.normalizar(request.data)
+        if errores:
+            return Response({"codigo": "datos_invalidos", "errores": errores}, status=400)
+        return Response(simulador.simular(entrada))

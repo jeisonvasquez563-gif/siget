@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from './api.js'
 import { Alerta, BloquesEsqueleto, Icono, Insignia } from './ui.jsx'
 import { mensajeDe } from './comun.jsx'
+import { Simulador } from './Simulador.jsx'
 
 const CORTO = {
   ciudadano: 'Ciudadanía', funcionario: 'Funcionario', supervisor: 'Supervisor', coordinador_institucional: 'Coordinación',
@@ -21,6 +22,13 @@ const EXPLICACION = {
   auditor_consulta: 'El auditor (nivel de aseguramiento 3) consulta el registro con segundo factor reciente.',
 }
 
+// Explica en una frase por qué una política permite o niega
+export function explicarPolitica(politica, denegaciones = []) {
+  return EXPLICACION[politica]
+    || denegaciones.find((d) => d.politica === politica)?.descripcion
+    || (politica.startsWith('operador_') || politica.startsWith('custodio_') ? 'El rol de plataforma está autorizado para esta acción de su área, con segundo factor reciente.' : '')
+}
+
 // Rol «de la matriz» que corresponde a quien está mirando, para resaltar su columna
 export function rolDeMatriz(yo) {
   if (yo.rol_plataforma !== 'ninguno') return yo.rol_plataforma
@@ -28,7 +36,7 @@ export function rolDeMatriz(yo) {
   return ['supervisor', 'coordinador_institucional', 'funcionario'].find((r) => roles.includes(r)) || 'ciudadano'
 }
 
-const PESTANAS = [['roles', 'Roles y módulos'], ['matriz', 'Matriz de permisos'], ['bd', 'Base de datos'], ['capas', 'Cómo se decide']]
+const PESTANAS = [['roles', 'Roles y módulos'], ['matriz', 'Matriz de permisos'], ['simulador', '¿Qué pasaría si…?'], ['bd', 'Base de datos'], ['capas', 'Cómo se decide']]
 
 export function RolesPermisos({ yo }) {
   const [pestana, setPestana] = useState('roles')
@@ -55,6 +63,7 @@ export function RolesPermisos({ yo }) {
       </div>
       {pestana === 'roles' && (matriz ? <Roles datos={matriz} yo={yo} irAMatriz={() => setPestana('matriz')} /> : <BloquesEsqueleto n={3} />)}
       {pestana === 'matriz' && (matriz ? <Matriz datos={matriz} yo={yo} /> : <BloquesEsqueleto n={3} />)}
+      {pestana === 'simulador' && (matriz ? <Simulador matriz={matriz} explicar={(p) => explicarPolitica(p, matriz.denegaciones)} /> : <BloquesEsqueleto n={3} />)}
       {pestana === 'bd' && (bd ? <BaseDeDatos datos={bd} /> : <BloquesEsqueleto n={3} />)}
       {pestana === 'capas' && <Capas denegaciones={matriz?.denegaciones || []} />}
     </>
@@ -117,9 +126,7 @@ function Matriz({ datos, yo }) {
     }
     return salida
   }, [datos])
-  const explicacionDe = (politica) => EXPLICACION[politica]
-    || datos.denegaciones.find((d) => d.politica === politica)?.descripcion
-    || (politica.startsWith('operador_') || politica.startsWith('custodio_') ? 'El rol de plataforma está autorizado para esta acción de su área, con segundo factor reciente.' : '')
+  const explicacionDe = (politica) => explicarPolitica(politica, datos.denegaciones)
 
   const detalle = sel && (() => {
     const rol = datos.roles.find((r) => r.id === sel.rol)
