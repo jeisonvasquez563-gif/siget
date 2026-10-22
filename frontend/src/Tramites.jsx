@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from './api.js'
 import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Plazo, SIGUIENTES, fecha, fechaCorta, hace, mensajeDe, useReautenticacion } from './comun.jsx'
-import { Alerta, Esclusas, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
+import { Seguimiento } from './Seguimiento.jsx'
+import { Alerta, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
 
 function useTramites() {
   const [filas, setFilas] = useState(null)
@@ -384,7 +385,7 @@ export function Detalle({ id, yo, volver, volverA }) {
       <Alerta>{error}</Alerta>
 
       <section className="panel recorrido" aria-label="Recorrido del trámite">
-        <Esclusas estado={tramite.estado} />
+        <Seguimiento estado={tramite.estado} />
         <div className="leyenda">
           <span>Iniciado el <strong>{fechaCorta(tramite.creado_en)}</strong></span>
           <span>Fecha límite <strong>{fechaCorta(tramite.fecha_limite)}</strong></span>

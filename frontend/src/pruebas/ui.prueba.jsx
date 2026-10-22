@@ -2,47 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'jest-axe'
 import { describe, expect, it } from 'vitest'
-import { Alerta, Avatar, Esclusas, Icono, Insignia, ProveedorUI, Vacio, useUI } from '../ui.jsx'
-
-describe('Esclusas: el estado del trámite hecho imagen', () => {
-  const etiquetas = {
-    Pendiente: 'Recepción', 'En Tramitacion': 'En tramitación', 'En Subsanacion': 'En subsanación', Aprobado: 'Aprobado', Rechazado: 'Rechazado',
-  }
-  for (const [estado, texto] of Object.entries(etiquetas)) {
-    it(`describe el estado «${estado}» a los lectores de pantalla`, () => {
-      render(<Esclusas estado={estado} />)
-      expect(screen.getByRole('img')).toHaveAttribute('aria-label', `Recorrido del trámite: ${texto}`)
-    })
-  }
-
-  it('la boya aparece mientras el trámite está abierto y se reemplaza por el sello al resolverse', () => {
-    const { container, rerender } = render(<Esclusas estado="En Tramitacion" />)
-    expect(container.querySelector('.esc-boya-g.pos-1')).toBeInTheDocument()
-    expect(container.textContent).not.toMatch(/APROBADO|RECHAZADO/)
-    rerender(<Esclusas estado="Aprobado" />)
-    expect(container.querySelector('.esc-boya-g')).not.toBeInTheDocument()
-    expect(container.textContent).toContain('APROBADO')
-    rerender(<Esclusas estado="Rechazado" />)
-    expect(container.textContent).toContain('RECHAZADO')
-  })
-
-  it('la boya se ubica en la cámara que corresponde (y en el dique para la subsanación)', () => {
-    const pos = (estado) => render(<Esclusas estado={estado} />).container.querySelector('.esc-boya-g').getAttribute('class')
-    expect(pos('Pendiente')).toContain('pos-0')
-    expect(pos('En Tramitacion')).toContain('pos-1')
-    expect(pos('En Subsanacion')).toContain('pos-sub')
-  })
-
-  it('la versión decorativa se oculta a los lectores de pantalla', () => {
-    const { container } = render(<Esclusas estado="Pendiente" decorativo />)
-    expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
-  })
-
-  it('no tiene violaciones de accesibilidad', async () => {
-    const { container } = render(<Esclusas estado="En Subsanacion" />)
-    expect(await axe(container)).toHaveNoViolations()
-  })
-})
+import { Alerta, Avatar, Icono, Insignia, ProveedorUI, Vacio, useUI } from '../ui.jsx'
 
 describe('piezas básicas', () => {
   it('Avatar saca las iniciales y es estable para el mismo nombre', () => {

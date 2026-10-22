@@ -178,32 +178,7 @@
 .ficha .pie { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: var(--t-xs); color: var(--tinta-suave); }
 .columna-vacia { color: var(--tinta-tenue); font-size: var(--t-s); text-align: center; padding: 1.2rem 0.5rem; }
 
-/* ---------- la pieza firma: recorrido por esclusas ---------- */
-.esclusas { width: 100%; height: auto; display: block; }
-.esc-cuenca { fill: var(--superficie-2); stroke: var(--borde-fuerte); stroke-width: 1.5; }
-.esc-cuenca.hecha { fill: var(--agua-clara); stroke: var(--agua-media); }
-.esc-cuenca.actual { fill: var(--agua-clara); stroke: var(--agua); stroke-width: 2.5; }
-.esc-cuenca.futura { stroke-dasharray: 5 4; }
-.esc-agua { fill: var(--agua-media); opacity: 0.55; }
-.esc-agua.actual { opacity: 0.8; }
-.esc-onda { fill: none; stroke: #fff; stroke-opacity: 0.55; stroke-width: 1.5; stroke-linecap: round; animation: onda 4s ease-in-out infinite; }
-.esc-compuerta { stroke: var(--borde-fuerte); stroke-width: 3; stroke-linecap: round; }
-.esc-compuerta.abierta { stroke: var(--agua-media); }
-.esc-etiqueta { font-family: var(--f-titulo); font-size: 12px; font-weight: 700; fill: var(--tinta); }
-.esc-sub { font-family: var(--f-texto); font-size: 10.5px; fill: var(--tinta-suave); }
-.esc-boya { fill: var(--boya); stroke: var(--superficie); stroke-width: 2.5; }
-.esc-boya-aro { fill: none; stroke: var(--boya); stroke-width: 1.5; animation: pulso 2.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
-.esc-sello-rojo { fill: var(--sello-rojo); }
-.esc-sello-verde { fill: var(--sello-verde); }
-.esc-boya-g { transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1); }
-.esc-boya-g.pos-0 { transform: translate(110px, 74px); }
-.esc-boya-g.pos-1 { transform: translate(320px, 74px); }
-.esc-boya-g.pos-sub { transform: translate(320px, 166px); }
-.esc-boya-g.pos-2 { transform: translate(530px, 74px); }
 @keyframes pulso { from { transform: scale(0.8); opacity: 0.9; } to { transform: scale(2.2); opacity: 0; } }
 @keyframes onda { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(6px); } }
-.esc-sello-verde-trazo { stroke: var(--sello-verde); }
-.esc-sello-rojo-trazo { stroke: var(--sello-rojo); }
 .enlace-sutil { background: none; border: 0; padding: 0; color: var(--agua-media); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; font-size: inherit; }
-.esc-sello-fondo { fill: var(--superficie); fill-opacity: 0.92; }
 :root[data-tema='oscuro'] .modal { background: var(--superficie-2); border-color: var(--borde-fuerte); }
