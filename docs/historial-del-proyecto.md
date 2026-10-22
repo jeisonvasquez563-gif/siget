@@ -11,9 +11,9 @@ Registro completo, en orden, de lo construido en SIGET entre el 24 de septiembre
 | **Plataforma web funcionando** en https://192.168.159.137:8443 | ✅ Interfaz React + API Django, TLS 1.3, segundo factor obligatorio |
 | Roles | 10 roles (4 de aplicación, 5 de plataforma con control dual, 1 auditor), **sin superusuario** |
 | Backend | Django 5.2 LTS + DRF: autenticación (Argon2, JWT corto, MFA TOTP), PDP (ABAC), trámites, catálogo, equipo, auditoría, transparencia, simulador |
-| Base de datos | PostgreSQL 16 rootless en VM2: esquema `siget` de 11 tablas, RLS, disparadores, auditoría de solo inserción, 7 migraciones |
+| Base de datos | PostgreSQL 16 rootless en VM2: esquema `siget` de 12 tablas, RLS, disparadores, auditoría de solo inserción, 9 migraciones, respaldo diario con prueba de restauración |
 | Interfaz | 15 pantallas por rol, sistema de diseño propio («el Canal»), claro/oscuro, accesible, responsiva |
-| Pruebas | **354** del backend + **130** del frontend + **6 verificaciones contra la base real** (11, 15, 47, 51, 34 y 39 pasos) + ensayo de la demo (**55 de 55**) |
+| Pruebas | **415** del backend + **141** del frontend + **6 verificaciones contra la base real** (11, 15, 71, 51, 34 y 39 pasos) + ensayo de la demo (**59 de 59**) |
 | CI en GitHub | `backend-ci` y `frontend-ci` pasan en cada push y PR |
 | Documentación | Más de 25 documentos en `docs/`, runbook de 32 secciones, contrato de la API, guion y guía de acceso |
 
@@ -58,6 +58,13 @@ Registro completo, en orden, de lo construido en SIGET entre el 24 de septiembre
 - **Pruebas automáticas del frontend** (Vitest, Testing Library, axe, ESLint; 9 mutaciones detectadas) y **transparencia**: matriz de permisos calculada por el propio PDP, privilegios reales de PostgreSQL, módulo de segundo factor con prueba en vivo. → runbook 30
 - **Simulador de «qué pasaría si…»**: evalúa una situación con el PDP real y muestra veredicto, traza regla por regla y qué lo cambiaría; no registra decisiones. → runbook 31
 - **Ensayo de la demostración** (55 de 55), ventana del segundo factor controlada desde el servidor, respaldo verificado y guion corregido. → runbook 32
+
+### Fase 4 — Demostración y endurecimiento (22 oct)
+
+- **Matriz módulo × rol** (15 módulos por 10 roles) calculada por el servidor, **revisión de seguridad** con evidencia en vivo (13 hallazgos, sin críticos) y **estado de la base de datos**. → `docs/revision-seguridad-2026-10-22.md`, `docs/estado-base-de-datos.md`
+- **Cierre por inactividad** (aviso a los 9 min, cierre a los 10), tope absoluto de 8 h por sesión y límites de tasa compartidos entre procesos. → runbook 33.1
+- **Acceso en dos pasos**, **registro con datos personales** (cédula cifrada, tabla `perfil`) y **bloqueo progresivo** (5, 15 y 60 min). → runbook 33.2 y 33.3
+- **Respaldos automáticos con prueba de restauración**, SSH endurecido, logs de conexión de PostgreSQL y mínimo privilegio para `pgadmin_lectura`. → runbook 33.4 y 33.5
 
 ## 3. Decisiones importantes y por qué
 

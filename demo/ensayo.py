@@ -131,9 +131,17 @@ except Exception as e:  # noqa: BLE001
 # --------------------------------------------------------------------------- 1. ciudadana
 titulo("1. Ana (ciudadana): login, menú, iniciar un trámite, historial")
 ana = Sesion("ana.ciudadana")
+# Acceso en dos pasos: la contraseña sola solo lleva a pedir el código, y no delata si la cuenta existe o tiene segundo factor
+e, d = ana.pedir("POST", "/auth/login/", {"username": ana.usuario, "password": ana.clave})
+paso(e == 401 and (d or {}).get("codigo") == "mfa_requerido", "paso 1: contraseña correcta sin código -> el servidor pide el código", e)
+e, d = ana.pedir("POST", "/auth/login/", {"username": "nadie.existe", "password": "x"})
+paso(e == 401 and (d or {}).get("codigo") == "credenciales_invalidas", "un usuario inexistente no responde «pide código» (no delata quién tiene segundo factor)", e)
+e, d = ana.pedir("POST", "/auth/registro/", {"username": "sin.datos.personales", "password": "una-frase-larga-y-poco-comun-5821"})
+paso(e == 400 and len((d or {}).get("errores", [])) >= 7, "crear cuenta sin datos personales se rechaza (400, dice qué falta)", e)
 e, _ = ana.entrar()
 paso(e == 200, "entra con usuario, contraseña y código del segundo factor", e)
 _, yo = ana.pedir("GET", "/auth/yo/")
+paso(yo.get("inactividad_minutos") == 10, "el servidor informa el tiempo de inactividad (10 min): la interfaz no lo escribe a mano", yo.get("inactividad_minutos"))
 ids = [m["id"] for m in yo["modulos"]]
 paso(ids == ["mis_tramites", "nuevo_tramite", "seguridad", "mfa", "roles_permisos"], "su menú es el de la ciudadanía", ids)
 _, lista = ana.pedir("GET", "/tramites/?limite=100")
