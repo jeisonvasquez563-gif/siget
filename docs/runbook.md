@@ -1552,3 +1552,45 @@ Fecha: 21 de octubre de 2026. Herramientas en [`demo/`](../demo/README.md); guio
 - El segundo script de despliegue no encuentra los archivos de configuración porque el primero los borra al terminar: no sobrescribe nada (el shell aborta la redirección antes de ejecutar `tee`), pero conviene copiarlos de nuevo.
 - Antes de culpar al servidor por un 401 en el login, comprobar si el código del segundo factor ya se usó en ese intervalo.
 
+## 33. Sesiones, registro completo, bloqueo progresivo, respaldos y endurecimiento (22 de octubre de 2026)
+
+Fecha: 22 de octubre de 2026, el día de la demostración. Cada cambio de las VM se aprobó antes y se aplicó con respaldo previo; el detalle de cada hallazgo está en [`revision-seguridad-2026-10-22.md`](./revision-seguridad-2026-10-22.md) y el estado de la base en [`estado-base-de-datos.md`](./estado-base-de-datos.md).
+
+### 33.1 Cierre de sesión por inactividad y duración máxima
+
+- La interfaz avisa a los 9 minutos («¿Sigues ahí?») y cierra a los 10, revocando la sesión en el servidor. Durante el aviso el movimiento no cancela el cierre.
+- El servidor no confía en el navegador: rechaza renovar un refresco con más de 15 minutos (`SIGET_REFRESH_MAX_EDAD_SEGUNDOS`, evento `sesion_cerrada_por_inactividad`) y **cada renovación hereda el vencimiento** de la sesión original (antes sumaba 8 horas más: una sesión podía prolongarse sin límite). Sin migración. Política pura en `backend/apps/autenticacion/politica_sesion.py`.
+- Recargar la página devuelve siempre al Inicio (la vista solo vive en memoria).
+- Los límites de tasa usan una caché en archivos compartida entre los 3 procesos de gunicorn (hallazgo H-4).
+- Despliegue: `git archive` del backend → `ejecutar-comando.sh verificar_autenticacion` (reconstruye la imagen y prueba contra la base real) → `desplegar.sh` (interfaz y reinicio ordenado del pod).
+
+### 33.2 Acceso en dos pasos y registro completo
+
+- Pantalla de acceso: usuario y contraseña; solo si el servidor acepta la contraseña pide el código (la respuesta `mfa_requerido` se da únicamente con contraseña válida, así que no delata quién tiene segundo factor).
+- **Migración 008** (`perfil`): nombre, apellidos, cédula, fecha de nacimiento, provincia, ciudad y correo. Cédula cifrada (Fernet) y con huella HMAC, con claves derivadas por HKDF; solo `app_role` lee e inserta; sin `UPDATE` ni `DELETE`; el auditor no la ve. Cuenta y perfil en una sola transacción; duplicados responden 409 genérico.
+- **Migración 009**: `pgadmin_lectura` era miembro de `pg_read_all_data` (leía hashes de contraseñas y de tokens); ahora tiene `SELECT` explícito solo sobre lo no sensible.
+- Aplicadas como superusuario del contenedor por el socket local, con respaldo previo: `cat 00X.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1`.
+
+### 33.3 Bloqueo progresivo
+
+3 fallos (contraseña o código) bloquean 5 minutos; el siguiente bloqueo, 15; los demás, 60. El escalón se calcula con los eventos `cuenta_bloqueada` desde el último `login_ok` (memoria de 24 h), sin columnas nuevas. Un inicio de sesión correcto reinicia la escalera. `verificar_autenticacion` lo prueba con el reloj controlado.
+
+### 33.4 Respaldos automáticos con prueba de restauración
+
+`infra/podman/vm2-db-server/respaldo/` → `siget-respaldo.timer` (02:30 diario, `Persistent=true`) y `siget-respaldo.sh`: `pg_dump` + roles, comprueba las tablas, **restaura en una base desechable y compara con la viva**, huella SHA-256, retención de 14 días (mínimo 3; los manuales `pre-*` no se tocan), archivos 600 en carpeta 700. Estado: `systemctl list-timers siget-respaldo.timer`; si el último falló, `systemctl is-failed siget-respaldo.service` dice `failed`. Pendiente: copia fuera de VM2.
+
+### 33.5 Endurecimiento aplicado
+
+SSH en las dos VM (`/etc/ssh/sshd_config.d/00-siget-endurecimiento.conf`: sin root, sin X11, 3 intentos; validado con `sshd -t`, recarga sin cortar sesiones y reconexión probada). PostgreSQL con `log_connections` y `log_disconnections` activos (`ALTER SYSTEM` + `pg_reload_conf()`).
+
+### 33.6 Verificación
+
+`verificar_autenticacion` 71 de 71 contra la base real; `verificar_politicas` 39 de 39; ensayo 59 de 59 contra producción; 415 pruebas del backend y 141 del frontend; `pip-audit` y `npm audit` sin vulnerabilidades.
+
+### 33.7 Gotchas
+
+- Los archivos del repositorio mezclan finales de línea (CRLF/LF): al editar con scripts hay que respetar el existente, o los reemplazos multilínea no coinciden.
+- Un `dnf updateinfo` sin `--assumeno` por SSH pide confirmación y se traga el resto del script.
+- `tar` en Git Bash interpreta `C:` como un host remoto: usar `--force-local`.
+- Ver la plataforma nueva en `https://…:8443`; el puerto 80 sigue siendo el checkpoint PHP antiguo.
+
