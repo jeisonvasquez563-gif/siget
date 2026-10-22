@@ -26,3 +26,7 @@ respaldos-siget/
 **/__pycache__/
 *.pyc
 .pytest_cache/
+
+# Credenciales y secretos de la demostración: solo locales, nunca al repositorio
+*.local.*
+demo-local/

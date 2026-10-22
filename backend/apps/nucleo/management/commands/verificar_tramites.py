@@ -98,6 +98,13 @@ class Command(BaseCommand):
         t = {u.username: self._token(u) for u in (ana, beto, func_mop, func2_mop, super_mop, func_minsa, operador)}
         tok = lambda u: t[u.username]  # noqa: E731
 
+        def cuantos(persona):
+            r = self._http("get", "/tramites/?limite=100", tok(persona))
+            return len(r.json()["resultados"]) if r.status_code == 200 else f"HTTP {r.status_code}"
+
+        # La base puede tener trámites de la demostración: se mide la línea base antes de crear los propios
+        base_mop, base_minsa = cuantos(func_mop), cuantos(func_minsa)
+
         # ---------------------------------------------------------------- acceso y catálogo
         self._paso("sin token se responde 401", self._http("get", "/tramites/").status_code == 401)
         enrolar = self._token(ana, tokens.SCOPE_ENROLAR_MFA)
@@ -137,13 +144,18 @@ class Command(BaseCommand):
         tramite_beto_minsa = r.json()["id"]
 
         # ---------------------------------------------------------------- quién ve qué (RLS)
-        def cuantos(persona):
-            r = self._http("get", "/tramites/", tok(persona))
-            return len(r.json()["resultados"]) if r.status_code == 200 else f"HTTP {r.status_code}"
         self._paso("la ciudadana ve solo sus 2 trámites", cuantos(ana) == 2, cuantos(ana))
-        self._paso("el funcionario del MOP ve los 2 del MOP (su institución), no el del MINSA", cuantos(func_mop) == 2, cuantos(func_mop))
-        self._paso("el funcionario del MINSA ve solo el del MINSA", cuantos(func_minsa) == 1, cuantos(func_minsa))
+        self._paso("el funcionario del MOP ve 2 más (los de su institución), no el del MINSA", cuantos(func_mop) == base_mop + 2, f"{base_mop} + 2 esperado, hay {cuantos(func_mop)}")
+        self._paso("el funcionario del MINSA ve 1 más (el del MINSA), no los del MOP", cuantos(func_minsa) == base_minsa + 1, f"{base_minsa} + 1 esperado, hay {cuantos(func_minsa)}")
         self._paso("la segunda ciudadana ve solo el suyo", cuantos(beto) == 1, cuantos(beto))
+        # Gestionar personas no da acceso a los datos de los trámites (la RLS solo abre las instituciones donde se atiende)
+        coordinador = self._persona("coordinador_mop")
+        Membresia.objects.create(usuario=coordinador, institucion=mop, rol="coordinador_institucional", asignado_por=super_mop)
+        t[coordinador.username] = self._token(coordinador)
+        self._paso("el coordinador de la institución NO ve ningún trámite de ella (gestiona personas, no datos)", cuantos(coordinador) == 0, cuantos(coordinador))
+        self._paso("ni siquiera uno concreto: para él no existe (404)", self._http("get", f"/tramites/{tramite_ana}/", tok(coordinador)).status_code == 404)
+        self._paso("pero sí ve el equipo de su institución", self._http("get", "/equipo/", tok(coordinador)).status_code == 200)
+        self._paso("y el personal sin rol de supervisión o coordinación no ve el equipo (403)", self._http("get", "/equipo/", tok(func_mop)).status_code == 403)
         r = self._http("get", "/tramites/", tok(func_mop))
         self._paso("el personal ve los datos internos; la ciudadana no", "solicitante_id" in r.json()["resultados"][0])
 

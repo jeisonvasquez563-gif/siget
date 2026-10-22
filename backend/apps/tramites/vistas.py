@@ -32,6 +32,9 @@ from .serializacion import (ESTADOS_VALIDOS, calcular_fecha_limite, entero_posit
                             texto, tramite_a_dict)
 
 
+ROLES_QUE_ATIENDEN = {"funcionario", "supervisor"}
+
+
 def _datos(request):
     return request.data if isinstance(request.data, dict) else {}
 
@@ -53,7 +56,8 @@ class _Base(APIView):
     def check_permissions(self, request):
         super().check_permissions(request)
         usuario = request.user.usuario
-        self.instituciones = sorted({m.institucion_id for m in _membresias(usuario)})
+        # Solo cuentan las instituciones donde atiende trámites: coordinar personas no da acceso a los datos de los trámites
+        self.instituciones = sorted({m.institucion_id for m in _membresias(usuario) if m.rol in ROLES_QUE_ATIENDEN})
         fijar_contexto(usuario.pk, self.instituciones)
 
     def _es_personal(self, tramite):
