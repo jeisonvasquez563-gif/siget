@@ -87,8 +87,8 @@ export function Login({ alEntrar, motivo = '' }) {
     } catch (e) {
       if (e instanceof ApiError && e.codigo === 'mfa_requerido') { setPaso('codigo'); setCodigo('') }
       else if (e instanceof ApiError && e.datos.errores) setError(`${e.datos.errores.join('. ')}.`)
-      else if (e instanceof ApiError && e.estado === 401 && paso === 'codigo') setError('Ese código no sirve: es incorrecto o ya se usó. Espera al siguiente e inténtalo otra vez. Tras 3 fallos la cuenta se bloquea 5 minutos.')
-      else if (e instanceof ApiError && e.estado === 401) setError('Usuario o contraseña incorrectos, o la cuenta está bloqueada unos minutos.')
+      else if (e instanceof ApiError && e.estado === 401 && paso === 'codigo') setError('Ese código no sirve: es incorrecto o ya se usó. Espera al siguiente e inténtalo otra vez. Tras 3 fallos la cuenta se bloquea (5, 15 y luego 60 minutos).')
+      else if (e instanceof ApiError && e.estado === 401) setError('Usuario o contraseña incorrectos, o la cuenta está bloqueada temporalmente.')
       else if (e instanceof ApiError && e.estado === 409) setError('No se pudo crear la cuenta con esos datos. Prueba con otro usuario.')
       else if (e instanceof ApiError && e.estado === 429) setError('Demasiados intentos. Espera un minuto e inténtalo de nuevo.')
       else setError('No se pudo conectar con el servidor. Revisa tu conexión.')
@@ -180,7 +180,7 @@ export function Login({ alEntrar, motivo = '' }) {
               </button>
             </div>
           )}
-          {!registro && <p className="aviso-bloqueo"><Icono nombre="llave" />Por tu seguridad, tras 3 intentos fallidos (contraseña o código) la cuenta se bloquea 5 minutos.</p>}
+          {!registro && <p className="aviso-bloqueo"><Icono nombre="llave" />Por tu seguridad, tras 3 intentos fallidos (contraseña o código) la cuenta se bloquea: 5 minutos la primera vez, 15 la segunda y 60 las siguientes. Un inicio de sesión correcto reinicia la cuenta.</p>}
           <div className="pie-acceso"><Icono nombre="escudo" /><span>Conexión cifrada con TLS 1.3. Nunca guardamos tu contraseña: solo una huella irreversible.</span></div>
         </div>
       </section>
