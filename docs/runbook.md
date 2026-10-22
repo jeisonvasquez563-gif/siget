@@ -587,11 +587,30 @@ Pegar de una vez un bloque con `cat > archivo << 'EOF' ... EOF` en la terminal S
 
 ### 12.8 Pendiente de este bloque
 
-- Instalar Podman en VM2 (`db-server`) y repetir las verificaciones.
+- ~~Instalar Podman en VM2 (`db-server`) y repetir las verificaciones.~~ Hecho el 15-oct, ver 12.9.
 - Decidir qué usuario corre los contenedores del proyecto (usuario de servicio dedicado o el de cada integrante) y activar el linger en ese usuario: `sudo loginctl enable-linger <usuario>`.
 - Resolver los puertos 80 y 443 en VM1 (Apache los ocupa y los contenedores rootless no pueden usar puertos menores a 1024 por defecto).
 - Decidir qué se hace con el contenedor de prueba `siget-prueba`. Con `Linger=no` solo corre mientras `andy_martinez` tiene una sesión abierta; al cerrarla systemd lo detiene. No se elimina sin aprobación de Jeison.
 - Git no está instalado en las VMs; no es necesario, porque el código se trabaja desde la PC de cada integrante.
+
+### 12.9 Podman rootless en VM2 (`db-server`)
+
+Fecha: 15 de octubre de 2026, tarea 1.2 del plan de las semanas 1 y 2. Ejecutado por Jeison desde su cuenta con sudo (decisión D3: no se dio sudo adicional a nadie).
+
+```bash
+sudo nohup bash -c "dnf install -y podman > /tmp/dnf-podman.log 2>&1; echo EXIT=\$? >> /tmp/dnf-podman.log" &
+```
+
+Se lanzó con `nohup` dentro de la VM porque en VM1 la sesión SSH se cortó durante la instalación (se actualiza `selinux-policy`). Resultado: `EXIT=0`, sin cortes.
+
+Verificación:
+
+- `podman --version` informa 5.8.2, con `container-selinux`, `crun`, `netavark`, `aardvark-dns` y `passt` instalados. Es la misma versión que en VM1.
+- SELinux sigue en `Enforcing` y `ausearch -m avc` no registra denegaciones.
+- Como `siget`: `podman info` informa `rootless=true`, driver `overlay` y red `netavark`; `podman run --rm quay.io/podman/hello` funciona.
+- El firewall no cambió (`dhcpv6-client ssh` y la regla del 5432 solo desde `192.168.100.10`) y el PostgreSQL nativo sigue activo, así que el checkpoint no se tocó.
+
+Gotcha: el servicio de PostgreSQL se llama `postgresql`, no `postgresql-16`; `systemctl is-active postgresql-16` responde `inactive` aunque la base esté funcionando.
 
 ## 13. Cuentas de Linux del equipo y sudo
 
@@ -630,7 +649,7 @@ Es sudo completo. Para revocarlo: `sudo rm /etc/sudoers.d/andy_martinez`. No tie
 
 ### 13.4 Gotcha: el sudo de Andy no dejó registro consultable
 
-El journal de las VMs no conservó los comandos `sudo` ejecutados por Andy el 10-oct (no hay persistencia o se perdió tras un reinicio). La instalación de Podman se verificó por `dnf history` y `rpm -q`. Pendiente: habilitar journal persistente o auditd para que el uso de sudo quede trazable.
+El journal de las VMs no conservó los comandos `sudo` ejecutados por Andy el 10-oct (no hay persistencia o se perdió tras un reinicio). La instalación de Podman se verificó por `dnf history` y `rpm -q`. Resuelto el 15-oct con el journal persistente (ver 14.6); `auditd` queda como mejora opcional.
 
 ## 14. Endurecimiento de SSH y firewall
 
@@ -668,3 +687,938 @@ Borrar `/etc/ssh/sshd_config.d/40-siget-hardening.conf` y recargar sshd. Para Co
 
 - PostgreSQL escucha en `0.0.0.0:5432` (contenido por el firewall). El spec pide bind solo a la IP interna; se corrige al migrar a contenedor.
 - Las cuentas sin clave cargada ya no tienen ninguna vía de acceso por SSH.
+
+### 14.6 Journal persistente (trazabilidad del uso de sudo)
+
+Antes, el journal de las VMs era volátil (no existía `/var/log/journal`) y se perdía al reiniciar, por eso no había registro de los `sudo` de Andy (13.4). El 15 de octubre se activó el almacenamiento persistente en VM1 y VM2:
+
+```bash
+sudo mkdir -p /var/log/journal
+printf '[Journal]
+Storage=persistent
+SystemMaxUse=200M
+' | sudo tee /etc/systemd/journald.conf.d/40-siget-persistente.conf
+sudo systemd-tmpfiles --create --prefix /var/log/journal
+sudo systemctl restart systemd-journald && sudo journalctl --flush
+```
+
+Verificación: `/var/log/journal` existe con contexto SELinux `var_log_t`, `systemd-journald` activo y `journalctl --disk-usage` informa 16 MB en ambas VMs. Desde ahora `sudo journalctl _COMM=sudo` conserva el historial entre reinicios. El tope de 200 MB evita que el journal crezca sin control.
+
+**Gotcha:** el primer script se colgó al final (la sesión SSH no volvió) aunque la configuración ya estaba aplicada. Se repitió con `timeout` en los comandos de recarga y funcionó. Conviene usar siempre `timeout` al reiniciar servicios de logging por SSH.
+
+## 15. Usuario de servicio `siget` para los contenedores
+
+Fecha: 15 de octubre de 2026. Decisión D1 del [plan de las semanas 1 y 2](./architecture/plan-semanas-1-2.md), tomada por Jeison: los contenedores del proyecto corren bajo un usuario de servicio dedicado y no bajo la cuenta de un integrante, para que el sistema no dependa de una persona. Tarea 1.1 del plan.
+
+### 15.1 Creación (VM1 y VM2)
+
+```bash
+sudo useradd -m -s /bin/bash -c "Usuario de servicio SIGET (contenedores)" siget
+sudo passwd -l siget
+sudo chmod 750 /home/siget
+sudo loginctl enable-linger siget
+```
+
+Resultado en ambas VMs: `uid=1009(siget)`, rango subuid/subgid `689824:65536` asignado automáticamente por `useradd`, contraseña bloqueada, sin directorio `~/.ssh` y sin sudo.
+
+### 15.2 Verificación
+
+- `loginctl show-user siget` informa `Linger=yes` y `State=lingering`, y existe `/run/user/1009`: el gestor de usuario de systemd arranca con el sistema, así que sus contenedores sobreviven al cierre de cualquier sesión.
+- En VM1, `podman info` como `siget` informa `rootless=true` y `systemctl --user is-system-running` responde `running`.
+- En VM2 el usuario existe y tiene linger, pero Podman aún no está instalado (tarea 1.2).
+
+### 15.3 Cómo se usa
+
+`siget` **no admite acceso por SSH** (sin contraseña ni claves). Se opera desde una cuenta con sudo:
+
+```bash
+sudo -H -u siget bash -c 'cd ~ && XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user status'
+```
+
+Las unidades Quadlet del proyecto van en `/home/siget/.config/containers/systemd/`.
+
+### 15.4 Gotchas
+
+- Ejecutar `sudo -u siget podman …` desde un directorio que `siget` no puede leer (por ejemplo el home de otro usuario) falla con `Error: setting up the process`. Hay que hacer `cd ~` antes, como en el comando de arriba.
+- Hay que fijar `XDG_RUNTIME_DIR=/run/user/<uid>` para que `systemctl --user` y Podman encuentren el bus del usuario.
+- El script de creación se colgó en VM2 pasados los 90 segundos aunque todo ya estaba aplicado; conviene usar `timeout` y verificar el estado por separado.
+
+### 15.5 Pendiente
+
+- Retirar el contenedor de prueba de `andy_martinez` y recrearlo bajo `siget` (decisión D4, requiere aprobación de Jeison).
+- Instalar Podman en VM2 (tarea 1.2).
+- El acceso a los puertos 80/443 en VM1 sigue pendiente de la decisión D2.
+
+## 16. Respaldo de la base de datos antes de la migración a contenedor
+
+Fecha: 15 de octubre de 2026, tarea 2.1 del plan de las semanas 1 y 2. Ejecutado por Jeison en VM2 (`db-server`), PostgreSQL 16.15 nativo. Es de solo lectura: no modifica la base.
+
+### 16.1 Contenido respaldado
+
+| Base | Tamaño | Datos |
+|---|---|---|
+| `tramites_demo` | 7,9 MB | `app_usuarios` (8 filas) y `demo_tramite` (1 fila) |
+| `postgres` | 7,7 MB | Sin datos del proyecto (no se respalda) |
+
+### 16.2 Comandos
+
+```bash
+sudo install -d -m 700 -o postgres -g postgres /var/backups/siget
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.dump
+sudo -u postgres pg_dump -Fp --no-owner -d tramites_demo -f /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.sql
+sudo -u postgres pg_dumpall --globals-only -f /var/backups/siget/globals-AAAAMMDD-HHMM.sql
+```
+
+Se generaron tres archivos con permisos 600 en un directorio 700: el volcado en formato personalizado (`.dump`, 6 KB), el mismo contenido en SQL plano (4,6 KB) y los roles de PostgreSQL (`globals`, 671 bytes). El sello de este respaldo es `20261015-1608`.
+
+### 16.3 Verificación
+
+- `pg_restore --list` muestra los datos de `app_usuarios` y `demo_tramite`.
+- **Prueba de restauración:** se restauró el `.dump` en una base temporal `restore_test`, que devolvió `app_usuarios=8` y `demo_tramite=1` (los mismos conteos que el original). Después se eliminó y se comprobó que no quedó rastro.
+- La base original quedó intacta.
+
+### 16.4 Copia fuera de la VM
+
+Los archivos `.dump` y `.sql` de `tramites_demo` se copiaron al equipo de Jeison, **fuera del repositorio** (`Desktop/respaldos-siget/`), y sus hashes SHA-256 coinciden con los de la VM:
+
+| Archivo | SHA-256 |
+|---|---|
+| `tramites_demo-20261015-1608.dump` | `eaed2ed5732c0871bf3025f13fbc2a10440484640958918c933d72fdb2c6e065` |
+| `tramites_demo-20261015-1608.sql` | `16e31a9ac000c3c033d4234bb11b259d4557ea7da0882328580c3d1e2b541a9b` |
+
+El archivo de roles (`globals`) **no se copió** fuera de la VM: contiene los hashes de contraseña de los roles de PostgreSQL.
+
+### 16.5 Seguridad: estos archivos no van al repositorio
+
+Los respaldos contienen los hashes bcrypt de las cuentas de la app, así que nunca se commitean. Se agregó `*.dump` y `globals-*.sql` a `.gitignore` como protección. `database/schema.sql` sigue versionado, porque es el esquema sin datos.
+
+### 16.6 Cómo restaurar
+
+```bash
+sudo -u postgres createdb tramites_demo
+sudo -u postgres pg_restore -d tramites_demo /var/backups/siget/tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+### 16.7 Gotchas
+
+- Un comodín como `chmod 600 /var/backups/siget/*` falla si el directorio es 700 y no pertenece a quien lo ejecuta, porque el shell lo expande antes de `sudo`. Hay que usar `sudo bash -c "chmod 600 …/*"`.
+- Las VMs no tienen `rg`: los scripts remotos deben usar `grep`.
+- `pg_stat_user_tables.n_live_tup` mostró 0 filas aunque había datos (las estadísticas no estaban actualizadas); para contar hay que usar `select count(*)`.
+
+### 16.8 Pendiente
+
+- Mantener este respaldo hasta verificar la migración (tarea 2.3). El PostgreSQL nativo **no se apaga** hasta entonces.
+- Definir una retención y un respaldo periódico (por ejemplo, con un systemd timer) cuando la base esté en contenedor.
+
+## 17. Roles de base de datos en marcha y cierre de la brecha del superusuario
+
+Fecha: 15 de octubre de 2026, parte de la tarea 2.4 del plan de las semanas 1 y 2. Ejecutado por Jeison en VM2 y VM1, con su aprobación explícita. Se aplicó sobre la base nativa actual; la migración a contenedor (tareas 2.2 y 2.3) queda pendiente. Detalle del diseño en [`roles-permisos-bd.md`](./roles-permisos-bd.md).
+
+### 17.1 Antes
+
+La base tenía un único rol (`postgres`, superusuario), dueño de todo, y la app PHP del checkpoint se conectaba con él. Contradecía el principio Zero Trust de no operar con superusuario.
+
+### 17.2 Respaldo previo
+
+`pg_dump` (`pre-roles-AAAAMMDD-HHMM.dump`) y copia de `pg_hba.conf` en `/var/backups/siget/` de VM2, antes de tocar nada. La contraseña de `postgres` no se modificó hasta verificar el login.
+
+### 17.3 Qué se aplicó (una sola transacción)
+
+Ejecutado por `postgres` como arranque inicial, a partir de [`database/diseno-roles-permisos.sql`](../database/diseno-roles-permisos.sql):
+
+- Esquema `siget` (8 tablas, 6 políticas RLS, 5 triggers) y roles `siget_owner`, `app_role` y `auditor_role` (los tres `NOLOGIN` por ahora: `app_role` se activará con su secret cuando exista Django).
+- `checkpoint_app`: rol `LOGIN` de la app PHP, con `SELECT, INSERT, UPDATE, DELETE` **solo** sobre `app_usuarios` y `USAGE` de su secuencia. No puede leer `demo_tramite`, borrar tablas, crear objetos ni roles.
+- `pgadmin_lectura`: rol `LOGIN` de solo lectura (`pg_read_all_data`, `pg_monitor`) para pgAdmin. No puede escribir y RLS le oculta los trámites.
+- La base y las tablas del checkpoint pasaron a ser propiedad de `siget_owner`. `REVOKE ALL … FROM PUBLIC` sobre la base y las tablas.
+
+### 17.4 Cambio en la app (VM1)
+
+Se cambió `DB_USER` y `DB_PASSWORD` en `/var/www/html/gestion/config.php` por los de `checkpoint_app` (archivo local, fuera de git, `apache:apache` 640, contexto `httpd_sys_content_t`). La contraseña se generó al vuelo (28 caracteres aleatorios) y se escribió sin mostrarse. El respaldo del `config.php` anterior se movió a `/root/siget-backups/` (700), fuera del directorio web.
+
+### 17.5 Cierre de la brecha: `postgres` ya no se usa
+
+En `pg_hba.conf`, la regla `host all all 192.168.100.10/32` se reemplazó por:
+
+```
+host    all             postgres        192.168.100.10/32       reject
+host    tramites_demo   checkpoint_app  192.168.100.10/32       scram-sha-256
+host    all             pgadmin_lectura 192.168.100.10/32       scram-sha-256
+```
+
+`pg_hba_file_rules` no informa errores. Además se anuló la contraseña de `postgres` (`ALTER ROLE postgres PASSWORD NULL`): solo se entra con el usuario del sistema por socket local.
+
+### 17.6 Verificación
+
+- Registro, login (302 al dashboard, dashboard 200) y "Acceso denegado" con el contador de intentos funcionan igual que antes, ya con `checkpoint_app`. El bloqueo tras 3 intentos también (el `UPDATE` funciona con el rol nuevo).
+- `checkpoint_app`: puede leer `app_usuarios`, pero `demo_tramite` y `siget.*` responden permiso denegado; no puede borrar ni crear tablas ni crear roles.
+- Las 19 pruebas de `diseno-pruebas.sql` pasan contra el esquema real (`bash ~/siget-diseno/demo.sh`), con `ROLLBACK` de los datos de prueba.
+- Los 8 usuarios del checkpoint siguen intactos. Se crearon y se borraron 3 usuarios de prueba (`zz_*`).
+- El único rol superusuario es `postgres`, sin contraseña y rechazado por red.
+
+### 17.7 pgAdmin: cambio de conexión
+
+pgAdmin se conectaba como `postgres`; ya no puede. Hay que cambiar la conexión del servidor a **usuario `pgadmin_lectura`**. Su contraseña se guardó **solo en el equipo de Jeison**, fuera del repositorio (`Desktop/respaldos-siget/credencial-pgadmin-lectura.txt`). Es de solo lectura: no sirve para escribir en la base.
+
+### 17.8 Incidente: contraseña expuesta en una salida
+
+Al inspeccionar `config.php`, el filtro que enmascaraba contraseñas no coincidió con la línea `DB_PASSWORD` y la contraseña **anterior** de `postgres` quedó impresa en el registro de la sesión de trabajo. Está anulada (17.5), así que no es utilizable. Lección: para mostrar un archivo de configuración se filtra por el nombre exacto de la constante o no se muestra su contenido.
+
+### 17.9 Gotchas
+
+- Un `tee /dev/stderr` dentro de una sustitución de comandos se traga la salida: no usarlo para mostrar resultados.
+- Los campos del formulario de registro son `username`, `password` y `password2`; una prueba con otro nombre devuelve 200 sin crear nada.
+- `pg_hba_file_rules` devuelve arreglos en `database` y `user_name`: hay que usar `array_to_string`.
+
+### 17.10 Pendiente
+
+- Activar `LOGIN` de `app_role` con `podman secret` cuando exista el backend.
+- Repetir esta configuración en el PostgreSQL en contenedor (tarea 2.2) y aplicar allí el esquema con el mismo script.
+- Retirar la app PHP cuando Django la reemplace.
+
+## 18. TLS entre la aplicación y la base de datos
+
+Fecha: 15 de octubre de 2026, tarea ZT-2 de la [matriz de cobertura de Zero Trust](./zero-trust-cobertura.md) (principio 2: toda la comunicación se asegura sin importar la ubicación de red). Ejecutado por Jeison en VM2 y VM1, con su aprobación. Se aplicó al PostgreSQL nativo; se repetirá en el contenedor (tarea 2.2).
+
+### 18.1 Antes
+
+La conexión entre la app y la base viajaba sin cifrar por la red interna. Se comprobó con una prueba desde VM1: `sslmode=disable` conectaba con `ssl=false`.
+
+### 18.2 Autoridad certificadora y certificado del servidor (VM2)
+
+CA interna propia (`SIGET CA interna`, ECDSA P-256, 5 años) y certificado del servidor (1 año) con `subjectAltName` de la IP `192.168.100.20` y `db-server`. La **clave privada de la CA queda solo en `/root/siget-ca/` (700) de VM2**, para emitir futuros certificados; la clave del servidor está en `/var/lib/pgsql/data/tls/` (600, `postgres`, contexto `postgresql_db_t`).
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out ca.key
+openssl req -x509 -new -key ca.key -sha256 -days 1825 -subj '/O=SIGET/OU=Ciberseguridad 5 UTP/CN=SIGET CA interna' -out ca.crt
+# servidor: clave, CSR y firma con la CA, con SAN IP:192.168.100.20,DNS:db-server
+```
+
+PostgreSQL (`ALTER SYSTEM`, recarga sin reinicio): `ssl = on`, `ssl_cert_file`, `ssl_key_file` y `ssl_min_protocol_version = 'TLSv1.3'`.
+
+### 18.3 Cliente (VM1)
+
+La CA **pública** se instaló en `/etc/pki/siget/ca.crt` (contexto `cert_t`). El `db.php` del checkpoint pasó a `sslmode=verify-full;sslrootcert=/etc/pki/siget/ca.crt`, así que el PHP verifica que el servidor es quien dice ser, no solo cifra. El `db.php` anterior se guardó en `/root/siget-backups/`.
+
+### 18.4 Exigir TLS en la base
+
+En `pg_hba.conf`, las reglas de `checkpoint_app` y `pgadmin_lectura` pasaron de `host` a `hostssl`:
+
+```
+host     all             postgres        192.168.100.10/32       reject
+hostssl  tramites_demo   checkpoint_app  192.168.100.10/32       scram-sha-256
+hostssl  all             pgadmin_lectura 192.168.100.10/32       scram-sha-256
+```
+
+Una conexión sin TLS ya no encuentra ninguna regla y es rechazada. Respaldo de la regla anterior en `/var/backups/siget/pg_hba.conf.antes-hostssl`.
+
+### 18.5 Verificación
+
+Prueba desde VM1 con el rol de la app (consulta `pg_stat_ssl` dentro de la propia sesión):
+
+| Intento | Antes de `hostssl` | Después de `hostssl` |
+|---|---|---|
+| `verify-full` con la CA de SIGET | Conecta: `ssl=true`, TLSv1.3, `TLS_AES_256_GCM_SHA384` | Conecta: igual |
+| `verify-full` sin confiar en la CA | Rechazada (certificado no verificable) | Rechazada |
+| `sslmode=disable` (sin TLS) | **Conectaba** (`ssl=false`) | **Rechazada**: no hay línea en `pg_hba.conf` |
+
+El login real de la app (registro, login, dashboard) siguió funcionando con la base exigiendo TLS. Usuario de prueba creado y borrado; los 8 usuarios reales intactos.
+
+### 18.6 pgAdmin
+
+La conexión de `pgadmin_lectura` ahora **debe usar SSL**: en pgAdmin, pestaña *SSL*, modo `require` (o `verify-full` con el certificado de la CA).
+
+### 18.7 Gotchas
+
+- `ssl` se activa con recarga (`pg_reload_conf()`), sin reiniciar PostgreSQL.
+- Con `verify-full` el nombre del servidor debe estar en el `subjectAltName`; por eso el certificado incluye la IP, porque la app se conecta por IP.
+- `hostssl` no rechaza explícitamente lo que no es TLS: simplemente no hay regla que lo acepte, y el error es "no hay una línea en pg_hba.conf".
+
+### 18.8 Pendiente
+
+- Renovar el certificado del servidor antes de su vencimiento (octubre de 2027) y definir la rotación.
+- Repetir esta configuración en el PostgreSQL en contenedor y guardar la clave del servidor con `podman secret`.
+- Cifrado del login HTTP (nginx con TLS): ZT-3, semana 5.
+
+## 19. División del rol de plataforma en cinco roles y control dual
+
+Fecha: 15 de octubre de 2026. Decisión de Jeison: un único "operador de plataforma" era un rol todopoderoso, contrario a Zero Trust (separación de funciones). Se aplicó sobre el esquema `siget` de la base nativa con la migración [`database/migraciones/002-dividir-rol-plataforma.sql`](../database/migraciones/002-dividir-rol-plataforma.sql), ejecutada como `siget_owner` y no como superusuario.
+
+### 19.1 Los cinco roles
+
+| Rol | Hace | No puede |
+|---|---|---|
+| `operador_infraestructura` | Servidores, contenedores, despliegues y parches | Ver datos de la aplicación; crear usuarios; tocar secretos |
+| `operador_identidades` | Altas de coordinadores y restablecer el segundo factor | Tocar infraestructura; ver trámites; crear instituciones |
+| `operador_catalogo` | Alta de instituciones y de los tipos de trámite base | Crear usuarios; tocar infraestructura |
+| `operador_seguridad` | Bloquear cuentas y revocar sesiones ante incidentes | Crear cuentas; leer trámites; modificar la auditoría |
+| `custodio_secretos` | Rotar contraseñas, claves y certificados | Desplegar; crear usuarios; leer datos |
+
+El `auditor` sigue aparte. `operador_plataforma` se renombró a `operador_infraestructura`.
+
+### 19.2 Reglas impuestas en la base
+
+- **Un solo rol de plataforma por persona** (columna única `usuario.rol_plataforma`).
+- **Quien tiene un rol de plataforma no puede tener membresías de institución, ni al revés**: dos triggers (`membresia_valida_rol_plataforma` y `usuario_valida_membresias`).
+- **Control dual:** nueva tabla `siget.aprobacion` con `CHECK (aprobado_por <> propuesto_por)`: quien propone un alta (institución o coordinador) no puede aprobarla. `app_role` solo puede completar `aprobado_por`, `estado` y `resuelto_en`; no puede cambiar quién propuso.
+
+### 19.3 Procedimiento
+
+1. Respaldo previo (`pre-002-AAAAMMDD-HHMM.dump` en `/var/backups/siget/` de VM2).
+2. Ensayo: la migración completa dentro de `BEGIN … ROLLBACK`, que confirmó que no falla y no deja cambios.
+3. Aplicación con `COMMIT`.
+4. Verificación: `rol_plataforma` tiene los 7 valores (ninguno, los 5 nuevos y auditor), el esquema pasó a 9 tablas y 7 triggers.
+
+### 19.4 Verificación
+
+Las pruebas pasaron de 19 a **24, todas contra el esquema real** (`bash ~/siget-diseno/demo.sh`). Las nuevas: 20 y 21 (un operador no recibe membresías y un funcionario no recibe rol de plataforma), 22 y 23 (nadie aprueba su propia solicitud; una segunda persona sí puede) y 24 (no se puede cambiar quién propuso). Los 8 usuarios del checkpoint siguen intactos y no quedan datos de prueba.
+
+### 19.5 Gotcha
+
+`ALTER TYPE … ADD VALUE` permite agregar valores a una enumeración dentro de una transacción (PostgreSQL 12 o posterior), pero **no se pueden usar en esa misma transacción**; por eso la migración no los usa y las pruebas corren en una transacción posterior.
+
+### 19.6 Pendiente
+
+- El control dual se aplica hoy a nivel de datos; falta que el backend lo exija en el flujo de altas.
+- Definir cómo se otorga el primer rol de cada operador (arranque inicial) sin romper la separación de funciones.
+
+## 20. Sudo de mínimo privilegio para `andy_martinez` (ZT-4)
+
+Fecha: 15 de octubre de 2026. Aprobado por Jeison. Principio 3 de Zero Trust (acceso con el mínimo privilegio): el `NOPASSWD: ALL` de Andy en VM1 era el desvío que la [matriz de cobertura](./zero-trust-cobertura.md) tenía marcado. Podman ya estaba instalado, así que ya no necesitaba root completo.
+
+### 20.1 Regla nueva (`/etc/sudoers.d/andy_martinez`, VM1)
+
+```
+andy_martinez ALL=(siget) NOPASSWD: ALL
+andy_martinez ALL=(root) NOPASSWD: /usr/bin/journalctl --no-pager *,     /usr/bin/systemctl --no-pager status *, /usr/sbin/ausearch -m avc *,     /usr/sbin/ss -tlnp, /usr/bin/dnf check-update, /usr/bin/dnf --quiet check-update, /usr/bin/dnf info *
+```
+
+Se validó con `visudo -cf` antes de instalarla (permisos 440, root). La regla anterior se guardó en `/root/siget-backups/sudoers-andy_martinez.antes-ZT4`.
+
+### 20.2 Verificación
+
+- `sudo -l -U andy_martinez` lista solo esas reglas.
+- Como Andy: `sudo -u siget id` funciona; `sudo whoami` y `sudo dnf install` piden contraseña (que no tiene), es decir, quedan denegados.
+
+### 20.3 Decisiones de diseño
+
+- Los comandos de lectura llevan `--no-pager` fijado como primer argumento: sin eso, `journalctl` y `systemctl status` abren un paginador desde el que se puede obtener una shell de root.
+- Operar como `siget` es suficiente para trabajar con los contenedores del proyecto sin tocar el sistema.
+- Si Andy necesita algo más, se agrega a la lista y queda en el `CHANGELOG.md`; no se vuelve a dar `ALL`.
+
+### 20.4 Pendiente
+
+- Aplicar el mismo criterio a cualquier compañero que reciba sudo en el futuro.
+- Jeison conserva `NOPASSWD: ALL`; es la única cuenta con sudo completo, y el journal persistente registra su uso.
+
+## 21. PostgreSQL en contenedor rootless (Podman + Quadlet)
+
+Fecha: 20 de octubre de 2026, tareas 2.2 y 2.3 del [plan de las semanas 1 y 2](./architecture/plan-semanas-1-2.md) y parte de 2.5. Ejecutado por Jeison en VM2, con su aprobación (puerto 5433 mientras conviven las dos bases, imagen oficial fijada a 16.15). La base nativa **no se apagó**: sigue encendida, pero ya sin uso.
+
+### 21.1 Resultado
+
+PostgreSQL 16.15 corre en un contenedor rootless del usuario de servicio `siget`, gestionado por una unidad Quadlet, con TLS 1.3, el esquema `siget` y los datos migrados. La app PHP del checkpoint ya trabaja contra él.
+
+| Elemento | Valor |
+|---|---|
+| Imagen | `docker.io/library/postgres:16.15` (oficial, 160 MB comprimida) |
+| Usuario | `siget` (sin sudo, sin contraseña, sin SSH) |
+| Puerto | `192.168.100.20:5433` → 5432 del contenedor; solo en la IP interna |
+| Datos | Volumen `siget-pgdata` (etiqueta SELinux `container_file_t`) |
+| Cifrado | TLS 1.3 mínimo; certificado y clave como `podman secret` |
+| Configuración de acceso | `pg_hba.conf` propio: `local peer`, `postgres` rechazado por red, `hostssl` solo para `checkpoint_app` y `pgadmin_lectura` desde `192.168.100.10` |
+| Archivos versionados | [`infra/podman/vm2-db-server/`](../infra/podman/vm2-db-server/) |
+
+### 21.2 Procedimiento
+
+1. **Preparar:** carpetas de `siget`, `pg_hba.conf`, unidad `siget-postgres.container` y volumen `siget-pgdata.volume` (Quadlet).
+2. **Secretos con `podman secret`:** certificado y clave TLS del servidor (los mismos de la sección 18) y una contraseña de arranque aleatoria que no se mostró. Los valores nunca pasaron por argumentos ni por un archivo.
+3. **Descargar la imagen y arrancar** con `systemctl --user start siget-postgres.service`.
+4. **Firewall:** regla rica para `5433` solo desde `192.168.100.10`.
+5. **Migrar:** volcado fresco de la base nativa (`pg_dump -Fc` y `pg_dumpall --globals-only`); los roles entraron con sus hashes (la contraseña de `checkpoint_app` no cambió), se creó la base con dueño `siget_owner` y se restauró con `pg_restore`.
+6. **Verificar, cambiar la app y limpiar** (ver 21.3 y 21.4).
+
+### 21.3 Verificación
+
+- Dentro del contenedor: 9 tablas del esquema `siget`, 6 políticas RLS, 7 triggers, `app_usuarios` = 8, los 7 valores de `rol_plataforma` y `siget_owner` como dueño. Idéntico a la base nativa.
+- Desde VM1 con el rol de la app: conecta con TLS 1.3 y `verify-full`; **el servidor ve la IP real `192.168.100.10`**, así que la regla `hostssl … 192.168.100.10/32` funciona con el modo de red del contenedor (pasta); sin TLS se rechaza.
+- Login real de la app contra el contenedor: registro, login (302 al dashboard) y dashboard 200. El usuario de prueba apareció en el contenedor y no en la base nativa; se borró.
+- Las **24 pruebas** de roles y permisos pasan contra el contenedor (`bash ~/siget-diseno/demo.sh`, que ahora apunta al contenedor por defecto).
+- El contenedor reinició con `systemctl --user restart` y conservó los datos.
+
+### 21.4 Zero Trust en el contenedor
+
+- Sin contraseña para el superusuario: `ALTER ROLE postgres PASSWORD NULL`, y el secreto de arranque se quitó de la unidad y del almacén (`podman secret rm`). El superusuario solo entra por el socket local con `podman exec -u postgres` (script [`database/psql-contenedor.sh`](../database/psql-contenedor.sh)).
+- No privilegiado, `no-new-privileges` activo, rootless y con SELinux de contenedor.
+- El único superusuario del contenedor es `postgres`, rechazado por red.
+
+### 21.5 Cambios en la app (VM1)
+
+`DB_PORT` de `config.php` pasó de `5432` a `5433` (la contraseña y el rol no cambian). Se guardó una copia previa en `/root/siget-backups/`.
+
+### 21.6 Gotchas
+
+- `podman exec` no pasa la entrada estándar si no se usa `-i`: un volcado de roles enviado sin `-i` se pierde en silencio y la creación de la base falla con "role does not exist".
+- El comodín `chmod 600 /var/backups/siget/*` falla si el directorio es 700; hay que usar `sudo bash -c "chmod 600 …/*"` (mismo gotcha de la sección 16).
+- Un archivo de respaldo en `/root/siget-backups/` solo existe en VM1; en VM2 esa carpeta no existe y `cp` falla sin avisar si no se verifica.
+- Con `Secret=…,type=mount` y `target=` absoluto, `uid`, `gid` y `mode` permiten que el usuario `postgres` del contenedor (999) lea la clave TLS con permisos 0600.
+- `DropCapability=ALL` no se aplicó: el entrypoint de la imagen necesita `chown` y cambiar de usuario al arrancar.
+
+### 21.7 Pendiente
+
+- ~~Apagar la base nativa~~: hecho el 20-oct, ver 21.8.
+- **pgAdmin debe apuntar al puerto 5433** (con SSL); el 5432 ya no escucha.
+- Quitar del firewall la regla del puerto 5432 (hoy sin servicio detrás) y decidir si el contenedor pasa al 5432.
+- `app_role` con `LOGIN` y su contraseña como `podman secret`, cuando exista el backend.
+- La contraseña de `checkpoint_app` sigue en el `config.php` del PHP, no en un secreto; desaparece con el retiro del checkpoint (semana 6).
+- Respaldo periódico del contenedor (`pg_dump` por un timer de systemd) y rotación del certificado (octubre de 2027).
+
+### 21.8 Apagado de la base nativa
+
+Fecha: 20 de octubre de 2026, con aprobación de Jeison. Cierra la tarea 2.3: la base viva es solo el contenedor.
+
+```bash
+sudo systemctl stop postgresql
+sudo systemctl disable postgresql
+```
+
+Antes de apagar se comprobó que **no había ninguna conexión de clientes** a la nativa (0). Después:
+
+- `postgresql` queda `inactive` y `disabled`: no arranca con el sistema. El puerto 5432 ya no escucha y el 5433 sí.
+- Desde VM1, la app conecta al contenedor (`app_usuarios = 8`) y el puerto 5432 es **inalcanzable**.
+- El login web responde 200. El contenedor sigue activo.
+- **No se borró nada:** los datos nativos siguen en `/var/lib/pgsql/data` (64 MB), junto con los respaldos de `/var/backups/siget/`.
+
+**Volver atrás** (solo en caso de emergencia, y los datos nuevos del contenedor no estarían en la nativa): `sudo systemctl enable --now postgresql`, y devolver `DB_PORT` a `5432` en el `config.php` de VM1.
+
+**Gotcha:** `systemctl --user` como `siget` desde una sesión sin entorno de usuario responde "Failed to connect to bus"; hay que fijar `XDG_RUNTIME_DIR=/run/user/<uid>`, como en la sección 15.
+
+**Pendiente de este paso:** decidir cuándo se desinstala el paquete y se borran los datos nativos (requiere aprobación explícita; hoy se conservan).
+
+## 22. Corrección de la hora de las VMs
+
+Fecha: 20 de octubre de 2026, con aprobación de Jeison. Hallazgo hecho al construir la imagen del backend: `tar` avisó de archivos con fecha "en el futuro".
+
+### 22.1 Hallazgo
+
+Los relojes de VM1 y VM2 iban **1 h 45 min atrasados** (21:26 UTC cuando eran las 23:11 UTC), aunque `timedatectl` decía "System clock synchronized: yes". No era un problema de tu equipo ni de VMware: se contrastó con **cuatro sitios independientes** (GitHub, Cloudflare, Google y Red Hat), consultados desde el PC y desde la propia VM, y todos coincidían con el PC.
+
+**Causa:** la red del laboratorio bloquea casi todo el NTP público (UDP 123 a Cloudflare y TCP 4460 de NTS agotaron el tiempo, y todas las fuentes `pool` figuraban sin respuesta). La única que contestaba, `154.6.3.7` (estrato 4), tenía la hora equivocada, y `chrony` se fiaba de ella.
+
+**Por qué importa:** los sellos de la auditoría, los vencimientos de los plazos (SLA), la vigencia del MFA (15 minutos), los tokens JWT y la validez de los certificados dependen del reloj. Una auditoría con la hora mal pone en duda justo la promesa del sistema: la evidencia confiable.
+
+### 22.2 Corrección
+
+La fuente de hora fiable disponible es el anfitrión (el PC de Jeison) a través de VMware:
+
+```bash
+sudo dnf install -y open-vm-tools
+sudo systemctl enable --now vmtoolsd
+sudo vmware-toolbox-cmd timesync enable
+sudo systemctl disable --now chronyd      # se fiaba de la fuente con hora mala
+```
+
+### 22.3 Verificación
+
+- La hora de ambas VMs saltó +1 h 45 min y quedó a **1 o 2 segundos** del PC y de GitHub.
+- Tras el salto: PostgreSQL responde con la hora correcta, el contenedor sigue activo (sin reiniciarse), `sshd`, `firewalld`, `tailscaled`, `httpd` y `php-fpm` activos y el login web responde 200.
+- Un salto **hacia adelante** es el seguro: los certificados siguen vigentes y no se repiten marcas de tiempo.
+
+### 22.4 Limitación (declarada)
+
+Las VMs dependen ahora de que el **PC anfitrión tenga la hora correcta**. Si el PC se desfasa, las VMs lo siguen. Con una red que permita NTP público, lo correcto sería volver a `chrony` con NTS (`time.cloudflare.com`).
+
+### 22.5 Gotchas
+
+- `timedatectl` dice "synchronized: yes" aunque la fuente esté mal: significa que sigue a su fuente, no que la fuente sea correcta. Hay que contrastarla con una referencia externa.
+- Un solo servidor de hora alcanzable es un punto único de fallo de confianza: no se puede detectar que miente.
+- Contrastar la hora con la cabecera HTTP `Date` de varios sitios HTTPS es un método rápido y sin NTP: `curl -sI https://github.com | grep -i ^date`.
+
+### 22.6 Pendiente
+
+- Los registros anteriores al 20-oct (auditoría de prueba, journal, `dnf history`) llevan la hora atrasada: no hay datos reales de trámites afectados.
+- Decidir una fuente de hora definitiva cuando el servidor se despliegue fuera de este laboratorio.
+
+## 23. Backend en contenedor y prueba contra la base real
+
+Fecha: 20 de octubre de 2026, parte de las tareas 1.6 y 2.5 del [plan](./architecture/plan-semanas-1-2.md) y ZT-6 de la [matriz de Zero Trust](./zero-trust-cobertura.md).
+
+### 23.1 Qué se hizo
+
+- **Modelos** de las 9 tablas del esquema `siget` (`managed = False`: la base es la autoridad; Django no crea ni migra nada).
+- **Contexto RLS** (`apps/nucleo/contexto.py`): tras permitir el PDP, se fija `app.usuario_id` y `app.instituciones` solo para la transacción (`set_config(..., true)`); con `ATOMIC_REQUESTS` el contexto muere al terminar la petición.
+- **Imagen** del backend (`backend/Containerfile`, UBI 9 con Python 3.12, usuario sin privilegios, 1,16 GB), construida por `siget` en VM1. No contiene secretos.
+- **`app_role` con LOGIN** (migración [`003-login-app-role.sql`](../database/migraciones/003-login-app-role.sql)): sin superusuario, sin `BYPASSRLS`, límite de 20 conexiones y contraseña aleatoria. Regla `hostssl` propia en `pg_hba.conf`.
+- **Secretos como `podman secret`** en VM1: `siget-db-app-password`, `siget-django-key` y `siget-ca`. Ningún valor pasó por argumentos ni quedó en un archivo.
+
+### 23.2 Verificación contra la base real
+
+Desde un contenedor de VM1, como `app_role`, por TLS 1.3 con `verify-full`:
+
+- **`verificar_esquema`:** los 9 modelos coinciden con las tablas reales (columnas incluidas).
+- **`verificar_integracion`:** 15 de 15 pasos a través del ORM, en una transacción que se revierte: conexión sin superusuario y por TLS; RLS por institución (el funcionario del MOP ve solo lo del MOP, la ciudadana solo lo propio, otra institución no ve la auditoría); la base escribe la auditoría en la misma transacción; transición inválida rechazada; ni el ORM ni la base dejan modificar la auditoría ni borrar trámites; `app_role` no se sube a un rol de plataforma; y el contexto no sobrevive a la transacción. Después de la prueba no quedó ningún dato.
+
+```bash
+sudo -H -u siget bash -lc 'cd /tmp && export XDG_RUNTIME_DIR=/run/user/$(id -u) && podman run --rm \
+  --secret siget-db-app-password,mode=0444 --secret siget-django-key,mode=0444 --secret siget-ca,mode=0444 \
+  -e SIGET_DB_PASSWORD_FILE=/run/secrets/siget-db-app-password \
+  -e SIGET_SECRET_KEY_FILE=/run/secrets/siget-django-key \
+  -e SIGET_DB_SSLROOTCERT=/run/secrets/siget-ca \
+  localhost/siget-backend:dev python manage.py verificar_integracion'
+```
+
+### 23.3 Incidente: el login del checkpoint cayó unos minutos
+
+La migración 003 hizo `REVOKE ALL ON DATABASE … FROM PUBLIC`. Los permisos de conexión **no viajaron con `pg_restore`** al migrar al contenedor: hasta entonces la app del checkpoint funcionaba solo porque `PUBLIC` tenía acceso. Al quitarlo, `checkpoint_app` quedó sin `CONNECT` y el login respondió **HTTP 500** ("permission denied for database"). Se detectó con la prueba de login, se devolvió `CONNECT` a `checkpoint_app`, `pgadmin_lectura` y `siget_owner`, y se verificó el flujo completo (302 al dashboard, 8 usuarios intactos). La migración 003 ahora concede `CONNECT` a los cinco roles. Lección: al quitar `PUBLIC`, conceder primero y verificar después con un login real.
+
+### 23.4 Gotchas
+
+- Una vista "que no toca la base" **sí abre una conexión** con `ATOMIC_REQUESTS = True`. `/salud/` se exentó con `@transaction.non_atomic_requests`; así responde aunque la base esté caída.
+- Los permisos a nivel de base de datos (`GRANT CONNECT`) no se restauran con `pg_restore` si la base se crea con `createdb`.
+- Con `psql -f` por ruta de archivo, un `cat` que falla por permisos no detiene el script: se envió por la entrada estándar y se comprobó el estado real, no el mensaje del script.
+- Las comillas dobles en SQL son identificadores: las cadenas llevan comillas simples.
+
+### 23.5 Pendiente
+
+- Servicio permanente del backend: unidad Quadlet con `gunicorn` y `nginx` en el mismo pod, con TLS en el borde (ZT-3).
+- Autenticación (Argon2, JWT corto, MFA TOTP) y vistas con el motor de acceso conectado.
+- Cargar el catálogo inicial de instituciones y trámites.
+
+## 24. nginx con TLS 1.3 y el backend como servicio permanente (pod `siget`)
+
+Fecha: 20 de octubre de 2026, tarea ZT-3 de la [matriz de Zero Trust](./zero-trust-cobertura.md) (principio 2: toda la comunicación se asegura) y parte de la decisión D2 del plan (puertos altos para los contenedores rootless). Ejecutado por Jeison en VM1, con su aprobación.
+
+### 24.1 Resultado
+
+Un pod rootless `siget` del usuario de servicio `siget`, gestionado por Quadlet, con dos contenedores. **Solo `nginx` está expuesto**; el backend escucha únicamente dentro del pod.
+
+| Pieza | Detalle |
+|---|---|
+| Pod `siget` | Publica `8443` (HTTPS) y `8080` (redirige a HTTPS). Archivos en [`infra/podman/vm1-app-backend/`](../infra/podman/vm1-app-backend/) |
+| `siget-nginx` | `registry.access.redhat.com/ubi9/nginx-126:1-1777855212` (UBI 9, 116 MB comprimida), TLS 1.3, sin root, sistema de archivos de solo lectura, `DropCapability=ALL` |
+| `siget-backend` | `localhost/siget-backend:dev` con `gunicorn` en `127.0.0.1:8000` **dentro del pod**, solo lectura, `DropCapability=ALL` |
+| Secretos | `siget-nginx-crt` y `siget-nginx-key` (nginx); `siget-db-app-password`, `siget-django-key` y `siget-ca` (backend). Nada en el repositorio ni en las imágenes |
+| Firewall | `8443/tcp` y `8080/tcp` abiertos en VM1 |
+| Acceso | `https://192.168.159.137:8443` (red del anfitrión) o `https://100.104.206.118:8443` (Tailscale) |
+
+El checkpoint PHP sigue en Apache (puerto 80) hasta que se retire (semana 6): por eso nginx usa los puertos altos 8443 y 8080.
+
+### 24.2 Certificado de nginx
+
+La clave privada se generó **en VM1 y pasó directo a un `podman secret`**: el archivo se destruyó con `shred` y nunca salió de la VM. Solo viajó la solicitud de firma (pública) a la CA de VM2, que emitió un certificado de 1 año con `subjectAltName` de `192.168.159.137`, `192.168.100.10`, `100.104.206.118`, `127.0.0.1`, `app-backend` y `localhost`. La CA pública está en [`infra/pki/siget-ca.crt`](../infra/pki/siget-ca.crt).
+
+**Huella SHA-256 de la CA** (para verificarla antes de instalarla en un equipo; instrucciones en [`infra/pki/README.md`](../infra/pki/README.md)):
+
+```
+F4:F4:15:F6:E5:4F:93:A7:77:7B:83:16:E3:97:87:17:31:AB:3B:08:6B:88:B9:C4:AD:77:C7:78:AD:8A:CC:E0
+```
+
+### 24.3 Configuración de seguridad de nginx
+
+- **TLS 1.3 únicamente** (TLS 1.2 recibe el aviso "protocol version"), sin tickets de sesión.
+- **Cabeceras:** `Strict-Transport-Security` (1 año), `Content-Security-Policy` (`default-src 'self'; frame-ancestors 'none'`), `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` y `Cross-Origin-Opener-Policy`. nginx es la **única fuente**: descarta las que repite Django.
+- **Solo los métodos que usa la API** (el resto responde 405) y `server_tokens off`.
+- **Límite de tasa** de 20 peticiones por segundo por origen, con ráfaga de 40.
+- **HTTP (`8080`)** no sirve contenido: responde 301 a HTTPS.
+- `client_max_body_size` de 10 MB y plazos cortos de cabecera y cuerpo.
+
+### 24.4 Verificación (desde el PC contra `https://192.168.159.137:8443`)
+
+| Prueba | Resultado |
+|---|---|
+| Certificado con la CA interna | HTTP 200 `{"estado":"ok"}`, verificación correcta |
+| Cliente sin confiar en la CA | Rechazado (curl 60) |
+| TLS 1.3 / TLS 1.2 | Negocia TLS 1.3 con `TLS_AES_256_GCM_SHA384`; TLS 1.2 rechazado |
+| Cabeceras de seguridad | Las siete presentes, **una sola vez cada una** |
+| `http://…:8080/salud/` | 301 a `https://…:8443/salud/` |
+| `Host` falso (`evil.example.com`) | HTTP 400 (rechazado por Django) |
+| `/api/tramites/`, `/admin/`, `/.env`, `/salud/../etc/passwd` | HTTP 404, sin revelar nada |
+| `TRACE` y `DELETE` | HTTP 405 |
+| Ráfaga de 150 peticiones simultáneas | 132 con 200 y **18 con 429** |
+| Puerto 8000 desde fuera | Sin conexión (el backend solo escucha dentro del pod) |
+| Denegaciones de SELinux | Ninguna |
+| Checkpoint PHP (Apache :80) | Sigue en 200 |
+| `podman kill siget-backend` | El servicio vuelve solo en segundos (`Restart=always`) |
+
+### 24.5 Gotchas
+
+- **`curl` en Windows (Schannel) falla con una CA privada** con "the revocation status is unknown" (código 60): hay que usar `--ssl-no-revoke`. Es un problema del cliente, no del servidor; los navegadores no lo sufren una vez instalada la CA.
+- Con el sistema de archivos de solo lectura hay que dar escritura explícita donde hace falta: `Tmpfs=/tmp` para ambos, `Tmpfs=/var/log/nginx` para nginx y `HOME=/tmp` para `gunicorn`, que escribe un socket de control en su carpeta personal.
+- Si Django y nginx agregan la misma cabecera, sale duplicada. Se resolvió con `proxy_hide_header` en nginx.
+- Un archivo montado por `Volume=` (como `nginx.conf`) se debe actualizar escribiendo sobre el mismo archivo (`tee`), no reemplazándolo (`sed -i` crea otro archivo y el contenedor sigue viendo el antiguo).
+- Un pod rootless publica los puertos a través de `pasta`: el proceso que escucha en el host es `pasta`, no `nginx`.
+
+### 24.6 Pendiente
+
+- **Todavía no hay interfaz ni API de trámites detrás de nginx**: solo `/salud/`. Cuando existan las vistas, nginx servirá también el frontend (React).
+- El login del checkpoint PHP sigue por HTTP (Apache, puerto 80) hasta su retiro en la semana 6.
+- Pasar a los puertos 80 y 443 cuando se retire Apache (por ejemplo, con `net.ipv4.ip_unprivileged_port_start` o una redirección de firewalld).
+- Renovar el certificado de nginx antes de octubre de 2027.
+- La imagen del backend se llama `:dev` y se construye a mano en VM1; falta fijarla por versión o resumen y automatizar la construcción.
+
+## 25. Autenticación del backend (login, MFA y sesiones)
+
+Fecha: 20 de octubre de 2026, parte de la tarea ZT-5 de la [matriz de Zero Trust](./zero-trust-cobertura.md) (principio 6). Diseño en [`2026-10-20-autenticacion-design.md`](./superpowers/specs/2026-10-20-autenticacion-design.md). Ejecutado por Jeison en VM2 y VM1.
+
+### 25.1 Qué se hizo
+
+- **Migración 004** ([`database/migraciones/004-autenticacion.sql`](../database/migraciones/004-autenticacion.sql)) aplicada en la base real, con respaldo previo: columnas del segundo factor y del bloqueo en `usuario`, tabla `sesion` (el refresco solo como hash) y tabla `evento_seguridad` de solo inserción (dos triggers). `app_role` recibió solo lo necesario: no puede borrar eventos ni tocar `rol_plataforma`.
+- **Módulo `apps/autenticacion/`:** registro, login con Argon2, TOTP con el secreto cifrado, tokens de acceso de 10 minutos y de refresco de un solo uso, reautenticación escalonada, bloqueo por intentos y registro de eventos de seguridad.
+- **Secretos nuevos** en VM1 como `podman secret`: `siget-jwt-key` y `siget-mfa-key` (clave Fernet), generados al vuelo sin mostrarse. La unidad `siget-backend.container` los monta.
+- **Imagen reconstruida** y pod reiniciado con el código nuevo.
+
+### 25.2 Verificación
+
+Desde un contenedor de VM1, como `app_role`, por TLS 1.3, contra la base real:
+
+- `verificar_esquema`: **11 de 11** tablas coinciden con los modelos.
+- `verificar_integracion`: **15 de 15** pasos (RLS, triggers, auditoría, permisos).
+- `verificar_autenticacion`: **47 de 47** pasos, en una transacción que se revierte y con el reloj controlado. No quedó ningún dato.
+- Además, **188 pruebas unitarias** en el PC.
+
+A través de `nginx` con TLS: `/salud/` 200; `/auth/yo/` sin token 401 con `WWW-Authenticate`; `GET` sobre el login 405; login con un usuario inexistente, respuesta genérica 401; cuerpo que no es JSON 415; refresco sin la cabecera anti-CSRF 403; contraseña débil 400.
+
+### 25.3 Errores encontrados y corregidos en el camino
+
+1. **Dígitos Unicode en el código MFA.** `"１２３４５６"` (ancho completo) pasa `isdigit()` y hace fallar a `hmac.compare_digest` con `TypeError`: cualquiera podía provocar un error 500 en el login, sin que se contara el intento. Ahora se exige `isascii()`. Lo detectó una prueba unitaria.
+2. **Contraseñas débiles que la política dejaba pasar:** `passwordpassword` y `qwertyuiopasdf`. La lista de Django solo compara contraseñas exactas; ahora se detectan repeticiones de una palabra común y secuencias de teclado o alfabeto. Lo detectaron las pruebas.
+3. **Tokens "del futuro".** La librería de JWT comparaba `iat` con el reloj real, lo que rechaza tokens válidos si el reloj se ajusta (como pasó con las VMs). Ahora se valida con el reloj inyectado y una tolerancia de 120 segundos.
+4. **La prueba de integración se rompía a mitad del recorrido** ("an error occurred in the current transaction"). Causa: DRF marca la transacción para revertirla (`set_rollback`) al lanzar una excepción de API, y mi arnés corre todo dentro de una transacción exterior. No era un fallo del código de producción, pero confirmó dos decisiones de diseño: las vistas de autenticación son `non_atomic_requests` y las decisiones del PDP se guardan por una conexión aparte.
+
+### 25.4 Gotchas
+
+- `str.isdigit()` acepta dígitos de otros alfabetos; para códigos numéricos hay que comprobar también `isascii()`.
+- Con `ATOMIC_REQUESTS = True`, DRF revierte la transacción de la petición ante cualquier excepción de API (401, 403, 429): todo lo que deba sobrevivir a un rechazo (contadores, eventos, decisiones) necesita otra transacción u otra conexión.
+- Los registros de seguridad son inalterables: **las pruebas de integración no deben escribir datos reales** (por eso corren en una transacción que se revierte); un evento escrito de verdad ya no se puede borrar.
+- El `tail` de un registro largo oculta el principio del error: para depurar, guardar la salida completa y leer desde la primera traza.
+- Un `with transaction.atomic()` dentro de otro es un punto de guardado: un error dentro revierte solo el interior, siempre que la excepción se capture **fuera** del bloque.
+
+### 25.5 Pendiente
+
+- Recuperación de contraseña (no hay servidor de correo en el laboratorio) y procedimiento del primer rol de cada operador.
+- Pantallas del frontend: login, enrolamiento del segundo factor (código QR a partir de la URI) y reautenticación.
+- Decisión de Jeison sobre el MFA obligatorio u opcional del ciudadano.
+- Rotación de las claves JWT y Fernet.
+- Conectar `PermisoPDP` a las vistas de trámites y de auditoría.
+
+## 26. API de trámites y catálogo
+
+Fecha: 20 de octubre de 2026. Primera API de negocio del backend; conecta el PDP (ABAC) con las vistas y con la base (RLS). Ejecutado por Jeison en el PC, VM1 y VM2.
+
+### 26.1 Qué se hizo
+
+- **Migraciones aplicadas** ([`005-catalogo-inicial.sql`](../database/migraciones/005-catalogo-inicial.sql), [`006-historial-solicitante.sql`](../database/migraciones/006-historial-solicitante.sql)): 6 instituciones y 6 tipos de trámite con su plazo (SLA); política RLS para que el solicitante vea el historial de sus propios trámites.
+- **Endpoints** (todos exigen token con scope completo): `GET/POST /tramites/`, `GET /tramites/<id>/`, `POST /tramites/<id>/estado/`, `POST /tramites/<id>/reasignar/`, `GET /tramites/<id>/historial/`, `GET /catalogo/instituciones/`, `GET /catalogo/tipos-tramite/?institucion=`.
+- **Defensa en capas por petición:** autenticación y sesión vigente → contexto RLS fijado (`app.usuario_id`, `app.instituciones`) → decisión del PDP (también las negadas quedan registradas, por una conexión aparte) → la base valida de nuevo las transiciones y escribe la auditoría en la misma transacción.
+- **Lo ajeno no existe:** un trámite que la persona no puede ver responde 404, igual que uno inexistente.
+- **Qué se muestra depende de quién mira:** la ciudadanía ve institución, estado y fechas; el personal además los identificadores y el detalle interno.
+- **Auditoría de rutas** (prueba unitaria): falla si alguna vista es pública fuera de `salud`, `registro`, `login` y `refresh`.
+- Módulo nuevo `apps/nucleo/errores.py`: el cuerpo de un acceso denegado conserva los tipos reales.
+
+### 26.2 Verificación
+
+Desde un contenedor de VM1, como `app_role`, contra la base real, en una transacción que se revierte:
+
+- `verificar_esquema`: **11 de 11**.
+- `verificar_tramites`: **47 de 47** pasos (visibilidad por rol e institución, conflicto de interés, segundo factor vencido, saltos de estado, reasignación, historial, decisiones registradas, sin superusuario). No quedó ningún dato.
+- **239 pruebas unitarias** en el PC.
+- Por nginx con TLS: `/tramites/` y `/catalogo/instituciones/` sin token responden 401.
+
+### 26.3 Errores encontrados y corregidos
+
+1. **Booleanos convertidos en texto.** DRF convierte a texto los valores del `detail` de una excepción: `reautenticacion_sugerida` llegaba como `"True"` (y `"False"` sería verdadero para una interfaz). Se creó `AccesoDenegado` y un manejador de excepciones que devuelve el cuerpo con sus tipos reales.
+2. **Historial desordenado.** Los eventos de una misma transacción comparten `now()`, así que `creado_en` no ordena; se ordena por `id`.
+3. **Prueba que no veía las denegaciones.** El arnés escribía las decisiones en la conexión principal, que DRF revierte al responder 403. Ahora se capturan en memoria y se verifica que producción use una conexión distinta en autocommit.
+4. **Importación circular** al poner el manejador: DRF carga los permisos por defecto al importar `rest_framework.views`; la importación en `errores.py` es diferida.
+
+### 26.4 Pendiente
+
+- Plazos en días hábiles (hoy días calendario), vencimiento y escalamiento automático (temporizador de systemd).
+- Documentos adjuntos y notificaciones.
+- Frontend (React): lista, detalle e historial.
+
+## 27. Interfaz web (React), módulos por rol y cuentas de demostración
+
+Fecha: 21 de octubre de 2026. Guion de la demostración en [`demo-guion.md`](./demo-guion.md).
+
+### 27.1 Qué se hizo
+
+- **Interfaz (`frontend/`)**: React 18 + Vite, JavaScript y CSS propios (sin estilos en línea, porque la CSP de nginx es `default-src 'self'`). Pantallas: inicio de sesión con código del segundo factor, creación de cuenta, enrolamiento del segundo factor con código QR, inicio con los módulos del rol, mis trámites, iniciar un trámite, bandeja y supervisión con filtros, detalle con historial y acciones, equipo, «Mi seguridad» y «Acceso a trámites». El token de acceso vive solo en memoria; el de refresco, en la cookie HttpOnly.
+- **Servida por nginx** desde una carpeta de solo lectura (`/home/siget/frontend`, montada en el contenedor). Solo `/`, `/index.html` y `/assets/` entregan archivos; las rutas `auth|tramites|catalogo|equipo|salud` van al backend y **todo lo demás responde 404**.
+- **Módulos por rol** (`apps/autorizacion/modulos.py`): `/auth/yo/` devuelve el menú de cada persona. Es solo ayuda visual: el PDP y la base siguen decidiendo en cada petición.
+- **`/equipo/`**: personal de las instituciones que la persona coordina o supervisa (PDP + segundo factor reciente para el coordinador).
+- **`sembrar_demo`**: 13 cuentas, una por rol, con segundo factor ya enrolado, y 5 trámites de ejemplo creados y movidos **por la API real** (PDP, RLS y auditoría reales). Es idempotente y tiene un modo `--ensayo` que se revierte. Las credenciales salen una sola vez por la salida del comando y se guardan solo en `demo-local/` (ignorado por git).
+
+### 27.2 Verificación
+
+- `verificar_tramites`: **51 de 51** contra la base real; **252 pruebas unitarias** en el PC.
+- Recorrido por HTTPS a través de nginx con las 13 cuentas (login con TOTP, módulos, listas): cada rol ve exactamente los suyos; los 6 roles de plataforma reciben 403 en trámites.
+
+### 27.3 Hallazgo corregido: el coordinador veía trámites
+
+El recorrido mostró que la coordinadora de una institución listaba sus trámites. La causa: el contexto de la RLS (`app.instituciones`) se armaba con **todas** las membresías y la política deja ver las filas de esas instituciones; el PDP la dejaba pasar por ser también ciudadana (la lista se evalúa sobre «lo propio»). Ahora solo cuentan las instituciones donde la persona es funcionaria o supervisora. `verificar_tramites` incluye el caso (el coordinador ve 0 trámites y recibe 404 en uno concreto).
+
+### 27.4 Gotchas
+
+- Un `add_header` dentro de un `location` de nginx **anula** las cabeceras de seguridad definidas en el `server`; para el caché se usa `expires`.
+- Reiniciar `siget-backend` y `siget-nginx` a la vez detiene el pod (`BindsTo`): se detienen todos y se levantan en orden (pod, backend, nginx).
+- Python 3.14 verifica de forma estricta la CA interna y la rechaza porque no trae `keyUsage`: hay que reemitirla (pendiente); los navegadores no lo exigen.
+- El refresco de sesión es de un solo uso: el cliente serializa las renovaciones y la interfaz no usa `StrictMode` (duplicaría el efecto de arranque y revocaría la sesión).
+- El navegador integrado del entorno de desarrollo no llega a las VMs: la interfaz se probó por API y con el modo de ejemplo (`?mock`); el recorrido visual con las cuentas reales lo hace una persona.
+
+### 27.5 Pendiente
+
+- Consolas de los operadores de plataforma y del auditor (hoy «próximamente»); registro de decisiones del PDP visible para el auditor.
+- Recuperación de contraseña, rotación de claves, reemisión de la CA, plazos en días hábiles y escalamiento automático.
+- Suspender las cuentas de demostración tras la presentación.
+
+### 27.6 Cómo desplegar la interfaz
+
+```bash
+cd frontend && npm install && npm run build          # en el PC
+tar -czf /tmp/fe.tgz -C frontend dist                # copiar a VM1 y, como root, reemplazar /home/siget/frontend
+```
+Después copiar `nginx.conf` y `siget-nginx.container` si cambiaron, `systemctl --user daemon-reload` y arrancar el pod (ver 27.4).
+
+## 28. Consola de auditoría (lectura con un rol propio de la base de datos)
+
+Fecha: 21 de octubre de 2026. Es el módulo «Auditoría» del rol `auditor`.
+
+### 28.1 Qué se hizo
+
+- **Migración 007** ([`007-auditor-login.sql`](../database/migraciones/007-auditor-login.sql)): `auditor_role` pasa a poder conectarse (límite de 5 conexiones) y recibe `SELECT` **solo** sobre `id`, `username` y `rol_plataforma` de las personas. Sigue sin ser superusuario ni BYPASSRLS. Su contraseña se generó al vuelo (nunca se mostró), se fijó con `ALTER ROLE` y vive como `podman secret` `siget-db-auditor-password` en VM1. `pg_hba.conf` de VM2 recibió su línea (`hostssl`, solo desde la red interna, `scram-sha-256`).
+- **Conexión propia** `DATABASES["auditoria"]` en Django: la consola lee como `auditor_role`, no como `app_role`. Aunque el backend tuviera un error o se comprometiera por otra vía, esta vía **no puede escribir, alterar ni borrar** nada.
+- **API** (`/auditoria/…`, solo lectura): `resumen/`, `decisiones/` (filtros: resultado, política, acción, persona), `seguridad/` y `tramites/`, todas paginadas. El PDP exige rol `auditor`, nivel de aseguramiento 3 y segundo factor reciente. Solo se piden columnas concretas: ni siquiera es posible leer hashes ni secretos.
+- **Quién audita al auditor:** cada consulta pasa por el PDP y queda registrada como una decisión más (`consultar_decisiones`).
+- **Interfaz:** resumen con gráfico de decisiones por política (permitidas y negadas), personas con más denegaciones, y listados con filtros y paginación.
+
+### 28.2 Verificación
+
+- `verificar_auditoria`: **34 de 34** contra la base real. Incluye lo que importa: la conexión de auditoría **es negada** al insertar o alterar decisiones, borrar eventos, alterar o leer trámites, leer hashes, secretos TOTP y sesiones, crear personas y borrar tablas (cada intento corre en una transacción que siempre se revierte).
+- API: 401 sin token; 403 para ciudadanía, funcionarios, operadores, un auditor con nivel 2 y uno con segundo factor vencido (con la sugerencia de reautenticar); filtros inválidos o con inyección, 400; ninguna respuesta contiene hashes ni secretos.
+- **274 pruebas unitarias** en el PC.
+
+### 28.3 Gotchas
+
+- Un `DROP TABLE` de quien no es dueño falla con «must be owner», no con «permission denied»: las pruebas de rechazo deben aceptar ambos mensajes.
+- Al pedir filas por `select_related` Django lee **todas** las columnas de la tabla unida; como `auditor_role` solo ve tres columnas de `usuario`, la consola usa `values()` con columnas explícitas.
+- El orden del contenedor sigue siendo detener todo y levantar pod, backend y nginx en ese orden.
+
+### 28.4 Pendiente
+
+- Exportar el registro (CSV firmado) y búsquedas por rango de fechas.
+- Alertas sobre patrones (muchas denegaciones de una persona, reuso de tokens).
+- Que `siget-postgres` registre también las conexiones de `auditor_role` (log del servidor).
+
+## 29. Rediseño de la interfaz: «el Canal»
+
+Fecha: 21 de octubre de 2026. Primer paso del frente de frontend (ver [`organizacion-backend-frontend.md`](./organizacion-backend-frontend.md)).
+
+### 29.1 Qué se hizo
+
+- **Sistema de diseño propio** (`frontend/src/estilos/`): tokens de color, tipografía, forma y sombra; modo claro y oscuro; componentes (botones, campos, insignias, tablas, plazo, esqueletos, estados vacíos, avisos, modal, pestañas, indicadores, tablero) y estructura (acceso en dos paneles, menú lateral agrupado, barra superior con ruta). Tipografía autohospedada (Archivo, Public Sans, IBM Plex Mono; OFL).
+- **Pieza firma: el recorrido por esclusas** en el detalle del trámite y en la pantalla de acceso.
+- **Pantallas renovadas:** acceso y alta del segundo factor; inicio con «Requiere tu atención»; mis trámites con indicadores y búsqueda; nuevo trámite en dos pasos con resumen; bandeja y supervisión con filtros, búsqueda y **tablero kanban**; detalle con línea de tiempo, confirmación de estados finales y reasignación con nombres; equipo; «Mi seguridad» como credencial con la **ventana del segundo factor**; acceso a trámites como respuesta HTTP real; auditoría con gráfico por política.
+- **Calidad de uso:** esqueletos de carga, estados vacíos con mensaje útil, avisos, diálogos de confirmación, enlace «Saltar al contenido», foco visible, `prefers-reduced-motion`, responsive hasta móvil.
+- **Modo de ejemplo para desarrollo** (`?mock`, `src/mock.js`): permite ver cada pantalla por rol sin VM ni credenciales; **no entra en el build de producción** (se comprueba con `grep` en `dist/`).
+
+### 29.2 Verificación
+
+- `npm run build` limpio; sin estilos ni scripts en línea; sin el modo de ejemplo en `dist/`.
+- Recorrido visual por rol con el modo de ejemplo en escritorio (claro y oscuro) y en móvil.
+- En VM1: la SPA, el CSS y las fuentes se sirven con el tipo MIME correcto (`font/woff2`) y el recorrido por API de todas las cuentas sigue igual.
+
+### 29.3 Hallazgo corregido
+
+El resumen de auditoría se quedaba en esqueleto para siempre cuando el segundo factor del auditor estaba vencido: retornaba antes de pintar el modal de reautenticación. Lo encontró el modo de ejemplo; ahora el modal se pinta también durante la espera.
+
+### 29.4 Gotchas
+
+- Con la CSP `default-src 'self'` no hay `style=`: el progreso del plazo usa `<progress>`, los anillos y gráficos usan atributos SVG, y las posiciones animadas de la boya son clases CSS.
+- Las fuentes caen un instante al respaldo (`font-display: swap`): no es un fallo.
+- El servidor de desarrollo de Vite debe reiniciarse después de instalar paquetes.
+
+### 29.5 Pendiente
+
+- Pruebas del frontend (ESLint, Vitest, Playwright) y revisión de contraste AA con herramienta.
+- Ilustraciones propias para cada estado vacío, atajos de teclado, impresión del trámite, internacionalización.
+- Repetir el recorrido visual con las cuentas reales (esta pasada fue con datos de ejemplo).
+
+## 30. Pruebas automáticas del frontend, roles y permisos, y segundo factor
+
+Fecha: 21 de octubre de 2026.
+
+### 30.1 Pruebas automáticas del frontend
+
+- **Vitest + Testing Library + jest-axe + ESLint** (`npm run verificar` = lint + pruebas + build). **113 pruebas** en 6 archivos (128 con el simulador, ver sección 31) (`frontend/src/pruebas/`):
+  - `api`: el token vive solo en memoria; el refresco lleva la cabecera anti-CSRF y es único aunque fallen varias peticiones a la vez; un 401 se renueva y se repite; `pideReautenticar` solo acepta un booleano verdadero.
+  - `comun`: plazos, estados (las transiciones de ayuda coinciden con el contrato) y agrupación del menú.
+  - `ui`: las esclusas describen cada estado a los lectores de pantalla; avisos, confirmaciones, tema.
+  - `pantallas`: **qué ve y qué puede hacer cada rol** (menús, trámites visibles, reautenticación, estados finales con confirmación, conflicto de interés, reasignar solo para el supervisor, auditoría, login y alta del segundo factor) más **accesibilidad con axe** en las pantallas clave.
+  - `permisos`: matriz, base de datos y MFA, apoyadas en una **captura real** de la política y de PostgreSQL (`src/mock-datos/`).
+  - `seguridad`: lee el código fuente y falla si alguien usa `style=`, `dangerouslySetInnerHTML`, `eval`, recursos de otros orígenes, guarda el token en el navegador, deja claves escritas o importa el simulador fuera de desarrollo.
+- **Mutaciones:** se rompieron a propósito 9 cosas críticas (cabecera CSRF, refresco único, booleano de reautenticación, confirmación de estados finales, selector de reasignar, conflicto de interés, descripción de las esclusas, módulos desconocidos, estilo en línea): **las 9 se detectan**. La primera pasada dejó una viva (la prueba del conflicto de interés miraba un botón que nunca aparece en estado «Pendiente») y se corrigió.
+- **CI** (`frontend-ci.yml`): lint, pruebas, build, y que el simulador no llegue a `dist/`.
+- Lo que las pruebas destaparon: un `<aside>` sin nombre duplicado (accesibilidad), nombre de hook incorrecto (`usarConsulta`) y el estado del simulador compartido entre pruebas.
+
+### 30.2 Roles, permisos y módulos (transparencia)
+
+- **`/politicas/matriz/`** (`apps/autorizacion/matriz.py`): la matriz rol × acción **sale de evaluar el PDP real** con una persona y un recurso de ejemplo por cada caso; marca qué acciones exigen segundo factor reciente (la misma persona con el factor vencido se niega) y comprueba que **ningún rol puede todo** (no existe un superusuario: el que más puede, el supervisor, hace 6 de 18 acciones). 20 pruebas, incluida una que demuestra que se detectaría un rol «todopoderoso».
+- **`/politicas/base-de-datos/`**: los privilegios reales de cada rol de PostgreSQL por tabla (`has_table_privilege`), con RLS, disparadores y atributos del rol (ninguno es superusuario ni omite la seguridad por filas).
+- **Pantalla «Roles y permisos»**: roles y módulos (con «tu rol» marcado), matriz interactiva (cada celda explica la política que decidió; alterna entre «en su ámbito» y «fuera de su ámbito»), base de datos por rol, y las cinco capas de defensa.
+- **Módulos nuevos para todas las personas:** «Segundo factor (MFA)» y «Roles y permisos» (junto a «Mi seguridad», en el grupo «Seguridad y permisos»).
+- `verificar_politicas` contra la base real: **30 de 30** (los privilegios mostrados coinciden con PostgreSQL).
+- **Hallazgo honesto:** `siget_owner` (dueño de las tablas) tiene `UPDATE/DELETE` sobre el registro **por ser dueño**; lo que lo vuelve inalterable es que no puede iniciar sesión y que los disparadores de solo inserción rechazan el cambio incluso para él. La pantalla lo explica en lugar de esconderlo.
+
+### 30.3 Segundo factor (MFA) para demostrar
+
+- **Pantalla «Segundo factor (MFA)»:** estado y ventana de 15 minutos, cómo funciona en 6 pasos (secreto cifrado, TOTP, verificación, anti-repetición, bloqueo, reautenticación escalonada), quién lo exige, y **una prueba en vivo**: verificar el código real de la cuenta y **reenviar el mismo código**, que el servidor rechaza (no se puede reutilizar). Incluye la **actividad de seguridad propia** (`/auth/actividad/`: inicios de sesión, verificaciones, fallos).
+- Advertencia en pantalla: tres códigos incorrectos bloquean la cuenta 5 minutos.
+
+### 30.4 Gotchas
+
+- `has_any_column_privilege` no admite `DELETE` (solo SELECT, INSERT, UPDATE y REFERENCES): lo encontró `verificar_politicas`.
+- Una prueba que busca un texto en un componente debe mirar algo que **realmente aparezca** en ese estado (si no, la prueba pasa en vacío y la mutación sobrevive).
+- El `mock.js` y sus datos solo deben existir en desarrollo: el CI busca marcas exclusivas del simulador en `dist/`.
+
+### 30.5 Pendiente
+
+- Playwright (recorrido real contra las VMs) y revisión de contraste AA con herramienta.
+- Simulador de decisiones («¿qué pasaría si…?») sobre la matriz y exportación de la matriz a PDF/CSV para el informe.
+
+## 31. Simulador de «qué pasaría si…»
+
+Fecha: 21 de octubre de 2026. Pestaña «¿Qué pasaría si…?» dentro de «Roles y permisos».
+
+### 31.1 Qué es
+
+Se arma una situación (rol, acción y solo las circunstancias que importan para esa acción) y **el PDP real** responde qué pasaría, por qué y qué lo cambiaría. No es una copia de las reglas: la decisión sale de `decidir()`, el mismo motor que usa la plataforma.
+
+- **Veredicto** con la política que decidió y su explicación.
+- **Cómo se evaluó:** la traza regla por regla (primero las que anulan, luego las que permiten; se detiene en la primera que decide).
+- **Qué lo cambiaría:** los cambios de una sola variable que invertirían el resultado («se permitiría si tuviera un segundo factor reciente», «se negaría si la cuenta estuviera bloqueada»), con un botón «Probarlo».
+- **12 escenarios** que enseñan cada protección: aprobar con normalidad, otra institución, conflicto de interés, segundo factor vencido, trámite asignado a un compañero, saltarse un paso, un rol de plataforma que quiere ver un trámite, cuenta bloqueada, control dual, coordinación que quiere ver un trámite, auditor sin nivel 3 y una ciudadana que mira lo ajeno.
+
+### 31.2 Seguridad
+
+- Endpoint `POST /politicas/simular/` (`apps/autorizacion/simulador.py`): **puro** (no consulta la base) y **no registra decisiones**: es hipotético y no debe ensuciar la auditoría inalterable (comprobado contra la base real: `decision_pdp` 74 → 74).
+- Entrada **estrictamente validada** con listas cerradas; un rol que llega como lista o un booleano como nivel se rechazan con 400, no con un error del servidor.
+- Solo autenticación (scope completo) y límite de tasa: es información de las reglas, no datos de nadie.
+
+### 31.3 Verificación
+
+- **53 pruebas** del simulador (348 en el backend), incluida una **propiedad**: en un barrido de más de 3 000 combinaciones de rol, acción y circunstancias, **la traza siempre termina con la misma decisión y la misma política que `decidir()`**; si alguien tocara el motor y la traza se desfasara, la prueba falla. También: validación, cada protección, alternativas y que un fallo del PDP se traduce en denegación.
+- `verificar_politicas` contra la base real: **38 de 38** (incluye 401 sin token, 400/415 ante entradas inválidas y que no registra decisiones).
+- **15 pruebas** de la pantalla (128 en el frontend), apoyadas en **respuestas reales capturadas** de producción (`src/mock-datos/simulador.json`), con accesibilidad (axe).
+
+### 31.4 Hallazgos corregidos
+
+1. Un `rol` enviado como lista hacía fallar la validación con `TypeError` (un 500 en la API): ahora se comprueba el tipo antes de buscar en el conjunto.
+2. Al cambiar de rol, el simulador arrastraba circunstancias que nadie había elegido (por ejemplo, «otra persona» como solicitante para la ciudadanía): ahora solo se conserva lo que la persona **tocó**.
+3. Una expectativa equivocada de prueba aclaró una regla: ver el propio trámite SÍ se permite (como ciudadano); el conflicto de interés aplica al **gestionarlo**.
+
+### 31.5 Pendiente
+
+- Exportar la traza de un escenario (para el informe) y guardar escenarios propios.
+- Comparar dos roles lado a lado sobre la misma situación.
+
+## 32. Ensayo de la demostración
+
+Fecha: 21 de octubre de 2026. Herramientas en [`demo/`](../demo/README.md); guion en [`demo-guion.md`](./demo-guion.md).
+
+### 32.1 Qué se hizo
+
+- **Ensayo automático** (`demo/ensayo.py`): recorre por HTTPS (nginx, TLS 1.3) los pasos del guion con las cuentas reales y su código TOTP. Comprueba la preparación (hora de VM1 frente al PC, certificado y su vencimiento, TLS 1.3, cabeceras, rutas que deben dar 404 y 401, archivos de la interfaz), el recorrido de Ana, Fabio, Saúl, Félix, Carla, Ines y Aldo, el segundo factor con su anti-repetición, la matriz, la base de datos, el simulador y el cierre de sesión. Las escrituras las hace sobre trámites nuevos.
+- **Resultado: 55 de 55 comprobaciones correctas**, antes y después de los ajustes de abajo.
+- **Estado de la infraestructura** al ensayar: ambas VMs sanas (pods y servicios activos, disco 5–9 %, memoria holgada), hora sincronizada (0,1 s de diferencia), certificado vigente hasta el 20-10-2027, y las VMs arrancaron solas tras el encendido (autoarranque verificado). **El CI de GitHub corrió y pasó** (backend y frontend, en push y en PR); el PR 6 (`develop → main`) es fusionable.
+
+### 32.2 Hallazgos
+
+1. **El guion decía algo que no ocurre.** Prometía que al cambiar el estado de un trámite aparecía «Confirma que eres tú», pero el código con el que se inicia sesión ya cuenta como segundo factor reciente (15 minutos), así que no aparece justo después de entrar. El guion ahora lo explica y ofrece tres formas de mostrarlo (simulador, esperar o acortar la ventana con `SIGET_MFA_RECIENTE_MINUTOS`).
+2. **El «15 minutos» estaba escrito a mano** en la matriz, el simulador y la interfaz, mientras el PDP real lee la configuración: si alguien cambiaba la ventana, **la pantalla habría mentido**. Ahora la ventana viaja desde el servidor (`mfa_ventana_minutos` en `/auth/yo/`, `ventana_minutos` en la matriz y el simulador) y `verificar_politicas` comprueba que coincidan (39 de 39). 6 pruebas nuevas del backend (354) y 2 del frontend (130).
+3. **Un código TOTP no se acepta dos veces:** un segundo script con la misma cuenta en el mismo intervalo recibe 401 (la protección que se muestra en la demo). Los scripts esperan al siguiente intervalo.
+4. **Pendientes de la VM:** ambas tienen un reinicio por actualizaciones pendiente; se hace después de la presentación.
+5. **No hay respaldos automáticos** de la base en contenedor: el último volcado era del 20-oct 18:39, anterior a las cuentas de demostración, y la base viva ya tenía 14 personas, 11 trámites, 129 decisiones y 114 eventos de seguridad (8,8 MB). Perderla obligaría a resembrar con **contraseñas y códigos nuevos**. Se hizo un respaldo manual verificado el 21-oct 22:42 (`demo-20261021-2242.dump` y `demo-globals-…sql` en `/var/backups/siget/`, 38 objetos legibles con `pg_restore --list`, copia en el PC fuera del repositorio con el mismo SHA-256):
+   ```bash
+   # en VM2, como jeison_vasquez
+   SELLO=$(date +%Y%m%d-%H%M)
+   sudo bash -c "cd /tmp; sudo -H -u siget env XDG_RUNTIME_DIR=/run/user/1009 podman exec -u postgres siget-postgres pg_dump -Fc -d tramites_demo > /var/backups/siget/demo-$SELLO.dump"
+   sudo bash -c "cd /tmp; sudo -H -u siget env XDG_RUNTIME_DIR=/run/user/1009 podman exec -u postgres siget-postgres pg_dumpall --globals-only > /var/backups/siget/demo-globals-$SELLO.sql"
+   sudo chown postgres:postgres /var/backups/siget/demo-*$SELLO*; sudo chmod 600 /var/backups/siget/demo-*$SELLO*
+   ```
+   **Pendiente:** un `systemd timer` diario con retención y copia fuera de la VM, y una **prueba de restauración** (hoy el respaldo se verifica por lectura, no restaurándolo).
+
+### 32.3 Gotchas
+
+- El segundo script de despliegue no encuentra los archivos de configuración porque el primero los borra al terminar: no sobrescribe nada (el shell aborta la redirección antes de ejecutar `tee`), pero conviene copiarlos de nuevo.
+- Antes de culpar al servidor por un 401 en el login, comprobar si el código del segundo factor ya se usó en ese intervalo.
+
+## 33. Sesiones, registro completo, bloqueo progresivo, respaldos y endurecimiento (22 de octubre de 2026)
+
+Fecha: 22 de octubre de 2026, el día de la demostración. Cada cambio de las VM se aprobó antes y se aplicó con respaldo previo; el detalle de cada hallazgo está en [`revision-seguridad-2026-10-22.md`](./revision-seguridad-2026-10-22.md) y el estado de la base en [`estado-base-de-datos.md`](./estado-base-de-datos.md).
+
+### 33.1 Cierre de sesión por inactividad y duración máxima
+
+- La interfaz avisa a los 9 minutos («¿Sigues ahí?») y cierra a los 10, revocando la sesión en el servidor. Durante el aviso el movimiento no cancela el cierre.
+- El servidor no confía en el navegador: rechaza renovar un refresco con más de 15 minutos (`SIGET_REFRESH_MAX_EDAD_SEGUNDOS`, evento `sesion_cerrada_por_inactividad`) y **cada renovación hereda el vencimiento** de la sesión original (antes sumaba 8 horas más: una sesión podía prolongarse sin límite). Sin migración. Política pura en `backend/apps/autenticacion/politica_sesion.py`.
+- Recargar la página devuelve siempre al Inicio (la vista solo vive en memoria).
+- Los límites de tasa usan una caché en archivos compartida entre los 3 procesos de gunicorn (hallazgo H-4).
+- Despliegue: `git archive` del backend → `ejecutar-comando.sh verificar_autenticacion` (reconstruye la imagen y prueba contra la base real) → `desplegar.sh` (interfaz y reinicio ordenado del pod).
+
+### 33.2 Acceso en dos pasos y registro completo
+
+- Pantalla de acceso: usuario y contraseña; solo si el servidor acepta la contraseña pide el código (la respuesta `mfa_requerido` se da únicamente con contraseña válida, así que no delata quién tiene segundo factor).
+- **Migración 008** (`perfil`): nombre, apellidos, cédula, fecha de nacimiento, provincia, ciudad y correo. Cédula cifrada (Fernet) y con huella HMAC, con claves derivadas por HKDF; solo `app_role` lee e inserta; sin `UPDATE` ni `DELETE`; el auditor no la ve. Cuenta y perfil en una sola transacción; duplicados responden 409 genérico.
+- **Migración 009**: `pgadmin_lectura` era miembro de `pg_read_all_data` (leía hashes de contraseñas y de tokens); ahora tiene `SELECT` explícito solo sobre lo no sensible.
+- Aplicadas como superusuario del contenedor por el socket local, con respaldo previo: `cat 00X.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1`.
+
+### 33.3 Bloqueo progresivo
+
+3 fallos (contraseña o código) bloquean 5 minutos; el siguiente bloqueo, 15; los demás, 60. El escalón se calcula con los eventos `cuenta_bloqueada` desde el último `login_ok` (memoria de 24 h), sin columnas nuevas. Un inicio de sesión correcto reinicia la escalera. `verificar_autenticacion` lo prueba con el reloj controlado.
+
+### 33.4 Respaldos automáticos con prueba de restauración
+
+`infra/podman/vm2-db-server/respaldo/` → `siget-respaldo.timer` (02:30 diario, `Persistent=true`) y `siget-respaldo.sh`: `pg_dump` + roles, comprueba las tablas, **restaura en una base desechable y compara con la viva**, huella SHA-256, retención de 14 días (mínimo 3; los manuales `pre-*` no se tocan), archivos 600 en carpeta 700. Estado: `systemctl list-timers siget-respaldo.timer`; si el último falló, `systemctl is-failed siget-respaldo.service` dice `failed`. Pendiente: copia fuera de VM2.
+
+### 33.5 Endurecimiento aplicado
+
+SSH en las dos VM (`/etc/ssh/sshd_config.d/00-siget-endurecimiento.conf`: sin root, sin X11, 3 intentos; validado con `sshd -t`, recarga sin cortar sesiones y reconexión probada). PostgreSQL con `log_connections` y `log_disconnections` activos (`ALTER SYSTEM` + `pg_reload_conf()`).
+
+### 33.6 Verificación
+
+`verificar_autenticacion` 71 de 71 contra la base real; `verificar_politicas` 39 de 39; ensayo 59 de 59 contra producción; 415 pruebas del backend y 141 del frontend; `pip-audit` y `npm audit` sin vulnerabilidades.
+
+### 33.7 Gotchas
+
+- Los archivos del repositorio mezclan finales de línea (CRLF/LF): al editar con scripts hay que respetar el existente, o los reemplazos multilínea no coinciden.
+- Un `dnf updateinfo` sin `--assumeno` por SSH pide confirmación y se traga el resto del script.
+- `tar` en Git Bash interpreta `C:` como un host remoto: usar `--force-local`.
+- Ver la plataforma nueva en `https://…:8443`; el puerto 80 sigue siendo el checkpoint PHP antiguo.
+
+
+## 34. Consolas de plataforma, control dual y recuperación de contraseña (22 de octubre de 2026)
+
+### 34.1 Qué se construyó
+
+Backend en `backend/apps/plataforma/` (modelos, `servicio.py`, `vistas.py`, `secretos.py`), recuperación pública en `backend/apps/autenticacion/restablecimiento.py` y `servicio.py`, interfaz en `frontend/src/Plataforma.jsx`. Detalle de las rutas en [`api.md`](./api.md). Las consolas reutilizan las acciones del PDP (`proponer_alta`, `aprobar_alta`, `restablecer_mfa`, `bloquear_cuenta`, `revocar_sesion`, `rotar_secretos`, `administrar_infraestructura`): no cambió la matriz de permisos.
+
+### 34.2 Migración 010 y despliegue
+
+Respaldo previo (`systemctl start siget-respaldo.service`), después `cat database/migraciones/010-plataforma-y-restablecimiento.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1` en VM2. En VM1: `ejecutar-comando.sh` con `verificar_plataforma`, `verificar_autenticacion` y `verificar_politicas` (79, 71 y 39 pasos), y `desplegar.sh`. **`nginx.conf` ahora incluye `plataforma`** en la lista de prefijos que llegan al backend. Ojo: `desplegar.sh` copia la unidad del repositorio y devuelve la inactividad a 10 minutos; para la demo se vuelve a poner `SIGET_INACTIVIDAD_MINUTOS=2`.
+
+### 34.3 Operadores adicionales
+
+El control dual necesita dos personas por rol: `sembrar_demo` creó `irene.identidades` y `camilo.catalogo` (sus credenciales viven solo en `demo-local/`).
+
+### 34.4 Verificación
+
+`verificar_plataforma` recorre contra la base real (en una transacción que se revierte): quién entra a cada consola, el ciclo completo del código (emisión, hash en la base, uso, reuso, vencimiento a los 16 minutos, mensajes idénticos), la separación de funciones, el control dual en el motor y en la base, bloqueos, secretos de solo inserción, infraestructura con TLS 1.3, privilegios de la base por rol y los eventos de seguridad. El ensayo de la demo (`demo/ensayo.py`, sección 10) repite lo no destructivo contra producción: **86 de 86**.
+
+### 34.4b Gestión del equipo (migración 011)
+
+Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1`. Backend: `apps/identidad/equipo.py` y las vistas de `/equipo/<institucion>/miembros/…`. Verificación: `verificar_equipo` (51 pasos) más regresión de todas las demás. El manager `Membresia.objects` filtra las revocadas: **todo código nuevo que decida accesos debe usarlo** (no `Membresia.todas`).
+
+### 34.5 Gotchas
+
+- Una anotación de Django no puede llamarse igual que una relación inversa del modelo (`sesiones`): daba un 500.
+- El límite de inicios de sesión (10 por minuto por IP) corta un ensayo con muchas cuentas: el script espera un minuto antes de la sección 10.
+- Una corrida interrumpida del ensayo deja una propuesta pendiente; el script la rechaza al empezar.

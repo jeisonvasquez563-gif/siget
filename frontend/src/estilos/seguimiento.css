@@ -1,0 +1,47 @@
+/* Seguimiento de un trámite: tres pasos en línea y una frase que explica el momento */
+.seguimiento { display: grid; gap: 1.25rem; }
+.seg-pasos { list-style: none; margin: 0; padding: 0.4rem 0 0; display: grid; grid-template-columns: repeat(3, 1fr); }
+.seg-paso { position: relative; display: grid; justify-items: center; gap: 0.15rem; text-align: center; padding: 0 0.4rem; }
+.seg-paso strong { margin-top: 0.55rem; font-family: var(--f-titulo); font-size: var(--t-s); color: var(--tinta); }
+.seg-paso small { color: var(--tinta-suave); font-size: var(--t-xs); }
+
+.seg-nodo { position: relative; z-index: 1; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%;
+  background: var(--superficie); border: 2px dashed var(--borde-fuerte); color: var(--tinta-tenue); transition: background 0.4s, border-color 0.4s, color 0.4s; }
+.seg-nodo .icono { width: 22px; height: 22px; }
+.seg-paso.hecho .seg-nodo { background: var(--agua-media); border: 2px solid var(--agua-media); color: #fff; }
+.seg-paso.actual .seg-nodo { background: var(--agua); border: 2px solid var(--agua); color: #fff; }
+.seg-paso.actual .seg-nodo::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid var(--boya); opacity: 0; animation: seg-aro 2.2s ease-out infinite; }
+.seg-paso.alerta .seg-nodo { background: var(--boya); border: 2px solid var(--boya); color: #fff; }
+.seg-paso.alerta .seg-nodo::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid var(--boya); opacity: 0; animation: seg-aro 2.2s ease-out infinite; }
+.seg-paso.aprobado .seg-nodo { background: var(--sello-verde); border: 2px solid var(--sello-verde); color: #fff; }
+.seg-paso.rechazado .seg-nodo { background: var(--sello-rojo); border: 2px solid var(--sello-rojo); color: #fff; }
+.seg-paso.aprobado strong { color: var(--sello-verde); }
+.seg-paso.rechazado strong { color: var(--sello-rojo); }
+
+/* El tramo que sale de cada paso: sólido si ya se recorrió, con rayas que fluyen si es el que sigue, gris si falta */
+.seg-paso:not(:last-child)::after { content: ''; position: absolute; top: 23px; left: calc(50% + 30px); right: calc(-50% + 30px); height: 3px; border-radius: 2px; background: var(--borde-fuerte); }
+.seg-paso.hecho:not(:last-child)::after { background: var(--agua-media); transform-origin: left; animation: seg-trazo 0.8s ease-out both; }
+.seg-paso.actual:not(:last-child)::after, .seg-paso.alerta:not(:last-child)::after {
+  background: repeating-linear-gradient(90deg, var(--agua-media) 0 8px, transparent 8px 15px); background-size: 15px 3px; animation: seg-flujo 0.9s linear infinite; }
+
+.seguimiento-frase { display: flex; align-items: center; gap: 0.7rem; margin: 0; padding: 0.8rem 1rem; border-radius: var(--radio); border: 1px solid var(--borde); background: var(--agua-fondo); color: var(--tinta); }
+.seguimiento-frase .icono { flex: none; width: 1.3rem; height: 1.3rem; color: var(--agua-media); }
+.seguimiento-frase.tono-alerta { background: color-mix(in srgb, var(--boya) 14%, var(--superficie)); border-color: color-mix(in srgb, var(--boya) 45%, var(--borde)); }
+.seguimiento-frase.tono-alerta .icono { color: var(--boya); }
+.seguimiento-frase.tono-bien { background: color-mix(in srgb, var(--sello-verde) 14%, var(--superficie)); border-color: color-mix(in srgb, var(--sello-verde) 45%, var(--borde)); }
+.seguimiento-frase.tono-bien .icono { color: var(--sello-verde); }
+.seguimiento-frase.tono-mal { background: color-mix(in srgb, var(--sello-rojo) 12%, var(--superficie)); border-color: color-mix(in srgb, var(--sello-rojo) 45%, var(--borde)); }
+.seguimiento-frase.tono-mal .icono { color: var(--sello-rojo); }
+
+@keyframes seg-aro { 0% { transform: scale(0.85); opacity: 0.9; } 100% { transform: scale(1.35); opacity: 0; } }
+@keyframes seg-trazo { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes seg-flujo { from { background-position: 0 0; } to { background-position: 15px 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .seg-paso::after, .seg-nodo::after { animation: none !important; }
+  .seg-paso.actual .seg-nodo::after, .seg-paso.alerta .seg-nodo::after { opacity: 0.55; transform: scale(1.15); }
+}
+@media (max-width: 30rem) {
+  .seg-paso small { display: none; }
+  .seg-nodo { width: 40px; height: 40px; }
+  .seg-paso:not(:last-child)::after { top: 19px; left: calc(50% + 24px); right: calc(-50% + 24px); }
+}

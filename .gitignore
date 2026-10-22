@@ -15,3 +15,18 @@ node_modules/
 
 # Logs
 *.log
+
+# Respaldos de base de datos (contienen hashes de contraseña)
+*.dump
+globals-*.sql
+respaldos-siget/
+
+# Python / Django
+.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Credenciales y secretos de la demostración: solo locales, nunca al repositorio
+*.local.*
+demo-local/

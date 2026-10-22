@@ -1,0 +1,42 @@
+/* SIGET · simulador de «qué pasaría si…». */
+.simulador { display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); gap: 1.25rem; align-items: start; margin: 1rem 0 1.25rem; }
+.simulador > div > .panel:last-child { margin-bottom: 0; }
+
+.veredicto { border-radius: var(--radio-l); padding: 1.25rem 1.4rem; margin-bottom: 1.25rem; border: 1px solid var(--borde); background: var(--superficie); box-shadow: var(--sombra-1); border-left-width: 6px; }
+.veredicto.permitido { border-left-color: var(--sello-verde); background: linear-gradient(90deg, var(--sello-verde-fondo), var(--superficie) 45%); }
+.veredicto.negado { border-left-color: var(--sello-rojo); background: linear-gradient(90deg, var(--sello-rojo-fondo), var(--superficie) 45%); }
+.veredicto-cabecera { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
+.veredicto-cabecera .sello { font-size: var(--t-m); padding: 0.4rem 1.1rem; }
+.veredicto-cabecera p { margin: 0; }
+.veredicto .datos { margin-bottom: 0; }
+.veredicto .datos dd.normal { font-weight: 450; }
+
+.traza { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.traza li { display: grid; grid-template-columns: 30px 1fr auto; gap: 0.8rem; align-items: center; padding: 0.55rem 0.8rem; border-radius: var(--radio); background: var(--superficie-2); border: 1px solid var(--borde); }
+.traza li > div { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.traza-fase { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tinta-suave); }
+.traza code { align-self: flex-start; font-size: var(--t-xs); }
+.traza-icono { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--superficie-3); color: var(--tinta-tenue); }
+.traza-icono .icono { width: 14px; height: 14px; stroke-width: 2.6; }
+.traza li.niega { border-color: color-mix(in srgb, var(--sello-rojo) 45%, transparent); background: var(--sello-rojo-fondo); }
+.traza li.niega .traza-icono { background: var(--sello-rojo); color: #fff; }
+.traza li.permite { border-color: color-mix(in srgb, var(--sello-verde) 45%, transparent); background: var(--sello-verde-fondo); }
+.traza li.permite .traza-icono { background: var(--sello-verde); color: #fff; }
+.traza li.neutro { opacity: 0.8; }
+
+.alternativas { list-style: none; margin: 0; padding: 0; }
+.alternativas li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; padding: 0.7rem 0; border-bottom: 1px solid var(--borde); font-size: var(--t-s); }
+.alternativas li:last-child { border-bottom: 0; }
+.alternativas li > span:first-child { flex: 1 1 240px; min-width: 0; }
+.alternativas li code { flex-basis: 100%; order: 5; font-size: var(--t-xs); align-self: flex-start; }
+
+.escenarios { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.7rem; }
+.escenario { text-align: left; display: flex; flex-direction: column; gap: 0.3rem; padding: 0.85rem 1rem; background: var(--superficie-2); border: 1.5px solid var(--borde); border-radius: var(--radio); transition: border-color 0.15s, background 0.15s; }
+.escenario:hover { border-color: var(--agua-media); background: var(--agua-fondo); }
+.escenario.activo { border-color: var(--boya); background: var(--boya-fondo); }
+.escenario strong { font-size: var(--t-s); }
+.escenario span { font-size: var(--t-xs); color: var(--tinta-suave); line-height: 1.4; }
+
+@media (max-width: 980px) {
+  .simulador { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,40 @@
+/* Consolas de los operadores de plataforma */
+.buscador { display: flex; gap: 0.5rem; align-items: center; }
+.buscador .entrada { min-width: 14rem; }
+.acciones-fila { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.acciones-fila .btn { padding: 0.35rem 0.7rem; font-size: var(--t-s); }
+.formulario-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)) auto; gap: 0.75rem 1rem; align-items: end; margin: 0.75rem 0; }
+.formulario-fila .campo { margin: 0; }
+textarea.entrada { resize: vertical; min-height: 5rem; font: inherit; }
+.lista-aprobaciones { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.lista-aprobaciones li { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--borde); }
+.lista-aprobaciones li:last-child { border-bottom: 0; }
+.lista-aprobaciones .texto { flex: 1 1 18rem; display: grid; gap: 0.15rem; }
+.lista-aprobaciones small { color: var(--tinta-suave); }
+.codigo-grande { font-family: var(--f-mono); font-size: var(--t-xl); letter-spacing: 0.15em; text-align: center; padding: 1rem; margin: 1rem 0; border: 1px dashed var(--borde-fuerte); border-radius: var(--radio-l); user-select: all; }
+.rejilla-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+.dato-sistema { display: grid; gap: 0.2rem; padding: 0.75rem 1rem; border: 1px solid var(--borde); border-radius: var(--radio-m, 10px); background: var(--superficie); }
+.dato-sistema small { color: var(--tinta-suave); }
+.dato-sistema strong { font-weight: 650; word-break: break-word; }
+.dato-sistema.mal { border-color: var(--sello-rojo); }
+.tabla th small, .tabla td small { display: block; color: var(--tinta-suave); font-weight: 400; margin-top: 0.1rem; }
+
+/* Tablas que en pantallas estrechas se apilan como tarjetas (una fila = una tarjeta con sus etiquetas) */
+.tabla td:last-child .acciones-fila { min-width: 14rem; }
+@media (max-width: 40rem) {
+  .tabla.apilada thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .tabla.apilada, .tabla.apilada tbody, .tabla.apilada tr, .tabla.apilada th, .tabla.apilada td { display: block; width: 100%; }
+  .tabla.apilada tr { padding: 0.8rem 1rem; border-bottom: 1px solid var(--borde); }
+  .tabla.apilada tbody tr:last-child { border-bottom: 0; }
+  .tabla.apilada th[scope='row'] { padding: 0 0 0.4rem; border: 0; font-size: var(--t-m, 1rem); }
+  .tabla.apilada td { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.3rem 0; border: 0; text-align: right; }
+  .tabla.apilada td::before { content: attr(data-etiqueta); color: var(--tinta-suave); font-size: var(--t-s); text-align: left; flex: none; }
+  .tabla.apilada td[data-etiqueta='Acciones'] { display: block; text-align: left; padding-top: 0.5rem; }
+  .tabla.apilada td[data-etiqueta='Acciones']::before { display: block; margin-bottom: 0.35rem; }
+  .tabla td:last-child .acciones-fila { min-width: 0; }
+}
+
+/* Equipo de la institución: personas con sus acciones */
+.persona-gestion { align-items: flex-start; }
+.persona-gestion .datos-persona { display: grid; gap: 0.35rem; justify-items: start; min-width: 0; }
+.persona-gestion .acciones-fila { margin-top: 0.15rem; }

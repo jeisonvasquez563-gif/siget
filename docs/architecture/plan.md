@@ -4,7 +4,26 @@ Orden de ejecución del proyecto, con estado real actualizado. Para la especific
 
 > **Actualizado el 11 de octubre de 2026** con el diseño de seguridad Zero Trust (ABAC + Row Level Security). Ver la sección "Cambios de diseño" más abajo.
 
-## Orden de trabajo original
+## Estado actual (21 de octubre de 2026)
+
+Lo que sigue en «Orden de trabajo original» conserva el texto del 11 de octubre como referencia histórica. **El estado real hoy es este** (detalle cronológico en [`../historial-del-proyecto.md`](../historial-del-proyecto.md)):
+
+| # | Punto del plan | Estado |
+|---|---|---|
+| 1 | VMs y red interna | ✅ Completo |
+| 2 | Podman rootless + Quadlet | ✅ En las dos VMs, con el usuario de servicio `siget` (runbook 12, 15, 21) |
+| 3 | PostgreSQL en contenedor con roles acotados | ✅ Contenedor rootless, TLS, sin superusuario; `app_role` y `auditor_role` de mínimo privilegio, RLS (runbook 17, 21) |
+| 4 | Django + DRF con nginx | ✅ Pod rootless `siget`; autenticación, PDP, trámites, catálogo, equipo, auditoría, transparencia y simulador (runbook 23–31) |
+| 5 | Conectividad app↔BD por TLS | ✅ TLS 1.3 con `verify-full` (runbook 18) |
+| 6 | Catálogo e instituciones | ✅ 6 instituciones y 6 trámites con SLA (migración 005) |
+| 7 | Validación del flujo completo | 🔄 El flujo (crear → cambiar estado → auditoría) está verificado contra la base real y ensayado (55 comprobaciones); falta el vencimiento de SLA con **escalamiento automático** (depende del módulo de plazos) |
+| 11 | Retirar el checkpoint PHP | ⏳ Semana 6; la plataforma nueva ya cubre registro, login, segundo factor y bloqueo |
+| — | Frontend React | ✅ 10 módulos completos (runbook 27–31) |
+| — | Pruebas y CI | ✅ 354 + 130 pruebas, 6 verificaciones contra la base real, CI en GitHub (runbook 30, 32) |
+
+**Lo que falta:** consolas de los operadores de plataforma con control dual real, plazos en días hábiles con escalamiento, documentos, notificaciones, recuperación de contraseña, rotación de claves, respaldos automáticos con restauración probada y el retiro del PHP. Ver [`../organizacion-backend-frontend.md`](../organizacion-backend-frontend.md).
+
+## Orden de trabajo original (texto del 11 de octubre; el estado actual está arriba)
 
 1. **Crear VM1 y VM2 en VMware, configurar red interna, confirmar ping entre ambas.**
    ✅ Completo — ver `spec.md` sección 2 y `runbook.md` secciones 1-6.
@@ -35,12 +54,16 @@ El diseño de seguridad Zero Trust (*Arquitectura Zero Trust*, Jeison Vásquez, 
 |---|---|---|
 | Autorización | RBAC con grupos de Django | ABAC (NIST SP 800-162): PEP en middleware de Django y PDP como módulo de políticas; denegar por defecto y *fail closed* |
 | Aislamiento entre instituciones | No definido | Dos barreras independientes: ABAC más Row Level Security en PostgreSQL |
-| Roles | 4 (ciudadano, funcionario, supervisor, administrador) | 6: se separan administrador institucional y de plataforma (sin acceso a trámites) y se agrega el auditor |
+| Roles | 4 (ciudadano, funcionario, supervisor y un rol de gestión único) | 10: ciudadano, funcionario, supervisor, coordinador institucional, cinco roles de operación de plataforma sin acceso a trámites (infraestructura, identidades, catálogo, seguridad y custodio de secretos) y auditor. Control dual y un solo rol de plataforma por persona |
 | Identidad | Usuario y rol | Membresías (institución, rol) y atributo `nivel_aseguramiento`; la identidad ciudadana no se verifica contra el Registro Civil (límite declarado) |
 | Auditoría | Eventos de cambio de estado | Además, registro de las decisiones del PDP, permitidas y negadas |
 | Catálogo | 3 trámites reales | 3 reales más 3 de demostración (MINSA, MOP, MiAmbiente) |
 
 Un motor externo (OPA) queda como fase futura: el PDP integrado en Django se diseña para poder migrarlo sin reescribir.
+
+## Cobertura de Zero Trust
+
+Cada principio de Zero Trust tiene tareas y semanas asignadas en [`../zero-trust-cobertura.md`](../zero-trust-cobertura.md) (ZT-1 a ZT-10). Esa matriz es la lista de control para afirmar, con evidencia, que el sistema aplica los 7 principios de NIST SP 800-207.
 
 ## Checkpoints intermedios (fuera del orden original, resueltos por pedidos puntuales del profesor)
 
@@ -57,7 +80,24 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 - ✅ **Guía de capturas repartida entre el grupo** (`docs/capturas-evidencia.md`) para documentar la configuración con evidencia de cada integrante.
 - ✅ **Documento de antecedentes del proyecto** (`docs/Antecedentes_SIGET.docx`), solicitado por el profesor: investigación documental con fuentes panameñas, marco normativo, brechas y justificación de SIGET, con bibliografía APA.
 
-## Próximos pasos (en orden sugerido)
+## Próximos pasos (actualizado el 21 de octubre de 2026)
+
+> **El detalle de cada paso (diseño, tareas, cronograma de S3 a S10 y criterios de aceptación) está en la [especificación del trabajo pendiente](../superpowers/specs/2026-10-21-pendientes-design.md) y en el [plan de ejecución a cargo de Andy](./plan-pendientes-andy.md).**
+
+Los pasos 1 a 10 de la lista original (Podman, migración de PostgreSQL, secretos, ABAC, backend, TLS, frontend, catálogo y validación) **están hechos**; ver el estado actual arriba. Lo que sigue:
+
+1. **Respaldos automáticos** de la base con retención, copia fuera de la VM y prueba de restauración.
+   - *Aplazado, por decidir:* **abrir la plataforma a internet** (Tailscale Funnel). Ver [`../abrir-a-internet.md`](../abrir-a-internet.md).
+2. **Consolas de los operadores de plataforma** con control dual real.
+3. **Plazos en días hábiles y escalamiento automático** (systemd timer).
+4. **Documentos adjuntos y notificaciones.**
+5. Recuperación de contraseña, rotación de claves JWT y Fernet, reemisión de la CA con `keyUsage`.
+6. Pruebas de recorrido completo (Playwright) y revisión de contraste.
+7. **Retirar el checkpoint PHP** (semana 6), apagar el PostgreSQL nativo y cerrar el puerto 5432.
+8. Aplicar las actualizaciones pendientes de las VMs y reiniciarlas (después de la presentación).
+9. Fusionar el PR 6 (`develop → main`) y regenerar los entregables `.docx`.
+
+### Lista original (histórica)
 
 1. Terminar Podman rootless + Quadlet: VM2, usuario que corre los contenedores (con linger) y puertos 80/443 en VM1 (punto 2 del plan original).
 2. Migrar PostgreSQL de instalación nativa a contenedor, crear `app_role` con permisos acotados (a cargo de Jeison).
@@ -69,11 +109,13 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 8. Iniciar `frontend/` con React + Vite, consumiendo la API de Django.
 9. Cargar catálogo de `TipoTramite` e instituciones, empezando por Permiso de Construcción Municipal.
 10. Validar flujo end-to-end completo y las verificaciones de seguridad (punto 7 del plan original).
-11. Decidir destino del checkpoint PHP actual (ahora con login, registro, reset de password y rate limiting) — conservar como referencia, migrar su lógica a Django, o retirarlo — requiere aprobación explícita antes de tocar nada.
+11. **Retirar el checkpoint PHP** (login, registro, reset de password y rate limiting sobre Apache + PHP-FPM). **Decisión: el PHP no forma parte del sistema final**; fue un entregable intermedio pedido por el profesor y vive aislado en `checkpoints/`. El sistema final es Django + DRF y React. **Fecha objetivo: semana 6 (16–22 de noviembre de 2026)**, cuando Django y React ofrezcan registro, login, restablecimiento de contraseña y bloqueo por intentos equivalentes. Hasta entonces se mantiene **sin funciones nuevas**, solo con correcciones de seguridad. El retiro (apagar la app, quitar `/gestion` de Apache y revocar `checkpoint_app`) requiere aprobación explícita de Jeison y se documenta en el runbook. Ver [`../zero-trust-cobertura.md`](../zero-trust-cobertura.md) (ZT-9).
 12. Evaluar si conviene remover el port forwarding por NAT que quedó configurado y sin uso (VMware NAT + regla de Firewall de Windows), ya que el acceso real es por Tailscale.
 
 ## Completado recientemente
 
+- ✅ **Plataforma de punta a punta (20–21 oct 2026):** PostgreSQL y backend en contenedores rootless, nginx con TLS 1.3, autenticación con segundo factor, PDP, API de trámites, consola de auditoría, interfaz React con 10 módulos, matriz de permisos y simulador, pruebas automáticas, ensayo de la demostración. Detalle en [`../historial-del-proyecto.md`](../historial-del-proyecto.md).
+
 - ✅ **Auth keys de Tailscale revocadas** — las que se compartieron por chat durante el alta de VM1 y VM2 ya no son utilizables; los dispositivos siguen conectados con normalidad (revocar la key no afecta a dispositivos ya autenticados, solo impide su reuso).
-- ✅ **Diseño de arquitectura Zero Trust** (octubre de 2026): modelo ABAC, matriz de 6 roles, capas, modelo de amenazas STRIDE y mapa de instituciones. Incorporado a `spec.md` y a este plan el 11 de octubre de 2026.
+- ✅ **Diseño de arquitectura Zero Trust** (octubre de 2026): modelo ABAC, matriz de 10 roles, capas, modelo de amenazas STRIDE y mapa de instituciones. Incorporado a `spec.md` y a este plan el 11 de octubre de 2026.
 - ✅ **Podman rootless + primera unidad Quadlet en VM1** (10 de octubre de 2026), documentado en `runbook.md` sección 12. Falta VM2.

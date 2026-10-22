@@ -1,0 +1,147 @@
+"""Configuración de SIGET.
+
+Zero Trust desde el arranque: nada de secretos en el código (se leen de variables de entorno o de
+archivos montados por `podman secret`), todo se deniega por defecto y la conexión a la base de datos
+va por TLS verificando el certificado del servidor.
+"""
+import os
+from datetime import date
+from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _leer(nombre, defecto=None, obligatorio=False):
+    """Lee `NOMBRE`, o el contenido del archivo indicado en `NOMBRE_FILE` (podman secret)."""
+    ruta = os.environ.get(f"{nombre}_FILE")
+    if ruta:
+        return Path(ruta).read_text(encoding="utf-8").strip()
+    valor = os.environ.get(nombre, defecto)
+    if obligatorio and not valor:
+        raise ImproperlyConfigured(f"Falta la configuración obligatoria {nombre} (o {nombre}_FILE).")
+    return valor
+
+
+def _bool(nombre, defecto=False):
+    return os.environ.get(nombre, str(defecto)).strip().lower() in {"1", "true", "si", "sí", "yes"}
+
+
+DEBUG = _bool("SIGET_DEBUG", False)
+SECRET_KEY = _leer("SIGET_SECRET_KEY", obligatorio=True)
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get("SIGET_ALLOWED_HOSTS", "").split(",") if h.strip()]
+
+# --- Autenticación ---
+SIGET_JWT_KEY = _leer("SIGET_JWT_KEY", obligatorio=True)
+if len(SIGET_JWT_KEY) < 32:
+    raise ImproperlyConfigured("SIGET_JWT_KEY debe tener al menos 32 caracteres.")
+SIGET_MFA_KEY = _leer("SIGET_MFA_KEY", obligatorio=True)  # clave Fernet (urlsafe base64 de 32 bytes) que cifra los secretos TOTP
+SIGET_EMISOR = "siget"
+SIGET_ACCESS_TTL_SEGUNDOS = int(os.environ.get("SIGET_ACCESS_TTL_SEGUNDOS", "600"))  # 10 minutos
+SIGET_REFRESH_TTL_SEGUNDOS = int(os.environ.get("SIGET_REFRESH_TTL_SEGUNDOS", "28800"))  # 8 horas
+SIGET_COOKIE_REFRESH = "siget_refresh"
+# Inactividad: la interfaz cierra la sesión a los N minutos sin actividad (avisando antes) y el servidor rechaza renovar un
+# refresco más viejo que SIGET_REFRESH_MAX_EDAD (por defecto 15 min: el acceso dura 10 y se renueva solo si la persona actúa).
+SIGET_CERT_NGINX_VENCE = date.fromisoformat(os.environ.get("SIGET_CERT_NGINX_VENCE", "2027-10-20"))  # solo para el recordatorio de la consola de secretos
+SIGET_INACTIVIDAD_MINUTOS = int(os.environ.get("SIGET_INACTIVIDAD_MINUTOS", "10"))
+SIGET_REFRESH_MAX_EDAD_SEGUNDOS = int(os.environ.get("SIGET_REFRESH_MAX_EDAD_SEGUNDOS", "900"))
+if SIGET_REFRESH_MAX_EDAD_SEGUNDOS <= SIGET_ACCESS_TTL_SEGUNDOS:
+    raise ImproperlyConfigured("SIGET_REFRESH_MAX_EDAD_SEGUNDOS debe ser mayor que la vida del token de acceso, o nadie podría renovar.")
+
+INSTALLED_APPS = [
+    "rest_framework",
+    "apps.nucleo",
+    "apps.catalogo",
+    "apps.identidad",
+    "apps.tramites",
+    "apps.auditoria",
+    "apps.autorizacion",
+    "apps.autenticacion",
+    "apps.plataforma",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.middleware.common.CommonMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Base de datos: PostgreSQL con TLS verificado y esquema `siget` ---
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("SIGET_DB_NAME", "tramites_demo"),
+        "USER": os.environ.get("SIGET_DB_USER", "app_role"),
+        "PASSWORD": _leer("SIGET_DB_PASSWORD", ""),
+        "HOST": os.environ.get("SIGET_DB_HOST", "192.168.100.20"),
+        "PORT": os.environ.get("SIGET_DB_PORT", "5433"),
+        "CONN_MAX_AGE": 0,
+        # Cada petición es una transacción: el contexto RLS (set_config local) muere con ella.
+        "ATOMIC_REQUESTS": True,
+        "OPTIONS": {
+            "sslmode": "verify-full",
+            "sslrootcert": os.environ.get("SIGET_DB_SSLROOTCERT", "/etc/pki/siget/ca.crt"),
+            "options": "-c search_path=siget,public",
+        },
+    }
+}
+
+# Conexión aparte, en autocommit y sin transacción por petición: las decisiones de acceso (sobre todo las
+# NEGADAS) deben quedar registradas aunque la petición se revierta (DRF revierte la transacción al denegar).
+DATABASES["decisiones"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False}
+
+# La consola de auditoría lee con SU PROPIO rol de base de datos (auditor_role: solo SELECT). Aunque el backend se
+# viera comprometido por otra vía, esta conexión no puede escribir ni alterar nada (migración 007).
+DATABASES["auditoria"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
+                          "USER": os.environ.get("SIGET_DB_AUDITOR_USER", "auditor_role"),
+                          "PASSWORD": _leer("SIGET_DB_AUDITOR_PASSWORD", "")}
+
+# --- Contraseñas: Argon2 primero ---
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
+
+# --- API: se deniega todo salvo lo que una política permita explícitamente ---
+# Los límites de tasa (throttling) se cuentan aquí. Con la memoria local cada proceso de gunicorn llevaba su propia cuenta
+# (límite real = N veces el nominal); una caché en archivos la comparten los procesos del contenedor (/tmp es tmpfs).
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+                      "LOCATION": os.environ.get("SIGET_CACHE_DIR", "/tmp/siget-cache")}}
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["apps.autenticacion.autenticacion.AutenticacionJWT"],
+    "DEFAULT_PERMISSION_CLASSES": ["apps.autorizacion.permisos.DenegarPorDefecto"],
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "EXCEPTION_HANDLER": "apps.nucleo.errores.manejador",
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "registro": "10/hour", "restablecer": "10/hour", "login": "10/min", "refresh": "60/min", "mfa": "10/min", "api": "120/min"},
+    "UNAUTHENTICATED_USER": None,
+}
+
+# --- Parámetros de la política de acceso (ver docs/superpowers/specs/2026-10-20-motor-abac-design.md) ---
+SIGET_MFA_RECIENTE_MINUTOS = int(os.environ.get("SIGET_MFA_RECIENTE_MINUTOS", "15"))
+SIGET_MFA_CIUDADANO_OBLIGATORIO = _bool("SIGET_MFA_CIUDADANO_OBLIGATORIO", True)
+
+# --- Cabeceras y cookies seguras (en producción detrás de nginx con TLS) ---
+if not DEBUG:
+    SECURE_SSL_REDIRECT = _bool("SIGET_SSL_REDIRECT", True)
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "same-origin"
+
+LANGUAGE_CODE = "es"
+TIME_ZONE = "America/Panama"
+USE_TZ = True
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"simple": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"}},
+    "handlers": {"consola": {"class": "logging.StreamHandler", "formatter": "simple"}},
+    "root": {"handlers": ["consola"], "level": os.environ.get("SIGET_LOG_LEVEL", "INFO")},
+}

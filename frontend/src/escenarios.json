@@ -1,0 +1,74 @@
+[
+  {
+    "id": "aprobar",
+    "titulo": "Un funcionario aprueba un trámite",
+    "leccion": "Lo normal: trámite de su institución, que está en tramitación y en la cola, con el segundo factor al día.",
+    "entrada": { "rol": "funcionario", "accion": "cambiar_estado", "institucion": "propia", "solicitante": "otra_persona", "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "nadie", "segundo_factor": "reciente", "cuenta": "activa" }
+  },
+  {
+    "id": "otra-institucion",
+    "titulo": "…pero el trámite es de otra institución",
+    "leccion": "El poder del funcionario termina en su institución: ninguna política lo permite fuera de ella.",
+    "entrada": { "rol": "funcionario", "accion": "cambiar_estado", "institucion": "ajena", "solicitante": "otra_persona", "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "nadie", "segundo_factor": "reciente", "cuenta": "activa" }
+  },
+  {
+    "id": "conflicto",
+    "titulo": "…y el trámite lo pidió él mismo",
+    "leccion": "Conflicto de interés: nadie gestiona un trámite que él mismo pidió. Esta regla anula todo lo demás.",
+    "entrada": { "rol": "funcionario", "accion": "cambiar_estado", "institucion": "propia", "solicitante": "yo", "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "nadie", "segundo_factor": "reciente", "cuenta": "activa" }
+  },
+  {
+    "id": "factor-vencido",
+    "titulo": "El segundo factor venció",
+    "leccion": "Cambiar un trámite exige un código reciente del segundo factor. Fíjate en «qué lo cambiaría».",
+    "entrada": { "rol": "funcionario", "accion": "cambiar_estado", "institucion": "propia", "solicitante": "otra_persona", "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "nadie", "segundo_factor": "vencido", "cuenta": "activa" }
+  },
+  {
+    "id": "asignado-a-otro",
+    "titulo": "Un funcionario toma el trámite de un compañero",
+    "leccion": "El funcionario solo mueve lo que está en cola o es suyo. Cambia el rol a Supervisor y compara.",
+    "entrada": { "rol": "funcionario", "accion": "cambiar_estado", "institucion": "propia", "solicitante": "otra_persona", "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "otra_persona", "segundo_factor": "reciente", "cuenta": "activa" }
+  },
+  {
+    "id": "saltar-paso",
+    "titulo": "Se salta un paso: de Pendiente a Aprobado",
+    "leccion": "Ni siquiera un supervisor puede saltarse la máquina de estados (y la base de datos la valida otra vez).",
+    "entrada": { "rol": "supervisor", "accion": "cambiar_estado", "institucion": "propia", "solicitante": "otra_persona", "estado": "Pendiente", "estado_destino": "Aprobado", "asignado": "nadie", "segundo_factor": "reciente", "cuenta": "activa" }
+  },
+  {
+    "id": "plataforma-ve-tramites",
+    "titulo": "El operador de infraestructura quiere ver un trámite",
+    "leccion": "Operar los servidores no da acceso a los datos de la ciudadanía. Ningún rol de plataforma ve trámites.",
+    "entrada": { "rol": "operador_infraestructura", "accion": "ver_tramite", "institucion": "propia", "solicitante": "otra_persona", "segundo_factor": "reciente", "cuenta": "activa" }
+  },
+  {
+    "id": "cuenta-bloqueada",
+    "titulo": "Una cuenta bloqueada intenta iniciar un trámite",
+    "leccion": "Una cuenta que no está activa no puede nada, sea cual sea su rol.",
+    "entrada": { "rol": "ciudadano", "accion": "crear_tramite", "institucion": "propia", "solicitante": "yo", "segundo_factor": "reciente", "cuenta": "bloqueada" }
+  },
+  {
+    "id": "control-dual",
+    "titulo": "Un operador aprueba un alta que él propuso",
+    "leccion": "Control dual: las altas sensibles las proponen y las aprueban dos personas distintas.",
+    "entrada": { "rol": "operador_identidades", "accion": "aprobar_alta", "tipo_alta": "alta_coordinador", "alta_propuesta_por": "yo", "segundo_factor": "reciente", "cuenta": "activa" }
+  },
+  {
+    "id": "coordinacion-ve-tramite",
+    "titulo": "La coordinadora quiere ver un trámite",
+    "leccion": "Gestionar personas no da acceso a los datos de los trámites.",
+    "entrada": { "rol": "coordinador_institucional", "accion": "ver_tramite", "institucion": "propia", "solicitante": "otra_persona", "segundo_factor": "reciente", "cuenta": "activa" }
+  },
+  {
+    "id": "auditor-nivel-2",
+    "titulo": "El auditor sin nivel de aseguramiento 3",
+    "leccion": "Leer el registro exige el nivel más alto de aseguramiento, además del segundo factor.",
+    "entrada": { "rol": "auditor", "accion": "consultar_auditoria", "segundo_factor": "reciente", "cuenta": "activa", "nivel": 2 }
+  },
+  {
+    "id": "ciudadana-ajeno",
+    "titulo": "Una ciudadana mira el trámite de otra persona",
+    "leccion": "La ciudadanía solo ve lo propio. Para ella, lo ajeno no existe.",
+    "entrada": { "rol": "ciudadano", "accion": "ver_tramite", "institucion": "propia", "solicitante": "otra_persona", "segundo_factor": "reciente", "cuenta": "activa" }
+  }
+]

@@ -1,0 +1,11 @@
+[Unit]
+Description=Respaldo de la base de SIGET con prueba de restauración
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/siget-respaldo.sh
+# Un respaldo no debe escribir fuera de su carpeta
+ProtectSystem=full
+PrivateTmp=true
+TimeoutStartSec=600
