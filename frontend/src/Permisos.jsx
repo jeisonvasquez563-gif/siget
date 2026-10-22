@@ -115,6 +115,7 @@ function Roles({ datos, yo, irAMatriz }) {
 
 function Matriz({ datos, yo }) {
   const mio = rolDeMatriz(yo)
+  const ventana = datos.ventana_minutos ?? 15
   const [caso, setCaso] = useState('favorable')
   const [sel, setSel] = useState(null)
   const grupos = useMemo(() => {
@@ -199,7 +200,7 @@ function Matriz({ datos, yo }) {
             <dl className="datos">
               <dt>Caso</dt><dd>{detalle.accion.casos ? detalle.accion.casos[caso === 'favorable' ? 0 : 1] : 'Sin variantes'}</dd>
               <dt>Política que decidió</dt><dd><code>{detalle.decision.politica}</code></dd>
-              <dt>Segundo factor</dt><dd>{detalle.exige ? 'Exige un código verificado en los últimos 15 minutos' : 'No lo exige'}</dd>
+              <dt>Segundo factor</dt><dd>{detalle.exige ? `Exige un código verificado en los últimos ${ventana} minutos` : 'No lo exige'}</dd>
             </dl>
             <p className="suave">{explicacionDe(detalle.decision.politica) || 'Ninguna política permite esta acción: se niega por defecto.'}</p>
           </>

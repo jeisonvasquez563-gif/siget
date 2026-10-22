@@ -122,3 +122,16 @@ def test_las_reglas_de_denegacion_documentadas_existen_en_el_pdp():
     assert {"cuenta_no_activa", "plataforma_sin_acceso_a_tramites", "conflicto_de_interes", "control_dual", "sin_regla_que_permita"} <= nombres
     en_el_pdp = {r.__name__ for r in pdp.DENEGACIONES}
     assert {"_cuenta_activa", "_plataforma_sin_tramites", "_conflicto_de_interes", "_control_dual"} <= en_el_pdp
+
+
+# --------------------------------------------------------------------------- la ventana del segundo factor es la configuración real
+
+def test_la_matriz_informa_la_ventana_configurada_y_el_vencido_siempre_la_supera():
+    assert matriz.vencido_hace(15) == 60 and matriz.vencido_hace(30) == 75 and matriz.vencido_hace(90) == 135
+    for ventana in (2, 15, 30, 90):
+        m = matriz.construir(ventana=ventana)
+        assert m["ventana_minutos"] == ventana
+        # lo que exige segundo factor reciente no depende de cuánto dure la ventana, sino de que exista
+        assert m["matriz"]["funcionario"]["cambiar_estado"]["exige_segundo_factor"] is True
+        assert m["matriz"]["funcionario"]["ver_tramite"]["exige_segundo_factor"] is False
+        assert m["ningun_rol_puede_todo"] is True

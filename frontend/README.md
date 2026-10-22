@@ -29,7 +29,7 @@ src/
 ├── Auditoria.jsx       # resumen con gráfico, decisiones, eventos de seguridad, actuaciones
 ├── Permisos.jsx        # roles y módulos, matriz de permisos, simulador, permisos de la base de datos, capas de defensa
 ├── Simulador.jsx       # «qué pasaría si…»: veredicto, traza y alternativas del PDP real
-├── escenarios.json     # los 12 escenarios del simulador (también los usa demo-local/capturar_simulador.py)
+├── escenarios.json     # los 12 escenarios del simulador (también los usa demo/capturar_simulador.py)
 ├── Mfa.jsx             # segundo factor: cómo funciona, prueba en vivo (incluye reuso) y actividad propia
 ├── ui.jsx              # iconos propios, logo, esclusas, insignias, avisos, confirmaciones, esqueletos, estados vacíos, tema
 ├── comun.jsx           # etiquetas, estados, plazos, reautenticación
@@ -51,14 +51,14 @@ npm run build    # genera dist/, que se copia a /home/siget/frontend en VM1 (run
 ## Pruebas
 
 ```bash
-npm test            # 128 pruebas (Vitest + Testing Library + axe), sin VM ni credenciales
+npm test            # 130 pruebas (Vitest + Testing Library + axe), sin VM ni credenciales
 npm run lint        # ESLint (hooks, `style=` prohibido por la CSP, sin eval)
 npm run verificar   # lint + pruebas + build
 ```
 
 Qué cubren: el cliente de la API y la sesión, el menú y los datos que ve cada rol, las acciones sobre un trámite (reautenticación, confirmación de estados finales, conflicto de interés), la matriz de permisos y los permisos de la base (con una captura real), el segundo factor, la accesibilidad con **axe** y la **seguridad del código** (CSP, sin token en el navegador, sin el simulador en producción). Si tocas una pantalla, agrega o ajusta su prueba en `src/pruebas/`.
 
-Para refrescar las capturas reales: `python demo-local/capturar_fixtures.py` (matriz y base) y `python demo-local/capturar_simulador.py` (simulador) (necesita las VMs encendidas y las cuentas de demostración).
+Para refrescar las capturas reales: `python demo/capturar_fixtures.py` (matriz y base) y `python demo/capturar_simulador.py` (simulador) (necesita las VMs encendidas y las cuentas de demostración).
 
 ### Ver cada pantalla sin la VM: modo de ejemplo
 

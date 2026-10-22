@@ -238,3 +238,21 @@ describe('segundo factor (MFA)', () => {
     expect(await axe(container, AXE)).toHaveNoViolations()
   })
 })
+
+describe('la ventana del segundo factor viene del servidor', () => {
+  it('el anillo y el texto usan la ventana configurada, no un número fijo', async () => {
+    const { VentanaMfa } = await import('../Otras.jsx')
+    const hace1 = new Date(Date.now() - 60000).toISOString()
+    const { container, unmount } = render(<VentanaMfa verificadoEn={hace1} ventana={2} />)
+    expect(container.querySelector('svg')).toHaveAttribute('aria-label', expect.stringMatching(/quedan 1 minutos/))
+    expect(screen.getByText(/de los últimos 2 minutos/)).toBeInTheDocument()
+    unmount()
+    const vencido = render(<VentanaMfa verificadoEn={new Date(Date.now() - 5 * 60000).toISOString()} ventana={2} />)
+    expect(vencido.container.querySelector('svg')).toHaveAttribute('aria-label', 'Segundo factor vencido')
+  })
+
+  it('la pantalla de MFA y la matriz hablan de la ventana que informa el servidor', async () => {
+    await abrirComo('fabio.mop', 'Segundo factor')
+    expect(await screen.findByText(/código de los últimos 15 minutos/)).toBeInTheDocument()
+  })
+})

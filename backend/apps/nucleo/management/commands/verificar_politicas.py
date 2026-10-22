@@ -162,3 +162,11 @@ class Command(BaseCommand):
         r = self._http("/politicas/simular/", t[ana.username])
         self._paso("el formulario del simulador (GET) lista las variables de las 18 acciones", r.status_code == 200 and len(r.json()["variables"]) == 18)
         self._paso("el simulador no registró ninguna decisión: es hipotético y no ensucia la auditoría", self._decisiones_registradas() == antes, f"{antes} -> {self._decisiones_registradas()}")
+
+        # ---------------------------------------------------------------- una sola fuente para la ventana del segundo factor
+        yo = self._http("/auth/yo/", t[ana.username]).json()
+        matriz_v = self._http("/politicas/matriz/", t[ana.username]).json()["ventana_minutos"]
+        meta_v = self._http("/politicas/simular/", t[ana.username]).json()["ventana_minutos"]
+        self._paso("la ventana del segundo factor es la misma en /auth/yo/, la matriz y el simulador (la configuración real)",
+                   yo["mfa_ventana_minutos"] == matriz_v == meta_v, f"{yo['mfa_ventana_minutos']} / {matriz_v} / {meta_v}")
+

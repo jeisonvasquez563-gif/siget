@@ -1,5 +1,6 @@
 {
  "meta": {
+  "ventana_minutos": 15,
   "variables": {
    "ver_tramite": [
     "institucion",
@@ -446,6 +447,7 @@
       "politica": "cuenta_no_activa"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -560,6 +562,7 @@
       "politica": "funcionario_cambia_estado"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -625,6 +628,7 @@
       "politica": "funcionario_cambia_estado"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -739,6 +743,7 @@
       "politica": "funcionario_cambia_estado"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -861,6 +866,7 @@
       "politica": "funcionario_cambia_estado"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -983,6 +989,7 @@
       "politica": "supervisor_cambia_estado"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -1026,6 +1033,7 @@
      }
     ],
     "alternativas": [],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -1071,6 +1079,7 @@
       "politica": "ciudadano_crea_su_tramite"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -1137,6 +1146,7 @@
       "politica": "operador_identidades_aprobar_alta"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -1245,6 +1255,7 @@
       "politica": "ciudadano_sobre_lo_propio"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -1351,6 +1362,7 @@
       "politica": "auditor_consulta"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   },
@@ -1459,6 +1471,7 @@
       "politica": "ciudadano_sobre_lo_propio"
      }
     ],
+    "ventana_minutos": 15,
     "hipotetico": true
    }
   }

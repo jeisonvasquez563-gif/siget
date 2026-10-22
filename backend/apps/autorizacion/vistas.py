@@ -8,6 +8,7 @@
 
 Cualquier persona autenticada puede consultarlas: que las reglas sean públicas para quien las vive es parte de Zero Trust.
 """
+from django.conf import settings
 from django.db import connection
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -59,7 +60,7 @@ class _Transparencia(APIView):
 
 class MatrizPermisos(_Transparencia):
     def get(self, request):
-        return Response(matriz.construir())
+        return Response(matriz.construir(ventana=settings.SIGET_MFA_RECIENTE_MINUTOS))
 
 
 class PermisosBaseDeDatos(_Transparencia):
@@ -97,10 +98,10 @@ class PermisosBaseDeDatos(_Transparencia):
 
 class Simulador(_Transparencia):
     def get(self, request):
-        return Response(simulador.meta())
+        return Response(simulador.meta(settings.SIGET_MFA_RECIENTE_MINUTOS))
 
     def post(self, request):
         entrada, errores = simulador.normalizar(request.data)
         if errores:
             return Response({"codigo": "datos_invalidos", "errores": errores}, status=400)
-        return Response(simulador.simular(entrada))
+        return Response(simulador.simular(entrada, ventana=settings.SIGET_MFA_RECIENTE_MINUTOS))

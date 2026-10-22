@@ -45,11 +45,11 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
   "id": 12, "usuario": "fabio.mop", "scope": "completo", "rol_plataforma": "ninguno",
   "membresias": [{ "institucion_id": 3, "institucion": "MOP", "rol": "funcionario" }],
   "modulos": [{ "id": "bandeja", "nombre": "Bandeja de la institución", "descripcion": "…", "estado": "disponible" }],
-  "mfa_activo": true, "mfa_obligatorio": true, "mfa_verificado_en": "2026-10-21T18:00:00Z", "nivel_aseguramiento": 2
+  "mfa_activo": true, "mfa_ventana_minutos": 15, "mfa_obligatorio": true, "mfa_verificado_en": "2026-10-21T18:00:00Z", "nivel_aseguramiento": 2
 }
 ```
 
-`modulos` es **solo ayuda para armar el menú** (`estado`: `disponible` o `proximamente`). La interfaz nunca decide qué se puede hacer: el servidor vuelve a autorizar cada petición.
+`mfa_ventana_minutos` es la duración de un segundo factor «reciente» (la configuración real del servidor): la interfaz **nunca** lo escribe a mano. `modulos` es **solo ayuda para armar el menú** (`estado`: `disponible` o `proximamente`). La interfaz nunca decide qué se puede hacer: el servidor vuelve a autorizar cada petición.
 
 ## Trámites (`/tramites/`) — scope `completo`
 
@@ -101,11 +101,11 @@ Información de las reglas, no datos de nadie. Se calcula en el momento: no est�
 
 | Ruta | Respuesta |
 |---|---|
-| `GET /politicas/matriz/` | La matriz de roles y permisos, **generada evaluando el PDP real**: `{roles: [{id, nombre, ambito, descripcion, modulos[], acciones_permitidas, acciones_totales}], acciones: [{id, nombre, grupo, casos}], matriz: {<rol>: {<accion>: {favorable: {permitido, politica}, desfavorable: {permitido, politica}, exige_segundo_factor}}}, denegaciones: [{politica, descripcion}], ningun_rol_puede_todo}` |
+| `GET /politicas/matriz/` | La matriz de roles y permisos, **generada evaluando el PDP real**: `{ventana_minutos, roles: [{id, nombre, ambito, descripcion, modulos[], acciones_permitidas, acciones_totales}], acciones: [{id, nombre, grupo, casos}], matriz: {<rol>: {<accion>: {favorable: {permitido, politica}, desfavorable: {permitido, politica}, exige_segundo_factor}}}, denegaciones: [{politica, descripcion}], ningun_rol_puede_todo}` |
 | `GET /politicas/base-de-datos/` | Los privilegios REALES de cada rol de PostgreSQL (`has_table_privilege`): `{roles: [{nombre, descripcion, superusuario, omite_rls, puede_conectar, limite_conexiones, ...}], tablas: [{nombre, rls, politicas, triggers}], privilegios: {<rol>: {<tabla>: {SELECT, INSERT, UPDATE, DELETE}}}, administrador_del_motor, ningun_rol_de_aplicacion_es_superusuario}`; cada privilegio es `total`, `columnas` (solo algunas columnas) o `no` |
 
 | `GET /politicas/simular/` | El formulario del simulador: `{variables: {<accion>: [variables que importan]}, etiquetas, valores: {<variable>: [{valor, etiqueta}]}, defectos}` |
-| `POST /politicas/simular/` | Cuerpo `{rol, accion, <variables>}` con valores de listas cerradas (`segundo_factor`: reciente\|vencido\|ninguno; `cuenta`: activa\|bloqueada\|suspendida; `institucion`: propia\|ajena; `solicitante`/`alta_propuesta_por`: otra_persona\|yo; `asignado`: nadie\|yo\|otra_persona; `estado` y `estado_destino`; `tipo_alta`; `nivel`: 1\|2\|3). Respuesta: `{entrada, decision: {permitido, politica, motivo}, traza: [{fase, regla, resultado, politica, motivo}], alternativas: [{variable, valor, etiqueta_variable, etiqueta_valor, permitido, politica}], hipotetico: true}`. Entrada inválida: `400 {codigo: "datos_invalidos", errores[]}` |
+| `POST /politicas/simular/` | Cuerpo `{rol, accion, <variables>}` con valores de listas cerradas (`segundo_factor`: reciente\|vencido\|ninguno; `cuenta`: activa\|bloqueada\|suspendida; `institucion`: propia\|ajena; `solicitante`/`alta_propuesta_por`: otra_persona\|yo; `asignado`: nadie\|yo\|otra_persona; `estado` y `estado_destino`; `tipo_alta`; `nivel`: 1\|2\|3). Respuesta: `{ventana_minutos, entrada, decision: {permitido, politica, motivo}, traza: [{fase, regla, resultado, politica, motivo}], alternativas: [{variable, valor, etiqueta_variable, etiqueta_valor, permitido, politica}], hipotetico: true}`. Entrada inválida: `400 {codigo: "datos_invalidos", errores[]}` |
 
 El simulador evalúa el **PDP real** con una situación hipotética: es puro (no toca la base) y **no registra decisiones** (no es una acción real). `alternativas` son los cambios de UNA sola variable que invertirían el resultado.
 
