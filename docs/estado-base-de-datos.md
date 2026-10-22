@@ -17,7 +17,7 @@ database/psql-contenedor.sh -d tramites_demo -f database/estado-bd.sql
 | Superusuario | `postgres` existe pero **sin contraseña** y rechazado por red; solo por el socket local del contenedor |
 | Roles de aplicación con superusuario u omisión de RLS | **Ninguno** |
 | Registro inalterable | Ningún rol puede `UPDATE`, `DELETE` ni `TRUNCATE` sobre `evento_auditoria`, `decision_pdp`, `evento_seguridad` ni `transicion` |
-| Respaldos automáticos | 🟠 **No** (último volcado manual de los que quedan en la VM: 20-oct; ver H-1 del [informe de seguridad](./revision-seguridad-2026-10-22.md)) |
+| Respaldos automáticos | 🟢 **Sí, desde el 22-oct:** diario a las 02:30 (`siget-respaldo.timer`), con prueba de restauración en una base desechable, retención de 14 días y permisos 600. Falta una copia fuera de VM2 (H-1 del [informe de seguridad](./revision-seguridad-2026-10-22.md)) |
 
 ## 2. Roles de PostgreSQL
 
