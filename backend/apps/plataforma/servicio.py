@@ -76,9 +76,9 @@ def personas(q="", limite=50):
     consulta = Usuario.objects.all().order_by("username")
     if q:
         consulta = consulta.filter(username__icontains=q)
-    filas = consulta.annotate(sesiones=Subquery(activas))[:limite]
+    filas = consulta.annotate(n_sesiones=Subquery(activas))[:limite]
     return [{"id": u.pk, "usuario": u.username, "estado_cuenta": u.estado_cuenta, "rol_plataforma": u.rol_plataforma, "mfa_activo": u.mfa_activo,
-             "sesiones_activas": u.sesiones or 0,
+             "sesiones_activas": u.n_sesiones or 0,
              "bloqueada_hasta": u.bloqueado_hasta if u.bloqueado_hasta and u.bloqueado_hasta > ahora else None} for u in filas]
 
 

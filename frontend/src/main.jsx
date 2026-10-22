@@ -10,6 +10,7 @@ import './estilos/layout.css'
 import './estilos/pantallas.css'
 import './estilos/permisos.css'
 import './estilos/simulador.css'
+import './estilos/plataforma.css'
 import App from './App.jsx'
 import { ProveedorUI } from './ui.jsx'
 

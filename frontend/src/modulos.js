@@ -2,6 +2,7 @@
 export const ICONO_MODULO = {
   mis_tramites: 'documento', nuevo_tramite: 'mas', bandeja: 'bandeja', supervision: 'supervision', equipo: 'equipo',
   seguridad: 'escudo', mfa: 'llave', roles_permisos: 'tabla', prueba_acceso: 'candado', auditoria: 'auditoria',
+  consola_identidades: 'usuario', consola_catalogo: 'tabla', consola_seguridad: 'escudo', consola_secretos: 'llave', consola_infraestructura: 'consola',
 }
 
 export const iconoDe = (id) => ICONO_MODULO[id] || 'consola'

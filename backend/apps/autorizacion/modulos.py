@@ -15,11 +15,11 @@ CATALOGO = {
     "mfa": ("Segundo factor (MFA)", "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.", DISPONIBLE),
     "roles_permisos": ("Roles y permisos", "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.", DISPONIBLE),
     "prueba_acceso": ("Acceso a trámites", "Comprueba en vivo que tu rol de plataforma no puede ver trámites.", DISPONIBLE),
-    "consola_infraestructura": ("Infraestructura", "Estado de los servidores y contenedores.", PROXIMAMENTE),
-    "consola_identidades": ("Identidades", "Alta de coordinadores y restablecimiento del segundo factor (control dual).", PROXIMAMENTE),
-    "consola_catalogo": ("Catálogo", "Alta de instituciones y de trámites (control dual).", PROXIMAMENTE),
-    "consola_seguridad": ("Respuesta a incidentes", "Bloqueo de cuentas y revocación de sesiones.", PROXIMAMENTE),
-    "consola_secretos": ("Custodia de secretos", "Rotación de claves y certificados.", PROXIMAMENTE),
+    "consola_infraestructura": ("Infraestructura", "Estado de la base de datos y del servicio, y vencimiento del certificado (solo lectura).", DISPONIBLE),
+    "consola_identidades": ("Identidades", "Restablece contraseñas y segundo factor, y da de alta a las coordinadoras con control dual.", DISPONIBLE),
+    "consola_catalogo": ("Catálogo", "Alta de instituciones con control dual.", DISPONIBLE),
+    "consola_seguridad": ("Respuesta a incidentes", "Bloquea cuentas, revoca sesiones y mira los eventos de seguridad.", DISPONIBLE),
+    "consola_secretos": ("Custodia de secretos", "Registra la rotación de secretos y avisa cuándo toca.", DISPONIBLE),
     "auditoria": ("Auditoría", "Consulta del registro inalterable de eventos y de decisiones de acceso.", DISPONIBLE),
 }
 

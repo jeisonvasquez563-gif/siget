@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { api, ApiError, confirmarMfa, iniciarSesion, registrar } from './api.js'
+import { api, ApiError, confirmarMfa, iniciarSesion, registrar, restablecerContrasena } from './api.js'
 import { Alerta, Esclusas, Icono, Logo } from './ui.jsx'
 
 function Faro({ titulo, lema, ilustracion = true }) {
@@ -55,6 +55,7 @@ export function Login({ alEntrar, motivo = '' }) {
   const [aviso, setAviso] = useState('')
   const [trabajando, setTrabajando] = useState(false)
   const [personales, setPersonales] = useState(PERSONALES_VACIOS)
+  const [codigoReset, setCodigoReset] = useState('')
   const poner = (campo) => (e) => setPersonales((p) => ({ ...p, [campo]: e.target.value }))
 
   function volver() {
@@ -68,7 +69,11 @@ export function Login({ alEntrar, motivo = '' }) {
     setAviso('')
     setTrabajando(true)
     try {
-      if (modo === 'registro') {
+      if (modo === 'recuperar') {
+        await restablecerContrasena(usuario, codigoReset, clave)
+        setAviso('Contraseña restablecida. Ingresa con tu nueva contraseña y el código de tu aplicación de autenticación.')
+        setModo('entrar'); setClave(''); setCodigoReset('')
+      } else if (modo === 'registro') {
         await registrar(usuario, clave, { ...personales, cedula: personales.cedula.trim().toUpperCase() })
         try {
           // Cuenta nueva: se entra de inmediato y el servidor guía al alta del segundo factor (QR), sin volver a escribir nada
@@ -87,6 +92,7 @@ export function Login({ alEntrar, motivo = '' }) {
     } catch (e) {
       if (e instanceof ApiError && e.codigo === 'mfa_requerido') { setPaso('codigo'); setCodigo('') }
       else if (e instanceof ApiError && e.datos.errores) setError(`${e.datos.errores.join('. ')}.`)
+      else if (e instanceof ApiError && e.codigo === 'codigo_invalido') setError('El código no es válido, ya se usó o venció. Pide uno nuevo al equipo de identidades.')
       else if (e instanceof ApiError && e.estado === 401 && paso === 'codigo') setError('Ese código no sirve: es incorrecto o ya se usó. Espera al siguiente e inténtalo otra vez. Tras 3 fallos la cuenta se bloquea (5, 15 y luego 60 minutos).')
       else if (e instanceof ApiError && e.estado === 401) setError('Usuario o contraseña incorrectos, o la cuenta está bloqueada temporalmente.')
       else if (e instanceof ApiError && e.estado === 409) setError('No se pudo crear la cuenta con esos datos. Prueba con otro usuario.')
@@ -98,9 +104,10 @@ export function Login({ alEntrar, motivo = '' }) {
   }
 
   const registro = modo === 'registro'
-  const pideCodigo = !registro && paso === 'codigo'
-  const titulo = registro ? 'Crea tu cuenta' : pideCodigo ? 'Verifica que eres tú' : 'Ingresa a tu cuenta'
-  const subtitulo = registro ? 'Elige un usuario y una contraseña larga que solo tú conozcas. Después activarás un segundo factor con tu teléfono.'
+  const recuperar = modo === 'recuperar'
+  const pideCodigo = !registro && !recuperar && paso === 'codigo'
+  const titulo = recuperar ? 'Recupera tu contraseña' : registro ? 'Crea tu cuenta' : pideCodigo ? 'Verifica que eres tú' : 'Ingresa a tu cuenta'
+  const subtitulo = recuperar ? 'Pide un código de un solo uso al equipo de identidades de SIGET (por un canal seguro) y úsalo aquí para elegir una contraseña nueva. Tu segundo factor sigue siendo necesario.' : registro ? 'Elige un usuario y una contraseña larga que solo tú conozcas. Después activarás un segundo factor con tu teléfono.'
     : pideCodigo ? `Hola, ${usuario}. Abre tu aplicación de autenticación y escribe el código de 6 dígitos que muestra.`
     : 'Usa tu usuario y tu contraseña. Si tu cuenta tiene segundo factor, te pediremos el código en el siguiente paso.'
   return (
@@ -114,6 +121,22 @@ export function Login({ alEntrar, motivo = '' }) {
             <Alerta tipo="info">{MOTIVOS[motivo]}</Alerta>
             <Alerta>{error}</Alerta>
             <Alerta tipo="ok">{aviso}</Alerta>
+            {recuperar && (
+              <>
+                <label className="campo"><span>Usuario</span>
+                  <input className="entrada" value={usuario} onChange={(e) => setUsuario(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck="false" required autoFocus />
+                </label>
+                <label className="campo"><span>Código de restablecimiento</span>
+                  <input className="entrada entrada-codigo" value={codigoReset} onChange={(e) => setCodigoReset(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 14))} placeholder="XXXX-XXXX-XXXX" autoComplete="off" spellCheck="false" required minLength={12} />
+                  <small>Vale 15 minutos y una sola vez.</small>
+                </label>
+                <label className="campo"><span>Contraseña nueva</span>
+                  <input className="entrada" type={verClave ? 'text' : 'password'} value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="new-password" minLength={12} aria-describedby="ayuda-clave" required />
+                  <small><button type="button" className="enlace-sutil" onClick={() => setVerClave(!verClave)}>{verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}</button></small>
+                </label>
+                <p id="ayuda-clave" className="suave ayuda-clave">Mínimo 12 caracteres; no uses tu nombre de usuario ni una contraseña común.</p>
+              </>
+            )}
             {registro && (
               <fieldset className="datos-personales">
                 <legend>Tus datos</legend>
@@ -146,7 +169,7 @@ export function Login({ alEntrar, motivo = '' }) {
               </fieldset>
             )}
             {registro && <h3 className="subtitulo-form">Tu acceso</h3>}
-            {!pideCodigo && (
+            {!pideCodigo && !recuperar && (
               <>
                 <label className="campo">
                   <span>Usuario</span>
@@ -168,11 +191,13 @@ export function Login({ alEntrar, motivo = '' }) {
               </label>
             )}
             <button type="submit" className="btn btn-ancho" disabled={trabajando}>
-              {trabajando ? 'Verificando…' : registro ? 'Crear cuenta' : pideCodigo ? 'Verificar' : 'Continuar'}
+              {trabajando ? 'Verificando…' : recuperar ? 'Restablecer contraseña' : registro ? 'Crear cuenta' : pideCodigo ? 'Verificar' : 'Continuar'}
             </button>
             {pideCodigo && <button type="button" className="btn btn-sec btn-ancho" onClick={volver}>Volver</button>}
           </form>
-          {!pideCodigo && (
+          {!registro && !pideCodigo && !recuperar && <p className="cambio-modo"><button type="button" onClick={() => { setModo('recuperar'); setError(''); setAviso(''); setClave('') }}>¿Olvidaste tu contraseña?</button></p>}
+          {recuperar && <p className="cambio-modo"><button type="button" onClick={() => { setModo('entrar'); setError(''); setClave(''); setCodigoReset('') }}>Volver a ingresar</button></p>}
+          {!pideCodigo && !recuperar && (
             <div className="alta-cuenta">
               <span>{registro ? '¿Ya tienes cuenta?' : '¿Primera vez en SIGET?'}</span>
               <button type="button" className="btn btn-sec btn-ancho" onClick={() => { setModo(registro ? 'entrar' : 'registro'); setError(''); setAviso(''); setClave('') }}>
@@ -180,7 +205,7 @@ export function Login({ alEntrar, motivo = '' }) {
               </button>
             </div>
           )}
-          {!registro && <p className="aviso-bloqueo"><Icono nombre="llave" />Por tu seguridad, tras 3 intentos fallidos (contraseña o código) la cuenta se bloquea: 5 minutos la primera vez, 15 la segunda y 60 las siguientes. Un inicio de sesión correcto reinicia la cuenta.</p>}
+          {!registro && !recuperar && <p className="aviso-bloqueo"><Icono nombre="llave" />Por tu seguridad, tras 3 intentos fallidos (contraseña o código) la cuenta se bloquea: 5 minutos la primera vez, 15 la segunda y 60 las siguientes. Un inicio de sesión correcto reinicia la cuenta.</p>}
           <div className="pie-acceso"><Icono nombre="escudo" /><span>Conexión cifrada con TLS 1.3. Nunca guardamos tu contraseña: solo una huella irreversible.</span></div>
         </div>
       </section>

@@ -43,11 +43,9 @@ describe('el menú cambia según el rol', () => {
     })
   }
 
-  it('los módulos aún sin construir se marcan como «pronto» y explican por qué', async () => {
-    const { user } = await abrirComo('ines.infra')
-    expect(entradaMenu('Infraestructura')).toHaveTextContent('pronto')
-    await irA(user, 'Infraestructura')
-    expect(await screen.findByText(/se construye en la siguiente fase/i)).toBeInTheDocument()
+  it('los cinco roles de plataforma ya tienen su consola: ningún módulo queda «pronto»', async () => {
+    await abrirComo('ines.infra')
+    expect(entradaMenu('Infraestructura')).not.toHaveTextContent('pronto')
   })
 })
 
