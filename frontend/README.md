@@ -1,34 +1,63 @@
 # frontend
 
-SPA de SIGET en **React 18 + Vite** (JavaScript y CSS propios). Se compila a archivos estáticos que sirve el mismo nginx del pod de VM1, así que API y interfaz comparten origen (sin CORS).
+SPA de SIGET en **React 18 + Vite** (JavaScript y CSS propios). Se compila a archivos estáticos que sirve el mismo nginx del pod de VM1, así que API y interfaz comparten origen (sin CORS). El contrato con el backend está en [`docs/api.md`](../docs/api.md).
+
+## Dirección de diseño: «el Canal»
+
+Un trámite recorre etapas como un buque cruza las esclusas del Canal. De ahí salen la identidad y la pieza firma:
+
+- **Pieza firma — el recorrido por esclusas** (`Esclusas` en `src/ui.jsx`): tres cámaras (Recepción, Tramitación, Resolución) y un dique lateral para la subsanación. El agua llena las etapas cumplidas, una boya naranja marca dónde está el trámite y, al resolverse, aparece el sello APROBADO o RECHAZADO. Es el estado del trámite hecho imagen, en el detalle y en la pantalla de acceso.
+- **Paleta** (`src/estilos/tokens.css`): agua de Miraflores (`#0f4c5c`), hormigón frío, **boya naranja** `#f26b21` solo para «dónde está» y los plazos, verde y rojo de sello solo para resolver. Modo claro y «noche de puerto» (oscuro), que sigue la preferencia del sistema y se puede cambiar.
+- **Tipografía autohospedada** (la CSP no permite CDN): **Archivo** en ancho expandido para títulos (rotulado de casco), **Public Sans** (la del sector público) para texto, **IBM Plex Mono** para números de trámite y políticas. Todas con licencia OFL, empaquetadas con la SPA.
 
 ## Reglas de seguridad que cumple
 
-- El token de acceso vive **solo en memoria** (nunca `localStorage`); el de refresco va en una cookie `HttpOnly; Secure; SameSite=Strict` que JavaScript no puede leer. La renovación es de un solo uso, por eso se serializa (`src/api.js`) y no se usa `StrictMode`.
-- **Sin estilos en línea ni scripts en línea**: la CSP de nginx es `default-src 'self'`.
-- La interfaz solo *muestra* módulos y botones; cada acción la vuelve a autorizar el servidor (PDP + RLS). Un botón mostrado de más no abre ningún acceso.
+- El token de acceso vive **solo en memoria** (nunca `localStorage`); el de refresco va en una cookie `HttpOnly; Secure; SameSite=Strict`. La renovación es de un solo uso, por eso se serializa (`src/api.js`) y no se usa `StrictMode`.
+- **Sin estilos ni scripts en línea** (la CSP de nginx es `default-src 'self'`): todo es CSS con clases; los valores dinámicos van en atributos SVG o en elementos nativos (`<progress>`). `frontend-ci` lo vigila.
+- La interfaz solo *muestra* módulos y botones; cada acción la vuelve a autorizar el servidor (PDP + RLS).
 - Las acciones sensibles piden un código reciente del segundo factor (modal de reautenticación).
 
 ## Estructura
 
 ```
 src/
-├── api.js          # cliente: token en memoria, renovación única, errores tipados
-├── App.jsx         # sesión, menú por módulos y navegación
-├── Acceso.jsx      # login, registro y enrolamiento del segundo factor (QR)
-├── Tramites.jsx    # mis trámites, nuevo, bandeja/supervisión, detalle con historial
-├── Otras.jsx       # inicio, equipo, mi seguridad, acceso a trámites, «próximamente»
-├── comun.jsx       # etiquetas, estados, reautenticación
-└── estilos.css
+├── api.js              # cliente: token en memoria, renovación única, errores tipados
+├── App.jsx             # sesión, armazón (menú lateral, barra superior) y navegación
+├── Acceso.jsx          # login, registro y alta del segundo factor (QR)
+├── Tramites.jsx        # mis trámites, nuevo, bandeja (lista y tablero), detalle con esclusas e historial
+├── Otras.jsx           # inicio, equipo, mi seguridad (credencial), acceso a trámites, «próximamente»
+├── Auditoria.jsx       # resumen con gráfico, decisiones, eventos de seguridad, actuaciones
+├── ui.jsx              # iconos propios, logo, esclusas, insignias, avisos, confirmaciones, esqueletos, estados vacíos, tema
+├── comun.jsx           # etiquetas, estados, plazos, reautenticación
+├── modulos.js          # cómo se agrupan y dibujan los módulos que manda el servidor
+├── mock.js             # servidor de mentira SOLO para desarrollo (no entra en producción)
+└── estilos/            # tokens.css, base.css, componentes.css, layout.css, pantallas.css
 ```
 
-## Desarrollo y construcción
+## Desarrollo
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173, con proxy a https://192.168.159.137:8443 (SIGET_API para cambiarlo)
+npm run dev      # http://localhost:5173 (proxy a https://192.168.159.137:8443; SIGET_API para cambiarlo)
 npm run build    # genera dist/, que se copia a /home/siget/frontend en VM1 (runbook sección 27.6)
 ```
+
+### Ver cada pantalla sin la VM: modo de ejemplo
+
+Con `npm run dev`, agrega `?mock` a la dirección y la interfaz usa datos de ejemplo (`src/mock.js`), sin backend ni credenciales:
+
+| Dirección | Qué muestra |
+|---|---|
+| `http://localhost:5173/?mock` | Pantalla de acceso |
+| `/?mock=ana.ciudadana` | Ciudadana: sus trámites y el flujo de nuevo trámite |
+| `/?mock=fabio.mop` · `flor.mop` | Funcionario del MOP: bandeja, detalle, cambio de estado (pide código; `000000` lo rechaza) |
+| `/?mock=saul.mop` | Supervisor: supervisión, tablero, reasignar, equipo |
+| `/?mock=carla.mop` | Coordinadora: equipo, sin trámites |
+| `/?mock=aldo.auditor` | Auditor: consola de auditoría |
+| `/?mock=ines.infra` (y los demás roles de plataforma) | Consola «próximamente» y la prueba de acceso negado |
+| `/?mock=enrolar` | Alta del segundo factor |
+
+Es un servidor de mentira: no valida nada. El único que decide es el backend. Al editar un archivo, el recarga en caliente reinicia la sesión de ejemplo.
 
 ## Por qué no está el checkpoint PHP acá
 

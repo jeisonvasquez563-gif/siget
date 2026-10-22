@@ -1409,3 +1409,37 @@ Fecha: 21 de octubre de 2026. Es el módulo «Auditoría» del rol `auditor`.
 - Alertas sobre patrones (muchas denegaciones de una persona, reuso de tokens).
 - Que `siget-postgres` registre también las conexiones de `auditor_role` (log del servidor).
 
+## 29. Rediseño de la interfaz: «el Canal»
+
+Fecha: 21 de octubre de 2026. Primer paso del frente de frontend (ver [`organizacion-backend-frontend.md`](./organizacion-backend-frontend.md)).
+
+### 29.1 Qué se hizo
+
+- **Sistema de diseño propio** (`frontend/src/estilos/`): tokens de color, tipografía, forma y sombra; modo claro y oscuro; componentes (botones, campos, insignias, tablas, plazo, esqueletos, estados vacíos, avisos, modal, pestañas, indicadores, tablero) y estructura (acceso en dos paneles, menú lateral agrupado, barra superior con ruta). Tipografía autohospedada (Archivo, Public Sans, IBM Plex Mono; OFL).
+- **Pieza firma: el recorrido por esclusas** en el detalle del trámite y en la pantalla de acceso.
+- **Pantallas renovadas:** acceso y alta del segundo factor; inicio con «Requiere tu atención»; mis trámites con indicadores y búsqueda; nuevo trámite en dos pasos con resumen; bandeja y supervisión con filtros, búsqueda y **tablero kanban**; detalle con línea de tiempo, confirmación de estados finales y reasignación con nombres; equipo; «Mi seguridad» como credencial con la **ventana del segundo factor**; acceso a trámites como respuesta HTTP real; auditoría con gráfico por política.
+- **Calidad de uso:** esqueletos de carga, estados vacíos con mensaje útil, avisos, diálogos de confirmación, enlace «Saltar al contenido», foco visible, `prefers-reduced-motion`, responsive hasta móvil.
+- **Modo de ejemplo para desarrollo** (`?mock`, `src/mock.js`): permite ver cada pantalla por rol sin VM ni credenciales; **no entra en el build de producción** (se comprueba con `grep` en `dist/`).
+
+### 29.2 Verificación
+
+- `npm run build` limpio; sin estilos ni scripts en línea; sin el modo de ejemplo en `dist/`.
+- Recorrido visual por rol con el modo de ejemplo en escritorio (claro y oscuro) y en móvil.
+- En VM1: la SPA, el CSS y las fuentes se sirven con el tipo MIME correcto (`font/woff2`) y el recorrido por API de todas las cuentas sigue igual.
+
+### 29.3 Hallazgo corregido
+
+El resumen de auditoría se quedaba en esqueleto para siempre cuando el segundo factor del auditor estaba vencido: retornaba antes de pintar el modal de reautenticación. Lo encontró el modo de ejemplo; ahora el modal se pinta también durante la espera.
+
+### 29.4 Gotchas
+
+- Con la CSP `default-src 'self'` no hay `style=`: el progreso del plazo usa `<progress>`, los anillos y gráficos usan atributos SVG, y las posiciones animadas de la boya son clases CSS.
+- Las fuentes caen un instante al respaldo (`font-display: swap`): no es un fallo.
+- El servidor de desarrollo de Vite debe reiniciarse después de instalar paquetes.
+
+### 29.5 Pendiente
+
+- Pruebas del frontend (ESLint, Vitest, Playwright) y revisión de contraste AA con herramienta.
+- Ilustraciones propias para cada estado vacío, atajos de teclado, impresión del trámite, internacionalización.
+- Repetir el recorrido visual con las cuentas reales (esta pasada fue con datos de ejemplo).
+

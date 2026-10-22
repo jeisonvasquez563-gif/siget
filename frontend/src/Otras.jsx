@@ -1,50 +1,115 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from './api.js'
-import { Alerta, Cargando, ROLES_INSTITUCION, ROLES_PLATAFORMA, fecha, mensajeDe, useReautenticacion } from './comun.jsx'
+import { Estado, FINALES, Plazo, ROLES_INSTITUCION, ROLES_PLATAFORMA, etiquetaDeRol, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { iconoDe } from './modulos.js'
+import { Alerta, Avatar, BloquesEsqueleto, Esqueleto, Icono, Insignia, Vacio } from './ui.jsx'
+import { esMio } from './Tramites.jsx'
 
-export function Inicio({ yo, ir }) {
+function saludoDeLaHora() {
+  const h = new Date().getHours()
+  return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches'
+}
+
+/* ---------------------------------------------------------------- inicio */
+
+export function Inicio({ yo, ir, abrir }) {
+  const veTramites = yo.modulos.some((m) => ['mis_tramites', 'bandeja'].includes(m.id))
+  const [filas, setFilas] = useState(veTramites ? null : [])
+  useEffect(() => {
+    if (veTramites) api('/tramites/?limite=100').then((d) => setFilas(d.resultados)).catch(() => setFilas([]))
+  }, [veTramites])
+
+  const mios = (filas || []).filter((t) => esMio(t, yo))
+  const bandeja = (filas || []).filter((t) => !esMio(t, yo) && !FINALES.includes(t.estado))
+  const aten = []
+  mios.filter((t) => t.estado === 'En Subsanacion').forEach((t) => aten.push({ t, motivo: 'Te pidieron corregir o completar información' }))
+  mios.filter((t) => t.vencido && t.estado !== 'En Subsanacion').forEach((t) => aten.push({ t, motivo: 'El plazo ya venció' }))
+  bandeja.filter((t) => t.vencido).forEach((t) => aten.push({ t, motivo: 'Vencido en tu institución' }))
+  bandeja.filter((t) => !t.vencido && !t.funcionario_asignado_id).slice(0, 4).forEach((t) => aten.push({ t, motivo: 'Nadie lo está atendiendo' }))
+
   return (
     <>
-      <div className="encabezado-vista"><div><h2>Hola, {yo.usuario}</h2><p>Estos son los módulos que tu rol tiene asignados. Lo que no ves, no existe para ti.</p></div></div>
-      <div className="tarjetas">
+      <div className="encabezado-vista">
+        <div className="saludo">
+          <Avatar nombre={yo.usuario} />
+          <div>
+            <h2>{saludoDeLaHora()}, {yo.usuario}</h2>
+            <p><Insignia clase="insignia-rol" punto={false}>{etiquetaDeRol(yo)}</Insignia></p>
+          </div>
+        </div>
+      </div>
+
+      {veTramites && (
+        <section className="panel">
+          <div className="panel-cabecera"><h3>Requiere tu atención</h3></div>
+          {filas === null ? <Esqueleto filas={2} /> : aten.length === 0 ? (
+            <p className="suave">Todo al día: no tienes trámites que requieran una acción ahora mismo.</p>
+          ) : (
+            <ul className="atencion-lista">
+              {aten.slice(0, 6).map(({ t, motivo }) => (
+                <li key={`${t.id}-${motivo}`}>
+                  <div className="texto">
+                    <button className="enlace" onClick={() => abrir(t.id)}>#{t.id} · {t.tipo_tramite.nombre}</button>
+                    <small>{motivo} · {t.institucion.nombre}</small>
+                  </div>
+                  <Estado valor={t.estado} />
+                  <Plazo tramite={t} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      <div className="panel-cabecera"><h3>Tus módulos</h3></div>
+      <div className="modulos">
         {yo.modulos.map((m) => (
-          <button key={m.id} className={`tarjeta-modulo ${m.estado}`} onClick={() => ir(m.id)}>
+          <button key={m.id} className={`modulo ${m.estado === 'proximamente' ? 'pronto' : ''}`} onClick={() => ir(m.id)}>
+            <span className="icono-modulo"><Icono nombre={iconoDe(m.id)} /></span>
             <h3>{m.nombre}</h3>
             <p>{m.descripcion}</p>
-            {m.estado === 'proximamente' && <span className="chip e-pendiente">Próximamente</span>}
+            {m.estado === 'proximamente' && <Insignia punto={false}>Próximamente</Insignia>}
           </button>
         ))}
       </div>
+      <p className="nota">Solo ves los módulos que tu rol tiene asignados. Lo demás no aparece, y aunque lo intentaras, el servidor lo negaría.</p>
     </>
   )
 }
+
+/* ---------------------------------------------------------------- equipo */
 
 export function Equipo() {
   const [equipos, setEquipos] = useState(null)
   const [error, setError] = useState('')
   const { ejecutar, modal } = useReautenticacion()
 
-  async function cargar() {
-    setError('')
-    try {
-      await ejecutar(async () => { setEquipos((await api('/equipo/')).equipos) })
-    } catch (e) {
-      setError(mensajeDe(e))
-      setEquipos([])
-    }
-  }
-  useEffect(() => { cargar() }, [])
+  useEffect(() => {
+    (async () => {
+      try {
+        await ejecutar(async () => { setEquipos((await api('/equipo/')).equipos) })
+      } catch (e) {
+        setError(mensajeDe(e))
+        setEquipos([])
+      }
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
       <div className="encabezado-vista"><div><h2>Equipo de la institución</h2><p>Quién tiene qué rol en las instituciones que coordinas o supervisas.</p></div></div>
       <Alerta>{error}</Alerta>
-      {equipos === null ? <Cargando /> : equipos.map((e) => (
+      {equipos === null ? <BloquesEsqueleto n={3} /> : equipos.map((e) => (
         <section className="panel" key={e.institucion.id}>
-          <h3>{e.institucion.nombre}</h3>
-          <ul className="lista-equipo">
-            {e.personal.map((p) => <li key={`${p.usuario_id}-${p.rol}`}><span>{p.usuario}</span><span className="chip">{ROLES_INSTITUCION[p.rol] || p.rol}</span></li>)}
-          </ul>
+          <div className="panel-cabecera"><h3>{e.institucion.nombre}</h3><span className="suave">{e.personal.length} personas</span></div>
+          <div className="rejilla-personas">
+            {e.personal.map((p) => (
+              <div className="persona" key={`${p.usuario_id}-${p.rol}`}>
+                <Avatar nombre={p.usuario} />
+                <div><strong>{p.usuario}</strong><Insignia clase="insignia-rol" punto={false}>{ROLES_INSTITUCION[p.rol] || p.rol}</Insignia></div>
+              </div>
+            ))}
+          </div>
         </section>
       ))}
       {modal}
@@ -52,30 +117,37 @@ export function Equipo() {
   )
 }
 
+/* ---------------------------------------------------------------- mi seguridad */
+
 const PERMISOS = {
   ciudadano: {
-    puede: ['Iniciar trámites del catálogo', 'Ver el estado e historial de SUS trámites', 'Ver si su trámite está en cola o en atención'],
-    no: ['Ver trámites de otras personas (responde 404, como si no existieran)', 'Cambiar el estado de un trámite', 'Saber qué funcionario lo atiende'],
+    puede: ['Iniciar trámites del catálogo', 'Ver el estado y el historial de tus trámites', 'Saber si tu trámite está en cola o en atención'],
+    no: ['Ver trámites de otras personas (para ti no existen: responde 404)', 'Cambiar el estado de un trámite', 'Saber qué funcionario lo atiende'],
   },
   funcionario: {
-    puede: ['Ver los trámites de su institución', 'Pasar a la siguiente etapa los que están en cola o asignados a él (con segundo factor reciente)'],
-    no: ['Ver trámites de otra institución', 'Gestionar un trámite que él mismo pidió (conflicto de interés)', 'Reasignar trámites'],
+    puede: ['Ver los trámites de tu institución', 'Pasar a la siguiente etapa los que están en cola o asignados a ti (con segundo factor reciente)'],
+    no: ['Ver trámites de otra institución', 'Gestionar un trámite que tú mismo pediste (conflicto de interés)', 'Reasignar trámites'],
   },
   supervisor: {
-    puede: ['Todo lo del funcionario, sobre cualquier trámite de su institución', 'Reasignar trámites y atender los escalados', 'Ver el equipo de su institución'],
-    no: ['Tocar trámites de otra institución', 'Gestionar un trámite que él mismo pidió'],
+    puede: ['Todo lo del funcionario, sobre cualquier trámite de tu institución', 'Reasignar trámites y atender los escalados', 'Ver el equipo de tu institución'],
+    no: ['Tocar trámites de otra institución', 'Gestionar un trámite que tú mismo pediste'],
   },
   coordinador_institucional: {
-    puede: ['Ver y gestionar el equipo y los roles de su institución (con segundo factor reciente)'],
-    no: ['Ver o mover trámites: gestionar personas no implica ver datos de los ciudadanos', 'Asignarse un rol a sí mismo (lo impone la base de datos)'],
+    puede: ['Ver el equipo y los roles de tu institución (con segundo factor reciente)'],
+    no: ['Ver o mover trámites: gestionar personas no da acceso a los datos de la ciudadanía', 'Asignarte un rol a ti mismo (lo impone la base de datos)'],
   },
   plataforma: {
-    puede: ['Operar solo su área (ver su consola)', 'Las altas sensibles exigen dos personas distintas (control dual)'],
-    no: ['Ver ningún trámite ni dato de ciudadanos', 'Ser a la vez operador y miembro de una institución', 'Existir un superusuario: nadie tiene todos los poderes'],
+    puede: ['Operar únicamente tu área', 'Participar en altas sensibles, siempre con una segunda persona (control dual)'],
+    no: ['Ver ningún trámite ni dato de la ciudadanía', 'Ser a la vez operador y miembro de una institución', 'Hacerlo todo: no existe un superusuario'],
+  },
+  auditor: {
+    puede: ['Leer el registro inalterable de decisiones y eventos', 'Ver quién hizo qué, cuándo y con qué política'],
+    no: ['Escribir, alterar o borrar cualquier registro (la base de datos se lo niega)', 'Ver trámites ni datos personales', 'Escapar de la auditoría: sus consultas también quedan registradas'],
   },
 }
 
-function perfil(yo) {
+function perfiles(yo) {
+  if (yo.rol_plataforma === 'auditor') return ['auditor']
   if (yo.rol_plataforma !== 'ninguno') return ['plataforma']
   const roles = new Set(yo.membresias.map((m) => m.rol))
   const salida = ['ciudadano']
@@ -83,32 +155,62 @@ function perfil(yo) {
   return salida
 }
 
+const VENTANA_MIN = 15
+const CIRCUNFERENCIA = 2 * Math.PI * 38
+
+function VentanaMfa({ verificadoEn }) {
+  const minutos = verificadoEn ? Math.max(0, (Date.now() - new Date(verificadoEn)) / 60000) : Infinity
+  const restante = Math.max(0, VENTANA_MIN - minutos)
+  const vigente = restante > 0
+  return (
+    <div className="ventana">
+      <svg viewBox="0 0 92 92" role="img" aria-label={vigente ? `Segundo factor vigente: quedan ${Math.ceil(restante)} minutos` : 'Segundo factor vencido'}>
+        <circle className="anillo-fondo" cx="46" cy="46" r="38" />
+        <circle className={`anillo ${vigente ? '' : 'vencida'}`} cx="46" cy="46" r="38" strokeDasharray={CIRCUNFERENCIA} strokeDashoffset={CIRCUNFERENCIA * (1 - restante / VENTANA_MIN)} />
+        <text className="cifra" x="46" y="48">{vigente ? Math.ceil(restante) : '0'}</text>
+        <text className="cifra-sub" x="46" y="62">min</text>
+      </svg>
+      <div>
+        <strong>{vigente ? 'Segundo factor vigente' : 'Segundo factor vencido'}</strong>
+        <p>{vigente ? `Las acciones que cambian trámites exigen una verificación de los últimos ${VENTANA_MIN} minutos.` : 'Para cambiar un trámite te pediremos un código nuevo.'}</p>
+      </div>
+    </div>
+  )
+}
+
 export function Seguridad({ yo }) {
-  const verificado = yo.mfa_verificado_en ? Math.max(0, Math.round((Date.now() - new Date(yo.mfa_verificado_en)) / 60000)) : null
   return (
     <>
-      <div className="encabezado-vista"><div><h2>Mi seguridad</h2><p>Quién eres para el sistema y qué te permite Zero Trust.</p></div></div>
-      <div className="rejilla-detalle">
-        <section className="panel">
-          <h3>Mi identidad</h3>
-          <dl>
-            <dt>Usuario</dt><dd>{yo.usuario}</dd>
-            <dt>Rol de plataforma</dt><dd>{ROLES_PLATAFORMA[yo.rol_plataforma] || yo.rol_plataforma}</dd>
-            <dt>Instituciones</dt>
-            <dd>{yo.membresias.length ? yo.membresias.map((m) => `${m.institucion}: ${ROLES_INSTITUCION[m.rol]}`).join(' · ') : 'Ninguna (ciudadanía o rol de plataforma)'}</dd>
-            <dt>Segundo factor</dt><dd>{yo.mfa_activo ? 'Activo (TOTP)' : 'No activo'}</dd>
-            <dt>Última verificación</dt><dd>{verificado === null ? '—' : `hace ${verificado} min (${fecha(yo.mfa_verificado_en)})`}</dd>
-            <dt>Nivel de aseguramiento</dt><dd>{yo.nivel_aseguramiento}</dd>
-          </dl>
-          <p className="nota">Tu sesión dura 8 horas con token de acceso de 10 minutos; el de renovación es de un solo uso y se guarda en una cookie que JavaScript no puede leer.</p>
-        </section>
-        <section className="panel">
+      <div className="encabezado-vista"><div><h2>Mi seguridad</h2><p>Quién eres para el sistema y qué te permite Zero Trust: nunca confiar, siempre verificar.</p></div></div>
+      <div className="rejilla-seguridad">
+        <div>
+          <div className="credencial">
+            <span className="id-mono">Credencial SIGET · cuenta {String(yo.id).padStart(4, '0')}</span>
+            <div className="quien">
+              <Avatar nombre={yo.usuario} />
+              <div><h3>{yo.usuario}</h3><span className="rol">{etiquetaDeRol(yo)}</span></div>
+            </div>
+            <dl>
+              <dt>Plataforma</dt><dd>{ROLES_PLATAFORMA[yo.rol_plataforma] || yo.rol_plataforma}</dd>
+              <dt>Instituciones</dt><dd>{yo.membresias.length ? yo.membresias.map((m) => `${m.institucion} (${ROLES_INSTITUCION[m.rol]})`).join(', ') : 'Ninguna'}</dd>
+              <dt>Segundo factor</dt><dd>{yo.mfa_activo ? 'Activo (TOTP)' : 'No activo'}</dd>
+              <dt>Verificado</dt><dd>{yo.mfa_verificado_en ? `${hace(yo.mfa_verificado_en)}` : '—'}</dd>
+              <dt>Aseguramiento</dt><dd>Nivel {yo.nivel_aseguramiento}</dd>
+            </dl>
+          </div>
+          <section className="panel">
+            <h3>Ventana del segundo factor</h3>
+            <VentanaMfa verificadoEn={yo.mfa_verificado_en} />
+            <p className="nota">Tu sesión dura 8 horas. El token de acceso vive 10 minutos y se renueva solo; el de renovación es de un solo uso y va en una cookie que JavaScript no puede leer.</p>
+          </section>
+        </div>
+        <section className="panel permisos">
           <h3>Lo que tu rol puede y no puede</h3>
-          {perfil(yo).map((p) => (
-            <div key={p} className="permisos">
-              <h4>{p === 'plataforma' ? ROLES_PLATAFORMA[yo.rol_plataforma] : ROLES_INSTITUCION[p]}</h4>
-              <ul className="puede">{PERMISOS[p].puede.map((t) => <li key={t}>{t}</li>)}</ul>
-              <ul className="no-puede">{PERMISOS[p].no.map((t) => <li key={t}>{t}</li>)}</ul>
+          {perfiles(yo).map((p) => (
+            <div key={p}>
+              <h4>{p === 'plataforma' || p === 'auditor' ? ROLES_PLATAFORMA[yo.rol_plataforma] : ROLES_INSTITUCION[p]}</h4>
+              <ul className="puede">{PERMISOS[p].puede.map((t) => <li key={t}><Icono nombre="check" />{t}</li>)}</ul>
+              <ul className="no-puede">{PERMISOS[p].no.map((t) => <li key={t}><Icono nombre="x" />{t}</li>)}</ul>
             </div>
           ))}
         </section>
@@ -117,39 +219,58 @@ export function Seguridad({ yo }) {
   )
 }
 
+/* ---------------------------------------------------------------- acceso a trámites (rol de plataforma) */
+
 export function PruebaAcceso({ yo }) {
   const [resultado, setResultado] = useState(null)
   async function probar() {
     setResultado('probando')
     try {
       await api('/tramites/?limite=1')
-      setResultado({ permitido: true })
+      setResultado({ estado: 200, cuerpo: { detalle: 'Acceso permitido' } })
     } catch (e) {
-      setResultado({ permitido: false, estado: e instanceof ApiError ? e.estado : 0, mensaje: mensajeDe(e) })
+      setResultado({ estado: e instanceof ApiError ? e.estado : 0, cuerpo: e instanceof ApiError ? e.datos : { detalle: mensajeDe(e) } })
     }
   }
+  const negado = resultado && resultado !== 'probando' && resultado.estado === 403
   return (
     <>
       <div className="encabezado-vista"><div><h2>Acceso a trámites</h2><p>Un rol de plataforma opera la infraestructura, no los trámites de las personas.</p></div></div>
-      <section className="panel">
-        <p>Pulsa el botón: la plataforma intentará listar trámites como <strong>{ROLES_PLATAFORMA[yo.rol_plataforma]}</strong>. El punto de decisión de acceso (PDP) consulta la política, niega y deja la decisión registrada, sin importar qué muestre la interfaz.</p>
-        <button onClick={probar} disabled={resultado === 'probando'}>Intentar ver los trámites</button>
-        {resultado && resultado !== 'probando' && (resultado.permitido
-          ? <Alerta tipo="ok">Acceso permitido.</Alerta>
-          : <Alerta>HTTP {resultado.estado} · {resultado.mensaje}</Alerta>)}
-      </section>
+      <div className="prueba">
+        <section className="panel">
+          <h3>La prueba</h3>
+          <p>Pulsa el botón: la plataforma intentará listar trámites como <strong>{ROLES_PLATAFORMA[yo.rol_plataforma]}</strong>.</p>
+          <p className="suave">El punto de decisión de acceso (PDP) consulta la política, niega y deja la decisión registrada, sin importar qué muestre la interfaz.</p>
+          <button className="btn" onClick={probar} disabled={resultado === 'probando'}>{resultado === 'probando' ? 'Probando…' : 'Intentar ver los trámites'}</button>
+        </section>
+        <section className="panel">
+          <h3>Lo que respondió el servidor</h3>
+          {!resultado || resultado === 'probando' ? <p className="suave">Aquí aparecerá la respuesta real de la API.</p> : (
+            <>
+              <Alerta tipo={negado ? 'ok' : 'error'}>{negado ? 'Acceso negado, como debe ser.' : 'Esto no debería pasar: revisa las políticas.'}</Alerta>
+              <div className="respuesta-http">
+                <div className="dim">GET /tramites/?limite=1</div>
+                <div className={negado ? 'no' : 'ok'}>← {resultado.estado} {negado ? 'Forbidden' : ''}</div>
+                <div>{JSON.stringify(resultado.cuerpo, null, 2).split('\n').map((l, i) => <div key={i}>{l}</div>)}</div>
+              </div>
+            </>
+          )}
+        </section>
+      </div>
     </>
   )
 }
+
+/* ---------------------------------------------------------------- próximamente */
 
 export function Proximamente({ modulo }) {
   return (
     <>
       <div className="encabezado-vista"><div><h2>{modulo.nombre}</h2><p>{modulo.descripcion}</p></div></div>
-      <section className="panel">
-        <p><span className="chip e-pendiente">Próximamente</span></p>
-        <p>Este módulo forma parte del diseño de roles y permisos (cada operador de plataforma tiene su propia área, sin un superusuario) y se construye en la siguiente fase. La separación de poderes ya está aplicada en la base de datos.</p>
-      </section>
+      <div className="pronto-detalle">
+        <Vacio titulo="Este módulo se construye en la siguiente fase"
+          texto="Forma parte del diseño de roles y permisos: cada operador de plataforma tiene su propia área, sin un superusuario. La separación de poderes ya está aplicada en la base de datos." />
+      </div>
     </>
   )
 }
