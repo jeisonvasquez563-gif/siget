@@ -1379,3 +1379,33 @@ tar -czf /tmp/fe.tgz -C frontend dist                # copiar a VM1 y, como root
 ```
 Después copiar `nginx.conf` y `siget-nginx.container` si cambiaron, `systemctl --user daemon-reload` y arrancar el pod (ver 27.4).
 
+## 28. Consola de auditoría (lectura con un rol propio de la base de datos)
+
+Fecha: 21 de octubre de 2026. Es el módulo «Auditoría» del rol `auditor`.
+
+### 28.1 Qué se hizo
+
+- **Migración 007** ([`007-auditor-login.sql`](../database/migraciones/007-auditor-login.sql)): `auditor_role` pasa a poder conectarse (límite de 5 conexiones) y recibe `SELECT` **solo** sobre `id`, `username` y `rol_plataforma` de las personas. Sigue sin ser superusuario ni BYPASSRLS. Su contraseña se generó al vuelo (nunca se mostró), se fijó con `ALTER ROLE` y vive como `podman secret` `siget-db-auditor-password` en VM1. `pg_hba.conf` de VM2 recibió su línea (`hostssl`, solo desde la red interna, `scram-sha-256`).
+- **Conexión propia** `DATABASES["auditoria"]` en Django: la consola lee como `auditor_role`, no como `app_role`. Aunque el backend tuviera un error o se comprometiera por otra vía, esta vía **no puede escribir, alterar ni borrar** nada.
+- **API** (`/auditoria/…`, solo lectura): `resumen/`, `decisiones/` (filtros: resultado, política, acción, persona), `seguridad/` y `tramites/`, todas paginadas. El PDP exige rol `auditor`, nivel de aseguramiento 3 y segundo factor reciente. Solo se piden columnas concretas: ni siquiera es posible leer hashes ni secretos.
+- **Quién audita al auditor:** cada consulta pasa por el PDP y queda registrada como una decisión más (`consultar_decisiones`).
+- **Interfaz:** resumen con gráfico de decisiones por política (permitidas y negadas), personas con más denegaciones, y listados con filtros y paginación.
+
+### 28.2 Verificación
+
+- `verificar_auditoria`: **34 de 34** contra la base real. Incluye lo que importa: la conexión de auditoría **es negada** al insertar o alterar decisiones, borrar eventos, alterar o leer trámites, leer hashes, secretos TOTP y sesiones, crear personas y borrar tablas (cada intento corre en una transacción que siempre se revierte).
+- API: 401 sin token; 403 para ciudadanía, funcionarios, operadores, un auditor con nivel 2 y uno con segundo factor vencido (con la sugerencia de reautenticar); filtros inválidos o con inyección, 400; ninguna respuesta contiene hashes ni secretos.
+- **274 pruebas unitarias** en el PC.
+
+### 28.3 Gotchas
+
+- Un `DROP TABLE` de quien no es dueño falla con «must be owner», no con «permission denied»: las pruebas de rechazo deben aceptar ambos mensajes.
+- Al pedir filas por `select_related` Django lee **todas** las columnas de la tabla unida; como `auditor_role` solo ve tres columnas de `usuario`, la consola usa `values()` con columnas explícitas.
+- El orden del contenedor sigue siendo detener todo y levantar pod, backend y nginx en ese orden.
+
+### 28.4 Pendiente
+
+- Exportar el registro (CSV firmado) y búsquedas por rango de fechas.
+- Alertas sobre patrones (muchas denegaciones de una persona, reuso de tokens).
+- Que `siget-postgres` registre también las conexiones de `auditor_role` (log del servidor).
+

@@ -18,7 +18,7 @@ CATALOGO = {
     "consola_catalogo": ("Catálogo", "Alta de instituciones y de trámites (control dual).", PROXIMAMENTE),
     "consola_seguridad": ("Respuesta a incidentes", "Bloqueo de cuentas y revocación de sesiones.", PROXIMAMENTE),
     "consola_secretos": ("Custodia de secretos", "Rotación de claves y certificados.", PROXIMAMENTE),
-    "auditoria": ("Auditoría", "Consulta del registro inalterable de eventos y de decisiones de acceso.", PROXIMAMENTE),
+    "auditoria": ("Auditoría", "Consulta del registro inalterable de eventos y de decisiones de acceso.", DISPONIBLE),
 }
 
 _POR_ROL_PLATAFORMA = {

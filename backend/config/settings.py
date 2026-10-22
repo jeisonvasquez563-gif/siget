@@ -85,6 +85,12 @@ DATABASES = {
 # NEGADAS) deben quedar registradas aunque la petición se revierta (DRF revierte la transacción al denegar).
 DATABASES["decisiones"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False}
 
+# La consola de auditoría lee con SU PROPIO rol de base de datos (auditor_role: solo SELECT). Aunque el backend se
+# viera comprometido por otra vía, esta conexión no puede escribir ni alterar nada (migración 007).
+DATABASES["auditoria"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
+                          "USER": os.environ.get("SIGET_DB_AUDITOR_USER", "auditor_role"),
+                          "PASSWORD": _leer("SIGET_DB_AUDITOR_PASSWORD", "")}
+
 # --- Contraseñas: Argon2 primero ---
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
 
