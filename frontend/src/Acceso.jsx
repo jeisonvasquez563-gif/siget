@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { api, ApiError, confirmarMfa, iniciarSesion, instituciones, registrar, restablecerContrasena } from './api.js'
 import { Alerta, Icono, Logo } from './ui.jsx'
+import { MapaPanama } from './Mapa.jsx'
 
-function Faro({ titulo, lema }) {
+function Faro({ titulo, lema, ilustracion = true }) {
   return (
     <section className="acceso-faro">
       <div className="marca">
@@ -15,6 +16,7 @@ function Faro({ titulo, lema }) {
         <h1>{titulo}</h1>
         <p className="lema">{lema}</p>
       </div>
+      {ilustracion && <div className="acceso-ilustracion"><MapaPanama /></div>}
       <ul className="garantias">
         <li><Icono nombre="llave" />Segundo factor obligatorio</li>
         <li><Icono nombre="auditoria" />Historial inalterable</li>
@@ -362,7 +364,7 @@ export function EnrolarMfa({ usuario, alTerminar, alSalir }) {
 
   return (
     <main className="acceso">
-      <Faro titulo="Un paso más para proteger tu cuenta." lema="Tu rol exige verificación en dos pasos: además de tu contraseña, un código que cambia cada 30 segundos." />
+      <Faro titulo="Un paso más para proteger tu cuenta." lema="Tu rol exige verificación en dos pasos: además de tu contraseña, un código que cambia cada 30 segundos." ilustracion={false} />
       <section className="acceso-formulario">
         <div className="tarjeta-acceso">
           <h2>Activa el segundo factor</h2>
