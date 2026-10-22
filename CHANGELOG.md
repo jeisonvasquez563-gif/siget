@@ -6,6 +6,10 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Cambiado (quién puede iniciar qué trámite, 22-oct)
+- **El personal de una institución ya no puede iniciar trámites en su propia institución** (el MOP no se hace trámites a sí mismo) y **cada trámite tiene una audiencia**: `ciudadania` (lo inicia una persona de la ciudadanía), `institucion` (lo inicia el personal de OTRA institución; p. ej. la «Solicitud interinstitucional de información», que ya existe en cada institución con plazo de 5 días) o `ambas`. Dos reglas de denegación nuevas en el PDP (`personal_no_inicia_en_su_institucion`, `audiencia_no_corresponde`), reflejadas en la matriz y en el simulador (variable «Trámite para»). El personal sigue siendo solicitante de lo que inicia en otra institución y no lo gestiona (conflicto de interés). La pantalla «Iniciar un trámite» filtra instituciones y trámites según quien eres; el catálogo (`GET /catalogo/tipos-tramite/`) devuelve `audiencia`.
+- **Segunda barrera en la base** (migración 012): `tipo_tramite.audiencia` y un trigger `BEFORE INSERT` en `tramite` que rechaza iniciar en la propia institución y la audiencia equivocada, aunque alguien saltara el PDP. 463 pruebas del backend (7 nuevas), 191 del frontend. **Pendiente de aplicar en producción** (migración 012 + despliegue).
+
 ### Cambiado (portada con el mapa de Panamá, 22-oct)
 - **La portada muestra el mapa de Panamá con el recorrido de un trámite** (`frontend/src/Mapa.jsx`): silueta real (Natural Earth 50m, dominio público, 5 polígonos y 237 puntos), el Canal, y una ruta naranja de la recepción (David) a la tramitación (Penonomé, con la boya) hasta la resolución (Ciudad de Panamá); se dibuja al cargar y respeta «reducir movimiento». Solo con los colores de la plataforma (azul petróleo y naranja boya). Se genera con `docs/identidad/generar_mapa.py` desde la geometría guardada en `docs/identidad/panama-natural-earth-50m.json`. Se retiró la bandera.
 

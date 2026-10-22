@@ -160,13 +160,33 @@ describe('acciones sobre un trámite', () => {
     expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
   })
 
-  it('un trámite que el propio funcionario inició no se puede gestionar (conflicto de interés)', async () => {
+  it('el personal no puede iniciar un trámite en su propia institución: no se le ofrece', async () => {
     const { user } = await abrirComo('fabio.mop')
     await irA(user, 'Iniciar un trámite')
+    expect(await screen.findByRole('radio', { name: /^MINSA/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /^MOP/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/No puedes iniciar trámites en la tuya/)).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: /^MINSA/ }))
+    // solo las solicitudes entre instituciones, no los trámites de la ciudadanía
+    expect(await screen.findByRole('radio', { name: /Solicitud interinstitucional/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Certificado de salud ocupacional/ })).not.toBeInTheDocument()
+  })
+
+  it('la ciudadanía ve todas las instituciones, pero no las solicitudes entre instituciones', async () => {
+    const { user } = await abrirComo('ana.ciudadana')
+    await irA(user, 'Iniciar un trámite')
     await user.click(await screen.findByRole('radio', { name: /^MOP/ }))
-    await user.click(await screen.findByRole('radio', { name: /Permiso de uso de vía pública/ }))
+    expect(await screen.findByRole('radio', { name: /Permiso de uso de vía pública/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Solicitud interinstitucional/ })).not.toBeInTheDocument()
+  })
+
+  it('lo que el personal inicia en otra institución lo sigue como solicitante: no puede gestionarlo', async () => {
+    const { user } = await abrirComo('fabio.mop')
+    await irA(user, 'Iniciar un trámite')
+    await user.click(await screen.findByRole('radio', { name: /^MINSA/ }))
+    await user.click(await screen.findByRole('radio', { name: /Solicitud interinstitucional/ }))
     await user.click(screen.getByRole('button', { name: 'Iniciar trámite' }))
-    expect(await screen.findByText(/por conflicto de interés no puedes gestionarlo/)).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: 'Recorrido del trámite: Recepción' })).toBeInTheDocument()
     // Un trámite «Pendiente» solo tiene la acción «Pasar a tramitación»: debe faltar (no vale mirar «Aprobar», que no aparece en ese estado)
     expect(screen.queryByRole('button', { name: 'Pasar a tramitación' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Acciones' })).not.toBeInTheDocument()

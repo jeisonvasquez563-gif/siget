@@ -81,7 +81,7 @@ Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) �
 | Ruta | Respuesta |
 |---|---|
 | `GET /catalogo/instituciones/` | `[{id, nombre, tipo}]` |
-| `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, institucion: {id, nombre}}]` |
+| `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, audiencia, institucion: {id, nombre}}]` (`audiencia`: `ciudadania`, `institucion` o `ambas`; quién puede iniciarlo) |
 | `GET /equipo/` | `{equipos: [{institucion: {id, nombre}, personal: [{usuario_id, usuario, rol}]}]}` — coordinación y supervisión de esa institución |
 
 ## Auditoría (`/auditoria/`) — solo rol `auditor`, nivel 3 y segundo factor reciente
