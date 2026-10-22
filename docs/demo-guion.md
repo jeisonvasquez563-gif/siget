@@ -9,7 +9,7 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
    ```bash
    backend/.venv/Scripts/python.exe demo/ensayo.py
    ```
-   Debe terminar en **«86 de 86 comprobaciones correctas»** (tarda ~5 minutos: espera un minuto a propósito por el límite de inicios de sesión). Revisa la hora de las VMs, el certificado, TLS 1.3, las 13 cuentas, el segundo factor, la auditoría, el simulador y el cierre de sesión. Si algo falla, ver «Si algo falla en vivo».
+   Debe terminar en **«89 de 89 comprobaciones correctas»** (tarda ~5 minutos: espera un minuto a propósito por el límite de inicios de sesión). Revisa la hora de las VMs, el certificado, TLS 1.3, las 13 cuentas, el segundo factor, la auditoría, el simulador y el cierre de sesión. Si algo falla, ver «Si algo falla en vivo».
 3. **Confiar en la CA interna** para que el navegador no avise «conexión no privada» (PowerShell, usuario normal):
    ```powershell
    certutil -addstore -user Root infra\pki\siget-ca.crt
@@ -38,6 +38,7 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 
 ## Recorrido sugerido (≈20 minutos; los pasos marcados ★ son los imprescindibles)
 
+0. ★ **Las tres puertas.** La pantalla de acceso pregunta «¿Cómo quieres ingresar?»: **ciudadanía** (puerta pública, con «Crear una cuenta»), **personal de una institución** (se elige la institución; no hay registro, el acceso lo da la coordinación) y **plataforma y auditoría**. Mostrar que `fabio.mop` por la puerta de ciudadanía o de otra institución recibe «tu cuenta no corresponde a este acceso» y no entra; solo entra por **MOP**. Cada institución tiene su enlace directo (`…:8443/#/institucion/<id>`).
 1. ★ **Login en dos pasos y segundo factor.** Entrar como `ana.ciudadana`: primero solo usuario y contraseña; **el campo del código aparece después**, solo si la contraseña es correcta (así la pantalla no delata quién tiene segundo factor). Escribir el código y entrar. Mostrar «Mi seguridad»: la credencial, la ventana del segundo factor y lo que *puede* y *no puede* hacer.
 2. **La ciudadana inicia un trámite** (Iniciar un trámite → MOP) y ve su estado e historial con las esclusas. No ve qué funcionario lo atiende.
 3. ★ **`fabio.mop` (funcionario).** Cerrar sesión y entrar. Bandeja: solo trámites del MOP. Abrir el trámite nuevo y pasarlo a «En tramitación»; aparece en el historial **con quién lo hizo**. Probar el tablero. Aprobarlo (pide confirmación: es un estado final) y mostrar el sello.
