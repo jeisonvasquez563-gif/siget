@@ -28,7 +28,7 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 | `carla.mop` | Coordinadora del MOP | Equipo y roles; **no** ve trámites |
 | `felix.minsa` | Funcionario del MINSA | Bandeja del MINSA (no ve la del MOP) |
 | `ines.infra`, `ivan.identidades`, `cata.catalogo`, `sergio.seguridad`, `silvia.secretos` | Los 5 roles de plataforma | Solo su consola (próximamente) y «Acceso a trámites» |
-| `aldo.auditor` | Auditor | Consola de auditoría (próximamente) |
+| `aldo.auditor` | Auditor | Auditoría: decisiones de acceso, eventos de seguridad y actuaciones en trámites (solo lectura) |
 
 ## Recorrido sugerido (≈10 minutos)
 
@@ -41,6 +41,8 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 6. **`felix.minsa`.** Su bandeja solo tiene trámites del MINSA: lo del MOP **no existe** para él (404, no «prohibido»).
 7. **`carla.mop` (coordinadora).** Ve el equipo y los roles de su institución, pero la lista de trámites está vacía: gestionar personas no da acceso a los datos de los ciudadanos.
 8. **Un rol de plataforma** (por ejemplo `ines.infra`). Menú distinto: solo su consola. En «Acceso a trámites», pulsar el botón: el PDP responde 403 y la decisión queda registrada. *Ningún operador, ni siquiera el de infraestructura, ve trámites; y no existe un superusuario.*
+
+9. **`aldo.auditor`.** Auditoría: el resumen muestra cuántas decisiones permitió y negó el sistema y qué políticas las motivaron; en «Decisiones de acceso» se filtra por «Solo negadas» y se ve quién intentó qué (por ejemplo, el operador de infraestructura pidiendo trámites). Remarcar: **la consola lee con un rol de base de datos de solo lectura** y **la propia consulta del auditor queda registrada** (quién audita al auditor).
 
 ## Qué decir (hilo conductor: Zero Trust)
 

@@ -157,3 +157,18 @@ tbody tr:last-child td { border-bottom: 0; }
   .contenido { padding: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) { .lateral { transition: none; } }
+
+/* ---------- auditoría ---------- */
+.barra-filtros { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.barra-filtros label { margin-bottom: 0; min-width: 200px; }
+.grafico { width: 100%; height: auto; display: block; margin-bottom: 0.75rem; }
+.grafico-texto { font-size: 11px; fill: var(--texto); }
+.grafico-cifra { font-size: 11px; fill: var(--suave); font-weight: 700; }
+.barra-ok { fill: var(--ok); }
+.barra-no { fill: var(--error); }
+.num-ok { color: var(--ok); }
+.separado { margin-top: 1.25rem; }
+.suave { color: var(--suave); }
+tr.sin-clic { cursor: default; }
+tr.sin-clic:hover { background: transparent; }
+.paginador { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin: 0.75rem 0; color: var(--suave); font-size: 0.9rem; }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { alPerderLaSesion, api, cerrarSesion, olvidarToken, renovar } from './api.js'
 import { EnrolarMfa, Login } from './Acceso.jsx'
+import { Auditoria } from './Auditoria.jsx'
 import { Cargando, ROLES_INSTITUCION, ROLES_PLATAFORMA } from './comun.jsx'
 import { Equipo, Inicio, Proximamente, PruebaAcceso, Seguridad } from './Otras.jsx'
 import { Bandeja, Detalle, MisTramites, NuevoTramite } from './Tramites.jsx'
@@ -53,6 +54,7 @@ export default function App() {
     case 'supervision': contenido = <Bandeja yo={yo} abrir={abrir} modo="supervision" />; break
     case 'equipo': contenido = <Equipo />; break
     case 'seguridad': contenido = <Seguridad yo={yo} />; break
+    case 'auditoria': contenido = <Auditoria />; break
     case 'prueba_acceso': contenido = <PruebaAcceso yo={yo} />; break
     case 'detalle': contenido = <Detalle id={vista.id} yo={yo} volver={() => ir(vista.desde || 'inicio')} />; break
     default: contenido = actual ? <Proximamente modulo={actual} /> : <Inicio yo={yo} ir={ir} />
