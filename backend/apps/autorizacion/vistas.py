@@ -17,6 +17,9 @@ from rest_framework.views import APIView
 from apps.autenticacion.autenticacion import exige_scope
 from apps.autenticacion.tokens import SCOPE_COMPLETO
 
+from apps.autenticacion import canales
+from apps.identidad.models import Membresia
+
 from . import matriz, simulador
 
 ROLES_BD = [
@@ -64,7 +67,12 @@ class MatrizPermisos(_Transparencia):
 
 
 class PermisosBaseDeDatos(_Transparencia):
+    """Cómo están configurados los permisos de PostgreSQL. Es información técnica de seguridad: no es para la ciudadanía."""
+
     def get(self, request):
+        u = request.user.usuario
+        if canales.canal_de(u.rol_plataforma, Membresia.objects.filter(usuario=u).values_list("rol", "institucion_id")) == canales.CIUDADANIA:
+            return Response({"codigo": "acceso_denegado", "detalle": "No tienes autorización para esta operación."}, status=403)
         nombres = [r for r, _ in ROLES_BD]
         with connection.cursor() as c:
             c.execute(_SQL_ATRIBUTOS, [[*nombres, "postgres"]])

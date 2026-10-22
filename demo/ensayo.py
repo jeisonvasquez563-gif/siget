@@ -162,6 +162,8 @@ e, _ = ana.pedir("GET", "/equipo/")
 paso(e == 403, "no ve el equipo (403)", e)
 e, m = ana.pedir("GET", "/politicas/matriz/")
 paso(e == 200 and m["ningun_rol_puede_todo"] is True, "ve la matriz de permisos: no hay superusuario")
+e, _ = ana.pedir("GET", "/politicas/base-de-datos/")
+paso(e == 403, "los permisos de la base de datos (información técnica) no son para la ciudadanía (403)", e)
 
 # --------------------------------------------------------------------------- 2. funcionario
 titulo("2. Fabio (funcionario del MOP): bandeja, cambiar estado, conflicto de interés")

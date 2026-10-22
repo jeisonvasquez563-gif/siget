@@ -147,7 +147,7 @@ describe('matriz de permisos', () => {
 
 describe('permisos de la base de datos', () => {
   async function abrirBd() {
-    const o = await abrirComo('ana.ciudadana', 'Roles y permisos')
+    const o = await abrirComo('saul.mop', 'Roles y permisos')
     await o.user.click(await screen.findByRole('tab', { name: 'Base de datos' }))
     await screen.findByText(/Ningún rol de la aplicación es superusuario/)
     return o
@@ -191,6 +191,40 @@ describe('permisos de la base de datos', () => {
   it('es accesible (axe)', async () => {
     const { container } = await abrirBd()
     expect(await axe(container, AXE)).toHaveNoViolations()
+  })
+})
+
+describe('lo técnico no es para la ciudadanía', () => {
+  it('la ciudadanía no ve las pestañas «Matriz de permisos» ni «Base de datos», pero sí las demás', async () => {
+    await abrirComo('ana.ciudadana', 'Roles y permisos')
+    await screen.findByRole('tab', { name: 'Roles y módulos' })
+    expect(screen.queryByRole('tab', { name: 'Matriz de permisos' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Base de datos' })).not.toBeInTheDocument()
+    for (const n of ['Módulos por rol', '¿Qué pasaría si…?', 'Cómo se decide']) expect(screen.getByRole('tab', { name: n })).toBeInTheDocument()
+  })
+
+  it('el personal sí las ve', async () => {
+    for (const usuario of ['fabio.mop', 'ines.infra', 'aldo.auditor']) {
+      const { unmount } = await abrirComo(usuario, 'Roles y permisos')
+      expect(await screen.findByRole('tab', { name: 'Matriz de permisos' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Base de datos' })).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('la ciudadanía ni siquiera pide los permisos de la base al servidor', async () => {
+    const pedidos = []
+    const original = window.fetch
+    instalarMock('ana.ciudadana', { demora: 0 })
+    const mock = window.fetch
+    window.fetch = (ruta, op) => { pedidos.push(String(ruta)); return mock(ruta, op) }
+    render(<ProveedorUI><App /></ProveedorUI>)
+    const nav = await screen.findByRole('navigation', { name: 'Módulos' })
+    await userEvent.setup().click(within(nav).getByRole('button', { name: /^Roles y permisos/ }))
+    await screen.findByRole('tab', { name: 'Roles y módulos' })
+    expect(pedidos.some((r) => r.includes('/politicas/matriz/'))).toBe(true)
+    expect(pedidos.some((r) => r.includes('/politicas/base-de-datos/'))).toBe(false)
+    window.fetch = original
   })
 })
 
