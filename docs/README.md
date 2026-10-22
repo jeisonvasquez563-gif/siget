@@ -45,7 +45,7 @@ La documentación "viva" del proyecto vive acá en Markdown, versionada junto co
 
 | Documento | Contenido |
 |---|---|
-| [`runbook.md`](./runbook.md) | **Paso a paso técnico de todo lo ejecutado** (33 secciones): VMs, red, SSH, firewall, checkpoint PHP, Podman, roles de base de datos, TLS, PostgreSQL y backend en contenedor, nginx, autenticación, API, interfaz, auditoría, pruebas, simulador, ensayo, sesiones, registro y respaldos |
+| [`runbook.md`](./runbook.md) | **Paso a paso técnico de todo lo ejecutado** (34 secciones): VMs, red, SSH, firewall, checkpoint PHP, Podman, roles de base de datos, TLS, PostgreSQL y backend en contenedor, nginx, autenticación, API, interfaz, auditoría, pruebas, simulador, ensayo, sesiones, registro, respaldos, consolas de plataforma y recuperación de contraseña |
 | [`acceso-equipo.md`](./acceso-equipo.md) | Cuentas de Linux del equipo en las VMs, cómo cargar claves SSH y reglas de acceso |
 | [`endurecimiento-vms.md`](./endurecimiento-vms.md) | Desvíos de seguridad hallados en la auditoría de las VMs, cambios aplicados y reversión |
 | [`revisiones/2026-10-15-revision-prs-3-y-4.md`](./revisiones/2026-10-15-revision-prs-3-y-4.md) | Revisión de los PRs de Podman y Zero Trust contra el estado real de las VMs |

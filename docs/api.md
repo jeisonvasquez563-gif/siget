@@ -116,3 +116,29 @@ El `modulos` de `/auth/yo/` incluye siempre `seguridad`, `mfa` y `roles_permisos
 1. **Agregar** campos o rutas es compatible: se documenta aquí.
 2. **Quitar o cambiar** un campo, un estado o un código de error rompe al otro frente: se avisa y se acuerda antes, y el PR toca este archivo, `frontend/` y `backend/` a la vez.
 3. El backend cubre cada ruta con pruebas (incluida la auditoría de rutas públicas); el frontend no inventa rutas que no estén aquí.
+
+### Recuperación de contraseña (pública)
+
+| Ruta | Cuerpo | Respuestas |
+|---|---|---|
+| `POST /auth/restablecer/` | `{username, codigo, password}` (el código lo emitió el operador de identidades) | `200`; `400 {codigo: "codigo_invalido"}` (**idéntico** si el código es incorrecto, ya se usó, venció o el usuario no existe); `400 {codigo: "datos_invalidos", errores[]}` si la contraseña no cumple la política (el código no se gasta) |
+
+Un código vale una vez y 15 minutos; al usarlo se cierran todas las sesiones de la persona y el segundo factor sigue siendo obligatorio. Límite de tasa: 10 por hora.
+
+## Consolas de plataforma (`/plataforma/…`)
+
+Todas exigen acceso completo y que el rol de plataforma correspondiente tenga el segundo factor reciente (si no, `403` con `reautenticacion_sugerida`). Ninguna devuelve trámites ni datos personales. Se aplican el PDP y, debajo, la base de datos.
+
+| Ruta | Quién | Qué hace |
+|---|---|---|
+| `GET /plataforma/personas/?q=` | identidades, seguridad | Cuentas: `id`, `usuario`, `estado_cuenta`, `rol_plataforma`, `mfa_activo`, `sesiones_activas`, `bloqueada_hasta` |
+| `POST /plataforma/personas/<id>/restablecer-contrasena/` | identidades | `201 {codigo_restablecimiento, vence_en}`: el código en claro **solo en esta respuesta** (`Cache-Control: no-store`) |
+| `POST /plataforma/personas/<id>/restablecer-mfa/` | identidades | Desactiva el segundo factor y cierra sus sesiones |
+| `POST /plataforma/personas/<id>/bloquear/` `{motivo}` · `…/desbloquear/` · `…/revocar-sesiones/` | seguridad | Bloqueo de cuenta (motivo de 5 a 200 caracteres) y cierre de sesiones |
+| `GET /plataforma/eventos/` | seguridad | Últimos eventos de seguridad |
+| `GET/POST /plataforma/aprobaciones/` | identidades (altas de coordinadora), catálogo (altas de institución) | Lista y propone. El tipo sale del rol, nunca del cliente |
+| `POST /plataforma/aprobaciones/<id>/resolver/` `{decision: aprobar\|rechazar}` | el mismo rol, **otra persona** | Aprueba (y aplica el efecto) o rechaza. Quien propuso recibe `403` |
+| `GET/POST /plataforma/secretos/` | custodio de secretos | Estado de los 8 secretos y registro de una rotación (`{secreto, nota}`); nunca valores |
+| `GET /plataforma/infraestructura/` | infraestructura | Salud de la base (respuesta, TLS, tamaño), del proceso y vencimiento del certificado |
+
+Errores propios: `409 no_a_si_mismo` (nadie actúa sobre su cuenta), `409 conflicto_de_funciones` (quien emitió el código de contraseña de una cuenta no restablece además su segundo factor en 24 horas, ni al revés), `409 ya_resuelta`, `409 no_corresponde`, `400 datos_invalidos {errores[]}`.

@@ -9,7 +9,7 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
    ```bash
    backend/.venv/Scripts/python.exe demo/ensayo.py
    ```
-   Debe terminar en **«59 de 59 comprobaciones correctas»**. Revisa la hora de las VMs, el certificado, TLS 1.3, las 13 cuentas, el segundo factor, la auditoría, el simulador y el cierre de sesión. Si algo falla, ver «Si algo falla en vivo».
+   Debe terminar en **«86 de 86 comprobaciones correctas»** (tarda ~5 minutos: espera un minuto a propósito por el límite de inicios de sesión). Revisa la hora de las VMs, el certificado, TLS 1.3, las 13 cuentas, el segundo factor, la auditoría, el simulador y el cierre de sesión. Si algo falla, ver «Si algo falla en vivo».
 3. **Confiar en la CA interna** para que el navegador no avise «conexión no privada» (PowerShell, usuario normal):
    ```powershell
    certutil -addstore -user Root infra\pki\siget-ca.crt
@@ -32,7 +32,8 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 | `saul.mop` | Supervisor del MOP | Lo anterior + Supervisión (reasignar) y Equipo |
 | `carla.mop` | Coordinadora del MOP | Equipo y roles; **no** ve trámites |
 | `felix.minsa` | Funcionario del MINSA | Bandeja del MINSA (no ve la del MOP) |
-| `ines.infra`, `ivan.identidades`, `cata.catalogo`, `sergio.seguridad`, `silvia.secretos` | Los 5 roles de plataforma | Solo su consola («próximamente») y «Acceso a trámites» |
+| `ines.infra`, `ivan.identidades`, `cata.catalogo`, `sergio.seguridad`, `silvia.secretos` | Los 5 roles de plataforma | Su consola (ya construidas) y «Acceso a trámites» |
+| `irene.identidades`, `camilo.catalogo` | Segundas personas de identidades y de catálogo | Lo mismo que su rol: hacen falta dos para demostrar el **control dual** |
 | `aldo.auditor` | Auditor | Auditoría: decisiones de acceso, eventos de seguridad y actuaciones en trámites (solo lectura) |
 
 ## Recorrido sugerido (≈20 minutos; los pasos marcados ★ son los imprescindibles)
@@ -56,7 +57,9 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 11. ★ **Segundo factor (MFA)** (`fabio.mop`). Menú «Segundo factor (MFA)»: explicar los 6 pasos; escribir el código actual en «Pruébalo ahora» → la ventana se renueva; luego **«Enviar el mismo código de nuevo»** → el servidor lo rechaza (anti-repetición). Mostrar la actividad de seguridad propia. *No introducir códigos incorrectos a propósito: tres bloquean la cuenta, y el bloqueo es progresivo (5 minutos, luego 15 y luego 60). Si se quiere mostrar, hacerlo con una cuenta que no se vaya a usar después.*
 12. ★ **Crear una cuenta y alta del segundo factor en vivo:** «Crear una cuenta» pide nombre, apellidos, cédula (formato panameño, p. ej. `8-123-456`), fecha de nacimiento (mayor de 18), provincia, ciudad y correo, más usuario y contraseña de 12 caracteres o más. Al enviar, entra directo al código QR para escanear con el celular → confirmar con el código. Remarcar: *la cédula se guarda cifrada y ni el auditor ni ningún otro rol puede leer los datos personales; el correo aún no se verifica (no hay servidor de correo). Deja una cuenta nueva en la base: el registro es inalterable y la cuenta se puede suspender, no borrar.*
 13. ★ **Cierre por inactividad y recarga.** Con una sesión abierta y un trámite a la vista: **recargar la página (F5)** → vuelve al Inicio (la vista no se recuerda). Dejar la sesión sin tocar: a los 9 minutos sale el aviso «¿Sigues ahí?» con cuenta regresiva y a los 10 se cierra la sesión (se revoca en el servidor) y el acceso explica el motivo. Para no esperar 10 minutos, ver «Cómo mostrar el cierre por inactividad».
-14. **Bloqueo progresivo** (opcional, con una cuenta de prueba): tres intentos fallidos bloquean 5 minutos; si se repite, 15; luego 60. Un inicio de sesión correcto reinicia la escalera. La respuesta es idéntica a una contraseña mala: no revela que la cuenta está bloqueada.
+14. ★ **Consolas de plataforma y control dual.** Entrar como `ivan.identidades`: la consola lista a las personas **sin datos personales**; proponer el alta de una coordinadora y mostrar que **no puede aprobar su propia propuesta** (el botón no existe y, aunque se forzara, el servidor responde 403 y la base también lo rechaza). Cerrar sesión, entrar como `irene.identidades` y aprobarla. Con `cata.catalogo` y `camilo.catalogo` es igual para las instituciones. Con `sergio.seguridad`: bloquear una cuenta (pide motivo) y cerrar sesiones. Con `silvia.secretos`: el estado de los 8 secretos y el registro de una rotación (nunca valores). Con `ines.infra`: la base responde, la conexión va cifrada con TLS 1.3 y el certificado vence en 2027. *Ninguna consola muestra trámites.*
+15. ★ **Recuperar una contraseña.** Con `ivan.identidades`: «Código de contraseña» sobre una cuenta de prueba → aparece un código `XXXX-XXXX-XXXX` **una sola vez**. En el acceso, «¿Olvidaste tu contraseña?», usuario + código + contraseña nueva. Remarcar: vale 15 minutos y una vez; en la base solo está su hash; un código incorrecto y un usuario inexistente responden igual; las sesiones se cierran y **el segundo factor sigue siendo obligatorio**; quien emite el código no puede además restablecer el segundo factor de esa cuenta. *No lo hagas con las cuentas de la demo: dejarías al equipo sin su contraseña.*
+16. **Bloqueo progresivo** (opcional, con una cuenta de prueba): tres intentos fallidos bloquean 5 minutos; si se repite, 15; luego 60. Un inicio de sesión correcto reinicia la escalera. La respuesta es idéntica a una contraseña mala: no revela que la cuenta está bloqueada.
 
 ## Cómo mostrar la reautenticación escalonada
 

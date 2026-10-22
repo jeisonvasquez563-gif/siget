@@ -33,14 +33,24 @@ Esquema `siget`, con 7 migraciones (002–007), seguridad por filas (RLS), dispa
 
 ## 3. Seguridad de la infraestructura
 
-| # | Módulo | Estado |
-|---|---|---|
-| 1 | Aislamiento de red (red interna, firewall, SELinux) | ✅ |
-| 2 | Acceso del equipo (Tailscale, SSH solo por clave, sudo de mínimo privilegio) | ✅ |
-| 3 | Roles de base de datos sin superusuario y RLS | ✅ |
-| 4 | Cifrado app ↔ base de datos (TLS 1.3 con verificación del certificado) | ✅ |
-| 5 | Registro del sistema (journal persistente) y hora verificada | ✅ |
-| 6 | TLS 1.3 en el borde con HSTS, CSP y límite de tasa (nginx) | ✅ |
+| # | Módulo | Estado | Ciudadanía | Funcionario | Supervisor | Coordinación | Infraest. | Identid. | Catálogo | Seguridad | Secretos | Auditor | Roles |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| **Mis trámites** | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | 4 |
+| **Iniciar un trámite** | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | 4 |
+| **Bandeja de la institución** | ✅ | — | ✅ | ✅ | — | — | — | — | — | — | — | 2 |
+| **Supervisión** | ✅ | — | — | ✅ | — | — | — | — | — | — | — | 1 |
+| **Equipo de la institución** | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | 2 |
+| **Mi seguridad** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
+| **Segundo factor (MFA)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
+| **Roles y permisos** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
+| **Acceso a trámites** | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 6 |
+| **Infraestructura** | ✅ | — | — | — | — | ✅ | — | — | — | — | — | 1 |
+| **Identidades** | ✅ | — | — | — | — | — | ✅ | — | — | — | — | 1 |
+| **Catálogo** | ✅ | — | — | — | — | — | — | ✅ | — | — | — | 1 |
+| **Respuesta a incidentes** | ✅ | — | — | — | — | — | — | — | ✅ | — | — | 1 |
+| **Custodia de secretos** | ✅ | — | — | — | — | — | — | — | — | ✅ | — | 1 |
+| **Auditoría** | ✅ | — | — | — | — | — | — | — | — | — | ✅ | 1 |
+| **Módulos que ve** | | 5 | 6 | 8 | 6 | 5 | 5 | 5 | 5 | 5 | 5 | |
 
 PostgreSQL, el backend y nginx corren como contenedores Podman rootless gestionados con Quadlet; los secretos llegan como `podman secret`.
 
@@ -63,7 +73,9 @@ Además, `nucleo` trae la prueba de salud, el contexto RLS por transacción y lo
 
 El servidor calcula el menú de cada persona (`/auth/yo/` → `modulos`); la interfaz solo lo dibuja. **Cada petición se vuelve a autorizar**: un módulo mostrado de más no abre ningún acceso.
 
-Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ módulo anunciado, aún sin construir). Se genera desde `modulos_para()` y se comprueba en `test_matriz.py` (la vista por módulo es la inversa exacta de la vista por rol), y la misma tabla está en la pantalla **Roles y permisos → Módulos por rol**.
+Diagrama: [`diagrama-roles-modulos.svg`](./diagrama-roles-modulos.svg) (generado desde la matriz del backend).
+
+Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ módulo anunciado, aún sin construir; hoy los 15 están construidos). Se genera desde `modulos_para()` y se comprueba en `test_matriz.py` (la vista por módulo es la inversa exacta de la vista por rol), y la misma tabla está en la pantalla **Roles y permisos → Módulos por rol**.
 
 | Módulo | Estado | Ciudadanía | Funcionario | Supervisor | Coordinación | Infraest. | Identid. | Catálogo | Seguridad | Secretos | Auditor | Roles |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
