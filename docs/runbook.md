@@ -1613,6 +1613,10 @@ El control dual necesita dos personas por rol: `sembrar_demo` creó `irene.ident
 
 `verificar_plataforma` recorre contra la base real (en una transacción que se revierte): quién entra a cada consola, el ciclo completo del código (emisión, hash en la base, uso, reuso, vencimiento a los 16 minutos, mensajes idénticos), la separación de funciones, el control dual en el motor y en la base, bloqueos, secretos de solo inserción, infraestructura con TLS 1.3, privilegios de la base por rol y los eventos de seguridad. El ensayo de la demo (`demo/ensayo.py`, sección 10) repite lo no destructivo contra producción: **86 de 86**.
 
+### 34.4b Gestión del equipo (migración 011)
+
+Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1`. Backend: `apps/identidad/equipo.py` y las vistas de `/equipo/<institucion>/miembros/…`. Verificación: `verificar_equipo` (51 pasos) más regresión de todas las demás. El manager `Membresia.objects` filtra las revocadas: **todo código nuevo que decida accesos debe usarlo** (no `Membresia.todas`).
+
 ### 34.5 Gotchas
 
 - Una anotación de Django no puede llamarse igual que una relación inversa del modelo (`sesiones`): daba un 500.

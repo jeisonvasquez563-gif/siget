@@ -7,6 +7,7 @@
 //           cata.catalogo sergio.seguridad silvia.secretos aldo.auditor
 
 import matrizEjemplo from './mock-datos/matriz.json'
+import { equipoMock } from './mock-equipo.js'
 import { plataformaMock } from './mock-plataforma.js'
 import bdEjemplo from './mock-datos/base-de-datos.json'
 import simuladorEjemplo from './mock-datos/simulador.json'
@@ -156,6 +157,11 @@ export function instalarMock(inicial, opciones = {}) {
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
     negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
   })
+  const equipo = equipoMock({
+    usuarios: USUARIOS, actual: () => actual, tramites: () => TRAMITES,
+    resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
+    negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
+  })
   const demora = (ms = opciones.demora ?? 140) => new Promise((r) => setTimeout(r, ms))
   const resp = (estado, cuerpo) => new Response(cuerpo === null ? null : JSON.stringify(cuerpo), { status: estado, headers: { 'Content-Type': 'application/json' } })
   const yo = () => {
@@ -224,11 +230,9 @@ export function instalarMock(inicial, opciones = {}) {
     }
     if (camino === '/catalogo/instituciones/') return resp(200, INSTITUCIONES)
     if (camino === '/catalogo/tipos-tramite/') return resp(200, TIPOS.filter((t) => !p.get('institucion') || String(t.institucion.id) === p.get('institucion')))
-    if (camino === '/equipo/') {
-      const mias = u.membresias.filter((m) => ['supervisor', 'coordinador_institucional'].includes(m.rol))
-      if (!mias.length) return negado()
-      return resp(200, { equipos: mias.map((m) => ({ institucion: { id: m.institucion_id, nombre: m.institucion }, personal: Object.entries(USUARIOS).filter(([, x]) => x.membresias.some((y) => y.institucion_id === m.institucion_id)).map(([nombre, x]) => ({ usuario_id: x.id, usuario: nombre, rol: x.membresias.find((y) => y.institucion_id === m.institucion_id).rol })) })) })
-    }
+    if (camino === '/equipo/') return equipo.listar(u)
+    const deEquipo = equipo.manejar(camino, metodo, cuerpo)
+    if (deEquipo) return deEquipo
     if (camino === '/tramites/' && metodo === 'GET') {
       if (u.plataforma !== 'ninguno') return negado()
       return resp(200, { resultados: TRAMITES.filter((t) => visibles(u, t)).sort((a, b) => b.id - a.id).map((t) => dto(u, t)), limite: 100, desplazamiento: 0 })

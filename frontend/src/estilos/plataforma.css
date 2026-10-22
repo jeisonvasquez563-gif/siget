@@ -33,3 +33,8 @@ textarea.entrada { resize: vertical; min-height: 5rem; font: inherit; }
   .tabla.apilada td[data-etiqueta='Acciones']::before { display: block; margin-bottom: 0.35rem; }
   .tabla td:last-child .acciones-fila { min-width: 0; }
 }
+
+/* Equipo de la institución: personas con sus acciones */
+.persona-gestion { align-items: flex-start; }
+.persona-gestion .datos-persona { display: grid; gap: 0.35rem; justify-items: start; min-width: 0; }
+.persona-gestion .acciones-fila { margin-top: 0.15rem; }
