@@ -37,13 +37,13 @@ backend/
 ├── config/                 # settings, urls y wsgi
 │   └── settings_test.py    # solo para las pruebas
 ├── apps/
-│   ├── autenticacion/      # login, MFA, sesiones, tokens y eventos de seguridad
-│   ├── autorizacion/       # PDP (pdp.py) y permisos de DRF
+│   ├── autenticacion/      # login, MFA, sesiones, tokens, eventos de seguridad y actividad propia
+│   ├── autorizacion/       # PDP (pdp.py), permisos de DRF, módulos por rol, matriz de permisos, simulador y transparencia
 │   ├── catalogo/           # Institucion, TipoTramite
-│   ├── identidad/          # Usuario, Membresia, Aprobacion y el adaptador al PDP
+│   ├── identidad/          # Usuario, Membresia, Aprobacion, el adaptador al PDP y el equipo de cada institución
 │   ├── tramites/           # Tramite, Transicion
-│   ├── auditoria/          # EventoAuditoria, DecisionPdp (solo inserción)
-│   └── nucleo/             # salud, contexto RLS y comandos verificar_esquema / verificar_integracion / verificar_autenticacion
+│   ├── auditoria/          # EventoAuditoria, DecisionPdp (solo inserción) y la consola de auditoría (rol de base propio)
+│   └── nucleo/             # salud, contexto RLS, manejo de errores y los comandos verificar_* y sembrar_demo
 └── tests/
 ```
 
@@ -61,6 +61,10 @@ Las pruebas de `pytest` no necesitan la base de datos. Para probar contra la bas
 - `python manage.py verificar_esquema`: compara cada modelo con su tabla real.
 - `python manage.py verificar_integracion`: recorrido por el ORM (RLS, triggers, auditoría, permisos) en una transacción que se revierte.
 - `python manage.py verificar_autenticacion`: recorrido HTTP de la autenticación (registro, login, MFA, refresco, bloqueo, límites) en una transacción que se revierte, con el reloj controlado.
+- `python manage.py verificar_tramites`: la API de trámites por HTTP (visibilidad por rol e institución, conflicto de interés, segundo factor vencido, historial).
+- `python manage.py verificar_auditoria`: la consola de auditoría y que la conexión de solo lectura **no pueda** escribir ni leer secretos.
+- `python manage.py verificar_politicas`: matriz, permisos reales de la base, actividad de seguridad y simulador.
+- `python manage.py sembrar_demo [--ensayo]`: crea las 13 cuentas de demostración (una por rol, con segundo factor) y trámites de ejemplo **por la propia API**; `--ensayo` lo hace todo dentro de una transacción que se revierte. Imprime las credenciales una sola vez (no las guarda).
 
 Se ejecutan en VM1 con la imagen del `Containerfile` y los secretos como `podman secret`; el comando exacto está en [`docs/runbook.md`](../docs/runbook.md) sección 23.
 

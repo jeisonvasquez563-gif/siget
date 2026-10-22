@@ -1363,7 +1363,7 @@ El recorrido mostró que la coordinadora de una institución listaba sus trámit
 - Reiniciar `siget-backend` y `siget-nginx` a la vez detiene el pod (`BindsTo`): se detienen todos y se levantan en orden (pod, backend, nginx).
 - Python 3.14 verifica de forma estricta la CA interna y la rechaza porque no trae `keyUsage`: hay que reemitirla (pendiente); los navegadores no lo exigen.
 - El refresco de sesión es de un solo uso: el cliente serializa las renovaciones y la interfaz no usa `StrictMode` (duplicaría el efecto de arranque y revocaría la sesión).
-- El panel de navegador de Claude no llega a las VMs: la interfaz se probó por API; el recorrido visual lo hace una persona.
+- El navegador integrado del entorno de desarrollo no llega a las VMs: la interfaz se probó por API y con el modo de ejemplo (`?mock`); el recorrido visual con las cuentas reales lo hace una persona.
 
 ### 27.5 Pendiente
 

@@ -1,78 +1,88 @@
 # Módulos de SIGET: qué hay hoy y qué se construye
 
-Respuesta corta para el profesor: **hoy están implementados y probados los módulos de datos y de seguridad de la infraestructura; los módulos de aplicación (backend y frontend) están diseñados y planificados, pero todavía no existe su código.** Esta página da los números exactos.
-
-Los nombres de las apps de Django y las vistas de React son una **propuesta** que el equipo confirma al iniciar cada bloque.
+Respuesta corta para el profesor: **están implementados y probados los módulos de datos, de seguridad de la infraestructura, del backend y del frontend que forman el flujo completo de un trámite, la autenticación con segundo factor, la auditoría y la transparencia de roles y permisos.** Lo que falta son las consolas de los operadores de plataforma, los plazos con escalamiento automático, los documentos adjuntos y las notificaciones. Esta página da los números exactos (actualizada el 21 de octubre de 2026).
 
 ## 1. Resumen
 
 | Capa | Módulos | Implementados hoy | Planificados |
 |---|---|---|---|
-| Base de datos | 11 | **9** (aplicados y probados) | 2 (documentos y notificaciones) |
+| Base de datos | 13 tablas del diseño | **11** (aplicadas y probadas) | 2 (documentos y notificaciones) |
 | Seguridad de infraestructura | 6 | **6** | 0 |
-| Backend (Django) | 7 | **1 completo** (autenticación) y el PDP del módulo 2 hecho | 6 |
-| Frontend (React) | 6 vistas | **0** | 6 |
+| Backend (Django) | 8 | **6 completos** | 2 (plazos y escalamiento; documentos y notificaciones) |
+| Frontend (React) | 11 módulos | **10 completos** | 1 (las consolas de plataforma, una por rol; hoy «próximamente») |
 
 ## 2. Módulos de base de datos
 
-Esquema `siget` aplicado el 15 de octubre de 2026, con 24 pruebas que pasan (`bash ~/siget-diseno/demo.sh`). Detalle en [`roles-permisos-bd.md`](./roles-permisos-bd.md).
+Esquema `siget`, con 7 migraciones (002–007), seguridad por filas (RLS), disparadores y 3 verificaciones contra la base real. Detalle en [`roles-permisos-bd.md`](./roles-permisos-bd.md).
 
 | # | Módulo | Tabla | Estado |
 |---|---|---|---|
-| 1 | Instituciones | `institucion` | ✅ |
-| 2 | Identidad (atributos del sujeto) | `usuario` | ✅ |
+| 1 | Instituciones | `institucion` | ✅ 6 sembradas (3 reales y 3 de demostración) |
+| 2 | Identidad (atributos del sujeto) | `usuario` | ✅ con campos del segundo factor y del bloqueo |
 | 3 | Permisos por institución | `membresia` | ✅ |
-| 4 | Catálogo de trámites | `tipo_tramite` | ✅ |
+| 4 | Catálogo de trámites | `tipo_tramite` | ✅ 6 sembrados con su SLA |
 | 5 | Trámites | `tramite` | ✅ |
 | 6 | Máquina de estados | `transicion` | ✅ |
 | 7 | Auditoría de solo inserción | `evento_auditoria` | ✅ |
 | 8 | Decisiones del PDP | `decision_pdp` | ✅ |
 | 9 | Control dual (altas sensibles con dos personas) | `aprobacion` | ✅ |
-| 10 | Documentos adjuntos | `documento` | ⏳ por modelar |
-| 11 | Notificaciones | `notificacion` | ⏳ por modelar |
+| 10 | Sesiones (refresco como huella, rotación) | `sesion` | ✅ |
+| 11 | Eventos de seguridad de solo inserción | `evento_seguridad` | ✅ |
+| 12 | Documentos adjuntos | `documento` | ⏳ por modelar |
+| 13 | Notificaciones | `notificacion` | ⏳ por modelar |
 
 ## 3. Seguridad de la infraestructura
 
 | # | Módulo | Estado |
 |---|---|---|
 | 1 | Aislamiento de red (red interna, firewall, SELinux) | ✅ |
-| 2 | Acceso del equipo (Tailscale, SSH solo por clave) | ✅ |
+| 2 | Acceso del equipo (Tailscale, SSH solo por clave, sudo de mínimo privilegio) | ✅ |
 | 3 | Roles de base de datos sin superusuario y RLS | ✅ |
-| 4 | Cifrado app ↔ base de datos (TLS 1.3 con verificación del certificado) | ✅ (checkpoint) |
-| 5 | Registro del sistema (journal persistente) | ✅ |
-| 6 | TLS en el borde con HSTS, CSP y límite de tasa (nginx) | ✅ (20-oct) |
+| 4 | Cifrado app ↔ base de datos (TLS 1.3 con verificación del certificado) | ✅ |
+| 5 | Registro del sistema (journal persistente) y hora verificada | ✅ |
+| 6 | TLS 1.3 en el borde con HSTS, CSP y límite de tasa (nginx) | ✅ |
 
-El backend y `nginx` corren como un pod rootless (`siget`) en VM1. Contenedores Podman rootless con Quadlet: instalados en las dos VMs. **PostgreSQL ya corre en un contenedor** (20-oct, runbook 21); falta desplegar `nginx` y Django.
+PostgreSQL, el backend y nginx corren como contenedores Podman rootless gestionados con Quadlet; los secretos llegan como `podman secret`.
 
-## 4. Módulos de backend (Django) planificados
+## 4. Módulos de backend (Django)
 
-| # | Módulo | Qué hace | Semana |
+| # | Módulo (app) | Qué hace | Estado |
 |---|---|---|---|
-| 1 | Identidad y autenticación | Registro, Argon2, JWT de vida corta, MFA TOTP, bloqueo y eventos de seguridad. **Hecho el 20-oct** (runbook 25) | ✅ |
-| 2 | Autorización (PEP y PDP) | Decide cada petición con atributos; deniega por defecto. **El PDP ya está hecho y probado (84 pruebas)**; falta el PEP que lo conecta a las vistas | S4–S6 |
-| 3 | Instituciones y catálogo | Instituciones y tipos de trámite con su SLA; altas con control dual | S3–S5 |
-| 4 | Trámites | Crear, consultar y cambiar de estado con transiciones válidas | S3–S5 |
-| 5 | Auditoría y decisiones | Registra cada actuación y cada decisión del PDP | S5–S7 |
-| 6 | Plazos y escalamiento | Calcula la fecha límite y escala los vencidos (systemd timer) | S5–S7 |
-| 7 | Documentos y notificaciones | Adjuntos y avisos al solicitante y a los responsables | S8–S9 |
+| 1 | Autenticación (`autenticacion`) | Registro, Argon2, JWT de vida corta, refresco de un solo uso, MFA TOTP, reautenticación escalonada, bloqueo, actividad de seguridad propia | ✅ runbook 25 |
+| 2 | Autorización (`autorizacion`) | **PDP** (ABAC, niega por defecto, *fail closed*), módulos por rol, **matriz de permisos calculada por el PDP**, privilegios reales de la base y **simulador** | ✅ runbook 30, 31 |
+| 3 | Catálogo (`catalogo`) | Instituciones y tipos de trámite con su SLA | ✅ runbook 26 |
+| 4 | Trámites (`tramites`) | Crear, listar, ver, cambiar de estado, reasignar e historial, con RLS y auditoría en la misma transacción | ✅ runbook 26 |
+| 5 | Identidad y equipo (`identidad`) | Usuarios, membresías y el equipo de cada institución | ✅ runbook 27 |
+| 6 | Auditoría (`auditoria`) | Consola de solo lectura con **su propio rol de base de datos**; registra cada consulta | ✅ runbook 28 |
+| 7 | Plazos y escalamiento | Fecha límite en días hábiles y escalamiento de vencidos (systemd timer) | ⏳ (hoy: días calendario) |
+| 8 | Documentos y notificaciones | Adjuntos y avisos al solicitante y a los responsables | ⏳ |
 
-## 5. Vistas de frontend (React) planificadas
+Además, `nucleo` trae la prueba de salud, el contexto RLS por transacción y los comandos `verificar_*` y `sembrar_demo`.
 
-| # | Vista | Para quién | Semana |
-|---|---|---|---|
-| 1 | Inicio de sesión y registro | Todos | S6 |
-| 2 | Mis trámites y nuevo trámite | Ciudadano | S6–S9 |
-| 3 | Cola de trabajo y cambio de estado | Funcionario | S7–S9 |
-| 4 | Escalados y reasignación | Supervisor | S7–S9 |
-| 5 | Usuarios, membresías y catálogo de su institución | Coordinador institucional | S8–S9 |
-| 6 | Auditoría y decisiones del PDP | Auditor | S8–S9 |
+## 5. Módulos de la interfaz (React) y quién los ve
 
-Los cinco roles de operación de plataforma (infraestructura, identidades, catálogo, seguridad y custodio de secretos) trabajan sobre sus funciones y ninguno tiene vista de trámites.
+El servidor calcula el menú de cada persona (`/auth/yo/` → `modulos`); la interfaz solo lo dibuja. **Cada petición se vuelve a autorizar**: un módulo mostrado de más no abre ningún acceso.
+
+| Módulo | Qué hace | Ciudadanía | Funcionario | Supervisor | Coordinación | Plataforma | Auditor |
+|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| Mis trámites | Seguimiento con el recorrido por esclusas | ✅ | ✅ | ✅ | ✅ | — | — |
+| Iniciar un trámite | Institución y trámite del catálogo, con su plazo | ✅ | ✅ | ✅ | ✅ | — | — |
+| Bandeja de la institución | Lista y tablero; cambio de estado con confirmación | — | ✅ | ✅ | — | — | — |
+| Supervisión | Vencidos, sin asignar y reasignación | — | — | ✅ | — | — | — |
+| Equipo de la institución | Personal y roles | — | — | ✅ | ✅ | — | — |
+| Auditoría | Decisiones, eventos de seguridad y actuaciones | — | — | — | — | — | ✅ |
+| Acceso a trámites | Demuestra en vivo que un rol de plataforma no ve trámites | — | — | — | — | ✅ | ✅ |
+| Consola de su área | Infraestructura, identidades, catálogo, seguridad o secretos | — | — | — | — | ⏳ (una por rol) | — |
+| Mi seguridad | Credencial, ventana del segundo factor, lo que el rol puede y no puede | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Segundo factor (MFA) | Cómo funciona, prueba en vivo con anti-repetición, actividad propia | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Roles y permisos | Roles y módulos, matriz, **simulador**, base de datos, capas de defensa | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+Los cinco roles de plataforma (infraestructura, identidades, catálogo, seguridad y custodio de secretos) tienen cada uno su consola, y ninguno ve trámites. El auditor es un sexto rol de plataforma de solo lectura.
 
 ## 6. Qué decir y qué no decir
 
-**Se puede afirmar con evidencia:** el modelo de datos completo de los 9 módulos centrales está aplicado y probado, con roles sin superusuario, aislamiento por institución, auditoría inalterable y cifrado de la conexión con la base.
+**Se puede afirmar con evidencia:** el flujo completo de un trámite funciona de punta a punta con 13 cuentas (una por rol) en producción; hay autenticación con segundo factor obligatorio, un decisor de acceso que niega por defecto, aislamiento por institución en dos barreras, auditoría inalterable y una consola de auditoría con su propio rol de solo lectura. Todo está probado: 354 pruebas del backend, 130 del frontend, 6 verificaciones contra la base real y un ensayo de la demostración de 55 comprobaciones.
 
-**No se debe afirmar:** que existe el backend, el frontend o el control de acceso por atributos en funcionamiento. Existe el diseño, el esquema que lo respalda y el plan con fechas.
+**No se debe afirmar:** que están construidos los plazos con escalamiento automático, los documentos adjuntos, las notificaciones ni las consolas de los operadores de plataforma (existen como diseño y como módulos «próximamente»). Tampoco que la identidad del ciudadano se verifica contra el Registro Civil (límite declarado).
 
-**Sobre el PHP:** el login que se ve hoy funcionando es el checkpoint intermedio y no es parte del sistema final; se retira en la semana 6 (ver el [plan](./architecture/plan.md)).
+**Sobre el PHP:** el login que existía antes es el checkpoint intermedio y no es parte del sistema final; se retira en la semana 6 (ver el [plan](./architecture/plan.md)).
