@@ -6,6 +6,9 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Cambiado (lo técnico no es para la ciudadanía, 22-oct)
+- **La ciudadanía ya no ve las pestañas «Matriz de permisos» y «Base de datos»** de «Roles y permisos» (siguen viéndose «Roles y módulos», «Módulos por rol», el simulador y «Cómo se decide»), y ni siquiera las pide al servidor. **El servidor también lo niega**: `GET /politicas/base-de-datos/` responde `403` a las cuentas de la puerta de ciudadanía (esconder un botón no protege nada si la ruta sigue abierta). Personal, operadores y auditor lo ven igual. `verificar_politicas` 40 de 40, 185 pruebas del frontend (3 nuevas), ensayo 98 de 98.
+
 ### Cambiado (identidad visual, 22-oct)
 - **Nuevo logo y nueva portada, inspirados en la mola** (el arte textil del pueblo guna: capas superpuestas y contornos en eco). El logo es una estrella —la de la bandera— con contornos en eco (`docs/identidad/logo-siget.svg`, `logo-siget-horizontal.svg`, favicon nuevo). La portada deja la ilustración de esclusas y muestra la **bandera de Panamá bordada como una mola**, cuyos contornos se dibujan al cargar (respeta «reducir movimiento») y con el crédito en pantalla a la mola guna. Las esclusas siguen en el detalle del trámite, donde cuentan el estado. Todo se genera con `docs/identidad/generar_identidad.py`; la identidad (paleta, tipografía, uso) está en `docs/identidad/README.md`. Los rojos y azules de la bandera aparecen solo en la ilustración: en la interfaz el rojo sigue significando error.
 

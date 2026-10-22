@@ -87,9 +87,10 @@ class Command(BaseCommand):
             self._paso(f"{ruta} sin token responde 401", self._http(ruta).status_code == 401)
 
         # ---------------------------------------------------------------- base de datos
-        r = self._http("/politicas/base-de-datos/", t[ana.username])
+        self._paso("una ciudadana NO ve los permisos de la base: es información técnica de seguridad (403)", self._http("/politicas/base-de-datos/", t[ana.username]).status_code == 403)
+        r = self._http("/politicas/base-de-datos/", t[operador.username])
         d = r.json() if r.status_code == 200 else {}
-        self._paso("una ciudadana puede ver los permisos de la base (transparencia)", r.status_code == 200 and len(d.get("roles", [])) == 5, r.status_code)
+        self._paso("el personal (aquí, un operador de plataforma) sí los ve", r.status_code == 200 and len(d.get("roles", [])) == 5, r.status_code)
         roles = {x["nombre"]: x for x in d.get("roles", [])}
         priv = d.get("privilegios", {})
         tablas = {x["nombre"]: x for x in d.get("tablas", [])}
