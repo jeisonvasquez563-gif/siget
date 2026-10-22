@@ -17,8 +17,8 @@ from django.utils import timezone
 
 from apps.identidad.models import Membresia, Perfil, Usuario
 
-from . import bloqueo, contrasenas, mfa, perfil, politica_sesion, tokens
-from .models import EventoSeguridad, Sesion
+from . import bloqueo, contrasenas, mfa, perfil, politica_sesion, restablecimiento, tokens
+from .models import EventoSeguridad, Restablecimiento, Sesion
 
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,31}$")
 ROLES_CON_MFA_SIEMPRE = {"funcionario", "supervisor", "coordinador_institucional"}
@@ -261,3 +261,51 @@ def verificar_mfa(usuario, codigo, ip, ahora=None) -> Resultado:
             return fallo
         registrar_evento(usuario.pk, "mfa_verificado", ip)
         return Resultado(True, "mfa_verificado")
+
+
+
+# --------------------------------------------------------------------------- recuperación de contraseña asistida
+
+def emitir_restablecimiento(operador, objetivo, ip, ahora=None) -> Resultado:
+    """El operador de identidades emite un código para `objetivo`. Devuelve el código en claro UNA vez; en la base solo queda su hash.
+
+    Los códigos anteriores sin usar de esa persona dejan de servir (solo uno vigente a la vez)."""
+    ahora = ahora or timezone.now()
+    if objetivo.pk == operador.pk:
+        return Resultado(False, "no_a_si_mismo")
+    if objetivo.estado_cuenta == "suspendida":
+        return Resultado(False, "cuenta_suspendida")
+    codigo = restablecimiento.nuevo_codigo()
+    with transaction.atomic():
+        Restablecimiento.objects.filter(usuario=objetivo, usado_en__isnull=True).update(usado_en=ahora)
+        Restablecimiento.objects.create(usuario=objetivo, codigo_hash=restablecimiento.huella(restablecimiento.normalizar(codigo)),
+                                        emitido_por=operador, vence_en=ahora + restablecimiento.VIGENCIA)
+        registrar_evento(operador.pk, "restablecimiento_emitido", ip, {"objetivo": objetivo.pk, "vence_minutos": int(restablecimiento.VIGENCIA.total_seconds() // 60)})
+    return Resultado(True, "restablecimiento_emitido", detalle={"codigo_restablecimiento": codigo, "vence_en": (ahora + restablecimiento.VIGENCIA).isoformat()})
+
+
+def restablecer_contrasena(username, codigo, nueva, ip, ahora=None) -> Resultado:
+    """Usa un código para fijar una contraseña nueva. Cualquier fallo responde lo mismo («código inválido»): no se revela
+    si la cuenta existe, si el código era de otra persona ni si ya venció. El segundo factor sigue exigiéndose al entrar."""
+    ahora = ahora or timezone.now()
+    username = (username or "").strip().lower() if isinstance(username, str) else ""
+    normal = restablecimiento.normalizar(codigo)
+    with transaction.atomic():
+        fila = None
+        if username and normal:
+            fila = (Restablecimiento.objects.select_for_update(of=("self",)).select_related("usuario")
+                    .filter(codigo_hash=restablecimiento.huella(normal), usuario__username=username).first())
+        if fila is None or not restablecimiento.vigente(fila.vence_en, fila.usado_en, ahora) or fila.usuario.estado_cuenta == "suspendida":
+            registrar_evento(fila.usuario_id if fila else None, "restablecimiento_rechazado", ip, {"huella": _huella(username)})
+            contrasenas.verificacion_falsa(nueva if isinstance(nueva, str) else "")
+            return Resultado(False, "codigo_invalido")
+        errores = contrasenas.errores_de_contrasena(nueva, username)
+        if errores:
+            # El código NO se gasta: la persona puede corregir y reintentar dentro de su vigencia
+            return Resultado(False, "datos_invalidos", detalle={"errores": errores})
+        usuario = fila.usuario
+        Usuario.objects.filter(pk=usuario.pk).update(password_hash=contrasenas.hashear(nueva), intentos_fallidos=0, bloqueado_hasta=None)
+        Restablecimiento.objects.filter(pk=fila.pk).update(usado_en=ahora)
+        _revocar_todas(usuario.pk)
+        registrar_evento(usuario.pk, "contrasena_restablecida", ip, {"emitido_por": fila.emitido_por_id})
+    return Resultado(True, "contrasena_restablecida")

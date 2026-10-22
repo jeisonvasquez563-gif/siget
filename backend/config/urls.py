@@ -10,4 +10,5 @@ urlpatterns = [
     path("equipo/", include("apps.identidad.urls")),
     path("auditoria/", include("apps.auditoria.urls")),
     path("politicas/", include("apps.autorizacion.urls")),
+    path("plataforma/", include("apps.plataforma.urls")),
 ]

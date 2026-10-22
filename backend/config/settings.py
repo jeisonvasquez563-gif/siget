@@ -5,6 +5,7 @@ archivos montados por `podman secret`), todo se deniega por defecto y la conexi�
 va por TLS verificando el certificado del servidor.
 """
 import os
+from datetime import date
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -42,6 +43,7 @@ SIGET_REFRESH_TTL_SEGUNDOS = int(os.environ.get("SIGET_REFRESH_TTL_SEGUNDOS", "2
 SIGET_COOKIE_REFRESH = "siget_refresh"
 # Inactividad: la interfaz cierra la sesión a los N minutos sin actividad (avisando antes) y el servidor rechaza renovar un
 # refresco más viejo que SIGET_REFRESH_MAX_EDAD (por defecto 15 min: el acceso dura 10 y se renueva solo si la persona actúa).
+SIGET_CERT_NGINX_VENCE = date.fromisoformat(os.environ.get("SIGET_CERT_NGINX_VENCE", "2027-10-20"))  # solo para el recordatorio de la consola de secretos
 SIGET_INACTIVIDAD_MINUTOS = int(os.environ.get("SIGET_INACTIVIDAD_MINUTOS", "10"))
 SIGET_REFRESH_MAX_EDAD_SEGUNDOS = int(os.environ.get("SIGET_REFRESH_MAX_EDAD_SEGUNDOS", "900"))
 if SIGET_REFRESH_MAX_EDAD_SEGUNDOS <= SIGET_ACCESS_TTL_SEGUNDOS:
@@ -56,6 +58,7 @@ INSTALLED_APPS = [
     "apps.auditoria",
     "apps.autorizacion",
     "apps.autenticacion",
+    "apps.plataforma",
 ]
 
 MIDDLEWARE = [
@@ -113,7 +116,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "EXCEPTION_HANDLER": "apps.nucleo.errores.manejador",
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "registro": "10/hour", "login": "10/min", "refresh": "60/min", "mfa": "10/min", "api": "120/min"},
+    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "registro": "10/hour", "restablecer": "10/hour", "login": "10/min", "refresh": "60/min", "mfa": "10/min", "api": "120/min"},
     "UNAUTHENTICATED_USER": None,
 }
 

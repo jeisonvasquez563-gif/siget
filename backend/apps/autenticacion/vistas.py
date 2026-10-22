@@ -80,6 +80,20 @@ class Registro(_Publica):
         return Response({"codigo": r.codigo, "detalle": "No se pudo crear la cuenta con esos datos."}, status=status.HTTP_409_CONFLICT)
 
 
+class RestablecerContrasena(_Publica):
+    """Fija una contraseña nueva con un código de un solo uso que emitió el operador de identidades."""
+
+    throttle_scope = "restablecer"
+
+    def post(self, request):
+        r = servicio.restablecer_contrasena(_campo(request, "username"), _campo(request, "codigo"), _campo(request, "password"), _ip(request))
+        if r.ok:
+            return Response({"detalle": "Contraseña restablecida. Inicia sesión con tu nueva contraseña y tu segundo factor."})
+        if r.codigo == "datos_invalidos":
+            return Response({"codigo": r.codigo, "errores": r.detalle["errores"]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"codigo": "codigo_invalido", "detalle": "El código no es válido, ya se usó o venció."}, status=status.HTTP_400_BAD_REQUEST)
+
+
 @method_decorator(transaction.non_atomic_requests, name="dispatch")
 class Login(_Publica):
     throttle_scope = "login"
