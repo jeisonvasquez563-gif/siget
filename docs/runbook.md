@@ -1443,3 +1443,45 @@ El resumen de auditoría se quedaba en esqueleto para siempre cuando el segundo 
 - Ilustraciones propias para cada estado vacío, atajos de teclado, impresión del trámite, internacionalización.
 - Repetir el recorrido visual con las cuentas reales (esta pasada fue con datos de ejemplo).
 
+## 30. Pruebas automáticas del frontend, roles y permisos, y segundo factor
+
+Fecha: 21 de octubre de 2026.
+
+### 30.1 Pruebas automáticas del frontend
+
+- **Vitest + Testing Library + jest-axe + ESLint** (`npm run verificar` = lint + pruebas + build). **113 pruebas** en 6 archivos (`frontend/src/pruebas/`):
+  - `api`: el token vive solo en memoria; el refresco lleva la cabecera anti-CSRF y es único aunque fallen varias peticiones a la vez; un 401 se renueva y se repite; `pideReautenticar` solo acepta un booleano verdadero.
+  - `comun`: plazos, estados (las transiciones de ayuda coinciden con el contrato) y agrupación del menú.
+  - `ui`: las esclusas describen cada estado a los lectores de pantalla; avisos, confirmaciones, tema.
+  - `pantallas`: **qué ve y qué puede hacer cada rol** (menús, trámites visibles, reautenticación, estados finales con confirmación, conflicto de interés, reasignar solo para el supervisor, auditoría, login y alta del segundo factor) más **accesibilidad con axe** en las pantallas clave.
+  - `permisos`: matriz, base de datos y MFA, apoyadas en una **captura real** de la política y de PostgreSQL (`src/mock-datos/`).
+  - `seguridad`: lee el código fuente y falla si alguien usa `style=`, `dangerouslySetInnerHTML`, `eval`, recursos de otros orígenes, guarda el token en el navegador, deja claves escritas o importa el simulador fuera de desarrollo.
+- **Mutaciones:** se rompieron a propósito 9 cosas críticas (cabecera CSRF, refresco único, booleano de reautenticación, confirmación de estados finales, selector de reasignar, conflicto de interés, descripción de las esclusas, módulos desconocidos, estilo en línea): **las 9 se detectan**. La primera pasada dejó una viva (la prueba del conflicto de interés miraba un botón que nunca aparece en estado «Pendiente») y se corrigió.
+- **CI** (`frontend-ci.yml`): lint, pruebas, build, y que el simulador no llegue a `dist/`.
+- Lo que las pruebas destaparon: un `<aside>` sin nombre duplicado (accesibilidad), nombre de hook incorrecto (`usarConsulta`) y el estado del simulador compartido entre pruebas.
+
+### 30.2 Roles, permisos y módulos (transparencia)
+
+- **`/politicas/matriz/`** (`apps/autorizacion/matriz.py`): la matriz rol × acción **sale de evaluar el PDP real** con una persona y un recurso de ejemplo por cada caso; marca qué acciones exigen segundo factor reciente (la misma persona con el factor vencido se niega) y comprueba que **ningún rol puede todo** (no existe un superusuario: el que más puede, el supervisor, hace 6 de 18 acciones). 20 pruebas, incluida una que demuestra que se detectaría un rol «todopoderoso».
+- **`/politicas/base-de-datos/`**: los privilegios reales de cada rol de PostgreSQL por tabla (`has_table_privilege`), con RLS, disparadores y atributos del rol (ninguno es superusuario ni omite la seguridad por filas).
+- **Pantalla «Roles y permisos»**: roles y módulos (con «tu rol» marcado), matriz interactiva (cada celda explica la política que decidió; alterna entre «en su ámbito» y «fuera de su ámbito»), base de datos por rol, y las cinco capas de defensa.
+- **Módulos nuevos para todas las personas:** «Segundo factor (MFA)» y «Roles y permisos» (junto a «Mi seguridad», en el grupo «Seguridad y permisos»).
+- `verificar_politicas` contra la base real: **30 de 30** (los privilegios mostrados coinciden con PostgreSQL).
+- **Hallazgo honesto:** `siget_owner` (dueño de las tablas) tiene `UPDATE/DELETE` sobre el registro **por ser dueño**; lo que lo vuelve inalterable es que no puede iniciar sesión y que los disparadores de solo inserción rechazan el cambio incluso para él. La pantalla lo explica en lugar de esconderlo.
+
+### 30.3 Segundo factor (MFA) para demostrar
+
+- **Pantalla «Segundo factor (MFA)»:** estado y ventana de 15 minutos, cómo funciona en 6 pasos (secreto cifrado, TOTP, verificación, anti-repetición, bloqueo, reautenticación escalonada), quién lo exige, y **una prueba en vivo**: verificar el código real de la cuenta y **reenviar el mismo código**, que el servidor rechaza (no se puede reutilizar). Incluye la **actividad de seguridad propia** (`/auth/actividad/`: inicios de sesión, verificaciones, fallos).
+- Advertencia en pantalla: tres códigos incorrectos bloquean la cuenta 5 minutos.
+
+### 30.4 Gotchas
+
+- `has_any_column_privilege` no admite `DELETE` (solo SELECT, INSERT, UPDATE y REFERENCES): lo encontró `verificar_politicas`.
+- Una prueba que busca un texto en un componente debe mirar algo que **realmente aparezca** en ese estado (si no, la prueba pasa en vacío y la mutación sobrevive).
+- El `mock.js` y sus datos solo deben existir en desarrollo: el CI busca marcas exclusivas del simulador en `dist/`.
+
+### 30.5 Pendiente
+
+- Playwright (recorrido real contra las VMs) y revisión de contraste AA con herramienta.
+- Simulador de decisiones («¿qué pasaría si…?») sobre la matriz y exportación de la matriz a PDF/CSV para el informe.
+

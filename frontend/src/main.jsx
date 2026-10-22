@@ -8,6 +8,7 @@ import './estilos/base.css'
 import './estilos/componentes.css'
 import './estilos/layout.css'
 import './estilos/pantallas.css'
+import './estilos/permisos.css'
 import App from './App.jsx'
 import { ProveedorUI } from './ui.jsx'
 

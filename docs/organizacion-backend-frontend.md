@@ -49,7 +49,7 @@ El proyecto se divide en **dos frentes con una frontera clara**: el [contrato de
 | ✅ tablero y búsqueda; faltan orden y filtros guardados | Bandeja tipo tablero (columnas por estado) con búsqueda, orden y filtros guardados | Productividad del funcionario |
 | ✅ gráfico por política; faltan tendencias | Gráficos de auditoría más ricos (tendencias por hora, mapa de calor de denegaciones) | Valor para el rol auditor |
 | ✅ hecho | Tipografía y gráficos **propios** (autohospedados): la CSP no permite CDNs ni estilos en línea | Mantener Zero Trust también en el cliente |
-| Media | Pruebas: ESLint, Vitest + Testing Library para los flujos, Playwright para el recorrido por rol | Que lo bonito no se rompa |
+| ✅ ESLint, Vitest, Testing Library y axe; falta Playwright | Pruebas: ESLint, Vitest + Testing Library para los flujos, Playwright para el recorrido por rol | Que lo bonito no se rompa |
 | Baja | Internacionalización (es/en), impresión del trámite, atajos de teclado | Detalle |
 
 **Decisión técnica tomada (frontend):** la intención inicial era Tailwind + shadcn/ui. Esas librerías suelen inyectar estilos en línea (posicionamiento), lo que choca con la CSP estricta de nginx (`default-src 'self'`). Recomendación: **mantener un sistema de diseño propio con variables CSS** (ya hay una base en `src/estilos.css`) y, si hace falta, usar primitivas sin estilo (p. ej. Radix) vestidas con esas variables; relajar la CSP con `unsafe-inline` queda descartado porque debilita justo lo que defendemos.

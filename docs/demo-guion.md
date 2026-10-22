@@ -44,6 +44,14 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 
 9. **`aldo.auditor`.** Auditoría: el resumen muestra cuántas decisiones permitió y negó el sistema y qué políticas las motivaron; en «Decisiones de acceso» se filtra por «Solo negadas» y se ve quién intentó qué (por ejemplo, el operador de infraestructura pidiendo trámites). Remarcar: **la consola lee con un rol de base de datos de solo lectura** y **la propia consulta del auditor queda registrada** (quién audita al auditor).
 
+10. **Roles y permisos** (cualquier cuenta, mejor `saul.mop`). Menú «Seguridad y permisos» → «Roles y permisos»:
+    - *Roles y módulos:* los 10 roles, cuántas acciones puede cada uno y sus módulos; el aviso verde **«No existe un superusuario»** (el que más puede hace 6 de 18).
+    - *Matriz de permisos:* cada ✔/✖ sale de evaluar el motor de decisiones real. Hacer clic en una celda explica **la política que decidió**. Alternar «Fuera de su ámbito» (el funcionario ve lo de su institución, no lo de otra). La llave marca lo que **exige segundo factor reciente**.
+    - *Base de datos:* elegir `auditor_role` (solo lee) y `app_role` (inserta decisiones pero no las altera ni borra); ningún rol es superusuario; RLS y disparadores por tabla.
+    - *Cómo se decide:* las cinco capas y «si esta capa fallara…».
+11. **Segundo factor (MFA)** (`fabio.mop`). Menú «Segundo factor (MFA)»: explicar los 6 pasos, escribir el código actual (`demo-local/codigo.py`) en «Pruébalo ahora» → la ventana se renueva; luego **«Enviar el mismo código de nuevo»** → el servidor lo rechaza (anti-repetición). Mostrar la actividad de seguridad propia. *No introducir códigos incorrectos a propósito: tres bloquean la cuenta 5 minutos.*
+12. **Alta del segundo factor en vivo:** «Crear cuenta» con un usuario nuevo → al entrar, QR para escanear con el celular → confirmar con el código.
+
 ## Qué decir (hilo conductor: Zero Trust)
 
 - **Nunca confiar, siempre verificar:** cada petición revalida token, sesión, cuenta y política; la interfaz solo *muestra* el menú, quien decide es el servidor (PDP/ABAC) y, otra vez, la base de datos (RLS).

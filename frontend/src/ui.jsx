@@ -30,6 +30,7 @@ const RUTAS = {
   usuario: 'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2 M12 11a4 4 0 100-8 4 4 0 000 8',
   reasignar: 'M7 7h13l-3-3 M17 17H4l3 3',
   llave: 'M14 10a4 4 0 11-4 4l-7 7v-3h3v-3h3l1-1 M16 8h.01',
+  tabla: 'M4 5h16v14H4z M4 10h16 M10 5v14',
   flujo: 'M5 5h4v4H5z M15 5h4v4h-4z M10 17h4v4h-4z M7 9v3h10V9 M12 12v5',
 }
 

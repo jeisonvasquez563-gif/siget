@@ -33,6 +33,7 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 | `POST /auth/refresh/` | — (cookie + `X-SIGET-CSRF: 1`) | igual que el login |
 | `POST /auth/logout/` | `{}` | `200` y borra la cookie |
 | `GET /auth/yo/` | — | ver abajo |
+| `GET /auth/actividad/` | — | `{eventos: [{id, evento, creado_en, ip}]}`: los últimos 25 eventos de seguridad de la propia cuenta |
 | `POST /auth/mfa/enrolar/` | `{}` | `201 {secreto, uri}`; el secreto se muestra **una sola vez** (la `uri` se dibuja como QR) |
 | `POST /auth/mfa/confirmar/` | `{codigo}` | `200` con tokens de scope `completo` |
 | `POST /auth/mfa/verificar/` | `{codigo}` | `200`; renueva la vigencia del segundo factor (15 min) |
@@ -93,6 +94,17 @@ Todas son de lectura y paginadas: `{total, limite, desplazamiento, resultados[]}
 | `GET /auditoria/decisiones/` | `resultado=permitidas\|negadas`, `politica`, `accion`, `actor` | `{id, creado_en, actor, accion, recurso, permitido, politica, motivo, institucion_id}` |
 | `GET /auditoria/seguridad/` | `evento`, `actor` | `{id, creado_en, evento, ip, actor, detalle}` |
 | `GET /auditoria/tramites/` | `accion`, `actor` | `{id, creado_en, tramite_id, institucion_id, accion, estado_anterior, estado_nuevo, actor}` |
+
+## Transparencia: roles, permisos y base de datos (`/politicas/`) — cualquier persona autenticada
+
+Información de las reglas, no datos de nadie. Se calcula en el momento: no está escrita a mano.
+
+| Ruta | Respuesta |
+|---|---|
+| `GET /politicas/matriz/` | La matriz de roles y permisos, **generada evaluando el PDP real**: `{roles: [{id, nombre, ambito, descripcion, modulos[], acciones_permitidas, acciones_totales}], acciones: [{id, nombre, grupo, casos}], matriz: {<rol>: {<accion>: {favorable: {permitido, politica}, desfavorable: {permitido, politica}, exige_segundo_factor}}}, denegaciones: [{politica, descripcion}], ningun_rol_puede_todo}` |
+| `GET /politicas/base-de-datos/` | Los privilegios REALES de cada rol de PostgreSQL (`has_table_privilege`): `{roles: [{nombre, descripcion, superusuario, omite_rls, puede_conectar, limite_conexiones, ...}], tablas: [{nombre, rls, politicas, triggers}], privilegios: {<rol>: {<tabla>: {SELECT, INSERT, UPDATE, DELETE}}}, administrador_del_motor, ningun_rol_de_aplicacion_es_superusuario}`; cada privilegio es `total`, `columnas` (solo algunas columnas) o `no` |
+
+El `modulos` de `/auth/yo/` incluye siempre `seguridad`, `mfa` y `roles_permisos` (transparencia para todos los roles).
 
 ## Reglas para cambiar el contrato
 

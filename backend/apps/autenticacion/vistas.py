@@ -14,6 +14,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.autorizacion.modulos import modulos_para
+from apps.autenticacion.models import EventoSeguridad
 from apps.identidad.models import Membresia
 
 from . import servicio, tokens
@@ -141,6 +142,19 @@ class Yo(_Autenticada):
             "mfa_activo": u.mfa_activo, "mfa_obligatorio": servicio.mfa_obligatorio(u, [r["rol"] for r in roles]),
             "mfa_verificado_en": u.mfa_verificado_en, "nivel_aseguramiento": u.nivel_aseguramiento,
         })
+
+
+class Actividad(_Autenticada):
+    """Los últimos eventos de seguridad de la propia cuenta (inicios de sesión, segundo factor, bloqueos): que cada
+    persona pueda ver qué se hizo con su cuenta y detectar algo extraño."""
+
+    permission_classes = [exige_scope(tokens.SCOPE_COMPLETO)]
+    throttle_scope = "refresh"
+
+    def get(self, request):
+        u = request.user.usuario
+        filas = EventoSeguridad.objects.filter(actor_id=u.pk).order_by("-id").values("id", "evento", "creado_en", "ip")[:25]
+        return Response({"eventos": list(filas)})
 
 
 @method_decorator(transaction.non_atomic_requests, name="dispatch")

@@ -8,6 +8,7 @@ urlpatterns = [
     path("refresh/", vistas.Refresh.as_view(), name="refresh"),
     path("logout/", vistas.Logout.as_view(), name="logout"),
     path("yo/", vistas.Yo.as_view(), name="yo"),
+    path("actividad/", vistas.Actividad.as_view(), name="actividad"),
     path("mfa/enrolar/", vistas.MfaEnrolar.as_view(), name="mfa-enrolar"),
     path("mfa/confirmar/", vistas.MfaConfirmar.as_view(), name="mfa-confirmar"),
     path("mfa/verificar/", vistas.MfaVerificar.as_view(), name="mfa-verificar"),
