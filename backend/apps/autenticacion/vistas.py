@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.autorizacion.modulos import modulos_para
 from apps.identidad.models import Membresia
 
 from . import servicio, tokens
@@ -129,10 +130,14 @@ class Yo(_Autenticada):
 
     def get(self, request):
         u = request.user.usuario
-        roles = list(Membresia.objects.filter(usuario=u).values("institucion_id", "rol"))
+        roles = list(Membresia.objects.filter(usuario=u).values("institucion_id", "institucion__nombre", "rol"))
+        completo = request.user.claims.scope == tokens.SCOPE_COMPLETO
         return Response({
             "id": u.pk, "usuario": u.username, "scope": request.user.claims.scope,
-            "rol_plataforma": u.rol_plataforma, "membresias": roles,
+            "rol_plataforma": u.rol_plataforma,
+            "membresias": [{"institucion_id": r["institucion_id"], "institucion": r["institucion__nombre"], "rol": r["rol"]} for r in roles],
+            # Solo ayuda para el menú: cada petición se vuelve a autorizar. Sin segundo factor activo no hay módulos.
+            "modulos": modulos_para(u.rol_plataforma, [r["rol"] for r in roles]) if completo else [],
             "mfa_activo": u.mfa_activo, "mfa_obligatorio": servicio.mfa_obligatorio(u, [r["rol"] for r in roles]),
             "mfa_verificado_en": u.mfa_verificado_en, "nivel_aseguramiento": u.nivel_aseguramiento,
         })

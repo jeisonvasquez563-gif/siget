@@ -7,6 +7,8 @@ Image=registry.access.redhat.com/ubi9/nginx-126:1-1777855212
 ContainerName=siget-nginx
 Pod=siget.pod
 Volume=/home/siget/config/nginx.conf:/etc/nginx/nginx.conf:ro,Z
+# La interfaz (SPA) compilada; se copia con `deploy-frontend` (ver README)
+Volume=/home/siget/frontend:/usr/share/nginx/html:ro,Z
 # Certificado y clave TLS como podman secret; la clave solo la lee el usuario de nginx (uid 1001)
 Secret=siget-nginx-crt,mode=0444
 Secret=siget-nginx-key,uid=1001,gid=0,mode=0400

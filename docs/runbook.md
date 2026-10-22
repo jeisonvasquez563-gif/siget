@@ -1336,3 +1336,46 @@ Desde un contenedor de VM1, como `app_role`, contra la base real, en una transac
 - Documentos adjuntos y notificaciones.
 - Frontend (React): lista, detalle e historial.
 
+## 27. Interfaz web (React), módulos por rol y cuentas de demostración
+
+Fecha: 21 de octubre de 2026. Guion de la demostración en [`demo-guion.md`](./demo-guion.md).
+
+### 27.1 Qué se hizo
+
+- **Interfaz (`frontend/`)**: React 18 + Vite, JavaScript y CSS propios (sin estilos en línea, porque la CSP de nginx es `default-src 'self'`). Pantallas: inicio de sesión con código del segundo factor, creación de cuenta, enrolamiento del segundo factor con código QR, inicio con los módulos del rol, mis trámites, iniciar un trámite, bandeja y supervisión con filtros, detalle con historial y acciones, equipo, «Mi seguridad» y «Acceso a trámites». El token de acceso vive solo en memoria; el de refresco, en la cookie HttpOnly.
+- **Servida por nginx** desde una carpeta de solo lectura (`/home/siget/frontend`, montada en el contenedor). Solo `/`, `/index.html` y `/assets/` entregan archivos; las rutas `auth|tramites|catalogo|equipo|salud` van al backend y **todo lo demás responde 404**.
+- **Módulos por rol** (`apps/autorizacion/modulos.py`): `/auth/yo/` devuelve el menú de cada persona. Es solo ayuda visual: el PDP y la base siguen decidiendo en cada petición.
+- **`/equipo/`**: personal de las instituciones que la persona coordina o supervisa (PDP + segundo factor reciente para el coordinador).
+- **`sembrar_demo`**: 13 cuentas, una por rol, con segundo factor ya enrolado, y 5 trámites de ejemplo creados y movidos **por la API real** (PDP, RLS y auditoría reales). Es idempotente y tiene un modo `--ensayo` que se revierte. Las credenciales salen una sola vez por la salida del comando y se guardan solo en `demo-local/` (ignorado por git).
+
+### 27.2 Verificación
+
+- `verificar_tramites`: **51 de 51** contra la base real; **252 pruebas unitarias** en el PC.
+- Recorrido por HTTPS a través de nginx con las 13 cuentas (login con TOTP, módulos, listas): cada rol ve exactamente los suyos; los 6 roles de plataforma reciben 403 en trámites.
+
+### 27.3 Hallazgo corregido: el coordinador veía trámites
+
+El recorrido mostró que la coordinadora de una institución listaba sus trámites. La causa: el contexto de la RLS (`app.instituciones`) se armaba con **todas** las membresías y la política deja ver las filas de esas instituciones; el PDP la dejaba pasar por ser también ciudadana (la lista se evalúa sobre «lo propio»). Ahora solo cuentan las instituciones donde la persona es funcionaria o supervisora. `verificar_tramites` incluye el caso (el coordinador ve 0 trámites y recibe 404 en uno concreto).
+
+### 27.4 Gotchas
+
+- Un `add_header` dentro de un `location` de nginx **anula** las cabeceras de seguridad definidas en el `server`; para el caché se usa `expires`.
+- Reiniciar `siget-backend` y `siget-nginx` a la vez detiene el pod (`BindsTo`): se detienen todos y se levantan en orden (pod, backend, nginx).
+- Python 3.14 verifica de forma estricta la CA interna y la rechaza porque no trae `keyUsage`: hay que reemitirla (pendiente); los navegadores no lo exigen.
+- El refresco de sesión es de un solo uso: el cliente serializa las renovaciones y la interfaz no usa `StrictMode` (duplicaría el efecto de arranque y revocaría la sesión).
+- El panel de navegador de Claude no llega a las VMs: la interfaz se probó por API; el recorrido visual lo hace una persona.
+
+### 27.5 Pendiente
+
+- Consolas de los operadores de plataforma y del auditor (hoy «próximamente»); registro de decisiones del PDP visible para el auditor.
+- Recuperación de contraseña, rotación de claves, reemisión de la CA, plazos en días hábiles y escalamiento automático.
+- Suspender las cuentas de demostración tras la presentación.
+
+### 27.6 Cómo desplegar la interfaz
+
+```bash
+cd frontend && npm install && npm run build          # en el PC
+tar -czf /tmp/fe.tgz -C frontend dist                # copiar a VM1 y, como root, reemplazar /home/siget/frontend
+```
+Después copiar `nginx.conf` y `siget-nginx.container` si cambiaron, `systemctl --user daemon-reload` y arrancar el pod (ver 27.4).
+
