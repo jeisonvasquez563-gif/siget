@@ -1,2603 +1,2780 @@
 {
- "roles": [
-  {
-   "id": "ciudadano",
-   "nombre": "Ciudadanía",
-   "ambito": "propio",
-   "descripcion": "Inicia trámites y sigue los suyos. No ve nada de otras personas.",
-   "modulos": [
-    {
-     "id": "mis_tramites",
-     "nombre": "Mis trámites",
-     "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
-     "estado": "disponible"
-    },
-    {
-     "id": "nuevo_tramite",
-     "nombre": "Iniciar un trámite",
-     "descripcion": "Elige una institución y un trámite del catálogo.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 4,
-   "acciones_totales": 18
-  },
-  {
-   "id": "funcionario",
-   "nombre": "Funcionario",
-   "ambito": "institucion",
-   "descripcion": "Atiende los trámites de su institución, con segundo factor reciente.",
-   "modulos": [
-    {
-     "id": "mis_tramites",
-     "nombre": "Mis trámites",
-     "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
-     "estado": "disponible"
-    },
-    {
-     "id": "nuevo_tramite",
-     "nombre": "Iniciar un trámite",
-     "descripcion": "Elige una institución y un trámite del catálogo.",
-     "estado": "disponible"
-    },
-    {
-     "id": "bandeja",
-     "nombre": "Bandeja de la institución",
-     "descripcion": "Trámites de tu institución: revisarlos y cambiar su estado.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 4,
-   "acciones_totales": 18
-  },
-  {
-   "id": "supervisor",
-   "nombre": "Supervisor",
-   "ambito": "institucion",
-   "descripcion": "Todo lo del funcionario y además reasigna y atiende escalados.",
-   "modulos": [
-    {
-     "id": "mis_tramites",
-     "nombre": "Mis trámites",
-     "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
-     "estado": "disponible"
-    },
-    {
-     "id": "nuevo_tramite",
-     "nombre": "Iniciar un trámite",
-     "descripcion": "Elige una institución y un trámite del catálogo.",
-     "estado": "disponible"
-    },
-    {
-     "id": "bandeja",
-     "nombre": "Bandeja de la institución",
-     "descripcion": "Trámites de tu institución: revisarlos y cambiar su estado.",
-     "estado": "disponible"
-    },
-    {
-     "id": "supervision",
-     "nombre": "Supervisión",
-     "descripcion": "Reasigna trámites y atiende los escalados de tu institución.",
-     "estado": "disponible"
-    },
-    {
-     "id": "equipo",
-     "nombre": "Equipo de la institución",
-     "descripcion": "Personal y roles de tu institución.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 6,
-   "acciones_totales": 18
-  },
-  {
-   "id": "coordinador_institucional",
-   "nombre": "Coordinación",
-   "ambito": "institucion",
-   "descripcion": "Gestiona al equipo de su institución. No ve trámites.",
-   "modulos": [
-    {
-     "id": "mis_tramites",
-     "nombre": "Mis trámites",
-     "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
-     "estado": "disponible"
-    },
-    {
-     "id": "nuevo_tramite",
-     "nombre": "Iniciar un trámite",
-     "descripcion": "Elige una institución y un trámite del catálogo.",
-     "estado": "disponible"
-    },
-    {
-     "id": "equipo",
-     "nombre": "Equipo de la institución",
-     "descripcion": "Personal y roles de tu institución.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 3,
-   "acciones_totales": 18
-  },
-  {
-   "id": "operador_infraestructura",
-   "nombre": "Operador de infraestructura",
-   "ambito": "plataforma",
-   "descripcion": "Opera servidores y contenedores. No ve trámites.",
-   "modulos": [
-    {
-     "id": "consola_infraestructura",
-     "nombre": "Infraestructura",
-     "descripcion": "Estado de los servidores y contenedores.",
-     "estado": "proximamente"
-    },
-    {
-     "id": "prueba_acceso",
-     "nombre": "Acceso a trámites",
-     "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 1,
-   "acciones_totales": 18
-  },
-  {
-   "id": "operador_identidades",
-   "nombre": "Operador de identidades",
-   "ambito": "plataforma",
-   "descripcion": "Altas de coordinadores y restablece el segundo factor (control dual).",
-   "modulos": [
-    {
-     "id": "consola_identidades",
-     "nombre": "Identidades",
-     "descripcion": "Alta de coordinadores y restablecimiento del segundo factor (control dual).",
-     "estado": "proximamente"
-    },
-    {
-     "id": "prueba_acceso",
-     "nombre": "Acceso a trámites",
-     "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 3,
-   "acciones_totales": 18
-  },
-  {
-   "id": "operador_catalogo",
-   "nombre": "Operador de catálogo",
-   "ambito": "plataforma",
-   "descripcion": "Altas de instituciones y de trámites (control dual).",
-   "modulos": [
-    {
-     "id": "consola_catalogo",
-     "nombre": "Catálogo",
-     "descripcion": "Alta de instituciones y de trámites (control dual).",
-     "estado": "proximamente"
-    },
-    {
-     "id": "prueba_acceso",
-     "nombre": "Acceso a trámites",
-     "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 2,
-   "acciones_totales": 18
-  },
-  {
-   "id": "operador_seguridad",
-   "nombre": "Operador de seguridad",
-   "ambito": "plataforma",
-   "descripcion": "Bloquea cuentas y revoca sesiones ante un incidente.",
-   "modulos": [
-    {
-     "id": "consola_seguridad",
-     "nombre": "Respuesta a incidentes",
-     "descripcion": "Bloqueo de cuentas y revocación de sesiones.",
-     "estado": "proximamente"
-    },
-    {
-     "id": "prueba_acceso",
-     "nombre": "Acceso a trámites",
-     "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 2,
-   "acciones_totales": 18
-  },
-  {
-   "id": "custodio_secretos",
-   "nombre": "Custodio de secretos",
-   "ambito": "plataforma",
-   "descripcion": "Rota claves y certificados. No ve datos.",
-   "modulos": [
-    {
-     "id": "consola_secretos",
-     "nombre": "Custodia de secretos",
-     "descripcion": "Rotación de claves y certificados.",
-     "estado": "proximamente"
-    },
-    {
-     "id": "prueba_acceso",
-     "nombre": "Acceso a trámites",
-     "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 1,
-   "acciones_totales": 18
-  },
-  {
-   "id": "auditor",
-   "nombre": "Auditor",
-   "ambito": "plataforma",
-   "descripcion": "Lee el registro inalterable. No puede escribir ni ver trámites.",
-   "modulos": [
-    {
-     "id": "auditoria",
-     "nombre": "Auditoría",
-     "descripcion": "Consulta del registro inalterable de eventos y de decisiones de acceso.",
-     "estado": "disponible"
-    },
-    {
-     "id": "prueba_acceso",
-     "nombre": "Acceso a trámites",
-     "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
-     "estado": "disponible"
-    },
-    {
-     "id": "seguridad",
-     "nombre": "Mi seguridad",
-     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
-     "estado": "disponible"
-    },
-    {
-     "id": "mfa",
-     "nombre": "Segundo factor (MFA)",
-     "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
-     "estado": "disponible"
-    },
-    {
-     "id": "roles_permisos",
-     "nombre": "Roles y permisos",
-     "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
-     "estado": "disponible"
-    }
-   ],
-   "acciones_permitidas": 2,
-   "acciones_totales": 18
-  }
- ],
- "acciones": [
-  {
-   "id": "ver_tramite",
-   "nombre": "Ver un trámite",
-   "grupo": "Trámites",
-   "casos": [
-    "De su institución o propio",
-    "De otra institución o de otra persona"
-   ]
-  },
-  {
-   "id": "crear_tramite",
-   "nombre": "Iniciar un trámite",
-   "grupo": "Trámites",
-   "casos": [
-    "A su nombre",
-    "A nombre de otra persona"
-   ]
-  },
-  {
-   "id": "cambiar_estado",
-   "nombre": "Cambiar el estado de un trámite",
-   "grupo": "Trámites",
-   "casos": [
-    "De su institución",
-    "De otra institución"
-   ]
-  },
-  {
-   "id": "reasignar_tramite",
-   "nombre": "Reasignar un trámite",
-   "grupo": "Trámites",
-   "casos": [
-    "De su institución",
-    "De otra institución"
-   ]
-  },
-  {
-   "id": "escalar_tramite",
-   "nombre": "Atender un trámite escalado",
-   "grupo": "Trámites",
-   "casos": [
-    "De su institución",
-    "De otra institución"
-   ]
-  },
-  {
-   "id": "adjuntar_documento",
-   "nombre": "Adjuntar un documento",
-   "grupo": "Trámites",
-   "casos": [
-    "A un trámite propio o de su institución",
-    "A un trámite ajeno"
-   ]
-  },
-  {
-   "id": "ver_documento",
-   "nombre": "Ver un documento",
-   "grupo": "Trámites",
-   "casos": [
-    "De un trámite propio o de su institución",
-    "De un trámite ajeno"
-   ]
-  },
-  {
-   "id": "gestionar_usuarios_institucion",
-   "nombre": "Gestionar al equipo de la institución",
-   "grupo": "Instituciones",
-   "casos": [
-    "De su institución",
-    "De otra institución"
-   ]
-  },
-  {
-   "id": "gestionar_catalogo_institucion",
-   "nombre": "Gestionar los trámites de la institución",
-   "grupo": "Instituciones",
-   "casos": [
-    "De su institución",
-    "De otra institución"
-   ]
-  },
-  {
-   "id": "proponer_alta",
-   "nombre": "Proponer un alta",
-   "grupo": "Control dual",
-   "casos": [
-    "Del tipo que le corresponde",
-    "De un tipo que no le corresponde"
-   ]
-  },
-  {
-   "id": "aprobar_alta",
-   "nombre": "Aprobar un alta",
-   "grupo": "Control dual",
-   "casos": [
-    "Propuesta por otra persona",
-    "Propuesta por la misma persona"
-   ]
-  },
-  {
-   "id": "administrar_infraestructura",
-   "nombre": "Administrar la infraestructura",
-   "grupo": "Plataforma",
-   "casos": null
-  },
-  {
-   "id": "restablecer_mfa",
-   "nombre": "Restablecer el segundo factor de alguien",
-   "grupo": "Plataforma",
-   "casos": null
-  },
-  {
-   "id": "bloquear_cuenta",
-   "nombre": "Bloquear una cuenta",
-   "grupo": "Plataforma",
-   "casos": null
-  },
-  {
-   "id": "revocar_sesion",
-   "nombre": "Revocar una sesión",
-   "grupo": "Plataforma",
-   "casos": null
-  },
-  {
-   "id": "rotar_secretos",
-   "nombre": "Rotar secretos y certificados",
-   "grupo": "Plataforma",
-   "casos": null
-  },
-  {
-   "id": "consultar_auditoria",
-   "nombre": "Consultar la auditoría",
-   "grupo": "Auditoría",
-   "casos": null
-  },
-  {
-   "id": "consultar_decisiones",
-   "nombre": "Consultar las decisiones de acceso",
-   "grupo": "Auditoría",
-   "casos": null
-  }
- ],
- "matriz": {
-  "ciudadano": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "ciudadano_sobre_lo_propio"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "ciudadano_crea_su_tramite"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": false,
-     "politica": "conflicto_de_interes"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "conflicto_de_interes"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "conflicto_de_interes"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": true,
-     "politica": "ciudadano_sobre_lo_propio"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": true,
-     "politica": "ciudadano_sobre_lo_propio"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": false
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "funcionario": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "personal_ve_su_institucion"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "ciudadano_crea_su_tramite"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": true,
-     "politica": "funcionario_cambia_estado"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": true
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": true,
-     "politica": "personal_ve_su_institucion"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": false
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "supervisor": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "personal_ve_su_institucion"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "ciudadano_crea_su_tramite"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": true,
-     "politica": "supervisor_cambia_estado"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": true
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "supervisor_reasigna_o_atiende_escalados"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": true
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "supervisor_reasigna_o_atiende_escalados"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": true
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": true,
-     "politica": "personal_ve_su_institucion"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": false
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "coordinador_institucional": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": true,
-     "politica": "ciudadano_crea_su_tramite"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": true,
-     "politica": "coordinador_gestiona_su_institucion"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": true
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": true,
-     "politica": "coordinador_gestiona_su_institucion"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": true
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": false
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "operador_infraestructura": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": false
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": true,
-     "politica": "operador_infraestructura_administrar_infraestructura"
-    },
-    "desfavorable": {
-     "permitido": true,
-     "politica": "operador_infraestructura_administrar_infraestructura"
-    },
-    "exige_segundo_factor": true
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "operador_identidades": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": true,
-     "politica": "operador_identidades_proponer_alta"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": true
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": true,
-     "politica": "operador_identidades_aprobar_alta"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": true
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": true,
-     "politica": "operador_identidades_restablecer_mfa"
-    },
-    "desfavorable": {
-     "permitido": true,
-     "politica": "operador_identidades_restablecer_mfa"
-    },
-    "exige_segundo_factor": true
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "operador_catalogo": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": true,
-     "politica": "operador_catalogo_proponer_alta"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": true
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": true,
-     "politica": "operador_catalogo_aprobar_alta"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": true
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "operador_seguridad": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": false
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": true,
-     "politica": "operador_seguridad_bloquear_cuenta"
-    },
-    "desfavorable": {
-     "permitido": true,
-     "politica": "operador_seguridad_bloquear_cuenta"
-    },
-    "exige_segundo_factor": true
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": true,
-     "politica": "operador_seguridad_revocar_sesion"
-    },
-    "desfavorable": {
-     "permitido": true,
-     "politica": "operador_seguridad_revocar_sesion"
-    },
-    "exige_segundo_factor": true
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "custodio_secretos": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": false
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": true,
-     "politica": "custodio_secretos_rotar_secretos"
-    },
-    "desfavorable": {
-     "permitido": true,
-     "politica": "custodio_secretos_rotar_secretos"
-    },
-    "exige_segundo_factor": true
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   }
-  },
-  "auditor": {
-   "ver_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "crear_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "cambiar_estado": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "reasignar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "escalar_tramite": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "adjuntar_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "ver_documento": {
-    "favorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "plataforma_sin_acceso_a_tramites"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_usuarios_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "gestionar_catalogo_institucion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "proponer_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "aprobar_alta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "control_dual"
-    },
-    "exige_segundo_factor": false
-   },
-   "administrar_infraestructura": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "restablecer_mfa": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "bloquear_cuenta": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "revocar_sesion": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "rotar_secretos": {
-    "favorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "desfavorable": {
-     "permitido": false,
-     "politica": "sin_regla_que_permita"
-    },
-    "exige_segundo_factor": false
-   },
-   "consultar_auditoria": {
-    "favorable": {
-     "permitido": true,
-     "politica": "auditor_consulta"
-    },
-    "desfavorable": {
-     "permitido": true,
-     "politica": "auditor_consulta"
-    },
-    "exige_segundo_factor": true
-   },
-   "consultar_decisiones": {
-    "favorable": {
-     "permitido": true,
-     "politica": "auditor_consulta"
-    },
-    "desfavorable": {
-     "permitido": true,
-     "politica": "auditor_consulta"
-    },
-    "exige_segundo_factor": true
-   }
-  }
- },
- "denegaciones": [
-  {
-   "politica": "cuenta_no_activa",
-   "descripcion": "Una cuenta bloqueada o suspendida no puede hacer nada."
-  },
-  {
-   "politica": "plataforma_sin_acceso_a_tramites",
-   "descripcion": "Ningún rol de plataforma ve trámites ni documentos de la ciudadanía."
-  },
-  {
-   "politica": "conflicto_de_interes",
-   "descripcion": "Nadie gestiona un trámite que él mismo pidió."
-  },
-  {
-   "politica": "control_dual",
-   "descripcion": "Quien propone un alta no puede aprobarla."
-  },
-  {
-   "politica": "sin_regla_que_permita",
-   "descripcion": "Si ninguna política lo permite explícitamente, se niega (denegar por defecto)."
-  }
- ],
- "ventana_minutos": 15,
- "ningun_rol_puede_todo": true
+    "roles": [
+        {
+            "id": "ciudadano",
+            "nombre": "Ciudadanía",
+            "ambito": "propio",
+            "descripcion": "Inicia trámites y sigue los suyos. No ve nada de otras personas.",
+            "modulos": [
+                {
+                    "id": "mis_tramites",
+                    "nombre": "Mis trámites",
+                    "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "nuevo_tramite",
+                    "nombre": "Iniciar un trámite",
+                    "descripcion": "Elige una institución y un trámite del catálogo.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 4,
+            "acciones_totales": 18
+        },
+        {
+            "id": "funcionario",
+            "nombre": "Funcionario",
+            "ambito": "institucion",
+            "descripcion": "Atiende los trámites de su institución, con segundo factor reciente.",
+            "modulos": [
+                {
+                    "id": "mis_tramites",
+                    "nombre": "Mis trámites",
+                    "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "nuevo_tramite",
+                    "nombre": "Iniciar un trámite",
+                    "descripcion": "Elige una institución y un trámite del catálogo.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "bandeja",
+                    "nombre": "Bandeja de la institución",
+                    "descripcion": "Trámites de tu institución: revisarlos y cambiar su estado.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 4,
+            "acciones_totales": 18
+        },
+        {
+            "id": "supervisor",
+            "nombre": "Supervisor",
+            "ambito": "institucion",
+            "descripcion": "Todo lo del funcionario y además reasigna y atiende escalados.",
+            "modulos": [
+                {
+                    "id": "mis_tramites",
+                    "nombre": "Mis trámites",
+                    "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "nuevo_tramite",
+                    "nombre": "Iniciar un trámite",
+                    "descripcion": "Elige una institución y un trámite del catálogo.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "bandeja",
+                    "nombre": "Bandeja de la institución",
+                    "descripcion": "Trámites de tu institución: revisarlos y cambiar su estado.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "supervision",
+                    "nombre": "Supervisión",
+                    "descripcion": "Reasigna trámites y atiende los escalados de tu institución.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "equipo",
+                    "nombre": "Equipo de la institución",
+                    "descripcion": "Personal y roles de tu institución.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 6,
+            "acciones_totales": 18
+        },
+        {
+            "id": "coordinador_institucional",
+            "nombre": "Coordinación",
+            "ambito": "institucion",
+            "descripcion": "Gestiona al equipo de su institución. No ve trámites.",
+            "modulos": [
+                {
+                    "id": "mis_tramites",
+                    "nombre": "Mis trámites",
+                    "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "nuevo_tramite",
+                    "nombre": "Iniciar un trámite",
+                    "descripcion": "Elige una institución y un trámite del catálogo.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "equipo",
+                    "nombre": "Equipo de la institución",
+                    "descripcion": "Personal y roles de tu institución.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 3,
+            "acciones_totales": 18
+        },
+        {
+            "id": "operador_infraestructura",
+            "nombre": "Operador de infraestructura",
+            "ambito": "plataforma",
+            "descripcion": "Opera servidores y contenedores. No ve trámites.",
+            "modulos": [
+                {
+                    "id": "consola_infraestructura",
+                    "nombre": "Infraestructura",
+                    "descripcion": "Estado de los servidores y contenedores.",
+                    "estado": "proximamente"
+                },
+                {
+                    "id": "prueba_acceso",
+                    "nombre": "Acceso a trámites",
+                    "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 1,
+            "acciones_totales": 18
+        },
+        {
+            "id": "operador_identidades",
+            "nombre": "Operador de identidades",
+            "ambito": "plataforma",
+            "descripcion": "Altas de coordinadores y restablece el segundo factor (control dual).",
+            "modulos": [
+                {
+                    "id": "consola_identidades",
+                    "nombre": "Identidades",
+                    "descripcion": "Alta de coordinadores y restablecimiento del segundo factor (control dual).",
+                    "estado": "proximamente"
+                },
+                {
+                    "id": "prueba_acceso",
+                    "nombre": "Acceso a trámites",
+                    "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 3,
+            "acciones_totales": 18
+        },
+        {
+            "id": "operador_catalogo",
+            "nombre": "Operador de catálogo",
+            "ambito": "plataforma",
+            "descripcion": "Altas de instituciones y de trámites (control dual).",
+            "modulos": [
+                {
+                    "id": "consola_catalogo",
+                    "nombre": "Catálogo",
+                    "descripcion": "Alta de instituciones y de trámites (control dual).",
+                    "estado": "proximamente"
+                },
+                {
+                    "id": "prueba_acceso",
+                    "nombre": "Acceso a trámites",
+                    "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 2,
+            "acciones_totales": 18
+        },
+        {
+            "id": "operador_seguridad",
+            "nombre": "Operador de seguridad",
+            "ambito": "plataforma",
+            "descripcion": "Bloquea cuentas y revoca sesiones ante un incidente.",
+            "modulos": [
+                {
+                    "id": "consola_seguridad",
+                    "nombre": "Respuesta a incidentes",
+                    "descripcion": "Bloqueo de cuentas y revocación de sesiones.",
+                    "estado": "proximamente"
+                },
+                {
+                    "id": "prueba_acceso",
+                    "nombre": "Acceso a trámites",
+                    "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 2,
+            "acciones_totales": 18
+        },
+        {
+            "id": "custodio_secretos",
+            "nombre": "Custodio de secretos",
+            "ambito": "plataforma",
+            "descripcion": "Rota claves y certificados. No ve datos.",
+            "modulos": [
+                {
+                    "id": "consola_secretos",
+                    "nombre": "Custodia de secretos",
+                    "descripcion": "Rotación de claves y certificados.",
+                    "estado": "proximamente"
+                },
+                {
+                    "id": "prueba_acceso",
+                    "nombre": "Acceso a trámites",
+                    "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 1,
+            "acciones_totales": 18
+        },
+        {
+            "id": "auditor",
+            "nombre": "Auditor",
+            "ambito": "plataforma",
+            "descripcion": "Lee el registro inalterable. No puede escribir ni ver trámites.",
+            "modulos": [
+                {
+                    "id": "auditoria",
+                    "nombre": "Auditoría",
+                    "descripcion": "Consulta del registro inalterable de eventos y de decisiones de acceso.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "prueba_acceso",
+                    "nombre": "Acceso a trámites",
+                    "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "seguridad",
+                    "nombre": "Mi seguridad",
+                    "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mfa",
+                    "nombre": "Segundo factor (MFA)",
+                    "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "roles_permisos",
+                    "nombre": "Roles y permisos",
+                    "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+                    "estado": "disponible"
+                }
+            ],
+            "acciones_permitidas": 2,
+            "acciones_totales": 18
+        }
+    ],
+    "acciones": [
+        {
+            "id": "ver_tramite",
+            "nombre": "Ver un trámite",
+            "grupo": "Trámites",
+            "casos": [
+                "De su institución o propio",
+                "De otra institución o de otra persona"
+            ]
+        },
+        {
+            "id": "crear_tramite",
+            "nombre": "Iniciar un trámite",
+            "grupo": "Trámites",
+            "casos": [
+                "A su nombre",
+                "A nombre de otra persona"
+            ]
+        },
+        {
+            "id": "cambiar_estado",
+            "nombre": "Cambiar el estado de un trámite",
+            "grupo": "Trámites",
+            "casos": [
+                "De su institución",
+                "De otra institución"
+            ]
+        },
+        {
+            "id": "reasignar_tramite",
+            "nombre": "Reasignar un trámite",
+            "grupo": "Trámites",
+            "casos": [
+                "De su institución",
+                "De otra institución"
+            ]
+        },
+        {
+            "id": "escalar_tramite",
+            "nombre": "Atender un trámite escalado",
+            "grupo": "Trámites",
+            "casos": [
+                "De su institución",
+                "De otra institución"
+            ]
+        },
+        {
+            "id": "adjuntar_documento",
+            "nombre": "Adjuntar un documento",
+            "grupo": "Trámites",
+            "casos": [
+                "A un trámite propio o de su institución",
+                "A un trámite ajeno"
+            ]
+        },
+        {
+            "id": "ver_documento",
+            "nombre": "Ver un documento",
+            "grupo": "Trámites",
+            "casos": [
+                "De un trámite propio o de su institución",
+                "De un trámite ajeno"
+            ]
+        },
+        {
+            "id": "gestionar_usuarios_institucion",
+            "nombre": "Gestionar al equipo de la institución",
+            "grupo": "Instituciones",
+            "casos": [
+                "De su institución",
+                "De otra institución"
+            ]
+        },
+        {
+            "id": "gestionar_catalogo_institucion",
+            "nombre": "Gestionar los trámites de la institución",
+            "grupo": "Instituciones",
+            "casos": [
+                "De su institución",
+                "De otra institución"
+            ]
+        },
+        {
+            "id": "proponer_alta",
+            "nombre": "Proponer un alta",
+            "grupo": "Control dual",
+            "casos": [
+                "Del tipo que le corresponde",
+                "De un tipo que no le corresponde"
+            ]
+        },
+        {
+            "id": "aprobar_alta",
+            "nombre": "Aprobar un alta",
+            "grupo": "Control dual",
+            "casos": [
+                "Propuesta por otra persona",
+                "Propuesta por la misma persona"
+            ]
+        },
+        {
+            "id": "administrar_infraestructura",
+            "nombre": "Administrar la infraestructura",
+            "grupo": "Plataforma",
+            "casos": null
+        },
+        {
+            "id": "restablecer_mfa",
+            "nombre": "Restablecer el segundo factor de alguien",
+            "grupo": "Plataforma",
+            "casos": null
+        },
+        {
+            "id": "bloquear_cuenta",
+            "nombre": "Bloquear una cuenta",
+            "grupo": "Plataforma",
+            "casos": null
+        },
+        {
+            "id": "revocar_sesion",
+            "nombre": "Revocar una sesión",
+            "grupo": "Plataforma",
+            "casos": null
+        },
+        {
+            "id": "rotar_secretos",
+            "nombre": "Rotar secretos y certificados",
+            "grupo": "Plataforma",
+            "casos": null
+        },
+        {
+            "id": "consultar_auditoria",
+            "nombre": "Consultar la auditoría",
+            "grupo": "Auditoría",
+            "casos": null
+        },
+        {
+            "id": "consultar_decisiones",
+            "nombre": "Consultar las decisiones de acceso",
+            "grupo": "Auditoría",
+            "casos": null
+        }
+    ],
+    "matriz": {
+        "ciudadano": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "ciudadano_sobre_lo_propio"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "ciudadano_crea_su_tramite"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "conflicto_de_interes"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "conflicto_de_interes"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "conflicto_de_interes"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "ciudadano_sobre_lo_propio"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "ciudadano_sobre_lo_propio"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": false
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "funcionario": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "personal_ve_su_institucion"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "ciudadano_crea_su_tramite"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "funcionario_cambia_estado"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "personal_ve_su_institucion"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": false
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "supervisor": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "personal_ve_su_institucion"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "ciudadano_crea_su_tramite"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "supervisor_cambia_estado"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "supervisor_reasigna_o_atiende_escalados"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "supervisor_reasigna_o_atiende_escalados"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "personal_ve_su_institucion"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": false
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "coordinador_institucional": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "ciudadano_crea_su_tramite"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "coordinador_gestiona_su_institucion"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "coordinador_gestiona_su_institucion"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": false
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "operador_infraestructura": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": false
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_infraestructura_administrar_infraestructura"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_infraestructura_administrar_infraestructura"
+                },
+                "exige_segundo_factor": true
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "operador_identidades": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_proponer_alta"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_aprobar_alta"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": true
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_restablecer_mfa"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_restablecer_mfa"
+                },
+                "exige_segundo_factor": true
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "operador_catalogo": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_catalogo_proponer_alta"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_catalogo_aprobar_alta"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": true
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "operador_seguridad": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": false
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_seguridad_bloquear_cuenta"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_seguridad_bloquear_cuenta"
+                },
+                "exige_segundo_factor": true
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_seguridad_revocar_sesion"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_seguridad_revocar_sesion"
+                },
+                "exige_segundo_factor": true
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "custodio_secretos": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": false
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "custodio_secretos_rotar_secretos"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "custodio_secretos_rotar_secretos"
+                },
+                "exige_segundo_factor": true
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            }
+        },
+        "auditor": {
+            "ver_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "cambiar_estado": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "reasignar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "escalar_tramite": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_usuarios_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "gestionar_catalogo_institucion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "proponer_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "aprobar_alta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "control_dual"
+                },
+                "exige_segundo_factor": false
+            },
+            "administrar_infraestructura": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "bloquear_cuenta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revocar_sesion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_auditoria": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "auditor_consulta"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "auditor_consulta"
+                },
+                "exige_segundo_factor": true
+            },
+            "consultar_decisiones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "auditor_consulta"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "auditor_consulta"
+                },
+                "exige_segundo_factor": true
+            }
+        }
+    },
+    "denegaciones": [
+        {
+            "politica": "cuenta_no_activa",
+            "descripcion": "Una cuenta bloqueada o suspendida no puede hacer nada."
+        },
+        {
+            "politica": "plataforma_sin_acceso_a_tramites",
+            "descripcion": "Ningún rol de plataforma ve trámites ni documentos de la ciudadanía."
+        },
+        {
+            "politica": "conflicto_de_interes",
+            "descripcion": "Nadie gestiona un trámite que él mismo pidió."
+        },
+        {
+            "politica": "control_dual",
+            "descripcion": "Quien propone un alta no puede aprobarla."
+        },
+        {
+            "politica": "sin_regla_que_permita",
+            "descripcion": "Si ninguna política lo permite explícitamente, se niega (denegar por defecto)."
+        }
+    ],
+    "ventana_minutos": 15,
+    "ningun_rol_puede_todo": true,
+    "modulos": [
+        {
+            "id": "mis_tramites",
+            "nombre": "Mis trámites",
+            "descripcion": "Consulta el estado y el historial de los trámites que iniciaste.",
+            "estado": "disponible",
+            "roles": [
+                "ciudadano",
+                "funcionario",
+                "supervisor",
+                "coordinador_institucional"
+            ]
+        },
+        {
+            "id": "nuevo_tramite",
+            "nombre": "Iniciar un trámite",
+            "descripcion": "Elige una institución y un trámite del catálogo.",
+            "estado": "disponible",
+            "roles": [
+                "ciudadano",
+                "funcionario",
+                "supervisor",
+                "coordinador_institucional"
+            ]
+        },
+        {
+            "id": "bandeja",
+            "nombre": "Bandeja de la institución",
+            "descripcion": "Trámites de tu institución: revisarlos y cambiar su estado.",
+            "estado": "disponible",
+            "roles": [
+                "funcionario",
+                "supervisor"
+            ]
+        },
+        {
+            "id": "supervision",
+            "nombre": "Supervisión",
+            "descripcion": "Reasigna trámites y atiende los escalados de tu institución.",
+            "estado": "disponible",
+            "roles": [
+                "supervisor"
+            ]
+        },
+        {
+            "id": "equipo",
+            "nombre": "Equipo de la institución",
+            "descripcion": "Personal y roles de tu institución.",
+            "estado": "disponible",
+            "roles": [
+                "supervisor",
+                "coordinador_institucional"
+            ]
+        },
+        {
+            "id": "seguridad",
+            "nombre": "Mi seguridad",
+            "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
+            "estado": "disponible",
+            "roles": [
+                "ciudadano",
+                "funcionario",
+                "supervisor",
+                "coordinador_institucional",
+                "operador_infraestructura",
+                "operador_identidades",
+                "operador_catalogo",
+                "operador_seguridad",
+                "custodio_secretos",
+                "auditor"
+            ]
+        },
+        {
+            "id": "mfa",
+            "nombre": "Segundo factor (MFA)",
+            "descripcion": "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.",
+            "estado": "disponible",
+            "roles": [
+                "ciudadano",
+                "funcionario",
+                "supervisor",
+                "coordinador_institucional",
+                "operador_infraestructura",
+                "operador_identidades",
+                "operador_catalogo",
+                "operador_seguridad",
+                "custodio_secretos",
+                "auditor"
+            ]
+        },
+        {
+            "id": "roles_permisos",
+            "nombre": "Roles y permisos",
+            "descripcion": "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.",
+            "estado": "disponible",
+            "roles": [
+                "ciudadano",
+                "funcionario",
+                "supervisor",
+                "coordinador_institucional",
+                "operador_infraestructura",
+                "operador_identidades",
+                "operador_catalogo",
+                "operador_seguridad",
+                "custodio_secretos",
+                "auditor"
+            ]
+        },
+        {
+            "id": "prueba_acceso",
+            "nombre": "Acceso a trámites",
+            "descripcion": "Comprueba en vivo que tu rol de plataforma no puede ver trámites.",
+            "estado": "disponible",
+            "roles": [
+                "operador_infraestructura",
+                "operador_identidades",
+                "operador_catalogo",
+                "operador_seguridad",
+                "custodio_secretos",
+                "auditor"
+            ]
+        },
+        {
+            "id": "consola_infraestructura",
+            "nombre": "Infraestructura",
+            "descripcion": "Estado de los servidores y contenedores.",
+            "estado": "proximamente",
+            "roles": [
+                "operador_infraestructura"
+            ]
+        },
+        {
+            "id": "consola_identidades",
+            "nombre": "Identidades",
+            "descripcion": "Alta de coordinadores y restablecimiento del segundo factor (control dual).",
+            "estado": "proximamente",
+            "roles": [
+                "operador_identidades"
+            ]
+        },
+        {
+            "id": "consola_catalogo",
+            "nombre": "Catálogo",
+            "descripcion": "Alta de instituciones y de trámites (control dual).",
+            "estado": "proximamente",
+            "roles": [
+                "operador_catalogo"
+            ]
+        },
+        {
+            "id": "consola_seguridad",
+            "nombre": "Respuesta a incidentes",
+            "descripcion": "Bloqueo de cuentas y revocación de sesiones.",
+            "estado": "proximamente",
+            "roles": [
+                "operador_seguridad"
+            ]
+        },
+        {
+            "id": "consola_secretos",
+            "nombre": "Custodia de secretos",
+            "descripcion": "Rotación de claves y certificados.",
+            "estado": "proximamente",
+            "roles": [
+                "custodio_secretos"
+            ]
+        },
+        {
+            "id": "auditoria",
+            "nombre": "Auditoría",
+            "descripcion": "Consulta del registro inalterable de eventos y de decisiones de acceso.",
+            "estado": "disponible",
+            "roles": [
+                "auditor"
+            ]
+        }
+    ]
 }

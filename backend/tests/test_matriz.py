@@ -117,6 +117,25 @@ def test_cada_rol_trae_sus_modulos_y_las_politicas_que_explican_cada_decision():
             assert a["favorable"]["politica"] and a["desfavorable"]["politica"]
 
 
+def test_la_vista_por_modulo_es_la_inversa_exacta_de_la_vista_por_rol():
+    from apps.autorizacion.modulos import CATALOGO
+    assert [m["id"] for m in M["modulos"]] == list(CATALOGO)
+    for modulo in M["modulos"]:
+        esperado = [r["id"] for r in M["roles"] if modulo["id"] in [x["id"] for x in r["modulos"]]]
+        assert modulo["roles"] == esperado
+    por_modulo = {m["id"]: m["roles"] for m in M["modulos"]}
+    # Un rol llega a varios módulos y un módulo lo comparten varios roles
+    assert len([m for m in M["modulos"] if "supervisor" in m["roles"]]) > 1
+    assert len(por_modulo["seguridad"]) == 10 and "ciudadano" in por_modulo["seguridad"]
+    # Los módulos operativos de trámites no los toca ningún rol de plataforma
+    assert por_modulo["bandeja"] == ["funcionario", "supervisor"]
+    assert por_modulo["supervision"] == ["supervisor"]
+    assert por_modulo["equipo"] == ["supervisor", "coordinador_institucional"]
+    assert por_modulo["auditoria"] == ["auditor"]
+    # Todo módulo del catálogo lo ve al menos un rol (no hay módulos huérfanos)
+    assert all(m["roles"] for m in M["modulos"])
+
+
 def test_las_reglas_de_denegacion_documentadas_existen_en_el_pdp():
     nombres = {d["politica"] for d in M["denegaciones"]}
     assert {"cuenta_no_activa", "plataforma_sin_acceso_a_tramites", "conflicto_de_interes", "control_dual", "sin_regla_que_permita"} <= nombres
