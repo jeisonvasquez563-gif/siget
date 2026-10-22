@@ -117,6 +117,10 @@ El `modulos` de `/auth/yo/` incluye siempre `seguridad`, `mfa` y `roles_permisos
 2. **Quitar o cambiar** un campo, un estado o un código de error rompe al otro frente: se avisa y se acuerda antes, y el PR toca este archivo, `frontend/` y `backend/` a la vez.
 3. El backend cubre cada ruta con pruebas (incluida la auditoría de rutas públicas); el frontend no inventa rutas que no estén aquí.
 
+### Puertas de entrada
+
+`POST /auth/login/` acepta además `canal` (`ciudadania`, `institucion` o `plataforma`) e `institucion_id` (entero, solo con `institucion`). Se comprueba tras validar contraseña y segundo factor: si la cuenta no corresponde a esa puerta responde `401 {codigo: "canal_incorrecto", acceso_correcto, instituciones[]}` y no abre sesión (no cuenta como intento fallido). Una puerta inexistente responde como credenciales inválidas. Sin `canal` el comportamiento no cambia. `GET /auth/instituciones/` (pública) devuelve `[{id, nombre}]` para la puerta del personal.
+
 ### Recuperación de contraseña (pública)
 
 | Ruta | Cuerpo | Respuestas |

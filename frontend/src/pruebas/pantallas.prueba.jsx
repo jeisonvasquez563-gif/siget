@@ -12,7 +12,8 @@ vi.mock('qrcode', () => ({ default: { toCanvas: vi.fn() } }))
 
 const AXE = { rules: { 'color-contrast': { enabled: false } } } // jsdom no calcula colores: el contraste se revisa en el navegador
 
-async function abrirComo(usuario) {
+async function abrirComo(usuario, puerta = '#/ciudadania') {
+  if (!usuario) window.location.hash = puerta
   instalarMock(usuario, { demora: 0 })
   const utilidades = render(<ProveedorUI><App /></ProveedorUI>)
   // «enrolar» y la ausencia de usuario muestran la pantalla de acceso, que no tiene menú
@@ -248,7 +249,7 @@ describe('acceso y sesión', () => {
   })
 
   it('con el código correcto en el segundo paso entra a la plataforma', async () => {
-    const { user } = await abrirComo(null)
+    const { user } = await abrirComo(null, '#/institucion/3') // fabio.mop es personal del MOP
     await user.type(await screen.findByLabelText('Usuario'), 'fabio.mop')
     await user.type(screen.getByLabelText('Contraseña'), 'clave')
     await user.click(screen.getByRole('button', { name: 'Continuar' }))
@@ -339,10 +340,10 @@ describe('acceso y sesión', () => {
     expect(await screen.findByRole('navigation', { name: 'Módulos' })).toBeInTheDocument()
   })
 
-  it('cerrar la sesión devuelve al formulario', async () => {
+  it('cerrar la sesión devuelve al acceso', async () => {
     const { user } = await abrirComo('ana.ciudadana')
     await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
-    expect(await screen.findByRole('heading', { name: 'Ingresa a tu cuenta' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '¿Cómo quieres ingresar?' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Módulos' })).not.toBeInTheDocument())
   })
 })
@@ -388,6 +389,89 @@ describe('accesibilidad (axe)', () => {
     const { container, user } = await abrirComo('saul.mop')
     await irA(user, 'Mi seguridad')
     await screen.findByText(/Credencial SIGET/)
+    expect(await axe(container, AXE)).toHaveNoViolations()
+  })
+})
+
+describe('las tres puertas de entrada', () => {
+  it('sin elegir puerta se ofrece cómo ingresar, con las tres opciones y sin formulario', async () => {
+    await abrirComo(null, '')
+    expect(await screen.findByRole('heading', { name: '¿Cómo quieres ingresar?' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Soy ciudadano o ciudadana/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Soy personal de una institución/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Plataforma y auditoría/ })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Usuario')).not.toBeInTheDocument()
+  })
+
+  it('la ciudadanía tiene su puerta con «Crear una cuenta»; las otras dos no ofrecen registro', async () => {
+    const { user } = await abrirComo(null, '')
+    await user.click(await screen.findByRole('button', { name: /Soy ciudadano/ }))
+    expect(await screen.findByRole('button', { name: 'Crear una cuenta' })).toBeInTheDocument()
+    window.location.hash = '#/plataforma'
+    expect(await screen.findByRole('heading', { name: 'Acceso de plataforma' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crear una cuenta' })).not.toBeInTheDocument()
+  })
+
+  it('el personal elige su institución y entra por ella', async () => {
+    const { user } = await abrirComo(null, '')
+    await user.click(await screen.findByRole('button', { name: /Soy personal de una institución/ }))
+    expect(await screen.findByRole('heading', { name: '¿En qué institución trabajas?' })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'MOP' }))
+    expect(await screen.findByRole('heading', { name: 'Personal de MOP' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crear una cuenta' })).not.toBeInTheDocument()
+    expect(screen.getByText(/en esta puerta no se crean cuentas/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Usuario'), 'fabio.mop')
+    await user.type(screen.getByLabelText('Contraseña'), 'clave')
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    await user.type(await screen.findByLabelText(/Código del autenticador/), '123456')
+    await user.click(screen.getByRole('button', { name: 'Verificar' }))
+    expect(await screen.findByRole('navigation', { name: 'Módulos' })).toBeInTheDocument()
+  })
+
+  it('un enlace directo a una institución abre su puerta', async () => {
+    await abrirComo(null, '#/institucion/2')
+    expect(await screen.findByRole('heading', { name: 'Personal de MINSA' })).toBeInTheDocument()
+  })
+
+  it('un enlace a una institución que no existe vuelve a la lista', async () => {
+    await abrirComo(null, '#/institucion/999')
+    expect(await screen.findByRole('heading', { name: '¿En qué institución trabajas?' })).toBeInTheDocument()
+  })
+
+  it('entrar por la puerta equivocada explica cuál es la correcta y no abre sesión', async () => {
+    const { user } = await abrirComo(null, '#/ciudadania')
+    await user.type(await screen.findByLabelText('Usuario'), 'fabio.mop')
+    await user.type(screen.getByLabelText('Contraseña'), 'clave')
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    await user.type(await screen.findByLabelText(/Código del autenticador/), '123456')
+    await user.click(screen.getByRole('button', { name: 'Verificar' }))
+    const aviso = await screen.findByRole('alert')
+    expect(aviso).toHaveTextContent(/no corresponde a este acceso/)
+    expect(aviso).toHaveTextContent(/Eres personal de MOP/)
+    expect(screen.queryByRole('navigation', { name: 'Módulos' })).not.toBeInTheDocument()
+    await user.click(within(aviso).getByRole('button', { name: 'Ir a mi acceso' }))
+    expect(await screen.findByRole('heading', { name: '¿En qué institución trabajas?' })).toBeInTheDocument()
+  })
+
+  it('el personal de otra institución tampoco entra por esta', async () => {
+    const { user } = await abrirComo(null, '#/institucion/2') // MINSA
+    await user.type(await screen.findByLabelText('Usuario'), 'fabio.mop') // es del MOP
+    await user.type(screen.getByLabelText('Contraseña'), 'clave')
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    await user.type(await screen.findByLabelText(/Código del autenticador/), '123456')
+    await user.click(screen.getByRole('button', { name: 'Verificar' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Eres personal de MOP/)
+  })
+
+  it('«Elegir otro acceso» regresa al portal', async () => {
+    const { user } = await abrirComo(null, '#/ciudadania')
+    await user.click(await screen.findByRole('button', { name: '← Elegir otro acceso' }))
+    expect(await screen.findByRole('heading', { name: '¿Cómo quieres ingresar?' })).toBeInTheDocument()
+  })
+
+  it('el portal es accesible (axe)', async () => {
+    const { container } = await abrirComo(null, '')
+    await screen.findByRole('heading', { name: '¿Cómo quieres ingresar?' })
     expect(await axe(container, AXE)).toHaveNoViolations()
   })
 })

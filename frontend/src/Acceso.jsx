@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { api, ApiError, confirmarMfa, iniciarSesion, registrar, restablecerContrasena } from './api.js'
+import { api, ApiError, confirmarMfa, iniciarSesion, instituciones, registrar, restablecerContrasena } from './api.js'
 import { Alerta, Esclusas, Icono, Logo } from './ui.jsx'
 
 function Faro({ titulo, lema, ilustracion = true }) {
@@ -44,7 +44,109 @@ const MOTIVOS = {
   vencida: 'Tu sesión venció o se cerró desde el servidor. Ingresa de nuevo para continuar.',
 }
 
-export function Login({ alEntrar, motivo = '' }) {
+// ---------------------------------------------------------------- las tres puertas
+
+// La puerta vive en la dirección (#/ciudadania, #/institucion/3, #/plataforma): se puede compartir el enlace de cada institución y
+// no llega al servidor. No da permisos; el servidor comprueba que la cuenta corresponda a la puerta y decide todo lo demás.
+export function puertaDeHash(hash) {
+  const h = (hash || '').replace(/^#\/?/, '')
+  if (h === 'ciudadania') return { canal: 'ciudadania' }
+  if (h === 'plataforma') return { canal: 'plataforma' }
+  const m = h.match(/^institucion(?:\/(\d+))?$/)
+  if (m) return m[1] ? { canal: 'institucion', institucion_id: Number(m[1]) } : { canal: 'institucion' }
+  return null
+}
+
+const irA = (hash) => { window.location.hash = hash }
+
+const TEXTOS_FARO = {
+  ciudadania: ['Cada trámite, de la entrada a la resolución.', 'Sigue tus gestiones ante el Estado: en qué etapa están, quién las atiende y cuándo vence cada plazo.'],
+  institucion: ['Atiende cada trámite de tu institución.', 'Tu bandeja, tus plazos y el historial de cada gestión, con el segundo factor que protege a la ciudadanía y a ti.'],
+  plataforma: ['Opera la plataforma sin ver un solo trámite.', 'Cada operador tiene su área, nadie reúne todos los poderes y todo lo que haces queda registrado.'],
+}
+
+function Portal({ motivo }) {
+  return (
+    <main className="acceso">
+      <Faro titulo={TEXTOS_FARO.ciudadania[0]} lema={TEXTOS_FARO.ciudadania[1]} />
+      <section className="acceso-formulario">
+        <div className="tarjeta-acceso ancha">
+          <h2>¿Cómo quieres ingresar?</h2>
+          <p className="subtitulo">Cada persona entra por su puerta. Así se sabe quién eres y a qué institución perteneces.</p>
+          <Alerta tipo="info">{MOTIVOS[motivo]}</Alerta>
+          <div className="puertas">
+            <button type="button" className="puerta" onClick={() => irA('#/ciudadania')}>
+              <Icono nombre="usuario" /><strong>Soy ciudadano o ciudadana</strong>
+              <span>Inicia trámites y sigue su estado. Aquí puedes crear tu cuenta.</span>
+            </button>
+            <button type="button" className="puerta" onClick={() => irA('#/institucion')}>
+              <Icono nombre="equipo" /><strong>Soy personal de una institución</strong>
+              <span>Funcionarios, supervisión y coordinación: elige tu institución.</span>
+            </button>
+            <button type="button" className="puerta" onClick={() => irA('#/plataforma')}>
+              <Icono nombre="escudo" /><strong>Plataforma y auditoría</strong>
+              <span>Operadores de plataforma y personal de auditoría.</span>
+            </button>
+          </div>
+          <div className="pie-acceso"><Icono nombre="escudo" /><span>Conexión cifrada con TLS 1.3. Todas las puertas exigen segundo factor.</span></div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function ElegirInstitucion({ motivo }) {
+  const [lista, setLista] = useState(null)
+  const [error, setError] = useState('')
+  useEffect(() => { instituciones().then(setLista).catch(() => setError('No se pudo cargar la lista de instituciones. Revisa tu conexión.')) }, [])
+  return (
+    <main className="acceso">
+      <Faro titulo={TEXTOS_FARO.institucion[0]} lema={TEXTOS_FARO.institucion[1]} />
+      <section className="acceso-formulario">
+        <div className="tarjeta-acceso ancha">
+          <button type="button" className="enlace-sutil volver-puerta" onClick={() => irA('')}>← Elegir otro acceso</button>
+          <h2>¿En qué institución trabajas?</h2>
+          <p className="subtitulo">Entrarás con tu usuario de SIGET. Si no tienes acceso, pídelo a la coordinación de tu institución: aquí nadie se registra por su cuenta.</p>
+          <Alerta tipo="info">{MOTIVOS[motivo]}</Alerta>
+          <Alerta>{error}</Alerta>
+          {!lista && !error ? <p className="suave" role="status">Cargando instituciones…</p> : (
+            <ul className="lista-instituciones">
+              {(lista || []).map((i) => <li key={i.id}><button type="button" className="puerta chica" onClick={() => irA(`#/institucion/${i.id}`)}><Icono nombre="equipo" /><strong>{i.nombre}</strong></button></li>)}
+            </ul>
+          )}
+        </div>
+      </section>
+    </main>
+  )
+}
+
+// Decide qué se ve antes de iniciar sesión según la puerta de la dirección
+export function Acceso({ alEntrar, motivo = '' }) {
+  const [hash, setHash] = useState(window.location.hash)
+  const [lista, setLista] = useState(null)
+  useEffect(() => {
+    const f = () => setHash(window.location.hash)
+    window.addEventListener('hashchange', f)
+    return () => window.removeEventListener('hashchange', f)
+  }, [])
+  const puerta = puertaDeHash(hash)
+  const necesitaLista = puerta?.canal === 'institucion' && puerta.institucion_id
+  useEffect(() => {
+    if (necesitaLista) instituciones().then(setLista).catch(() => setLista([]))
+  }, [necesitaLista])
+
+  if (!puerta) return <Portal motivo={motivo} />
+  if (puerta.canal === 'institucion' && !puerta.institucion_id) return <ElegirInstitucion motivo={motivo} />
+  if (puerta.canal === 'institucion') {
+    if (!lista) return <main className="acceso"><section className="acceso-formulario" role="status" aria-label="Cargando la institución"><Logo className="marca-logo" /></section></main>
+    const institucion = lista.find((i) => i.id === puerta.institucion_id)
+    if (!institucion) return <ElegirInstitucion motivo={motivo} />  // el enlace apunta a una institución que no existe
+    return <Login alEntrar={alEntrar} motivo={motivo} puerta={{ ...puerta, institucion }} />
+  }
+  return <Login alEntrar={alEntrar} motivo={motivo} puerta={puerta} />
+}
+
+export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } }) {
   const [modo, setModo] = useState('entrar')
   const [paso, setPaso] = useState('credenciales') // «codigo»: la contraseña ya la validó el servidor y falta el segundo factor
   const [usuario, setUsuario] = useState('')
@@ -56,6 +158,7 @@ export function Login({ alEntrar, motivo = '' }) {
   const [trabajando, setTrabajando] = useState(false)
   const [personales, setPersonales] = useState(PERSONALES_VACIOS)
   const [codigoReset, setCodigoReset] = useState('')
+  const [equivocada, setEquivocada] = useState(null) // la cuenta es válida pero corresponde a otra puerta
   const poner = (campo) => (e) => setPersonales((p) => ({ ...p, [campo]: e.target.value }))
 
   function volver() {
@@ -67,6 +170,7 @@ export function Login({ alEntrar, motivo = '' }) {
     ev.preventDefault()
     setError('')
     setAviso('')
+    setEquivocada(null)
     setTrabajando(true)
     try {
       if (modo === 'recuperar') {
@@ -77,7 +181,7 @@ export function Login({ alEntrar, motivo = '' }) {
         await registrar(usuario, clave, { ...personales, cedula: personales.cedula.trim().toUpperCase() })
         try {
           // Cuenta nueva: se entra de inmediato y el servidor guía al alta del segundo factor (QR), sin volver a escribir nada
-          await iniciarSesion(usuario, clave)
+          await iniciarSesion(usuario, clave, '', puerta)
           setClave(''); setPersonales(PERSONALES_VACIOS)
           await alEntrar()
         } catch {
@@ -85,12 +189,13 @@ export function Login({ alEntrar, motivo = '' }) {
           setModo('entrar'); setClave('')
         }
       } else {
-        await iniciarSesion(usuario, clave, paso === 'codigo' ? codigo : '')
+        await iniciarSesion(usuario, clave, paso === 'codigo' ? codigo : '', puerta)
         setClave(''); setCodigo('')
         await alEntrar()
       }
     } catch (e) {
       if (e instanceof ApiError && e.codigo === 'mfa_requerido') { setPaso('codigo'); setCodigo('') }
+      else if (e instanceof ApiError && e.codigo === 'canal_incorrecto') { setEquivocada(e.datos); setPaso('credenciales'); setClave(''); setCodigo('') }
       else if (e instanceof ApiError && e.datos.errores) setError(`${e.datos.errores.join('. ')}.`)
       else if (e instanceof ApiError && e.codigo === 'codigo_invalido') setError('El código no es válido, ya se usó o venció. Pide uno nuevo al equipo de identidades.')
       else if (e instanceof ApiError && e.estado === 401 && paso === 'codigo') setError('Ese código no sirve: es incorrecto o ya se usó. Espera al siguiente e inténtalo otra vez. Tras 3 fallos la cuenta se bloquea (5, 15 y luego 60 minutos).')
@@ -106,19 +211,33 @@ export function Login({ alEntrar, motivo = '' }) {
   const registro = modo === 'registro'
   const recuperar = modo === 'recuperar'
   const pideCodigo = !registro && !recuperar && paso === 'codigo'
-  const titulo = recuperar ? 'Recupera tu contraseña' : registro ? 'Crea tu cuenta' : pideCodigo ? 'Verifica que eres tú' : 'Ingresa a tu cuenta'
+  const esCiudadania = puerta.canal === 'ciudadania'
+  const nombreDePuerta = puerta.canal === 'institucion' ? `Personal de ${puerta.institucion.nombre}` : puerta.canal === 'plataforma' ? 'Acceso de plataforma' : 'Ingresa a tu cuenta'
+  const titulo = recuperar ? 'Recupera tu contraseña' : registro ? 'Crea tu cuenta' : pideCodigo ? 'Verifica que eres tú' : nombreDePuerta
   const subtitulo = recuperar ? 'Pide un código de un solo uso al equipo de identidades de SIGET (por un canal seguro) y úsalo aquí para elegir una contraseña nueva. Tu segundo factor sigue siendo necesario.' : registro ? 'Elige un usuario y una contraseña larga que solo tú conozcas. Después activarás un segundo factor con tu teléfono.'
     : pideCodigo ? `Hola, ${usuario}. Abre tu aplicación de autenticación y escribe el código de 6 dígitos que muestra.`
+    : puerta.canal === 'institucion' ? `Acceso para funcionarios, supervisión y coordinación de ${puerta.institucion.nombre}. Si tu cuenta tiene segundo factor, te pediremos el código en el siguiente paso.`
+    : puerta.canal === 'plataforma' ? 'Solo para operadores de plataforma y personal de auditoría. Te pediremos el código de tu segundo factor en el siguiente paso.'
     : 'Usa tu usuario y tu contraseña. Si tu cuenta tiene segundo factor, te pediremos el código en el siguiente paso.'
   return (
     <main className="acceso">
-      <Faro titulo="Cada trámite, de la entrada a la resolución." lema="Sigue tus gestiones ante el Estado: en qué etapa están, quién las atiende y cuándo vence cada plazo." />
+      <Faro titulo={TEXTOS_FARO[puerta.canal][0]} lema={TEXTOS_FARO[puerta.canal][1]} />
       <section className="acceso-formulario">
         <div className={`tarjeta-acceso ${registro ? 'ancha' : ''}`}>
+          {!registro && !recuperar && !pideCodigo && <button type="button" className="enlace-sutil volver-puerta" onClick={() => irA(puerta.canal === 'institucion' ? '#/institucion' : '')}>{puerta.canal === 'institucion' ? '← Elegir otra institución' : '← Elegir otro acceso'}</button>}
           <h2>{titulo}</h2>
           <p className="subtitulo">{subtitulo}</p>
           <form onSubmit={enviar} autoComplete="on">
             <Alerta tipo="info">{MOTIVOS[motivo]}</Alerta>
+            {equivocada && (
+              <Alerta>
+                <strong>Tu cuenta es válida, pero no corresponde a este acceso.</strong>{' '}
+                {equivocada.acceso_correcto === 'institucion' && <>Eres personal de {equivocada.instituciones.join(' y ')}: entra por «Personal de una institución».</>}
+                {equivocada.acceso_correcto === 'plataforma' && <>Tu cuenta es de plataforma o auditoría: entra por «Plataforma y auditoría».</>}
+                {equivocada.acceso_correcto === 'ciudadania' && <>Esta es una cuenta de ciudadanía: entra por «Soy ciudadano o ciudadana».</>}
+                {' '}<button type="button" className="enlace-sutil" onClick={() => irA(equivocada.acceso_correcto === 'institucion' ? '#/institucion' : equivocada.acceso_correcto === 'plataforma' ? '#/plataforma' : '#/ciudadania')}>Ir a mi acceso</button>
+              </Alerta>
+            )}
             <Alerta>{error}</Alerta>
             <Alerta tipo="ok">{aviso}</Alerta>
             {recuperar && (
@@ -197,7 +316,8 @@ export function Login({ alEntrar, motivo = '' }) {
           </form>
           {!registro && !pideCodigo && !recuperar && <p className="cambio-modo"><button type="button" onClick={() => { setModo('recuperar'); setError(''); setAviso(''); setClave('') }}>¿Olvidaste tu contraseña?</button></p>}
           {recuperar && <p className="cambio-modo"><button type="button" onClick={() => { setModo('entrar'); setError(''); setClave(''); setCodigoReset('') }}>Volver a ingresar</button></p>}
-          {!pideCodigo && !recuperar && (
+          {!pideCodigo && !recuperar && !esCiudadania && <p className="nota-sin-registro">¿No tienes acceso? Pídelo a la coordinación de tu institución: en esta puerta no se crean cuentas.</p>}
+          {!pideCodigo && !recuperar && esCiudadania && (
             <div className="alta-cuenta">
               <span>{registro ? '¿Ya tienes cuenta?' : '¿Primera vez en SIGET?'}</span>
               <button type="button" className="btn btn-sec btn-ancho" onClick={() => { setModo(registro ? 'entrar' : 'registro'); setError(''); setAviso(''); setClave('') }}>

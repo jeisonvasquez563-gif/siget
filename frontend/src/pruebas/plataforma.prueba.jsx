@@ -185,6 +185,7 @@ describe('secretos e infraestructura', () => {
 
 describe('recuperar la contraseña', () => {
   async function irARecuperar() {
+    window.location.hash = '#/ciudadania'
     instalarMock(null, { demora: 0 })
     render(<ProveedorUI><App /></ProveedorUI>)
     const user = userEvent.setup()

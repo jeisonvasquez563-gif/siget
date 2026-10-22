@@ -4,6 +4,7 @@ from . import vistas
 
 urlpatterns = [
     path("registro/", vistas.Registro.as_view(), name="registro"),
+    path("instituciones/", vistas.InstitucionesPublicas.as_view(), name="instituciones-publicas"),
     path("restablecer/", vistas.RestablecerContrasena.as_view(), name="restablecer"),
     path("login/", vistas.Login.as_view(), name="login"),
     path("refresh/", vistas.Refresh.as_view(), name="refresh"),

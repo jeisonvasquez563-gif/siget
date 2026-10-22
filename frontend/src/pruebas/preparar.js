@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { afterEach, expect } from 'vitest'
+import { afterEach, beforeEach, expect } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import { toHaveNoViolations } from 'jest-axe'
 import { olvidarToken } from '../api.js'
@@ -11,6 +11,8 @@ window.scrollTo = () => {}
 if (!window.matchMedia) {
   window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} })
 }
+
+beforeEach(() => { window.location.hash = '' })
 
 afterEach(() => {
   cleanup()
