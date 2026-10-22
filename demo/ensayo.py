@@ -174,7 +174,7 @@ paso(e == 200, "entra", e)
 _, lista = fabio.pedir("GET", "/tramites/?limite=100")
 ids_visibles = {t["id"] for t in lista["resultados"]}
 paso(tramite in ids_visibles, "ve el trámite nuevo de Ana en su bandeja", f"{len(ids_visibles)} trámites")
-paso(all(t["institucion"]["nombre"] == "MOP" for t in lista["resultados"]), "solo ve trámites del MOP")
+paso(all(t["institucion"]["nombre"] == "MOP" or t["tipo_tramite"]["nombre"].startswith("Solicitud interinstitucional") for t in lista["resultados"]), "solo ve trámites del MOP y sus propias solicitudes a otras instituciones")
 e, r = fabio.pedir("POST", f"/tramites/{tramite}/estado/", {"estado": "En Tramitacion"})
 paso(e == 200 and r["estado"] == "En Tramitacion", "lo pasa a «En tramitación» (el segundo factor del login sigue vigente 15 minutos)", e)
 e, r = fabio.pedir("POST", f"/tramites/{tramite}/estado/", {"estado": "Aprobado"})
@@ -378,5 +378,5 @@ paso(e == 401 and sin_filtrar["codigo"] == "credenciales_invalidas" and "acceso_
 
 malos = resultados.count(False)
 print(f"\nENSAYO: {len(resultados) - malos} de {len(resultados)} comprobaciones correctas" + ("" if not malos else f"  ← {malos} FALLARON"))
-print(f"Se creó el trámite #{tramite} (aprobado) y el #{t2['id']} (asignado a Flor) durante el ensayo; el #{propio['id']} es de Fabio.")
+print(f"Se creó el trámite #{tramite} (aprobado) y el #{t2['id']} (asignado a Flor) durante el ensayo; la solicitud interinstitucional #{solicitud['id']} es de Fabio.")
 sys.exit(1 if malos else 0)
