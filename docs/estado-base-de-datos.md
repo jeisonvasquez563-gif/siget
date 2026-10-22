@@ -12,7 +12,7 @@ database/psql-contenedor.sh -d tramites_demo -f database/estado-bd.sql
 |---|---|
 | Motor | PostgreSQL 16.15 (imagen oficial) en Podman rootless, puerto `192.168.100.20:5433` solo en la red interna |
 | Tamaño | 8,8 MB |
-| Esquema | `siget`: 11 tablas, 7 funciones, migraciones 002 a 007 aplicadas |
+| Esquema | `siget`: 12 tablas (la nueva, `perfil`, guarda los datos personales), 7 funciones, migraciones 002 a 009 aplicadas |
 | Conexión | TLS 1.3 obligatorio, verificación completa del certificado, `scram-sha-256` |
 | Superusuario | `postgres` existe pero **sin contraseña** y rechazado por red; solo por el socket local del contenedor |
 | Roles de aplicación con superusuario u omisión de RLS | **Ninguno** |

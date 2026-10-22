@@ -25,6 +25,20 @@ function Faro({ titulo, lema, ilustracion = true }) {
   )
 }
 
+// Provincias y comarcas de Panamá. El servidor valida contra su propia lista: esta solo arma el selector.
+const PROVINCIAS = [
+  'Bocas del Toro', 'Chiriquí', 'Coclé', 'Colón', 'Darién', 'Herrera', 'Los Santos', 'Panamá', 'Panamá Oeste', 'Veraguas',
+  'Comarca Guna Yala', 'Comarca Emberá-Wounaan', 'Comarca Ngäbe-Buglé',
+]
+const PERSONALES_VACIOS = { nombre: '', apellidos: '', cedula: '', fecha_nacimiento: '', provincia: '', ciudad: '', correo: '' }
+
+// Fecha más reciente en la que alguien ya cumplió 18 años (el servidor lo vuelve a comprobar)
+function fechaMaximaDeNacimiento() {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() - 18)
+  return d.toISOString().slice(0, 10)
+}
+
 const MOTIVOS = {
   inactividad: 'Cerramos tu sesión por inactividad, para proteger tu cuenta. Ingresa de nuevo para continuar.',
   vencida: 'Tu sesión venció o se cerró desde el servidor. Ingresa de nuevo para continuar.',
@@ -32,6 +46,7 @@ const MOTIVOS = {
 
 export function Login({ alEntrar, motivo = '' }) {
   const [modo, setModo] = useState('entrar')
+  const [paso, setPaso] = useState('credenciales') // «codigo»: la contraseña ya la validó el servidor y falta el segundo factor
   const [usuario, setUsuario] = useState('')
   const [clave, setClave] = useState('')
   const [verClave, setVerClave] = useState(false)
@@ -39,6 +54,13 @@ export function Login({ alEntrar, motivo = '' }) {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [trabajando, setTrabajando] = useState(false)
+  const [personales, setPersonales] = useState(PERSONALES_VACIOS)
+  const poner = (campo) => (e) => setPersonales((p) => ({ ...p, [campo]: e.target.value }))
+
+  function volver() {
+    // Al retroceder se olvida la contraseña y el código: no deben quedar en pantalla ni en memoria más de lo necesario
+    setPaso('credenciales'); setClave(''); setCodigo(''); setError(''); setAviso('')
+  }
 
   async function enviar(ev) {
     ev.preventDefault()
@@ -47,18 +69,26 @@ export function Login({ alEntrar, motivo = '' }) {
     setTrabajando(true)
     try {
       if (modo === 'registro') {
-        await registrar(usuario, clave)
-        setAviso('Tu cuenta está lista. Ingresa con tu usuario y contraseña: te guiaremos para activar el segundo factor.')
-        setModo('entrar')
-        setClave('')
+        await registrar(usuario, clave, { ...personales, cedula: personales.cedula.trim().toUpperCase() })
+        try {
+          // Cuenta nueva: se entra de inmediato y el servidor guía al alta del segundo factor (QR), sin volver a escribir nada
+          await iniciarSesion(usuario, clave)
+          setClave(''); setPersonales(PERSONALES_VACIOS)
+          await alEntrar()
+        } catch {
+          setAviso('Tu cuenta está lista. Ingresa con tu usuario y contraseña: te guiaremos para activar el segundo factor.')
+          setModo('entrar'); setClave('')
+        }
       } else {
-        await iniciarSesion(usuario, clave, codigo)
+        await iniciarSesion(usuario, clave, paso === 'codigo' ? codigo : '')
+        setClave(''); setCodigo('')
         await alEntrar()
       }
     } catch (e) {
-      if (e instanceof ApiError && e.codigo === 'mfa_requerido') setError('Escribe el código de 6 dígitos de tu aplicación de autenticación.')
+      if (e instanceof ApiError && e.codigo === 'mfa_requerido') { setPaso('codigo'); setCodigo('') }
       else if (e instanceof ApiError && e.datos.errores) setError(`${e.datos.errores.join('. ')}.`)
-      else if (e instanceof ApiError && e.estado === 401) setError('Usuario, contraseña o código incorrectos, o la cuenta está bloqueada unos minutos.')
+      else if (e instanceof ApiError && e.estado === 401 && paso === 'codigo') setError('Ese código no sirve: es incorrecto o ya se usó. Espera al siguiente e inténtalo otra vez. Tras 3 fallos la cuenta se bloquea 5 minutos.')
+      else if (e instanceof ApiError && e.estado === 401) setError('Usuario o contraseña incorrectos, o la cuenta está bloqueada unos minutos.')
       else if (e instanceof ApiError && e.estado === 409) setError('No se pudo crear la cuenta con esos datos. Prueba con otro usuario.')
       else if (e instanceof ApiError && e.estado === 429) setError('Demasiados intentos. Espera un minuto e inténtalo de nuevo.')
       else setError('No se pudo conectar con el servidor. Revisa tu conexión.')
@@ -68,39 +98,89 @@ export function Login({ alEntrar, motivo = '' }) {
   }
 
   const registro = modo === 'registro'
+  const pideCodigo = !registro && paso === 'codigo'
+  const titulo = registro ? 'Crea tu cuenta' : pideCodigo ? 'Verifica que eres tú' : 'Ingresa a tu cuenta'
+  const subtitulo = registro ? 'Elige un usuario y una contraseña larga que solo tú conozcas. Después activarás un segundo factor con tu teléfono.'
+    : pideCodigo ? `Hola, ${usuario}. Abre tu aplicación de autenticación y escribe el código de 6 dígitos que muestra.`
+    : 'Usa tu usuario y tu contraseña. Si tu cuenta tiene segundo factor, te pediremos el código en el siguiente paso.'
   return (
     <main className="acceso">
       <Faro titulo="Cada trámite, de la entrada a la resolución." lema="Sigue tus gestiones ante el Estado: en qué etapa están, quién las atiende y cuándo vence cada plazo." />
       <section className="acceso-formulario">
-        <div className="tarjeta-acceso">
-          <h2>{registro ? 'Crea tu cuenta' : 'Ingresa a tu cuenta'}</h2>
-          <p className="subtitulo">{registro ? 'Elige un usuario y una contraseña larga que solo tú conozcas.' : 'Usa tu usuario, tu contraseña y el código de tu aplicación de autenticación.'}</p>
+        <div className={`tarjeta-acceso ${registro ? 'ancha' : ''}`}>
+          <h2>{titulo}</h2>
+          <p className="subtitulo">{subtitulo}</p>
           <form onSubmit={enviar} autoComplete="on">
             <Alerta tipo="info">{MOTIVOS[motivo]}</Alerta>
             <Alerta>{error}</Alerta>
             <Alerta tipo="ok">{aviso}</Alerta>
-            <label className="campo">
-              <span>Usuario</span>
-              <input className="entrada" value={usuario} onChange={(e) => setUsuario(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck="false" required autoFocus />
-            </label>
-            <label className="campo">
-              <span>Contraseña</span>
-              <input className="entrada" type={verClave ? 'text' : 'password'} value={clave} onChange={(e) => setClave(e.target.value)} autoComplete={registro ? 'new-password' : 'current-password'} required />
-              <small><button type="button" className="enlace-sutil" onClick={() => setVerClave(!verClave)}>{verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}</button></small>
-            </label>
-            {!registro && (
+            {registro && (
+              <fieldset className="datos-personales">
+                <legend>Tus datos</legend>
+                <label className="campo"><span>Nombre</span>
+                  <input className="entrada" value={personales.nombre} onChange={poner('nombre')} autoComplete="given-name" maxLength={60} required autoFocus />
+                </label>
+                <label className="campo"><span>Apellidos</span>
+                  <input className="entrada" value={personales.apellidos} onChange={poner('apellidos')} autoComplete="family-name" maxLength={80} required />
+                </label>
+                <label className="campo"><span>Cédula</span>
+                  <input className="entrada" value={personales.cedula} onChange={poner('cedula')} placeholder="8-123-456" inputMode="text" autoComplete="off" spellCheck="false" maxLength={20} required />
+                  <small>Con guiones, por ejemplo 8-123-456 o PE-12-345. Se guarda cifrada.</small>
+                </label>
+                <label className="campo"><span>Fecha de nacimiento</span>
+                  <input className="entrada" type="date" value={personales.fecha_nacimiento} onChange={poner('fecha_nacimiento')} autoComplete="bday" min="1900-01-01" max={fechaMaximaDeNacimiento()} required />
+                  <small>Debes ser mayor de 18 años.</small>
+                </label>
+                <label className="campo"><span>Provincia</span>
+                  <select className="entrada" value={personales.provincia} onChange={poner('provincia')} autoComplete="address-level1" required>
+                    <option value="">Elige una provincia</option>
+                    {PROVINCIAS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </label>
+                <label className="campo"><span>Ciudad</span>
+                  <input className="entrada" value={personales.ciudad} onChange={poner('ciudad')} autoComplete="address-level2" maxLength={60} required />
+                </label>
+                <label className="campo ancho-completo"><span>Correo electrónico</span>
+                  <input className="entrada" type="email" value={personales.correo} onChange={poner('correo')} autoComplete="email" inputMode="email" spellCheck="false" maxLength={254} required />
+                </label>
+              </fieldset>
+            )}
+            {registro && <h3 className="subtitulo-form">Tu acceso</h3>}
+            {!pideCodigo && (
+              <>
+                <label className="campo">
+                  <span>Usuario</span>
+                  <input className="entrada" value={usuario} onChange={(e) => setUsuario(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck="false" required autoFocus={!registro} />
+                </label>
+                <label className="campo">
+                  <span>Contraseña</span>
+                  <input className="entrada" type={verClave ? 'text' : 'password'} value={clave} onChange={(e) => setClave(e.target.value)} autoComplete={registro ? 'new-password' : 'current-password'} minLength={registro ? 12 : undefined} aria-describedby={registro ? 'ayuda-clave' : undefined} required />
+                  <small><button type="button" className="enlace-sutil" onClick={() => setVerClave(!verClave)}>{verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}</button></small>
+                </label>
+                {registro && <p id="ayuda-clave" className="suave ayuda-clave">Mínimo 12 caracteres; no uses tu nombre de usuario ni una contraseña común.</p>}
+              </>
+            )}
+            {pideCodigo && (
               <label className="campo">
                 <span>Código del autenticador</span>
-                <input className="entrada entrada-codigo" value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" />
-                <small>¿Aún no activas el segundo factor? Déjalo vacío: te guiaremos al entrar.</small>
+                <input className="entrada entrada-codigo" value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" required minLength={6} autoFocus />
+                <small>El código cambia cada 30 segundos y solo sirve una vez.</small>
               </label>
             )}
-            <button type="submit" className="btn btn-ancho" disabled={trabajando}>{trabajando ? 'Verificando…' : registro ? 'Crear cuenta' : 'Ingresar'}</button>
+            <button type="submit" className="btn btn-ancho" disabled={trabajando}>
+              {trabajando ? 'Verificando…' : registro ? 'Crear cuenta' : pideCodigo ? 'Verificar' : 'Continuar'}
+            </button>
+            {pideCodigo && <button type="button" className="btn btn-sec btn-ancho" onClick={volver}>Volver</button>}
           </form>
-          <p className="cambio-modo">
-            {registro ? '¿Ya tienes cuenta? ' : '¿Primera vez aquí? '}
-            <button type="button" onClick={() => { setModo(registro ? 'entrar' : 'registro'); setError(''); setAviso('') }}>{registro ? 'Ingresa' : 'Crea tu cuenta'}</button>
-          </p>
+          {!pideCodigo && (
+            <div className="alta-cuenta">
+              <span>{registro ? '¿Ya tienes cuenta?' : '¿Primera vez en SIGET?'}</span>
+              <button type="button" className="btn btn-sec btn-ancho" onClick={() => { setModo(registro ? 'entrar' : 'registro'); setError(''); setAviso(''); setClave('') }}>
+                {registro ? 'Ingresar con mi cuenta' : 'Crear una cuenta'}
+              </button>
+            </div>
+          )}
+          {!registro && <p className="aviso-bloqueo"><Icono nombre="llave" />Por tu seguridad, tras 3 intentos fallidos (contraseña o código) la cuenta se bloquea 5 minutos.</p>}
           <div className="pie-acceso"><Icono nombre="escudo" /><span>Conexión cifrada con TLS 1.3. Nunca guardamos tu contraseña: solo una huella irreversible.</span></div>
         </div>
       </section>

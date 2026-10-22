@@ -222,34 +222,60 @@ describe('acceso y sesión', () => {
     expect(screen.getByLabelText('Usuario')).toBeInTheDocument()
   })
 
-  it('un usuario inexistente recibe un mensaje genérico (no revela si existe)', async () => {
+  it('al principio NO se pide el código: solo usuario y contraseña', async () => {
+    await abrirComo(null)
+    expect(await screen.findByLabelText('Usuario')).toBeInTheDocument()
+    expect(screen.getByLabelText('Contraseña')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Código del autenticador/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear una cuenta' })).toBeInTheDocument()
+  })
+
+  it('un usuario inexistente recibe un mensaje genérico (no revela si existe ni si tiene segundo factor)', async () => {
     const { user } = await abrirComo(null)
     await user.type(await screen.findByLabelText('Usuario'), 'nadie')
     await user.type(screen.getByLabelText('Contraseña'), 'x')
-    await user.click(screen.getByRole('button', { name: 'Ingresar' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Usuario, contraseña o código incorrectos/)
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Usuario o contraseña incorrectos/)
+    expect(screen.queryByLabelText(/Código del autenticador/)).not.toBeInTheDocument()
   })
 
-  it('sin código del segundo factor se pide el código', async () => {
+  it('solo después de que el servidor acepta la contraseña aparece el segundo paso, con el código', async () => {
     const { user } = await abrirComo(null)
     await user.type(await screen.findByLabelText('Usuario'), 'fabio.mop')
     await user.type(screen.getByLabelText('Contraseña'), 'clave')
-    await user.click(screen.getByRole('button', { name: 'Ingresar' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/código de 6 dígitos/)
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByRole('heading', { name: 'Verifica que eres tú' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Código del autenticador/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Contraseña')).not.toBeInTheDocument() // ya no se muestra ni se pide otra vez
   })
 
-  it('con usuario, contraseña y código entra a la plataforma', async () => {
+  it('con el código correcto en el segundo paso entra a la plataforma', async () => {
     const { user } = await abrirComo(null)
     await user.type(await screen.findByLabelText('Usuario'), 'fabio.mop')
     await user.type(screen.getByLabelText('Contraseña'), 'clave')
-    await user.type(screen.getByLabelText(/Código del autenticador/), '123456')
-    await user.click(screen.getByRole('button', { name: 'Ingresar' }))
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    await user.type(await screen.findByLabelText(/Código del autenticador/), '123456')
+    await user.click(screen.getByRole('button', { name: 'Verificar' }))
     expect(await screen.findByRole('navigation', { name: 'Módulos' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/fabio.mop/)
   })
 
+  it('«Volver» regresa al primer paso y olvida la contraseña', async () => {
+    const { user } = await abrirComo(null)
+    await user.type(await screen.findByLabelText('Usuario'), 'fabio.mop')
+    await user.type(screen.getByLabelText('Contraseña'), 'clave')
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    await user.click(await screen.findByRole('button', { name: 'Volver' }))
+    expect(await screen.findByRole('heading', { name: 'Ingresa a tu cuenta' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Contraseña')).toHaveValue('')
+    expect(screen.queryByLabelText(/Código del autenticador/)).not.toBeInTheDocument()
+  })
+
   it('el código solo admite dígitos y máximo seis', async () => {
     const { user } = await abrirComo(null)
+    await user.type(await screen.findByLabelText('Usuario'), 'fabio.mop')
+    await user.type(screen.getByLabelText('Contraseña'), 'clave')
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
     const campo = await screen.findByLabelText(/Código del autenticador/)
     await user.type(campo, '12ab34567890')
     expect(campo).toHaveValue('123456')
@@ -263,14 +289,43 @@ describe('acceso y sesión', () => {
     expect(campo).toHaveAttribute('type', 'text')
   })
 
-  it('crear cuenta no pide código y avisa cuándo se activa el segundo factor', async () => {
+  it('el formulario de crear cuenta pide todos los datos personales', async () => {
     const { user } = await abrirComo(null)
-    await user.click(await screen.findByRole('button', { name: 'Crea tu cuenta' }))
+    await user.click(await screen.findByRole('button', { name: 'Crear una cuenta' }))
+    for (const campo of ['Nombre', 'Apellidos', 'Cédula', 'Fecha de nacimiento', 'Provincia', 'Ciudad', 'Correo electrónico', 'Usuario', 'Contraseña']) {
+      expect(screen.getByLabelText(new RegExp(`^${campo}`)), campo).toBeRequired()
+    }
+    const provincias = within(screen.getByLabelText('Provincia')).getAllByRole('option').map((o) => o.textContent)
+    expect(provincias).toContain('Panamá Oeste')
+    expect(provincias).toContain('Comarca Ngäbe-Buglé')
+    expect(provincias).toHaveLength(14) // 13 + el texto «Elige una provincia»
+    expect(screen.getByLabelText(/^Fecha de nacimiento/)).toHaveAttribute('max') // nadie menor de 18
+  })
+
+  it('crear una cuenta no pide código y lleva directo a activar el segundo factor', async () => {
+    const { user } = await abrirComo(null)
+    await user.click(await screen.findByRole('button', { name: 'Crear una cuenta' }))
+    expect(screen.getByRole('heading', { name: 'Crea tu cuenta' })).toBeInTheDocument()
     expect(screen.queryByLabelText(/Código del autenticador/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Mínimo 12 caracteres/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Nombre'), 'María José')
+    await user.type(screen.getByLabelText('Apellidos'), 'Pérez de Gracia')
+    await user.type(screen.getByLabelText(/^Cédula/), '8-123-456')
+    await user.type(screen.getByLabelText(/^Fecha de nacimiento/), '1995-04-12')
+    await user.selectOptions(screen.getByLabelText('Provincia'), 'Panamá')
+    await user.type(screen.getByLabelText('Ciudad'), 'San Miguelito')
+    await user.type(screen.getByLabelText('Correo electrónico'), 'maria@correo.com')
     await user.type(screen.getByLabelText('Usuario'), 'nuevo.usuario')
     await user.type(screen.getByLabelText('Contraseña'), 'una-frase-larga-y-unica')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
-    expect(await screen.findByRole('status')).toHaveTextContent(/segundo factor/)
+    expect(await screen.findByRole('heading', { name: 'Activa el segundo factor' })).toBeInTheDocument()
+  })
+
+  it('el aviso del bloqueo por intentos fallidos se ve al ingresar, no al crear cuenta', async () => {
+    const { user } = await abrirComo(null)
+    expect(await screen.findByText(/tras 3 intentos fallidos.*se bloquea 5 minutos/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Crear una cuenta' }))
+    expect(screen.queryByText(/tras 3 intentos fallidos/)).not.toBeInTheDocument()
   })
 
   it('el alta del segundo factor muestra el QR y la clave, y al confirmar entra', async () => {
