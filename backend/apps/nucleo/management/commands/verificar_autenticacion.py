@@ -15,9 +15,10 @@ from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.autenticacion import perfil
+from apps.autenticacion import contrasenas, perfil
 from apps.autenticacion.models import EventoSeguridad, Sesion
-from apps.identidad.models import Perfil, Usuario
+from apps.catalogo.models import Institucion
+from apps.identidad.models import Membresia, Perfil, Usuario
 
 CLAVE_BUENA = "una-frase-larga-y-poco-comun-7391"
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.7"}
@@ -266,6 +267,47 @@ class Command(BaseCommand):
         self._paso("pasada la hora vuelve a poder entrar", entrar(t4) == 200)
         t5 = t4 + timedelta(seconds=1)
         self._paso("un inicio de sesión exitoso reinicia la escalera: el siguiente bloqueo vuelve a durar 5 minutos", tres_fallos(t5) == t5 + timedelta(minutes=5))
+
+        # ---------------------------------------------------------------- las tres puertas: ciudadanía, personal por institución y plataforma
+        inst_a, inst_b = list(Institucion.objects.order_by("id")[:2])
+        asignador = Usuario.objects.create(username="int_asig", password_hash=contrasenas.hashear(CLAVE_BUENA), estado_cuenta="suspendida")
+        for nombre, rol in (("int_pc", "ninguno"), ("int_staff", "ninguno"), ("int_op", "operador_seguridad")):
+            Usuario.objects.create(username=nombre, password_hash=contrasenas.hashear(CLAVE_BUENA), rol_plataforma=rol, nivel_aseguramiento=2)
+        Membresia.objects.create(usuario=Usuario.objects.get(username="int_staff"), institucion=inst_a, rol="funcionario", asignado_por=asignador)
+
+        def puerta(usuario, canal, institucion=None, clave=CLAVE_BUENA):
+            cuerpo = {"username": usuario, "password": clave}
+            if canal is not None:
+                cuerpo["canal"] = canal
+            if institucion is not None:
+                cuerpo["institucion_id"] = institucion
+            return self._http("post", "/auth/login/", cuerpo)
+
+        self._paso("la lista pública de instituciones se ve sin iniciar sesión y trae solo id y nombre",
+                   (lambda r: r.status_code == 200 and len(r.json()) >= 2 and all(set(i) == {"id", "nombre"} for i in r.json()))(self._http("get", "/auth/instituciones/")))
+        self._paso("la ciudadanía entra por la puerta pública", puerta("int_pc", "ciudadania").status_code == 200)
+        r = puerta("int_pc", "institucion", inst_a.pk)
+        self._paso("pero no por la del personal: se le dice cuál es la suya y no se abre sesión",
+                   r.status_code == 401 and r.json()["codigo"] == "canal_incorrecto" and r.json()["acceso_correcto"] == "ciudadania" and "access_token" not in r.json())
+        self._paso("el personal entra por SU institución", puerta("int_staff", "institucion", inst_a.pk).status_code == 200)
+        r = puerta("int_staff", "institucion", inst_b.pk)
+        self._paso("no por otra institución: se le indica la suya", r.status_code == 401 and r.json()["acceso_correcto"] == "institucion" and r.json()["instituciones"] == [inst_a.nombre], r.json())
+        self._paso("el personal no usa la puerta pública", puerta("int_staff", "ciudadania").json().get("codigo") == "canal_incorrecto")
+        self._paso("un operador de plataforma entra por la suya y no por la pública",
+                   puerta("int_op", "plataforma").status_code == 200 and puerta("int_op", "ciudadania").status_code == 401)
+        self._paso("un cliente de la API sin `canal` entra como siempre", puerta("int_staff", None).status_code == 200)
+        malo = puerta("int_staff", "administrador")
+        self._paso("una puerta inexistente responde como cualquier credencial inválida", malo.status_code == 401 and malo.json()["codigo"] == "credenciales_invalidas")
+        mala = puerta("int_staff", "ciudadania", clave="mala-mala-mala-1")
+        self._paso("con contraseña mala la respuesta es la genérica: la puerta no se comprueba sin credenciales válidas (no filtra quién es personal)",
+                   mala.status_code == 401 and mala.json()["codigo"] == "credenciales_invalidas" and "acceso_correcto" not in mala.json())
+        for _ in range(4):
+            puerta("int_staff", "ciudadania")
+        self._paso("equivocarse de puerta no cuenta como intento fallido ni bloquea la cuenta", puerta("int_staff", "institucion", inst_a.pk).status_code == 200
+                   and Usuario.objects.get(username="int_staff").intentos_fallidos == 0)
+        eventos = set(EventoSeguridad.objects.filter(actor__username="int_staff").values_list("evento", flat=True))
+        self._paso("entrar por la puerta equivocada queda registrado como evento de seguridad", "login_canal_incorrecto" in eventos)
+        self._paso("y no se abrió ninguna sesión por esos intentos", Sesion.objects.filter(usuario__username="int_pc").count() == 1)
 
         # ---------------------------------------------------------------- cuenta suspendida
         self._http("post", "/auth/registro/", {"username": "int_carla", "password": CLAVE_BUENA, **personales(3)})

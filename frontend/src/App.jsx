@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { alPerderLaSesion, api, cerrarSesion, olvidarToken, renovar } from './api.js'
-import { EnrolarMfa, Login } from './Acceso.jsx'
+import { Acceso, EnrolarMfa } from './Acceso.jsx'
 import { Auditoria } from './Auditoria.jsx'
 import { AvisoInactividad, useInactividad } from './inactividad.jsx'
 import { SegundoFactor } from './Mfa.jsx'
@@ -58,7 +58,7 @@ export default function App() {
   if (fase === 'cargando') {
     return <main className="acceso"><section className="acceso-formulario" role="status" aria-label="Verificando tu sesión"><Logo className="marca-logo" /></section></main>
   }
-  if (fase === 'login') return <Login alEntrar={cargarYo} motivo={motivo} />
+  if (fase === 'login') return <Acceso alEntrar={cargarYo} motivo={motivo} />
   if (fase === 'enrolar') return <><EnrolarMfa usuario={yo.usuario} alTerminar={cargarYo} alSalir={salir} />{restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}</>
 
   const ir = (modulo) => { setVista({ modulo }); setMenuAbierto(false); window.scrollTo({ top: 0 }) }

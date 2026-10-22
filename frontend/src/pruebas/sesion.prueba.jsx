@@ -34,7 +34,7 @@ describe('cierre de sesión por inactividad', () => {
     await pasar(60) // se agotó
     expect(await screen.findByText(/Cerramos tu sesión por inactividad/)).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Módulos' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Continuar/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '¿Cómo quieres ingresar?' })).toBeInTheDocument()
   })
 
   it('«Seguir conectado» reinicia la cuenta', async () => {

@@ -70,7 +70,7 @@ function TablaPersonas({ yo, acciones }) {
       <Alerta>{error}</Alerta>
       {!datos ? <BloquesEsqueleto n={2} /> : datos.personas.length === 0 ? <Vacio titulo="Nadie coincide" texto="Prueba con otra parte del usuario." /> : (
         <div className="tabla-caja">
-          <table className="tabla">
+          <table className="tabla apilada">
             <caption className="solo-lector">Personas con su estado de cuenta</caption>
             <thead><tr><th scope="col">Usuario</th><th scope="col">Rol</th><th scope="col">Cuenta</th><th scope="col">2.º factor</th><th scope="col">Sesiones</th><th scope="col">Acciones</th></tr></thead>
             <tbody>
@@ -79,11 +79,11 @@ function TablaPersonas({ yo, acciones }) {
                 return (
                   <tr key={p.id}>
                     <th scope="row">{p.usuario}{p.id === yo.id && <small>Eres tú</small>}</th>
-                    <td>{ETIQUETA_ROL[p.rol_plataforma] || p.rol_plataforma}</td>
-                    <td><Insignia clase={clase}>{texto}</Insignia>{p.bloqueada_hasta && <small>Bloqueo temporal por intentos</small>}</td>
-                    <td>{p.mfa_activo ? 'Activo' : 'No activo'}</td>
-                    <td>{p.sesiones_activas}</td>
-                    <td><div className="acciones-fila">{p.id === yo.id ? <span className="suave">—</span> : acciones(p, recargar)}</div></td>
+                    <td data-etiqueta="Rol">{ETIQUETA_ROL[p.rol_plataforma] || p.rol_plataforma}</td>
+                    <td data-etiqueta="Cuenta"><Insignia clase={clase}>{texto}</Insignia>{p.bloqueada_hasta && <small>Bloqueo temporal por intentos</small>}</td>
+                    <td data-etiqueta="2.º factor">{p.mfa_activo ? 'Activo' : 'No activo'}</td>
+                    <td data-etiqueta="Sesiones">{p.sesiones_activas}</td>
+                    <td data-etiqueta="Acciones"><div className="acciones-fila">{p.id === yo.id ? <span className="suave">—</span> : acciones(p, recargar)}</div></td>
                   </tr>
                 )
               })}
@@ -332,11 +332,11 @@ export function ConsolaSeguridad({ yo }) {
         <Alerta>{eventos.error}</Alerta>
         {!eventos.datos ? <BloquesEsqueleto n={2} /> : (
           <div className="tabla-caja">
-            <table className="tabla">
+            <table className="tabla apilada">
               <caption className="solo-lector">Últimos eventos de seguridad</caption>
               <thead><tr><th scope="col">Cuándo</th><th scope="col">Evento</th><th scope="col">Persona</th><th scope="col">Dirección</th></tr></thead>
               <tbody>{eventos.datos.eventos.slice(0, 30).map((e) => (
-                <tr key={e.id}><td>{fecha(e.creado_en)}</td><td><code>{e.evento}</code></td><td>{e.usuario || '—'}</td><td>{e.ip || '—'}</td></tr>
+                <tr key={e.id}><td data-etiqueta="Cuándo">{fecha(e.creado_en)}</td><td data-etiqueta="Evento"><code>{e.evento}</code></td><td data-etiqueta="Persona">{e.usuario || '—'}</td><td data-etiqueta="Dirección">{e.ip || '—'}</td></tr>
               ))}</tbody>
             </table>
           </div>
@@ -364,7 +364,7 @@ export function ConsolaSecretos() {
         <div className="panel-cabecera"><h3>Estado de los secretos</h3></div>
         {!datos ? <BloquesEsqueleto n={3} /> : (
           <div className="tabla-caja">
-            <table className="tabla">
+            <table className="tabla apilada">
               <caption className="solo-lector">Secretos, última rotación y estado</caption>
               <thead><tr><th scope="col">Secreto</th><th scope="col">Dónde vive</th><th scope="col">Cada</th><th scope="col">Última rotación</th><th scope="col">Estado</th></tr></thead>
               <tbody>{datos.secretos.map((s) => {
@@ -372,9 +372,9 @@ export function ConsolaSecretos() {
                 return (
                   <tr key={s.id}>
                     <th scope="row">{s.nombre}{s.nota && <small>{s.nota}</small>}</th>
-                    <td>{s.donde}</td><td>{s.frecuencia_dias} días</td>
-                    <td>{s.ultima_rotacion ? hace(s.ultima_rotacion) : '—'}</td>
-                    <td><Insignia clase={clase}>{texto}</Insignia>{s.dias_restantes !== null && <small>{s.dias_restantes >= 0 ? `Faltan ${s.dias_restantes} días` : `Vencida hace ${-s.dias_restantes} días`}</small>}</td>
+                    <td data-etiqueta="Dónde vive">{s.donde}</td><td data-etiqueta="Cada">{s.frecuencia_dias} días</td>
+                    <td data-etiqueta="Última rotación">{s.ultima_rotacion ? hace(s.ultima_rotacion) : '—'}</td>
+                    <td data-etiqueta="Estado"><Insignia clase={clase}>{texto}</Insignia>{s.dias_restantes !== null && <small>{s.dias_restantes >= 0 ? `Faltan ${s.dias_restantes} días` : `Vencida hace ${-s.dias_restantes} días`}</small>}</td>
                   </tr>
                 )
               })}</tbody>

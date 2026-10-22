@@ -60,13 +60,18 @@ export async function api(ruta, opciones = {}) {
   return r.datos
 }
 
-export async function iniciarSesion(username, password, codigo) {
+export async function iniciarSesion(username, password, codigo, puerta = {}) {
   const cuerpo = { username, password }
   if (codigo) cuerpo.codigo = codigo
+  // La puerta por la que se entra (ciudadanía, personal de una institución o plataforma). No da permisos: solo evita entrar por la equivocada
+  if (puerta.canal) cuerpo.canal = puerta.canal
+  if (puerta.institucion_id) cuerpo.institucion_id = puerta.institucion_id
   const d = await api('/auth/login/', { metodo: 'POST', cuerpo, conToken: false })
   tokenDeAcceso = d.access_token
   return d
 }
+
+export const instituciones = () => api('/auth/instituciones/', { conToken: false })
 
 export const registrar = (username, password, personales = {}) =>
   api('/auth/registro/', { metodo: 'POST', cuerpo: { username, password, ...personales }, conToken: false })

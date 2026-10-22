@@ -15,9 +15,10 @@ from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.catalogo.models import Institucion
 from apps.identidad.models import Membresia, Perfil, Usuario
 
-from . import bloqueo, contrasenas, mfa, perfil, politica_sesion, restablecimiento, tokens
+from . import bloqueo, canales, contrasenas, mfa, perfil, politica_sesion, restablecimiento, tokens
 from .models import EventoSeguridad, Restablecimiento, Sesion
 
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,31}$")
@@ -120,7 +121,7 @@ def registrar_usuario(username, password, ip, datos_personales=None, hoy=None) -
     return Resultado(True, "registrado", detalle={"id": usuario.pk})
 
 
-def iniciar_sesion(username, password, codigo_mfa, ip, ahora=None) -> Resultado:
+def iniciar_sesion(username, password, codigo_mfa, ip, ahora=None, canal=None, institucion_id=None) -> Resultado:
     ahora = ahora or timezone.now()
     username = (username or "").strip().lower() if isinstance(username, str) else ""
     password = password if isinstance(password, str) else ""
@@ -153,6 +154,14 @@ def iniciar_sesion(username, password, codigo_mfa, ip, ahora=None) -> Resultado:
         if paso is not None:
             campos.update(mfa_ultimo_paso=paso, mfa_verificado_en=ahora)
         Usuario.objects.filter(pk=usuario.pk).update(**campos)
+        if canal is not None:
+            membresias = list(Membresia.objects.filter(usuario=usuario).values_list("rol", "institucion_id"))
+            if not canales.permitido(canal, institucion_id, usuario.rol_plataforma, membresias):
+                # Ya probó quién es (contraseña y segundo factor): se le dice por qué puerta debe entrar. No se abre ninguna sesión.
+                correcta = canales.canal_de(usuario.rol_plataforma, membresias)
+                registrar_evento(usuario.pk, "login_canal_incorrecto", ip, {"canal": canal if isinstance(canal, str) else None, "correcto": correcta})
+                nombres = list(Institucion.objects.filter(pk__in=canales.instituciones_del_personal(membresias)).order_by("nombre").values_list("nombre", flat=True))
+                return Resultado(False, "canal_incorrecto", detalle={"acceso_correcto": correcta, "instituciones": nombres if correcta == canales.INSTITUCION else []})
         return _crear_sesion(usuario, _scope_para(usuario), ip, ahora, "login_ok")
 
 

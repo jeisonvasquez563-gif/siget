@@ -18,3 +18,18 @@ textarea.entrada { resize: vertical; min-height: 5rem; font: inherit; }
 .dato-sistema strong { font-weight: 650; word-break: break-word; }
 .dato-sistema.mal { border-color: var(--sello-rojo); }
 .tabla th small, .tabla td small { display: block; color: var(--tinta-suave); font-weight: 400; margin-top: 0.1rem; }
+
+/* Tablas que en pantallas estrechas se apilan como tarjetas (una fila = una tarjeta con sus etiquetas) */
+.tabla td:last-child .acciones-fila { min-width: 14rem; }
+@media (max-width: 40rem) {
+  .tabla.apilada thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .tabla.apilada, .tabla.apilada tbody, .tabla.apilada tr, .tabla.apilada th, .tabla.apilada td { display: block; width: 100%; }
+  .tabla.apilada tr { padding: 0.8rem 1rem; border-bottom: 1px solid var(--borde); }
+  .tabla.apilada tbody tr:last-child { border-bottom: 0; }
+  .tabla.apilada th[scope='row'] { padding: 0 0 0.4rem; border: 0; font-size: var(--t-m, 1rem); }
+  .tabla.apilada td { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.3rem 0; border: 0; text-align: right; }
+  .tabla.apilada td::before { content: attr(data-etiqueta); color: var(--tinta-suave); font-size: var(--t-s); text-align: left; flex: none; }
+  .tabla.apilada td[data-etiqueta='Acciones'] { display: block; text-align: left; padding-top: 0.5rem; }
+  .tabla.apilada td[data-etiqueta='Acciones']::before { display: block; margin-bottom: 0.35rem; }
+  .tabla td:last-child .acciones-fila { min-width: 0; }
+}

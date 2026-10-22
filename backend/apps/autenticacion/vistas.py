@@ -15,9 +15,10 @@ from rest_framework.views import APIView
 
 from apps.autorizacion.modulos import modulos_para
 from apps.autenticacion.models import EventoSeguridad
+from apps.catalogo.models import Institucion
 from apps.identidad.models import Membresia
 
-from . import servicio, tokens
+from . import canales, servicio, tokens
 from .autenticacion import exige_scope
 
 ENCABEZADO_CSRF = "HTTP_X_SIGET_CSRF"
@@ -57,6 +58,18 @@ def _tokens_en_respuesta(resultado, codigo_http=status.HTTP_200_OK):
 
 def _denegado(codigo, detalle=MENSAJE_GENERICO, http=status.HTTP_401_UNAUTHORIZED):
     return Response({"codigo": codigo, "detalle": detalle}, status=http)
+
+
+class InstitucionesPublicas(APIView):
+    """Las instituciones que aparecen en la puerta del personal. Es información pública (el catálogo de SIGET), no datos de nadie."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "anon"
+
+    def get(self, request):
+        return Response([{"id": i.pk, "nombre": i.nombre} for i in Institucion.objects.order_by("nombre")])
 
 
 class _Publica(APIView):
@@ -99,11 +112,18 @@ class Login(_Publica):
     throttle_scope = "login"
 
     def post(self, request):
-        r = servicio.iniciar_sesion(_campo(request, "username"), _campo(request, "password"), _campo(request, "codigo"), _ip(request))
+        datos = request.data if isinstance(request.data, dict) else {}
+        canal = datos.get("canal")
+        if canal is not None and canal not in canales.CANALES:
+            return _denegado("credenciales_invalidas")  # una puerta que no existe: se trata como cualquier fallo
+        r = servicio.iniciar_sesion(_campo(request, "username"), _campo(request, "password"), _campo(request, "codigo"), _ip(request),
+                                    canal=canal, institucion_id=datos.get("institucion_id"))
         if r.ok:
             return _tokens_en_respuesta(r)
         if r.codigo == "mfa_requerido":
             return _denegado("mfa_requerido", "Falta el código del segundo factor.")
+        if r.codigo == "canal_incorrecto":
+            return Response({"codigo": "canal_incorrecto", "detalle": "Tu cuenta no corresponde a este acceso.", **r.detalle}, status=status.HTTP_401_UNAUTHORIZED)
         return _denegado("credenciales_invalidas")
 
 

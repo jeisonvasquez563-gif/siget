@@ -178,10 +178,19 @@ export function instalarMock(inicial, opciones = {}) {
       if (nombre === 'nuevo.usuario') { enrolando = true; return resp(200, { access_token: 'mock', scope: 'enrolar_mfa' }) }
       if (!USUARIOS[nombre]) return resp(401, { codigo: 'credenciales_invalidas' })
       if (!cuerpo.codigo) return resp(401, { codigo: 'mfa_requerido' })
+      if (cuerpo.canal) {
+        // Igual que el servidor: la puerta se comprueba tras validar las credenciales y solo restringe
+        const u = USUARIOS[nombre]
+        const personal = u.membresias.filter((m) => ['funcionario', 'supervisor', 'coordinador_institucional'].includes(m.rol))
+        const correcta = u.plataforma !== 'ninguno' ? 'plataforma' : personal.length ? 'institucion' : 'ciudadania'
+        const entra = cuerpo.canal === correcta && (correcta !== 'institucion' || personal.some((m) => m.institucion_id === cuerpo.institucion_id))
+        if (!entra) return resp(401, { codigo: 'canal_incorrecto', detalle: 'Tu cuenta no corresponde a este acceso.', acceso_correcto: correcta, instituciones: correcta === 'institucion' ? personal.map((m) => m.institucion) : [] })
+      }
       actual = nombre
       mfaFresco = true
       return resp(200, { access_token: 'mock', scope: 'completo' })
     }
+    if (camino === '/auth/instituciones/') return resp(200, INSTITUCIONES.map(({ id, nombre }) => ({ id, nombre })))
     if (camino === '/auth/registro/') return resp(201, { detalle: 'Cuenta creada.' })
     if (camino === '/auth/restablecer/') {
       const bueno = (cuerpo.codigo || '').replace(/[\s-]/g, '').toUpperCase() === 'K7MQ2XWD9PRT' && USUARIOS[(cuerpo.username || '').trim().toLowerCase()]
