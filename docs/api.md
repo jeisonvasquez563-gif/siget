@@ -117,6 +117,18 @@ El `modulos` de `/auth/yo/` incluye siempre `seguridad`, `mfa` y `roles_permisos
 2. **Quitar o cambiar** un campo, un estado o un código de error rompe al otro frente: se avisa y se acuerda antes, y el PR toca este archivo, `frontend/` y `backend/` a la vez.
 3. El backend cubre cada ruta con pruebas (incluida la auditoría de rutas públicas); el frontend no inventa rutas que no estén aquí.
 
+### Gestión del equipo (`/equipo/…`)
+
+`GET /equipo/` ahora indica por institución `puede_gestionar` y, por persona, `gestionable`. Las acciones exigen la **coordinación de esa institución** con segundo factor reciente (si no, `403`).
+
+| Ruta | Cuerpo | Respuestas |
+|---|---|---|
+| `POST /equipo/<institucion>/miembros/` | `{usuario, rol}` (`funcionario` o `supervisor`) | `201`; `400 {errores[]}` (no existe, plataforma, cuenta inactiva, ya lo es); `409 no_a_si_mismo` |
+| `POST /equipo/<institucion>/miembros/<persona>/cambiar-rol/` | `{rol}` | `200`; `409 no_corresponde` |
+| `POST /equipo/<institucion>/miembros/<persona>/quitar/` | — | `200`; `409 tiene_tramites_abiertos {tramites_abiertos}` (supervisión debe reasignarlos antes); `409 no_corresponde` |
+
+Quitar **revoca** la membresía (no se borra): queda quién la dio y quién la quitó.
+
 ### Puertas de entrada
 
 `POST /auth/login/` acepta además `canal` (`ciudadania`, `institucion` o `plataforma`) e `institucion_id` (entero, solo con `institucion`). Se comprueba tras validar contraseña y segundo factor: si la cuenta no corresponde a esa puerta responde `401 {codigo: "canal_incorrecto", acceso_correcto, instituciones[]}` y no abre sesión (no cuenta como intento fallido). Una puerta inexistente responde como credenciales inválidas. Sin `canal` el comportamiento no cambia. `GET /auth/instituciones/` (pública) devuelve `[{id, nombre}]` para la puerta del personal.

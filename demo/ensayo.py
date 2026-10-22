@@ -337,6 +337,27 @@ e, inf = ines.pedir("GET", "/plataforma/infraestructura/")
 paso(e == 200 and inf["base"]["ok"] and inf["base"]["tls"] == "TLSv1.3", "infraestructura ve la base viva con la conexión cifrada TLS 1.3", inf["base"].get("tls") if e == 200 else e)
 paso(e == 200 and inf["certificado"]["dias_restantes"] > 30, "y el certificado de nginx vence dentro de más de 30 días", inf["certificado"]["dias_restantes"] if e == 200 else e)
 
+# --- gestión del equipo (solo lo que no deja cambios: la gestión completa la prueba verificar_equipo)
+carla, saul2 = Sesion("carla.mop"), Sesion("saul.mop")
+for s in (carla, saul2):
+    e, _ = s.entrar()
+    paso(e == 200, f"{s.usuario} entra para la gestión del equipo", e)
+e, eq = carla.pedir("GET", "/equipo/")
+mop_eq = next((x for x in eq["equipos"] if x["institucion"]["id"] == mop), None) if e == 200 else None
+paso(bool(mop_eq) and mop_eq["puede_gestionar"] is True and any(p["gestionable"] for p in mop_eq["personal"]) and not next(p for p in mop_eq["personal"] if p["usuario"] == "carla.mop")["gestionable"],
+     "la coordinadora ve su equipo y puede gestionar al personal, no a sí misma ni a las coordinaciones", e)
+e, eq2 = saul2.pedir("GET", "/equipo/")
+mop_sup = next((x for x in eq2["equipos"] if x["institucion"]["id"] == mop), None) if e == 200 else None
+paso(bool(mop_sup) and mop_sup["puede_gestionar"] is False and not any(p["gestionable"] for p in mop_sup["personal"]), "el supervisor ve el equipo pero no lo puede gestionar", e)
+e, _ = saul2.pedir("POST", f"/equipo/{mop}/miembros/", {"usuario": "beto.ciudadano", "rol": "funcionario"})
+paso(e == 403, "el supervisor no asigna personal (403)", e)
+e, r = carla.pedir("POST", f"/equipo/{mop}/miembros/", {"usuario": "carla.mop", "rol": "supervisor"})
+paso(e == 409, "nadie se asigna a sí mismo (409)", e)
+e, r = carla.pedir("POST", f"/equipo/{mop}/miembros/", {"usuario": "ivan.identidades", "rol": "funcionario"})
+paso(e == 400, "una cuenta de plataforma no puede ser personal de una institución (400)", e)
+e, _ = ivan.pedir("POST", f"/equipo/{mop}/miembros/", {"usuario": "beto.ciudadano", "rol": "funcionario"})
+paso(e == 403, "un operador de plataforma no gestiona equipos (403)", e)
+
 # --- las tres puertas (la semántica completa la prueba verificar_autenticacion; aquí lo observable desde fuera)
 e, lista = ana.pedir("GET", "/auth/instituciones/")
 paso(e == 200 and len(lista) >= 6 and all(set(i) == {"id", "nombre"} for i in lista), "la lista de instituciones de la puerta del personal es pública y solo trae id y nombre", e)
