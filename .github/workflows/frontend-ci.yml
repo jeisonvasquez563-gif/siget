@@ -1,0 +1,35 @@
+name: frontend-ci
+
+# Solo corre cuando cambia algo de la interfaz (o de este mismo flujo).
+on:
+  pull_request:
+    paths: ["frontend/**", ".github/workflows/frontend-ci.yml"]
+  push:
+    branches: [develop, main]
+    paths: ["frontend/**", ".github/workflows/frontend-ci.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  compilacion:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # La CSP de nginx es `default-src 'self'`: la interfaz no puede llevar estilos ni scripts en línea.
+      - name: Sin estilos ni scripts en línea (CSP)
+        run: |
+          if grep -rnE "style=\{\{|dangerouslySetInnerHTML|<script>[^<]|style=\"" src index.html; then
+            echo "La interfaz no puede usar estilos ni scripts en línea (CSP default-src 'self')." >&2
+            exit 1
+          fi
