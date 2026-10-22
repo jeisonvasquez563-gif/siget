@@ -6,6 +6,9 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Cambiado (solo en VM1, temporal)
+- **Inactividad en 2 minutos para la demostración** (`Environment=SIGET_INACTIVIDAD_MINUTOS=2` en la unidad instalada de VM1; el repositorio conserva 10). Revertir tras la presentación. El ensayo acepta el valor configurado.
+
 ### Añadido (bloqueo progresivo, 22-oct)
 - **Bloqueo progresivo por intentos fallidos**: 3 fallos seguidos (de contraseña o de código) bloquean la cuenta **5 minutos la primera vez, 15 la segunda y 60 las siguientes** (tope de una hora: una espera eterna sería un ataque de denegación contra la víctima). La escalera se cuenta con los eventos de seguridad inalterables (`cuenta_bloqueada`, ahora con `minutos` y `bloqueos_previos`) desde el último inicio de sesión exitoso y con memoria máxima de 24 h, así que no hizo falta migración y una persona legítima que acierta reinicia la cuenta. La respuesta del servidor sigue siendo idéntica a una contraseña mala (no revela el bloqueo). Lógica pura en `bloqueo.py` (+8 pruebas) y 8 pasos nuevos en `verificar_autenticacion` con el reloj controlado (5 → 15 → 60 y reinicio). La pantalla de acceso explica la escalera.
 

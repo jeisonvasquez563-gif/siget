@@ -141,7 +141,8 @@ paso(e == 400 and len((d or {}).get("errores", [])) >= 7, "crear cuenta sin dato
 e, _ = ana.entrar()
 paso(e == 200, "entra con usuario, contraseña y código del segundo factor", e)
 _, yo = ana.pedir("GET", "/auth/yo/")
-paso(yo.get("inactividad_minutos") == 10, "el servidor informa el tiempo de inactividad (10 min): la interfaz no lo escribe a mano", yo.get("inactividad_minutos"))
+inactividad = yo.get("inactividad_minutos")
+paso(isinstance(inactividad, int) and 1 <= inactividad <= 15, "el servidor informa el tiempo de inactividad (la interfaz no lo escribe a mano)", f"{inactividad} min")
 ids = [m["id"] for m in yo["modulos"]]
 paso(ids == ["mis_tramites", "nuevo_tramite", "seguridad", "mfa", "roles_permisos"], "su menú es el de la ciudadanía", ids)
 _, lista = ana.pedir("GET", "/tramites/?limite=100")

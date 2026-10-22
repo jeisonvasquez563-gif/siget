@@ -72,6 +72,8 @@ Es la pieza del segundo factor que más impresiona y la que no aparece sola, por
 
 ## Cómo mostrar el cierre por inactividad
 
+> **Estado actual en VM1 (22-oct, por decisión de Jeison): la inactividad está en 2 minutos** (aviso al minuto, cierre a los 2) para la demostración. **Después hay que volver a 10:** quitar la línea `Environment=SIGET_INACTIVIDAD_MINUTOS=2` de la unidad instalada y reiniciar el pod. Ojo: `desplegar.sh` copia la unidad del repositorio y también la devuelve a 10.
+
 La sesión se cierra a los **10 minutos** sin actividad, con aviso un minuto antes; el servidor además rechaza renovar un acceso que nadie usó durante 15 minutos y ninguna sesión pasa de 8 horas. Para no esperar 10 minutos (decisión de Jeison): en VM1, agregar `Environment=SIGET_INACTIVIDAD_MINUTOS=2` a `/home/siget/.config/containers/systemd/siget-backend.container` y reiniciar el pod con el mismo comando de la opción C de arriba. Con 2 minutos, el aviso sale al minuto y el cierre a los 2. Al terminar, quitar la línea y reiniciar. Es una ventana **más estricta**, no más débil.
 
 ## Qué decir (hilo conductor: Zero Trust)
