@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from './api.js'
-import { Estado, FINALES, Plazo, ROLES_INSTITUCION, ROLES_PLATAFORMA, etiquetaDeRol, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { Estado, FINALES, Plazo, ROLES_INSTITUCION, ROLES_PLATAFORMA, etiquetaDeRol, hace, mensajeDe } from './comun.jsx'
 import { iconoDe } from './modulos.js'
-import { Alerta, Avatar, BloquesEsqueleto, Esqueleto, Icono, Insignia, Vacio } from './ui.jsx'
+import { Alerta, Avatar, Esqueleto, Icono, Insignia, Vacio } from './ui.jsx'
 import { esMio } from './Tramites.jsx'
 
 function saludoDeLaHora() {
@@ -78,44 +78,6 @@ export function Inicio({ yo, ir, abrir }) {
 }
 
 /* ---------------------------------------------------------------- equipo */
-
-export function Equipo() {
-  const [equipos, setEquipos] = useState(null)
-  const [error, setError] = useState('')
-  const { ejecutar, modal } = useReautenticacion()
-
-  useEffect(() => {
-    (async () => {
-      try {
-        await ejecutar(async () => { setEquipos((await api('/equipo/')).equipos) })
-      } catch (e) {
-        setError(mensajeDe(e))
-        setEquipos([])
-      }
-    })()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <>
-      <div className="encabezado-vista"><div><h2>Equipo de la institución</h2><p>Quién tiene qué rol en las instituciones que coordinas o supervisas.</p></div></div>
-      <Alerta>{error}</Alerta>
-      {equipos === null ? <BloquesEsqueleto n={3} /> : equipos.map((e) => (
-        <section className="panel" key={e.institucion.id}>
-          <div className="panel-cabecera"><h3>{e.institucion.nombre}</h3><span className="suave">{e.personal.length} personas</span></div>
-          <div className="rejilla-personas">
-            {e.personal.map((p) => (
-              <div className="persona" key={`${p.usuario_id}-${p.rol}`}>
-                <Avatar nombre={p.usuario} />
-                <div><strong>{p.usuario}</strong><Insignia clase="insignia-rol" punto={false}>{ROLES_INSTITUCION[p.rol] || p.rol}</Insignia></div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
-      {modal}
-    </>
-  )
-}
 
 /* ---------------------------------------------------------------- mi seguridad */
 

@@ -20,6 +20,8 @@ from apps.autenticacion.servicio import Resultado, registrar_evento
 from apps.catalogo.models import Institucion
 from apps.identidad.models import Aprobacion, Membresia, Usuario
 
+from apps.identidad import equipo
+
 from . import secretos
 from .models import RotacionSecreto
 
@@ -182,7 +184,7 @@ def _aplicar(operador, aprobacion):
     inst = Institucion.objects.filter(pk=objetivo.get("institucion_id")).first()
     if persona is None or inst is None or persona.rol_plataforma != "ninguno" or persona.estado_cuenta != "activa":
         return Resultado(False, "datos_invalidos", detalle={"errores": ["la persona o la institución ya no son válidas para este alta"]})
-    Membresia.objects.get_or_create(usuario=persona, institucion=inst, rol="coordinador_institucional", defaults={"asignado_por": operador})
+    equipo.dar_rol(persona, inst, "coordinador_institucional", operador)  # crea la membresía o reactiva una revocada
     return Resultado(True, "ok")
 
 

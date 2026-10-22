@@ -39,8 +39,19 @@ class Usuario(ModeloDeEsquema):
         return self.username
 
 
+class MembresiasVigentes(models.Manager):
+    """Solo las membresías no revocadas: todo el código que decide accesos usa este manager, así una revocación surte efecto al instante."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(revocada_en__isnull=True)
+
+
 class Membresia(ModeloDeEsquema):
-    """Rol de una persona dentro de una institución. Nadie se asigna a sí mismo (lo impone la base)."""
+    """Rol de una persona dentro de una institución. Nadie se asigna a sí mismo (lo impone la base).
+
+    Quitar a alguien no borra la fila: se REVOCA (migración 011) y queda quién dio el acceso y quién lo quitó.
+    `Membresia.objects` devuelve solo las vigentes; `Membresia.todas`, también las revocadas.
+    """
 
     ROLES = [
         ("ciudadano", "Ciudadano"),
@@ -55,6 +66,11 @@ class Membresia(ModeloDeEsquema):
     rol = models.TextField(choices=ROLES)
     asignado_por = models.ForeignKey(Usuario, on_delete=models.DO_NOTHING, db_column="asignado_por", related_name="+")
     creado_en = models.DateTimeField(auto_now_add=True)
+    revocada_en = models.DateTimeField(null=True, blank=True)
+    revocada_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.DO_NOTHING, db_column="revocada_por", related_name="+")
+
+    objects = MembresiasVigentes()
+    todas = models.Manager()
 
     class Meta(ModeloDeEsquema.Meta):
         db_table = "membresia"
