@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { api, ApiError, confirmarMfa, iniciarSesion, instituciones, registrar, restablecerContrasena } from './api.js'
-import { Alerta, Esclusas, Icono, Logo } from './ui.jsx'
+import { Alerta, Icono, Logo } from './ui.jsx'
+import mola from './assets/mola-panama.svg'
 
 function Faro({ titulo, lema, ilustracion = true }) {
   return (
@@ -15,7 +16,12 @@ function Faro({ titulo, lema, ilustracion = true }) {
         <h1>{titulo}</h1>
         <p className="lema">{lema}</p>
       </div>
-      {ilustracion && <div className="acceso-ilustracion"><Esclusas estado="En Tramitacion" decorativo /></div>}
+      {ilustracion && (
+        <figure className="acceso-ilustracion">
+          <img src={mola} alt="" width="640" height="440" />
+          <figcaption>Inspirada en la mola, el arte textil del pueblo guna</figcaption>
+        </figure>
+      )}
       <ul className="garantias">
         <li><Icono nombre="llave" />Segundo factor obligatorio</li>
         <li><Icono nombre="auditoria" />Historial inalterable</li>

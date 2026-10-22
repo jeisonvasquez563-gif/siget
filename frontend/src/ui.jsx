@@ -45,13 +45,15 @@ export function Icono({ nombre, className = '' }) {
 /* ---------------------------------------------------------------- marca */
 
 export function Logo({ className = 'marca-logo' }) {
+  // Estrella con contornos en eco, como una mola: el mismo lenguaje de la portada. Ver docs/identidad/README.md
   return (
-    <svg className={className} viewBox="0 0 40 40" role="img" aria-label="SIGET">
-      <rect width="40" height="40" rx="10" fill="#0f4c5c" />
-      <rect x="6" y="9" width="28" height="22" rx="3" fill="none" stroke="#7fc6d3" strokeWidth="2" />
-      <path d="M6 24h9v-6h10v-6h9" fill="none" stroke="#7fc6d3" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M7 30v-5h8v5zM15 30v-11h10v11zM25 30V13h8v17z" fill="#2b8a9a" opacity="0.85" />
-      <circle cx="20" cy="15" r="3.2" fill="#f26b21" />
+    <svg className={className} viewBox="0 0 64 64" role="img" aria-label="SIGET">
+      <rect width="64" height="64" rx="14.08" fill="#0f4c5c" />
+      <path d="M15.36 5.76H48.64A9.6 9.6 0 0 1 58.24 15.36V48.64A9.6 9.6 0 0 1 48.64 58.24H15.36A9.6 9.6 0 0 1 5.76 48.64V15.36A9.6 9.6 0 0 1 15.36 5.76Z" fill="none" stroke="#f6b81f" strokeWidth="1.6" opacity="0.9"/>
+      <path d="M32 11.52 L36.89 26.56 L52.69 26.56 L39.91 35.85 L44.79 50.88 L32 41.59 L19.21 50.88 L24.09 35.85 L11.31 26.56 L27.11 26.56Z" fill="#f26b21" stroke="#f26b21" strokeWidth="1.92" strokeLinejoin="round"/>
+      <path d="M32 17.18 L35.62 28.3 L47.31 28.3 L37.85 35.18 L41.46 46.31 L32 39.43 L22.54 46.31 L26.15 35.18 L16.69 28.3 L28.38 28.3Z" fill="none" stroke="#f4ead2" strokeWidth="2.24" strokeLinejoin="round"/>
+      <path d="M32 23.27 L34.25 30.19 L41.52 30.19 L35.64 34.46 L37.88 41.38 L32 37.1 L26.12 41.38 L28.36 34.46 L22.48 30.19 L29.75 30.19Z" fill="none" stroke="#f6b81f" strokeWidth="2.24" strokeLinejoin="round"/>
+      <circle cx="32" cy="34.24" r="2.56" fill="#f4ead2"/>
     </svg>
   )
 }
