@@ -2598,5 +2598,6 @@
    "descripcion": "Si ninguna política lo permite explícitamente, se niega (denegar por defecto)."
   }
  ],
+ "ventana_minutos": 15,
  "ningun_rol_puede_todo": true
 }

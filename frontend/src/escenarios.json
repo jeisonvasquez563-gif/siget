@@ -20,7 +20,7 @@
   {
     "id": "factor-vencido",
     "titulo": "El segundo factor venció",
-    "leccion": "Cambiar un trámite exige un código de los últimos 15 minutos. Fíjate en «qué lo cambiaría».",
+    "leccion": "Cambiar un trámite exige un código reciente del segundo factor. Fíjate en «qué lo cambiaría».",
     "entrada": { "rol": "funcionario", "accion": "cambiar_estado", "institucion": "propia", "solicitante": "otra_persona", "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "nadie", "segundo_factor": "vencido", "cuenta": "activa" }
   },
   {

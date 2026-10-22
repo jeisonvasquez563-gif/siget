@@ -33,7 +33,7 @@ ETIQUETAS_VARIABLE = {
 }
 
 ETIQUETAS_VALOR = {
-    "segundo_factor": {"reciente": "Verificado hace 1 minuto", "vencido": "Verificado hace 60 minutos (vencido)", "ninguno": "Nunca verificado"},
+    "segundo_factor": {"reciente": "Verificado hace 1 minuto", "vencido": "Verificado hace 60 minutos (vencido)", "ninguno": "Nunca verificado"},  # `vencido` se ajusta en meta()
     "cuenta": {"activa": "Activa", "bloqueada": "Bloqueada", "suspendida": "Suspendida"},
     "institucion": {"propia": "Su propia institución", "ajena": "Otra institución"},
     "solicitante": {"otra_persona": "Otra persona", "yo": "La misma persona que actúa"},
@@ -90,12 +90,14 @@ PERSONA, OTRA, SEGUNDA_OTRA = 1, 900, 901
 _ROLES_VALIDOS = {r[0] for r in matriz.ROLES}
 
 
-def meta():
+def meta(ventana=15):
     """Lo que la interfaz necesita para armar el formulario: variables por acción y valores admitidos con su etiqueta."""
+    etiquetas = {**ETIQUETAS_VALOR, "segundo_factor": {**ETIQUETAS_VALOR["segundo_factor"], "vencido": f"Verificado hace {matriz.vencido_hace(ventana)} minutos (vencido)"}}
     return {
+        "ventana_minutos": ventana,
         "variables": {a.value: list(v) for a, v in VARIABLES_POR_ACCION.items()},
         "etiquetas": ETIQUETAS_VARIABLE,
-        "valores": {v: [{"valor": x, "etiqueta": ETIQUETAS_VALOR.get(v, {}).get(x, x)} for x in opciones] for v, opciones in VALORES.items()},
+        "valores": {v: [{"valor": x, "etiqueta": etiquetas.get(v, {}).get(x, x)} for x in opciones] for v, opciones in VALORES.items()},
         "defectos": DEFECTOS,
     }
 
@@ -136,9 +138,9 @@ def normalizar(datos):
     return (None, errores) if errores else (entrada, [])
 
 
-def _sujeto(entrada, ahora):
+def _sujeto(entrada, ahora, ventana=15):
     rol = entrada["rol"]
-    minutos = {"reciente": 1, "vencido": 60}.get(entrada.get("segundo_factor", "reciente"))
+    minutos = {"reciente": 1, "vencido": matriz.vencido_hace(ventana)}.get(entrada.get("segundo_factor", "reciente"))
     plataforma = rol if rol in {r[0] for r in matriz.ROLES[4:]} else "ninguno"
     membresias = frozenset({(matriz.PROPIA, rol)}) if rol in {"funcionario", "supervisor", "coordinador_institucional"} else frozenset()
     return Sujeto(
@@ -166,10 +168,10 @@ def _recurso(entrada, accion, sujeto):
     return Recurso(tipo="plataforma")
 
 
-def _evaluar(entrada, ahora):
+def _evaluar(entrada, ahora, ventana=15):
     accion = Accion(entrada["accion"])
-    sujeto = _sujeto(entrada, ahora)
-    entorno = Entorno(ahora=ahora, mfa_reciente_minutos=15, mfa_ciudadano_obligatorio=True)
+    sujeto = _sujeto(entrada, ahora, ventana)
+    entorno = Entorno(ahora=ahora, mfa_reciente_minutos=ventana, mfa_ciudadano_obligatorio=True)
     recurso = _recurso(entrada, accion, sujeto)
     return sujeto, accion, recurso, entorno, decidir(sujeto, accion, recurso, entorno)
 
@@ -204,28 +206,29 @@ def _traza(sujeto, accion, recurso, entorno):
     return pasos
 
 
-def _alternativas(entrada, base, ahora):
+def _alternativas(entrada, base, ahora, ventana=15):
     """Los cambios de UNA sola variable que invertirían el resultado."""
     salida = []
     for variable in VARIABLES_POR_ACCION[Accion(entrada["accion"])]:
         for valor in VALORES[variable]:
             if valor == entrada[variable]:
                 continue
-            d = _evaluar({**entrada, variable: valor}, ahora)[4]
+            d = _evaluar({**entrada, variable: valor}, ahora, ventana)[4]
             if d.permitido != base.permitido:
                 salida.append({"variable": variable, "valor": valor, "etiqueta_variable": ETIQUETAS_VARIABLE[variable],
                                "etiqueta_valor": ETIQUETAS_VALOR.get(variable, {}).get(valor, valor), "permitido": d.permitido, "politica": d.politica})
     return salida
 
 
-def simular(entrada, ahora=None):
-    """`entrada` ya normalizada. Devuelve la decisión, la traza y las alternativas."""
+def simular(entrada, ahora=None, ventana=15):
+    """`entrada` ya normalizada. `ventana`: minutos de un segundo factor reciente (la configuración real). Devuelve la decisión, la traza y las alternativas."""
     ahora = ahora or datetime.now().astimezone()
-    sujeto, accion, recurso, entorno, decision = _evaluar(entrada, ahora)
+    sujeto, accion, recurso, entorno, decision = _evaluar(entrada, ahora, ventana)
     return {
         "entrada": entrada,
         "decision": {"permitido": decision.permitido, "politica": decision.politica, "motivo": decision.motivo},
         "traza": _traza(sujeto, accion, recurso, entorno),
-        "alternativas": _alternativas(entrada, decision, ahora),
+        "alternativas": _alternativas(entrada, decision, ahora, ventana),
+        "ventana_minutos": ventana,
         "hipotetico": True,
     }

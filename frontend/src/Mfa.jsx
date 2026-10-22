@@ -5,13 +5,13 @@ import { fecha, hace, mensajeDe } from './comun.jsx'
 import { VentanaMfa } from './Otras.jsx'
 import { Alerta, Icono, Insignia } from './ui.jsx'
 
-const PASOS = [
+const pasos = (ventana) => [
   ['Alta', 'El sistema genera un secreto aleatorio y te lo muestra una sola vez, como código QR. Después solo existe cifrado en la base de datos.'],
   ['El código', 'Tu aplicación calcula, con ese secreto y la hora, un código de 6 dígitos que cambia cada 30 segundos (TOTP, RFC 6238). Nunca viaja el secreto, solo el código.'],
   ['Verificación', 'El servidor calcula lo mismo y compara. Tolera un paso de diferencia de reloj, no más.'],
   ['Anti-repetición', 'Un código ya usado no se acepta otra vez, aunque siga vigente: quien lo espíe no puede reutilizarlo.'],
   ['Bloqueo', 'Tres códigos incorrectos en 5 minutos bloquean la cuenta y cierran todas sus sesiones.'],
-  ['Reautenticación escalonada', 'Las acciones que cambian trámites piden un código de los últimos 15 minutos, aunque ya hayas iniciado sesión.'],
+  ['Reautenticación escalonada', `Las acciones que cambian trámites piden un código de los últimos ${ventana} minutos, aunque ya hayas iniciado sesión.`],
 ]
 
 const QUIEN_EXIGE = [
@@ -21,6 +21,7 @@ const QUIEN_EXIGE = [
 ]
 
 export function SegundoFactor({ yo, refrescar }) {
+  const ventana = yo.mfa_ventana_minutos ?? 15
   const [codigo, setCodigo] = useState('')
   const [ultimoOk, setUltimoOk] = useState(null)
   const [resultado, setResultado] = useState(null)
@@ -41,7 +42,7 @@ export function SegundoFactor({ yo, refrescar }) {
     try {
       await api('/auth/mfa/verificar/', { metodo: 'POST', cuerpo: { codigo } })
       setUltimoOk(codigo)
-      setResultado({ tipo: 'ok', texto: 'Código verificado: tu ventana de 15 minutos se renovó.' })
+      setResultado({ tipo: 'ok', texto: `Código verificado: tu ventana de ${ventana} minutos se renovó.` })
       setCodigo('')
       await refrescar()
     } catch (e) {
@@ -80,7 +81,7 @@ export function SegundoFactor({ yo, refrescar }) {
         <div>
           <section className="panel">
             <div className="panel-cabecera"><h3>Tu estado</h3><Insignia clase={yo.mfa_activo ? 'e-aprobado' : 'e-rechazado'}>{yo.mfa_activo ? 'Activo' : 'No activo'}</Insignia></div>
-            <VentanaMfa verificadoEn={yo.mfa_verificado_en} />
+            <VentanaMfa verificadoEn={yo.mfa_verificado_en} ventana={ventana} />
             <dl className="datos separado">
               <dt>Último código verificado</dt><dd>{yo.mfa_verificado_en ? `${hace(yo.mfa_verificado_en)} · ${fecha(yo.mfa_verificado_en)}` : '—'}</dd>
               <dt>¿Es obligatorio para ti?</dt><dd>{yo.mfa_obligatorio ? 'Sí' : 'No'}</dd>
@@ -113,7 +114,7 @@ export function SegundoFactor({ yo, refrescar }) {
           <section className="panel">
             <h3>Cómo funciona</h3>
             <ol className="capas compacta">
-              {PASOS.map(([titulo, texto], i) => (
+              {pasos(ventana).map(([titulo, texto], i) => (
                 <li key={titulo}>
                   <span className="capa-num" aria-hidden="true">{i + 1}</span>
                   <div className="capa-cuerpo"><h3>{titulo}</h3><p>{texto}</p></div>

@@ -216,3 +216,22 @@ def test_un_fallo_del_pdp_se_refleja_como_denegacion(monkeypatch):
     r = sim(rol="funcionario", accion="ver_tramite")
     assert r["decision"] == {"permitido": False, "politica": "fallo_del_pdp", "motivo": "RuntimeError"}
     assert r["traza"][-1]["politica"] == "fallo_del_pdp"
+
+
+# --------------------------------------------------------------------------- la ventana del segundo factor es la configuración real
+
+@pytest.mark.parametrize("ventana", [2, 15, 30, 90])
+def test_el_simulador_respeta_la_ventana_configurada(ventana):
+    base = {"rol": "funcionario", "accion": "cambiar_estado"}
+    permitido = simulador.simular(simulador.normalizar({**base, "segundo_factor": "reciente"})[0], ventana=ventana)
+    vencido = simulador.simular(simulador.normalizar({**base, "segundo_factor": "vencido"})[0], ventana=ventana)
+    assert permitido["decision"]["permitido"] is True and permitido["ventana_minutos"] == ventana
+    assert vencido["decision"]["permitido"] is False
+    assert any(a["variable"] == "segundo_factor" and a["valor"] == "reciente" and a["permitido"] for a in vencido["alternativas"])
+
+
+def test_la_etiqueta_del_factor_vencido_dice_cuantos_minutos_son_con_cada_ventana():
+    for ventana, minutos in ((15, 60), (30, 75), (90, 135)):
+        meta = simulador.meta(ventana)
+        etiquetas = {o["valor"]: o["etiqueta"] for o in meta["valores"]["segundo_factor"]}
+        assert meta["ventana_minutos"] == ventana and str(minutos) in etiquetas["vencido"]

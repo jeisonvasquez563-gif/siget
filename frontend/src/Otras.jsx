@@ -155,24 +155,24 @@ function perfiles(yo) {
   return salida
 }
 
-const VENTANA_MIN = 15
+const VENTANA_POR_DEFECTO = 15 // solo si el servidor no la informa
 const CIRCUNFERENCIA = 2 * Math.PI * 38
 
-export function VentanaMfa({ verificadoEn }) {
+export function VentanaMfa({ verificadoEn, ventana = VENTANA_POR_DEFECTO }) {
   const minutos = verificadoEn ? Math.max(0, (Date.now() - new Date(verificadoEn)) / 60000) : Infinity
-  const restante = Math.max(0, VENTANA_MIN - minutos)
+  const restante = Math.max(0, ventana - minutos)
   const vigente = restante > 0
   return (
     <div className="ventana">
       <svg viewBox="0 0 92 92" role="img" aria-label={vigente ? `Segundo factor vigente: quedan ${Math.ceil(restante)} minutos` : 'Segundo factor vencido'}>
         <circle className="anillo-fondo" cx="46" cy="46" r="38" />
-        <circle className={`anillo ${vigente ? '' : 'vencida'}`} cx="46" cy="46" r="38" strokeDasharray={CIRCUNFERENCIA} strokeDashoffset={CIRCUNFERENCIA * (1 - restante / VENTANA_MIN)} />
+        <circle className={`anillo ${vigente ? '' : 'vencida'}`} cx="46" cy="46" r="38" strokeDasharray={CIRCUNFERENCIA} strokeDashoffset={CIRCUNFERENCIA * (1 - restante / ventana)} />
         <text className="cifra" x="46" y="48">{vigente ? Math.ceil(restante) : '0'}</text>
         <text className="cifra-sub" x="46" y="62">min</text>
       </svg>
       <div>
         <strong>{vigente ? 'Segundo factor vigente' : 'Segundo factor vencido'}</strong>
-        <p>{vigente ? `Las acciones que cambian trámites exigen una verificación de los últimos ${VENTANA_MIN} minutos.` : 'Para cambiar un trámite te pediremos un código nuevo.'}</p>
+        <p>{vigente ? `Las acciones que cambian trámites exigen una verificación de los últimos ${ventana} minutos.` : 'Para cambiar un trámite te pediremos un código nuevo.'}</p>
       </div>
     </div>
   )

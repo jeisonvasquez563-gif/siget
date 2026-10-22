@@ -98,15 +98,20 @@ def _celda(d):
     return {"permitido": d.permitido, "politica": d.politica}
 
 
-def construir(ahora=None):
-    """Evalúa el PDP para cada rol y cada acción. Devuelve roles, acciones, matriz y reglas de denegación."""
+def vencido_hace(ventana):
+    """Minutos que se usan para representar «segundo factor vencido»: siempre más que la ventana vigente."""
+    return max(60, ventana + 45)
+
+
+def construir(ahora=None, ventana=15):
+    """Evalúa el PDP para cada rol y cada acción. `ventana`: minutos que dura un segundo factor «reciente» (la configuración real)."""
     ahora = ahora or datetime.now().astimezone()
-    entorno = Entorno(ahora=ahora, mfa_reciente_minutos=15, mfa_ciudadano_obligatorio=True)
+    entorno = Entorno(ahora=ahora, mfa_reciente_minutos=ventana, mfa_ciudadano_obligatorio=True)
     matriz = {}
     for rol, *_ in ROLES:
         fila = {}
         for accion, _etiqueta, _grupo, _casos in ACCIONES:
-            fresco, vencido = _sujeto(rol, ahora, 1), _sujeto(rol, ahora, 60)
+            fresco, vencido = _sujeto(rol, ahora, 1), _sujeto(rol, ahora, vencido_hace(ventana))
             favorable, desfavorable = _recursos(accion, rol, fresco)
             d_fav, d_des = decidir(fresco, accion, favorable, entorno), decidir(fresco, accion, desfavorable, entorno)
             sin_factor = decidir(vencido, accion, favorable, entorno)
@@ -127,5 +132,6 @@ def construir(ahora=None):
     return {
         "roles": roles, "acciones": acciones, "matriz": matriz,
         "denegaciones": [{"politica": p, "descripcion": d} for p, d in REGLAS_DE_DENEGACION],
+        "ventana_minutos": ventana,
         "ningun_rol_puede_todo": all(r["acciones_permitidas"] < r["acciones_totales"] for r in roles),
     }

@@ -1521,3 +1521,34 @@ Se arma una situación (rol, acción y solo las circunstancias que importan para
 - Exportar la traza de un escenario (para el informe) y guardar escenarios propios.
 - Comparar dos roles lado a lado sobre la misma situación.
 
+## 32. Ensayo de la demostración
+
+Fecha: 21 de octubre de 2026. Herramientas en [`demo/`](../demo/README.md); guion en [`demo-guion.md`](./demo-guion.md).
+
+### 32.1 Qué se hizo
+
+- **Ensayo automático** (`demo/ensayo.py`): recorre por HTTPS (nginx, TLS 1.3) los pasos del guion con las cuentas reales y su código TOTP. Comprueba la preparación (hora de VM1 frente al PC, certificado y su vencimiento, TLS 1.3, cabeceras, rutas que deben dar 404 y 401, archivos de la interfaz), el recorrido de Ana, Fabio, Saúl, Félix, Carla, Ines y Aldo, el segundo factor con su anti-repetición, la matriz, la base de datos, el simulador y el cierre de sesión. Las escrituras las hace sobre trámites nuevos.
+- **Resultado: 55 de 55 comprobaciones correctas**, antes y después de los ajustes de abajo.
+- **Estado de la infraestructura** al ensayar: ambas VMs sanas (pods y servicios activos, disco 5–9 %, memoria holgada), hora sincronizada (0,1 s de diferencia), certificado vigente hasta el 20-10-2027, y las VMs arrancaron solas tras el encendido (autoarranque verificado). **El CI de GitHub corrió y pasó** (backend y frontend, en push y en PR); el PR 6 (`develop → main`) es fusionable.
+
+### 32.2 Hallazgos
+
+1. **El guion decía algo que no ocurre.** Prometía que al cambiar el estado de un trámite aparecía «Confirma que eres tú», pero el código con el que se inicia sesión ya cuenta como segundo factor reciente (15 minutos), así que no aparece justo después de entrar. El guion ahora lo explica y ofrece tres formas de mostrarlo (simulador, esperar o acortar la ventana con `SIGET_MFA_RECIENTE_MINUTOS`).
+2. **El «15 minutos» estaba escrito a mano** en la matriz, el simulador y la interfaz, mientras el PDP real lee la configuración: si alguien cambiaba la ventana, **la pantalla habría mentido**. Ahora la ventana viaja desde el servidor (`mfa_ventana_minutos` en `/auth/yo/`, `ventana_minutos` en la matriz y el simulador) y `verificar_politicas` comprueba que coincidan (39 de 39). 6 pruebas nuevas del backend (354) y 2 del frontend (130).
+3. **Un código TOTP no se acepta dos veces:** un segundo script con la misma cuenta en el mismo intervalo recibe 401 (la protección que se muestra en la demo). Los scripts esperan al siguiente intervalo.
+4. **Pendientes de la VM:** ambas tienen un reinicio por actualizaciones pendiente; se hace después de la presentación.
+5. **No hay respaldos automáticos** de la base en contenedor: el último volcado era del 20-oct 18:39, anterior a las cuentas de demostración, y la base viva ya tenía 14 personas, 11 trámites, 129 decisiones y 114 eventos de seguridad (8,8 MB). Perderla obligaría a resembrar con **contraseñas y códigos nuevos**. Se hizo un respaldo manual verificado el 21-oct 22:42 (`demo-20261021-2242.dump` y `demo-globals-…sql` en `/var/backups/siget/`, 38 objetos legibles con `pg_restore --list`, copia en el PC fuera del repositorio con el mismo SHA-256):
+   ```bash
+   # en VM2, como jeison_vasquez
+   SELLO=$(date +%Y%m%d-%H%M)
+   sudo bash -c "cd /tmp; sudo -H -u siget env XDG_RUNTIME_DIR=/run/user/1009 podman exec -u postgres siget-postgres pg_dump -Fc -d tramites_demo > /var/backups/siget/demo-$SELLO.dump"
+   sudo bash -c "cd /tmp; sudo -H -u siget env XDG_RUNTIME_DIR=/run/user/1009 podman exec -u postgres siget-postgres pg_dumpall --globals-only > /var/backups/siget/demo-globals-$SELLO.sql"
+   sudo chown postgres:postgres /var/backups/siget/demo-*$SELLO*; sudo chmod 600 /var/backups/siget/demo-*$SELLO*
+   ```
+   **Pendiente:** un `systemd timer` diario con retención y copia fuera de la VM, y una **prueba de restauración** (hoy el respaldo se verifica por lectura, no restaurándolo).
+
+### 32.3 Gotchas
+
+- El segundo script de despliegue no encuentra los archivos de configuración porque el primero los borra al terminar: no sobrescribe nada (el shell aborta la redirección antes de ejecutar `tee`), pero conviene copiarlos de nuevo.
+- Antes de culpar al servidor por un 401 en el login, comprobar si el código del segundo factor ya se usó en ese intervalo.
+
