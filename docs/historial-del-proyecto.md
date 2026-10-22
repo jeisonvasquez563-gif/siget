@@ -112,4 +112,6 @@ Registro completo, en orden, de lo construido en SIGET entre el 24 de septiembre
 
 **Frontend:** pruebas de recorrido completo (Playwright), revisión de contraste con herramienta, ilustraciones de estados vacíos, internacionalización.
 
+**Abrir a internet (aplazado el 21-oct):** análisis hecho y decisiones pendientes en [`abrir-a-internet.md`](./abrir-a-internet.md) (Tailscale Funnel recomendado; antes hay que leer la IP real del cliente en nginx, cerrar o proteger el registro y rotar las cuentas de demostración).
+
 **Proyecto:** retirar el checkpoint PHP (semana 6), apagar el PostgreSQL nativo y cerrar el puerto 5432, aplicar las actualizaciones pendientes de las VMs y reiniciarlas, repartir el equipo en los cuatro frentes, cargar las llaves SSH de los compañeros, decidir si el segundo factor de la ciudadanía es obligatorio, fusionar el PR 6 (`develop → main`) y regenerar los entregables `.docx`.

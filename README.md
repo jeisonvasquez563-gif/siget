@@ -92,6 +92,7 @@ Todo está en [`docs/`](./docs/README.md). Lo esencial:
 | [`como-abrir-la-plataforma.md`](./docs/como-abrir-la-plataforma.md) | **Abrir, probar y operar la plataforma** |
 | [`historial-del-proyecto.md`](./docs/historial-del-proyecto.md) | **Todo lo que se hizo**, en orden, con decisiones, incidentes y lo que falta |
 | [`demo-guion.md`](./docs/demo-guion.md) | Guion de la presentación, lista de verificación del día y plan B |
+| [`abrir-a-internet.md`](./docs/abrir-a-internet.md) | **Pendiente:** publicar la plataforma a todo internet (opciones, riesgos y plan) |
 | [`runbook.md`](./docs/runbook.md) | Paso a paso técnico de todo lo ejecutado (32 secciones) |
 | [`api.md`](./docs/api.md) | Contrato de la API (frontera entre backend y frontend) |
 | [`zero-trust-cobertura.md`](./docs/zero-trust-cobertura.md) | Cobertura de los 7 principios de Zero Trust (NIST SP 800-207) |

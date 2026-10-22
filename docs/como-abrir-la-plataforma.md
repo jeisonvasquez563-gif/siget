@@ -21,6 +21,8 @@ Guía paso a paso para **abrir, probar y operar** SIGET: desde encender las máq
 - Todo lo que no es la interfaz ni una ruta de la API responde **404**; lo privado sin sesión, **401**.
 - `http://…:8080` solo redirige a HTTPS.
 
+> **¿Abrirla a todo internet?** Hoy solo se accede por la red de VMware o por Tailscale. El plan para publicarla en un enlace público (con sus riesgos y decisiones pendientes) está en [`abrir-a-internet.md`](./abrir-a-internet.md).
+
 ## 2. Antes de empezar (una sola vez por equipo)
 
 ### 2.1 Requisitos
