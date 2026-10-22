@@ -8,6 +8,8 @@
 - `release/<version>` — estabiliza una entrega antes de pasar a `main`.
 - `hotfix/<nombre>` — arreglo urgente sobre `main`.
 
+Trabajamos en **dos frentes** (backend y frontend) con el [contrato de la API](./docs/api.md) como frontera: ramas `feature/backend-<tema>` y `feature/frontend-<tema>`, un PR por frente y revisión cruzada. Detalle en [`docs/organizacion-backend-frontend.md`](./docs/organizacion-backend-frontend.md).
+
 Nunca se commitea directo a `main`. Nunca se commitea directo a `develop` para trabajo que no sea trivial (un typo en un README sí, una feature no).
 
 ```bash

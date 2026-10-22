@@ -11,8 +11,11 @@ Django 5.2 LTS + Django REST Framework (API-first). Corre en un contenedor Podma
 | Contexto RLS por transacción e integración con la base real | ✅ 15 pasos contra la base real |
 | Imagen del contenedor (`Containerfile`) | ✅ construida en VM1 |
 | Modelos de las tablas del esquema `siget` | ✅ 9 modelos verificados contra la base real |
-| Autenticación (Argon2, JWT corto, MFA TOTP, reautenticación, bloqueo) | ✅ 188 pruebas y 47 pasos contra la base real |
-| Trámites, catálogo, auditoría, plazos y escalamiento | ⏳ |
+| Autenticación (Argon2, JWT corto, MFA TOTP, reautenticación, bloqueo) | ✅ 47 pasos contra la base real |
+| Trámites y catálogo (crear, bandeja, estado, reasignar, historial) | ✅ 51 pasos contra la base real |
+| Equipo, módulos por rol y cuentas de demostración (`sembrar_demo`) | ✅ |
+| Consola de auditoría con rol de base de datos propio (solo lectura) | ✅ 34 pasos contra la base real |
+| Consolas de plataforma (control dual), plazos hábiles y escalamiento, documentos, notificaciones | ⏳ ([hoja de ruta](../docs/organizacion-backend-frontend.md)) |
 
 ## Stack
 
@@ -87,3 +90,7 @@ Todo se lee de variables de entorno. Los secretos pueden venir de un archivo con
 ## Por qué no está el checkpoint PHP acá
 
 Vive aislado en `checkpoints/` y se retira en la semana 6. El sistema final es Django + React.
+
+## Contrato con el frontend
+
+Las rutas, formatos y errores que consume la interfaz están en [`docs/api.md`](../docs/api.md). Cambiarlos exige actualizar ese archivo en el mismo PR. Cómo se reparte el trabajo: [`docs/organizacion-backend-frontend.md`](../docs/organizacion-backend-frontend.md).
