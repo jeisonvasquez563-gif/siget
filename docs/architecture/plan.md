@@ -85,6 +85,7 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 Los pasos 1 a 10 de la lista original (Podman, migración de PostgreSQL, secretos, ABAC, backend, TLS, frontend, catálogo y validación) **están hechos**; ver el estado actual arriba. Lo que sigue:
 
 1. **Respaldos automáticos** de la base con retención, copia fuera de la VM y prueba de restauración.
+   - *Aplazado, por decidir:* **abrir la plataforma a internet** (Tailscale Funnel). Ver [`../abrir-a-internet.md`](../abrir-a-internet.md).
 2. **Consolas de los operadores de plataforma** con control dual real.
 3. **Plazos en días hábiles y escalamiento automático** (systemd timer).
 4. **Documentos adjuntos y notificaciones.**

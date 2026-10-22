@@ -11,6 +11,7 @@ La documentación "viva" del proyecto vive acá en Markdown, versionada junto co
 | [`como-abrir-la-plataforma.md`](./como-abrir-la-plataforma.md) | **Cómo abrir SIGET:** encender las VMs, instalar la CA, direcciones, iniciar sesión con cada rol, crear una cuenta con segundo factor, qué hacer si algo no abre, ver la interfaz sin las VMs y publicar una versión nueva |
 | [`demo-guion.md`](./demo-guion.md) | Guion de la presentación al profesor: lista de verificación del día, recorrido de 12 pasos, cómo mostrar la reautenticación escalonada, preguntas probables y plan B |
 | [`historial-del-proyecto.md`](./historial-del-proyecto.md) | **Todo lo que se hizo**, en orden, con decisiones, incidentes, lecciones y lo que falta |
+| [`abrir-a-internet.md`](./abrir-a-internet.md) | **Pendiente:** cómo abrir la plataforma a todo internet (Tailscale Funnel o Cloudflare Tunnel), riesgos, plan por pasos y decisiones por tomar |
 
 ## 2. Cómo está hecho (arquitectura y diseño)
 
