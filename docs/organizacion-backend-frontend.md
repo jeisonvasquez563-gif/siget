@@ -63,4 +63,6 @@ El proyecto se divide en **dos frentes con una frontera clara**: el [contrato de
 | Frontend: sistema de diseño y flujos | _por asignar_ | Componentes, login, inicio, bandeja, detalle |
 | Frontend: auditoría y calidad | _por asignar_ | Gráficos, accesibilidad, pruebas |
 
+> **Responsable del trabajo pendiente:** Andy Martínez, con Jeison como aprobador de todo lo que toque las VMs (ver [`plan-pendientes-andy.md`](./architecture/plan-pendientes-andy.md)). Los paquetes que se pueden repartir (frontend, documentación, pruebas) están marcados ahí.
+>
 > Pendiente de Jeison: confirmar quién va en cada fila (9 integrantes). Mientras tanto, cualquier persona puede tomar una tarea de las tablas de arriba abriendo una rama `feature/backend-…` o `feature/frontend-…`.

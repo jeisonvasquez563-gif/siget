@@ -33,6 +33,8 @@ La documentación "viva" del proyecto vive acá en Markdown, versionada junto co
 |---|---|
 | [`organizacion-backend-frontend.md`](./organizacion-backend-frontend.md) | Los dos frentes (backend sólido y seguro; frontend detallado y hermoso), definición de «terminado», hojas de ruta y reparto del equipo |
 | [`architecture/plan.md`](./architecture/plan.md) | Plan de trabajo con el **estado actual** y los próximos pasos |
+| [`superpowers/specs/2026-10-21-pendientes-design.md`](./superpowers/specs/2026-10-21-pendientes-design.md) | **Especificación del trabajo pendiente** (14 paquetes con diseño y criterios de aceptación), a cargo de Andy Martínez |
+| [`architecture/plan-pendientes-andy.md`](./architecture/plan-pendientes-andy.md) | **Plan de ejecución del trabajo pendiente**: cronograma de S3 a S10, tareas con casillas, evidencia y comandos |
 | [`architecture/plan-semanas-1-2.md`](./architecture/plan-semanas-1-2.md) | Plan operativo de las semanas 1 y 2: tareas, responsables, camino crítico y riesgos |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Ramas (GitFlow), commits, documentación obligatoria y seguridad |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | Cada cambio significativo, con su motivo |

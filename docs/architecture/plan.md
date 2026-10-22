@@ -82,6 +82,8 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 
 ## Próximos pasos (actualizado el 21 de octubre de 2026)
 
+> **El detalle de cada paso (diseño, tareas, cronograma de S3 a S10 y criterios de aceptación) está en la [especificación del trabajo pendiente](../superpowers/specs/2026-10-21-pendientes-design.md) y en el [plan de ejecución a cargo de Andy](./plan-pendientes-andy.md).**
+
 Los pasos 1 a 10 de la lista original (Podman, migración de PostgreSQL, secretos, ABAC, backend, TLS, frontend, catálogo y validación) **están hechos**; ver el estado actual arriba. Lo que sigue:
 
 1. **Respaldos automáticos** de la base con retención, copia fuera de la VM y prueba de restauración.
