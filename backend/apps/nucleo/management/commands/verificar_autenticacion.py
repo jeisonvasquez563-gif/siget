@@ -8,17 +8,27 @@ from datetime import timedelta
 from unittest import mock
 
 import pyotp
+from django.conf import settings
 from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
 from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.autenticacion import perfil
 from apps.autenticacion.models import EventoSeguridad, Sesion
-from apps.identidad.models import Usuario
+from apps.identidad.models import Perfil, Usuario
 
 CLAVE_BUENA = "una-frase-larga-y-poco-comun-7391"
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.7"}
+
+
+def personales(n, **cambios):
+    """Datos personales válidos y únicos por número (la cédula y el correo no pueden repetirse)."""
+    base = {"nombre": "Prueba", "apellidos": "Integración", "cedula": f"8-900-{1000 + n}", "fecha_nacimiento": "1990-05-20",
+            "provincia": "Panamá", "ciudad": "Ciudad de Panamá", "correo": f"prueba{n}@ejemplo.com"}
+    base.update(cambios)
+    return base
 
 
 class _Revertir(Exception):
@@ -78,11 +88,28 @@ class Command(BaseCommand):
         self._paso("rechaza una contraseña débil", r.status_code == 400, r.status_code)
         r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": "passwordpassword"})
         self._paso("rechaza una contraseña común aunque sea larga", r.status_code == 400)
-        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": CLAVE_BUENA})
+        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": CLAVE_BUENA, **personales(1)})
         self._paso("registra una cuenta", r.status_code == 201, r.status_code)
-        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": CLAVE_BUENA})
+        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": CLAVE_BUENA, **personales(9)})
         self._paso("no permite registrar dos veces el mismo usuario", r.status_code == 409, r.status_code)
+        r = self._http("post", "/auth/registro/", {"username": "int_otra", "password": CLAVE_BUENA, **personales(9, cedula="8-900-1001")})
+        self._paso("no permite repetir la cédula, y responde igual que un usuario repetido (no revela quién está registrado)",
+                   r.status_code == 409 and r.json() == self._http("post", "/auth/registro/", {"username": "int_ana", "password": CLAVE_BUENA, **personales(9)}).json())
+        r = self._http("post", "/auth/registro/", {"username": "int_otra", "password": CLAVE_BUENA, **personales(9, correo="PRUEBA1@ejemplo.com")})
+        self._paso("no permite repetir el correo (sin distinguir mayúsculas)", r.status_code == 409, r.status_code)
+        r = self._http("post", "/auth/registro/", {"username": "int_otra", "password": CLAVE_BUENA})
+        self._paso("sin datos personales no se crea la cuenta", r.status_code == 400 and len(r.json()["errores"]) >= 7, r.status_code)
+        r = self._http("post", "/auth/registro/", {"username": "int_menor", "password": CLAVE_BUENA, **personales(8, fecha_nacimiento="2015-01-01")})
+        self._paso("una persona menor de 18 años no puede registrarse", r.status_code == 400, r.status_code)
+        self._paso("las altas rechazadas no dejaron cuentas a medias (ni usuario ni perfil)",
+                   not Usuario.objects.filter(username__in=["int_otra", "int_menor"]).exists() and not Perfil.objects.filter(correo__in=["prueba9@ejemplo.com", "prueba8@ejemplo.com"]).exists())
         ana = Usuario.objects.get(username="int_ana")
+        perfil_ana = Perfil.objects.get(usuario=ana)
+        self._paso("el perfil quedó guardado con sus datos", perfil_ana.nombre == "Prueba" and perfil_ana.provincia == "Panamá" and perfil_ana.correo == "prueba1@ejemplo.com")
+        self._paso("la cédula NO está en claro: solo cifrada y como huella", "8-900-1001" not in (perfil_ana.cedula_cifrada + perfil_ana.cedula_huella)
+                   and len(perfil_ana.cedula_huella) == 64)
+        self._paso("la cédula cifrada se puede recuperar con la clave del servidor",
+                   perfil.descifrar_cedula(settings.SIGET_MFA_KEY, perfil_ana.cedula_cifrada) == "8-900-1001")
         self._paso("la contraseña quedó con hash Argon2 (nunca en claro)", ana.password_hash.startswith("argon2$") and CLAVE_BUENA not in ana.password_hash)
 
         # ---------------------------------------------------------------- login sin enumerar usuarios
@@ -196,7 +223,7 @@ class Command(BaseCommand):
         self._paso("el cierre por inactividad queda registrado como evento de seguridad", "sesion_cerrada_por_inactividad" in eventos)
 
         # ---------------------------------------------------------------- bloqueo por intentos
-        self._http("post", "/auth/registro/", {"username": "int_beto", "password": CLAVE_BUENA})
+        self._http("post", "/auth/registro/", {"username": "int_beto", "password": CLAVE_BUENA, **personales(2)})
         for _ in range(3):
             self._http("post", "/auth/login/", {"username": "int_beto", "password": "mala-mala-mala-1"})
         r = self._http("post", "/auth/login/", {"username": "int_beto", "password": CLAVE_BUENA})
@@ -209,7 +236,7 @@ class Command(BaseCommand):
         self._paso("al entrar se reinicia el contador de intentos", beto.intentos_fallidos == 0 and beto.bloqueado_hasta is None)
 
         # ---------------------------------------------------------------- cuenta suspendida
-        self._http("post", "/auth/registro/", {"username": "int_carla", "password": CLAVE_BUENA})
+        self._http("post", "/auth/registro/", {"username": "int_carla", "password": CLAVE_BUENA, **personales(3)})
         r = self._http("post", "/auth/login/", {"username": "int_carla", "password": CLAVE_BUENA})
         token_carla = r.json()["access_token"]
         Usuario.objects.filter(username="int_carla").update(estado_cuenta="suspendida")
@@ -239,7 +266,15 @@ class Command(BaseCommand):
             self._paso("la base no deja modificar el registro de seguridad", False)
         except DatabaseError:
             self._paso("la base no deja modificar el registro de seguridad", True)
+        for operacion, sql in (("modificar", "update siget.perfil set nombre = 'x'"), ("borrar", "delete from siget.perfil")):
+            try:
+                with transaction.atomic(), connection.cursor() as c:
+                    c.execute(sql)
+                self._paso(f"la base no deja {operacion} un perfil (ni a la propia aplicación)", False)
+            except DatabaseError:
+                self._paso(f"la base no deja {operacion} un perfil (ni a la propia aplicación)", True)
         crudos = " ".join(str(v) for v in EventoSeguridad.objects.values_list("detalle", flat=True))
+        self._paso("la bitácora de seguridad no lleva cédula, correo ni nombre", all(x not in crudos for x in ("8-900-", "@ejemplo.com", "Prueba")))
         self._paso("ningún evento contiene contraseñas, códigos ni tokens", CLAVE_BUENA not in crudos and secreto not in crudos)
         con_refresh_en_claro = Sesion.objects.filter(refresh_hash=refresh_viejo).count()
         self._paso("el token de refresco no está en claro en la base (solo su hash)", con_refresh_en_claro == 0)

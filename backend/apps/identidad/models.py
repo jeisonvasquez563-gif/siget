@@ -76,3 +76,24 @@ class Aprobacion(ModeloDeEsquema):
 
     class Meta(ModeloDeEsquema.Meta):
         db_table = "aprobacion"
+
+
+class Perfil(ModeloDeEsquema):
+    """Datos personales de quien se registra (migración 008). Tabla aparte, solo `app_role` la toca y sin UPDATE ni DELETE.
+
+    La cédula nunca se guarda en claro: `cedula_cifrada` (Fernet) y `cedula_huella` (HMAC, para impedir duplicados).
+    """
+
+    usuario = models.OneToOneField(Usuario, primary_key=True, on_delete=models.DO_NOTHING, db_column="usuario_id", related_name="perfil")
+    nombre = models.TextField()
+    apellidos = models.TextField()
+    cedula_cifrada = models.TextField()
+    cedula_huella = models.TextField(unique=True)
+    fecha_nacimiento = models.DateField()
+    provincia = models.TextField()
+    ciudad = models.TextField()
+    correo = models.TextField()
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta(ModeloDeEsquema.Meta):
+        db_table = "perfil"

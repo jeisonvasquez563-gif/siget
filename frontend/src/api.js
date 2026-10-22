@@ -68,8 +68,8 @@ export async function iniciarSesion(username, password, codigo) {
   return d
 }
 
-export const registrar = (username, password) =>
-  api('/auth/registro/', { metodo: 'POST', cuerpo: { username, password }, conToken: false })
+export const registrar = (username, password, personales = {}) =>
+  api('/auth/registro/', { metodo: 'POST', cuerpo: { username, password, ...personales }, conToken: false })
 
 export async function confirmarMfa(codigo) {
   const d = await api('/auth/mfa/confirmar/', { metodo: 'POST', cuerpo: { codigo } })

@@ -70,7 +70,9 @@ class Registro(_Publica):
     throttle_scope = "registro"
 
     def post(self, request):
-        r = servicio.registrar_usuario(_campo(request, "username"), _campo(request, "password"), _ip(request))
+        datos = request.data if isinstance(request.data, dict) else {}
+        personales = {k: datos.get(k) for k in ("nombre", "apellidos", "cedula", "fecha_nacimiento", "provincia", "ciudad", "correo")}
+        r = servicio.registrar_usuario(_campo(request, "username"), _campo(request, "password"), _ip(request), personales)
         if r.ok:
             return Response({"detalle": "Cuenta creada. Inicia sesión y activa el segundo factor."}, status=status.HTTP_201_CREATED)
         if r.codigo == "datos_invalidos":
