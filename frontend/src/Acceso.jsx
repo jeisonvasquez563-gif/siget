@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import { api, ApiError, confirmarMfa, iniciarSesion, instituciones, registrar, restablecerContrasena } from './api.js'
 import { Alerta, Icono, Logo } from './ui.jsx'
 
-function Faro({ titulo, lema, ilustracion = true }) {
+function Faro({ titulo, lema }) {
   return (
     <section className="acceso-faro">
       <div className="marca">
@@ -362,7 +362,7 @@ export function EnrolarMfa({ usuario, alTerminar, alSalir }) {
 
   return (
     <main className="acceso">
-      <Faro titulo="Un paso más para proteger tu cuenta." lema="Tu rol exige verificación en dos pasos: además de tu contraseña, un código que cambia cada 30 segundos." ilustracion={false} />
+      <Faro titulo="Un paso más para proteger tu cuenta." lema="Tu rol exige verificación en dos pasos: además de tu contraseña, un código que cambia cada 30 segundos." />
       <section className="acceso-formulario">
         <div className="tarjeta-acceso">
           <h2>Activa el segundo factor</h2>
