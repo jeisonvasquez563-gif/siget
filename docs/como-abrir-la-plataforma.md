@@ -109,7 +109,7 @@ backend/.venv/Scripts/python.exe demo/codigo.py fabio.mop    # una sola
 
 ### 5.3 Crear tu propia cuenta (y activar el segundo factor)
 
-1. En la pantalla de acceso, **«Crea tu cuenta»** → elige usuario y una contraseña larga.
+1. En la pantalla de acceso, **«Crear una cuenta»** → llena tus datos (nombre, apellidos, cédula, fecha de nacimiento —mayor de 18—, provincia, ciudad y correo) y elige usuario y una contraseña larga (mínimo 12 caracteres).
 2. **Ingresa** con ellas (deja el código vacío): SIGET te lleva a **activar el segundo factor**.
 3. Abre una aplicación de autenticación en tu celular (Google Authenticator, Microsoft Authenticator, Aegis…), **escanea el código QR** (o escribe la clave) y confirma con el código de 6 dígitos.
 4. Listo: desde ahora entras con usuario, contraseña y el código del celular. El secreto se muestra **una sola vez** y queda cifrado en la base.

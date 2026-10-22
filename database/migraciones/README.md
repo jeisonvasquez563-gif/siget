@@ -10,11 +10,12 @@ Cambios incrementales sobre el esquema `siget` que ya está aplicado. Se ejecuta
 | 005 | `005-catalogo-inicial.sql` | Siembra 6 instituciones y 6 tipos de trámite con su plazo | 20-oct-2026 |
 | 006 | `006-historial-solicitante.sql` | Política RLS: el solicitante ve el historial de sus trámites | 20-oct-2026 |
 | 007 | `007-auditor-login.sql` | `auditor_role` puede conectarse (solo lectura) y ve solo `id`, `username` y rol de plataforma de las personas | 21-oct-2026 |
-| 007 | `007-auditor-login.sql` | `auditor_role` puede conectarse (solo lectura) y ve solo `id` y `username` de las personas | 21-oct-2026 |
+| 008 | `008-perfil-ciudadano.sql` | Tabla `perfil` con los datos personales del registro (cédula cifrada); solo `app_role` la lee e inserta | 22-oct-2026 |
+| 009 | `009-pgadmin-minimo-privilegio.sql` | `pgadmin_lectura` deja de leer todo (`pg_read_all_data`): solo lo no sensible | 22-oct-2026 |
 
 ## Para una base nueva
 
-`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 007**.
+`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 009**.
 
 ## Reglas
 
