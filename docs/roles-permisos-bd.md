@@ -10,7 +10,9 @@ Material para mostrar al profesor. Resume qué roles, permisos y módulos define
 | Base del checkpoint (`tramites_demo`): tablas `app_usuarios` y `demo_tramite` | **Implementado** | VM2 |
 | La app PHP del checkpoint | **Brecha cerrada**: ya no usa `postgres`; se conecta como `checkpoint_app` (solo `app_usuarios`). `postgres` quedó sin contraseña y rechazado por red | `checkpoints/`, runbook 17 |
 
-Estado real de la base hoy, consultado en VM2: 6 roles (`postgres` es el único superusuario, sin contraseña y rechazado por red; `siget_owner`, `app_role` y `auditor_role` sin privilegios especiales; `checkpoint_app` y `pgadmin_lectura` con `LOGIN`), 6 políticas RLS y 7 triggers. **Todavía no hay datos reales en el esquema `siget`**: `app_role` está `NOLOGIN` hasta que exista el backend, y la base **corre desde el 20-oct en un contenedor Podman rootless** (runbook 21); la instalación nativa antigua está **apagada y deshabilitada** desde el 20-oct (sus datos se conservan en disco).
+Estado real de la base (actualizado el 21 de octubre de 2026): 6 roles (`postgres` es el único superusuario, sin contraseña y rechazado por red; `siget_owner` sin inicio de sesión; `app_role` y `auditor_role` con `LOGIN` y límite de conexiones, sin privilegios especiales; `checkpoint_app` y `pgadmin_lectura`), **11 tablas**, políticas RLS y disparadores, **con datos reales** (personas, trámites, decisiones y eventos de seguridad de la plataforma en producción). La base **corre en un contenedor Podman rootless** desde el 20-oct (runbook 21); la instalación nativa está apagada.
+
+**Se puede comprobar en vivo desde la propia plataforma:** «Roles y permisos» → «Base de datos» muestra, leído de PostgreSQL en ese instante (`has_table_privilege`), qué puede hacer cada rol sobre cada tabla, con la seguridad por filas y los disparadores. Lo verifica `verificar_politicas` contra la base real (runbook 30).
 
 ## 2. Principio: no hay superusuario en la operación
 
@@ -25,8 +27,8 @@ Zero Trust: ninguna pieza opera con privilegios de administrador absoluto.
 | Rol | Quién lo usa | Puede | No puede |
 |---|---|---|---|
 | `siget_owner` | Solo las migraciones (`NOLOGIN`, se asume con `SET ROLE`) | Crear y modificar objetos del esquema `siget` | Ser superusuario; modificar la auditoría (lo impide el trigger); usarlo la aplicación |
-| `app_role` | Django, con contraseña desde `podman secret` | Leer catálogos; crear y leer trámites **dentro de su institución**; cambiar `estado` y `funcionario_asignado_id`; insertar eventos y decisiones | `UPDATE` o `DELETE` sobre auditoría; borrar trámites; modificar `rol_plataforma`; saltarse RLS |
-| `auditor_role` | Consultas de auditoría | Leer `evento_auditoria` y `decision_pdp` de **todas** las instituciones | Leer trámites; escribir en cualquier tabla |
+| `app_role` | Django, con contraseña desde `podman secret` | Leer catálogos; crear y leer trámites **dentro de su institución**; cambiar `estado` y `funcionario_asignado_id`; insertar eventos, decisiones y sesiones | `UPDATE` o `DELETE` sobre auditoría; borrar trámites; modificar `rol_plataforma`; saltarse RLS |
+| `auditor_role` | **La consola de auditoría**, con su propia conexión y contraseña (`podman secret`), límite de 5 conexiones | Leer `evento_auditoria`, `decision_pdp` y `evento_seguridad` de **todas** las instituciones, y solo `id`, `username` y `rol_plataforma` de las personas (migración 007) | Leer trámites, sesiones, hashes de contraseña o secretos del segundo factor; escribir o borrar en cualquier tabla |
 
 ## 4. Roles de aplicación (los evalúa el PDP, viven como datos)
 
@@ -115,5 +117,6 @@ Muestra primero el **estado real** de la base (un solo rol, sin RLS) y luego las
 | La app PHP del checkpoint usaba `postgres` (superusuario) | **Cerrada el 15-oct** (runbook 17): usa `checkpoint_app`, de mínimo privilegio |
 | `postgres` conservaba acceso por red con contraseña | **Cerrada**: sin contraseña y `reject` en `pg_hba.conf` |
 | pgAdmin se conectaba como `postgres` | **Cerrada**: ahora usa `pgadmin_lectura` (solo lectura) |
-| `app_role` sin `LOGIN` | Pendiente: se activa con `podman secret` cuando exista el backend |
+| `app_role` sin `LOGIN` | **Cerrada el 20-oct** (migración 003): `LOGIN` con límite de 20 conexiones y contraseña como `podman secret` |
+| La consola de auditoría leía con `app_role` | **Cerrada el 21-oct** (migración 007): `auditor_role` con `LOGIN` y su propia conexión, solo `SELECT` |
 | La base era la instalación nativa | **Cerrada el 20-oct**: migrada a un contenedor rootless con la misma configuración. La base nativa está apagada y deshabilitada |
