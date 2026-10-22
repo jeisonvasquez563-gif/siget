@@ -12,6 +12,8 @@ CATALOGO = {
     "supervision": ("Supervisión", "Reasigna trámites y atiende los escalados de tu institución.", DISPONIBLE),
     "equipo": ("Equipo de la institución", "Personal y roles de tu institución.", DISPONIBLE),
     "seguridad": ("Mi seguridad", "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.", DISPONIBLE),
+    "mfa": ("Segundo factor (MFA)", "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.", DISPONIBLE),
+    "roles_permisos": ("Roles y permisos", "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.", DISPONIBLE),
     "prueba_acceso": ("Acceso a trámites", "Comprueba en vivo que tu rol de plataforma no puede ver trámites.", DISPONIBLE),
     "consola_infraestructura": ("Infraestructura", "Estado de los servidores y contenedores.", PROXIMAMENTE),
     "consola_identidades": ("Identidades", "Alta de coordinadores y restablecimiento del segundo factor (control dual).", PROXIMAMENTE),
@@ -31,6 +33,10 @@ _POR_ROL_PLATAFORMA = {
 }
 
 
+# Todas las personas pueden ver su propia seguridad, cómo funciona el segundo factor y qué permite cada rol (transparencia)
+_TRANSPARENCIA = ["seguridad", "mfa", "roles_permisos"]
+
+
 def _entrada(identificador):
     nombre, descripcion, estado = CATALOGO[identificador]
     return {"id": identificador, "nombre": nombre, "descripcion": descripcion, "estado": estado}
@@ -40,7 +46,7 @@ def modulos_para(rol_plataforma, roles_en_instituciones):
     """`roles_en_instituciones`: los roles (texto) que la persona tiene en cualquier institución."""
     if rol_plataforma != "ninguno":
         # Un rol de plataforma excluye al resto (lo impone la base): sin trámites, solo su consola
-        ids = _POR_ROL_PLATAFORMA.get(rol_plataforma, []) + ["prueba_acceso", "seguridad"]
+        ids = _POR_ROL_PLATAFORMA.get(rol_plataforma, []) + ["prueba_acceso", *_TRANSPARENCIA]
         return [_entrada(i) for i in ids]
     roles = set(roles_en_instituciones)
     ids = ["mis_tramites", "nuevo_tramite"]
@@ -50,5 +56,5 @@ def modulos_para(rol_plataforma, roles_en_instituciones):
         ids.append("supervision")
     if roles & {"supervisor", "coordinador_institucional"}:
         ids.append("equipo")
-    ids.append("seguridad")
+    ids.extend(_TRANSPARENCIA)
     return [_entrada(i) for i in ids]

@@ -158,7 +158,7 @@ function perfiles(yo) {
 const VENTANA_MIN = 15
 const CIRCUNFERENCIA = 2 * Math.PI * 38
 
-function VentanaMfa({ verificadoEn }) {
+export function VentanaMfa({ verificadoEn }) {
   const minutos = verificadoEn ? Math.max(0, (Date.now() - new Date(verificadoEn)) / 60000) : Infinity
   const restante = Math.max(0, VENTANA_MIN - minutos)
   const vigente = restante > 0

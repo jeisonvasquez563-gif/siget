@@ -10,7 +10,7 @@ const PESTANAS = [
   ['tramites', 'Actuaciones en trámites'],
 ]
 
-const NOMBRES_EVENTO = {
+export const NOMBRES_EVENTO = {
   registro: 'Cuenta creada', login_ok: 'Inicio de sesión', login_fallido: 'Inicio de sesión fallido',
   login_rechazado_bloqueada: 'Intento con cuenta bloqueada', login_cuenta_no_activa: 'Intento con cuenta no activa',
   cuenta_bloqueada: 'Cuenta bloqueada', mfa_enrolamiento_iniciado: 'Alta del segundo factor iniciada',
@@ -19,7 +19,7 @@ const NOMBRES_EVENTO = {
   refresh_ok: 'Sesión renovada', refresh_invalido: 'Renovación inválida', refresh_reuso: 'Reuso de token de sesión (posible robo)',
   logout: 'Cierre de sesión',
 }
-const EVENTOS_ALERTA = ['login_fallido', 'cuenta_bloqueada', 'refresh_reuso', 'login_rechazado_bloqueada', 'mfa_verificacion_fallida', 'mfa_confirmacion_fallida', 'refresh_invalido']
+export const EVENTOS_ALERTA = ['login_fallido', 'cuenta_bloqueada', 'refresh_reuso', 'login_rechazado_bloqueada', 'mfa_verificacion_fallida', 'mfa_confirmacion_fallida', 'refresh_invalido']
 
 const Quien = ({ actor }) => (actor
   ? <span className="quien-fila"><Avatar nombre={actor.usuario} /><span>{actor.usuario}</span></span>
@@ -47,7 +47,7 @@ export function Auditoria() {
   )
 }
 
-function usarConsulta(ruta, parametros) {
+function useConsulta(ruta, parametros) {
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
   const { ejecutar, modal } = useReautenticacion()
@@ -69,7 +69,7 @@ function usarConsulta(ruta, parametros) {
 /* ---------------------------------------------------------------- resumen */
 
 function Resumen({ alAbrirDecisiones }) {
-  const { datos, error, modal } = usarConsulta('/auditoria/resumen/', {})
+  const { datos, error, modal } = useConsulta('/auditoria/resumen/', {})
   // El modal de reautenticación debe pintarse también mientras se espera: si no, el esqueleto quedaría para siempre
   if (datos === null) return <><BloquesEsqueleto n={4} />{modal}</>
   if (datos === false) return <><Alerta>{error}</Alerta>{modal}</>
@@ -154,7 +154,7 @@ function Decisiones() {
   const parametros = { limite: TAM, desplazamiento: pagina * TAM }
   if (resultado) parametros.resultado = resultado
   if (politica) parametros.politica = politica
-  const { datos, error, modal } = usarConsulta('/auditoria/decisiones/', parametros)
+  const { datos, error, modal } = useConsulta('/auditoria/decisiones/', parametros)
 
   return (
     <>
@@ -216,7 +216,7 @@ function Listado({ ruta, columnas, filtro: [clave, etiqueta, ejemplo], vacio }) 
   const [pagina, setPagina] = useState(0)
   const parametros = { limite: TAM, desplazamiento: pagina * TAM }
   if (valor) parametros[clave] = valor
-  const { datos, error, modal } = usarConsulta(ruta, parametros)
+  const { datos, error, modal } = useConsulta(ruta, parametros)
   return (
     <>
       <div className="barra-filtros">

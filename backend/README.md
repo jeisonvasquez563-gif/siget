@@ -15,6 +15,7 @@ Django 5.2 LTS + Django REST Framework (API-first). Corre en un contenedor Podma
 | Trámites y catálogo (crear, bandeja, estado, reasignar, historial) | ✅ 51 pasos contra la base real |
 | Equipo, módulos por rol y cuentas de demostración (`sembrar_demo`) | ✅ |
 | Consola de auditoría con rol de base de datos propio (solo lectura) | ✅ 34 pasos contra la base real |
+| Transparencia: matriz de permisos calculada por el PDP y permisos reales de la base (`/politicas/`), actividad de seguridad propia | ✅ 30 pasos contra la base real |
 | Consolas de plataforma (control dual), plazos hábiles y escalamiento, documentos, notificaciones | ⏳ ([hoja de ruta](../docs/organizacion-backend-frontend.md)) |
 
 ## Stack

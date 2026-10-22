@@ -176,7 +176,7 @@ export function NuevoTramite({ abrir }) {
             </section>
           )}
         </div>
-        <aside className="panel resumen-nuevo">
+        <aside className="panel resumen-nuevo" aria-label="Resumen del trámite">
           <h3>Resumen</h3>
           {tipo ? (
             <>

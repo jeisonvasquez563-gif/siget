@@ -6,9 +6,11 @@
 // Usuarios: ana.ciudadana beto.ciudadano fabio.mop flor.mop saul.mop carla.mop felix.minsa ines.infra ivan.identidades
 //           cata.catalogo sergio.seguridad silvia.secretos aldo.auditor
 
+import matrizEjemplo from './mock-datos/matriz.json'
+import bdEjemplo from './mock-datos/base-de-datos.json'
+
 const DIA = 86400000
 const hace = (ms) => new Date(Date.now() - ms).toISOString()
-const dentro = (ms) => new Date(Date.now() + ms).toISOString()
 
 const mem = (id, nombre, rol) => ({ institucion_id: id, institucion: nombre, rol })
 const MOP = (rol) => mem(3, 'MOP', rol)
@@ -37,6 +39,8 @@ const MODULOS = {
   supervision: ['Supervisión', 'Reasigna trámites y atiende los escalados de tu institución.', 'disponible'],
   equipo: ['Equipo de la institución', 'Personal y roles de tu institución.', 'disponible'],
   seguridad: ['Mi seguridad', 'Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.', 'disponible'],
+  mfa: ['Segundo factor (MFA)', 'Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.', 'disponible'],
+  roles_permisos: ['Roles y permisos', 'Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.', 'disponible'],
   prueba_acceso: ['Acceso a trámites', 'Comprueba en vivo que tu rol de plataforma no puede ver trámites.', 'disponible'],
   consola_infraestructura: ['Infraestructura', 'Estado de los servidores y contenedores.', 'proximamente'],
   consola_identidades: ['Identidades', 'Alta de coordinadores y restablecimiento del segundo factor (control dual).', 'proximamente'],
@@ -52,14 +56,14 @@ const POR_PLATAFORMA = {
 
 function modulosDe(u) {
   let ids
-  if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad']
+  if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa', 'roles_permisos']
   else {
     const roles = u.membresias.map((m) => m.rol)
     ids = ['mis_tramites', 'nuevo_tramite']
     if (roles.some((r) => r === 'funcionario' || r === 'supervisor')) ids.push('bandeja')
     if (roles.includes('supervisor')) ids.push('supervision')
     if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('equipo')
-    ids.push('seguridad')
+    ids.push('seguridad', 'mfa', 'roles_permisos')
   }
   return ids.map((id) => ({ id, nombre: MODULOS[id][0], descripcion: MODULOS[id][1], estado: MODULOS[id][2] }))
 }
@@ -87,24 +91,24 @@ const T = (id, tipo, estado, solicitante, asignado, creadoDias, sla, extra = {})
     vencido: !['Aprobado', 'Rechazado'].includes(estado) && limite < Date.now(), creado_en: new Date(creado).toISOString(),
     solicitante_id: solicitante, funcionario_asignado_id: asignado, sensibilidad: 2, ...extra }
 }
-const TRAMITES = [
+const TRAMITES_BASE = [
   T(35, 3, 'Aprobado', 101, 201, 9, 10), T(36, 2, 'En Tramitacion', 101, 205, 3, 10), T(37, 3, 'En Subsanacion', 102, 202, 8, 10),
   T(38, 3, 'Pendiente', 102, null, 1, 10), T(39, 1, 'Pendiente', 101, null, 2, 15), T(41, 3, 'En Tramitacion', 102, 201, 12, 10),
   T(42, 3, 'Pendiente', 101, null, 7, 10), T(43, 3, 'Rechazado', 102, 203, 14, 10), T(44, 3, 'En Tramitacion', 101, 202, 4, 10),
 ]
-const EVENTOS = {}
+const EVENTOS_BASE = {}
 const ev = (id, tramite, accion, de, a, actor, hacia) => ({ id, accion, estado_anterior: de, estado_nuevo: a, institucion_id: 3, creado_en: hace(hacia), actor_id: actor, atributos: {} })
-TRAMITES.forEach((t, i) => {
+TRAMITES_BASE.forEach((t, i) => {
   const lista = [ev(i * 10 + 1, t.id, 'creacion', null, 'Pendiente', t.solicitante_id, (i + 6) * 3600000 * 5)]
   if (t.estado !== 'Pendiente') lista.push(ev(i * 10 + 2, t.id, 'cambio_estado', 'Pendiente', 'En Tramitacion', t.funcionario_asignado_id || 201, (i + 3) * 3600000 * 4))
   if (t.estado === 'En Subsanacion') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', 'En Subsanacion', 202, 3600000 * 9))
   if (t.estado === 'Aprobado' || t.estado === 'Rechazado') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', t.estado, 203, 3600000 * 6))
-  EVENTOS[t.id] = lista
+  EVENTOS_BASE[t.id] = lista
 })
 
 const visibles = (u, t) => t.solicitante_id === u.id || u.membresias.some((m) => m.institucion_id === t.institucion.id && ['funcionario', 'supervisor'].includes(m.rol))
 const esPersonal = (u, t) => u.membresias.some((m) => m.institucion_id === t.institucion.id && ['funcionario', 'supervisor'].includes(m.rol))
-const paraCiudadania = (t) => { const { solicitante_id, funcionario_asignado_id, sensibilidad, ...resto } = t; return { ...resto, asignado: funcionario_asignado_id !== null } }
+const paraCiudadania = (t) => { const { solicitante_id: _s, funcionario_asignado_id, sensibilidad: _n, ...resto } = t; return { ...resto, asignado: funcionario_asignado_id !== null } }
 const dto = (u, t) => (esPersonal(u, t) ? t : paraCiudadania(t))
 
 // ---- auditoría
@@ -127,7 +131,7 @@ const SEGURIDAD = Array.from({ length: 34 }, (_, i) => {
   const nombre = Object.keys(USUARIOS)[(i * 5) % 13]
   return { id: 34 - i, creado_en: hace(i * 47 * 60000), evento: eventos[i % eventos.length], ip: `192.168.100.${10 + (i % 6)}`, actor: i % 7 === 3 ? null : { id: USUARIOS[nombre].id, usuario: nombre }, detalle: {} }
 })
-const ACTUACIONES = Object.values(EVENTOS).flat().sort((a, b) => b.id - a.id).map((e) => ({ ...e, tramite_id: Object.keys(EVENTOS).find((k) => EVENTOS[k].includes(e)) * 1, actor: e.actor_id ? { id: e.actor_id, usuario: NOMBRES[e.actor_id] } : null }))
+const ACTUACIONES = Object.values(EVENTOS_BASE).flat().sort((a, b) => b.id - a.id).map((e) => ({ ...e, tramite_id: Object.keys(EVENTOS_BASE).find((k) => EVENTOS_BASE[k].includes(e)) * 1, actor: e.actor_id ? { id: e.actor_id, usuario: NOMBRES[e.actor_id] } : null }))
 
 function paginar(lista, p) {
   const limite = Number(p.get('limite') || 20)
@@ -135,11 +139,15 @@ function paginar(lista, p) {
   return { total: lista.length, limite, desplazamiento: desde, resultados: lista.slice(desde, desde + limite) }
 }
 
-export function instalarMock(inicial) {
+export function instalarMock(inicial, opciones = {}) {
+  // Cada instalación parte del mismo estado: lo que se cambie en una sesión de ejemplo no contamina la siguiente
+  const TRAMITES = structuredClone(TRAMITES_BASE)
+  const EVENTOS = structuredClone(EVENTOS_BASE)
   let actual = USUARIOS[inicial] ? inicial : null
   let enrolando = inicial === 'enrolar'
   let mfaFresco = false
-  const demora = (ms = 140) => new Promise((r) => setTimeout(r, ms))
+  let ultimoCodigo = null // un código ya usado no se acepta otra vez, como en el servidor
+  const demora = (ms = opciones.demora ?? 140) => new Promise((r) => setTimeout(r, ms))
   const resp = (estado, cuerpo) => new Response(cuerpo === null ? null : JSON.stringify(cuerpo), { status: estado, headers: { 'Content-Type': 'application/json' } })
   const yo = () => {
     if (enrolando) return { id: 999, usuario: 'nuevo.usuario', scope: 'enrolar_mfa', rol_plataforma: 'ninguno', membresias: [], modulos: [], mfa_activo: false, mfa_obligatorio: true, mfa_verificado_en: null, nivel_aseguramiento: 1 }
@@ -170,12 +178,18 @@ export function instalarMock(inicial) {
     if (camino === '/auth/yo/') return resp(200, yo())
     if (camino === '/auth/mfa/enrolar/') return resp(201, { secreto: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', uri: 'otpauth://totp/SIGET:nuevo.usuario?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=SIGET' })
     if (camino === '/auth/mfa/confirmar/') { enrolando = false; actual = 'ana.ciudadana'; mfaFresco = true; return resp(200, { access_token: 'mock', scope: 'completo' }) }
-    if (camino === '/auth/mfa/verificar/') { if (cuerpo.codigo === '000000') return resp(400, { codigo: 'mfa_invalido' }); mfaFresco = true; return resp(200, { detalle: 'Segundo factor verificado.' }) }
+    if (camino === '/auth/mfa/verificar/') { if (cuerpo.codigo === '000000' || cuerpo.codigo === ultimoCodigo) return resp(400, { codigo: 'mfa_invalido' }); ultimoCodigo = cuerpo.codigo; mfaFresco = true; return resp(200, { detalle: 'Segundo factor verificado.' }) }
     if (!actual) return resp(401, { codigo: 'no_autenticado' })
     const u = USUARIOS[actual]
     const negado = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false })
     const pideCodigo = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: true })
 
+    if (camino === '/politicas/matriz/') return resp(200, matrizEjemplo)
+    if (camino === '/politicas/base-de-datos/') return resp(200, bdEjemplo)
+    if (camino === '/auth/actividad/') {
+      const eventos = [['mfa_verificado', 9], ['login_ok', 9], ['refresh_ok', 40], ['login_fallido', 300], ['login_ok', 1500], ['logout', 1620]]
+      return resp(200, { eventos: eventos.map(([evento, min], i) => ({ id: 100 - i, evento, creado_en: hace(min * 60000), ip: '192.168.100.10' })) })
+    }
     if (camino === '/catalogo/instituciones/') return resp(200, INSTITUCIONES)
     if (camino === '/catalogo/tipos-tramite/') return resp(200, TIPOS.filter((t) => !p.get('institucion') || String(t.institucion.id) === p.get('institucion')))
     if (camino === '/equipo/') {

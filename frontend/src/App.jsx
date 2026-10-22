@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { alPerderLaSesion, api, cerrarSesion, olvidarToken, renovar } from './api.js'
 import { EnrolarMfa, Login } from './Acceso.jsx'
 import { Auditoria } from './Auditoria.jsx'
+import { SegundoFactor } from './Mfa.jsx'
+import { RolesPermisos } from './Permisos.jsx'
 import { etiquetaDeRol } from './comun.jsx'
 import { agrupar, iconoDe } from './modulos.js'
 import { Equipo, Inicio, Proximamente, PruebaAcceso, Seguridad } from './Otras.jsx'
@@ -21,6 +23,9 @@ export default function App() {
     setVista({ modulo: 'inicio' })
     setFase(datos.scope === 'enrolar_mfa' ? 'enrolar' : 'app')
   }, [])
+
+  // Vuelve a pedir quién soy (p. ej. tras verificar el segundo factor) sin cambiar de pantalla
+  const refrescarYo = useCallback(async () => { setYo(await api('/auth/yo/')) }, [])
 
   const salirDelTodo = useCallback(() => { olvidarToken(); setYo(null); setFase('login') }, [])
 
@@ -57,6 +62,8 @@ export default function App() {
     case 'equipo': contenido = <Equipo />; break
     case 'seguridad': contenido = <Seguridad yo={yo} />; break
     case 'auditoria': contenido = <Auditoria />; break
+    case 'mfa': contenido = <SegundoFactor yo={yo} refrescar={refrescarYo} />; break
+    case 'roles_permisos': contenido = <RolesPermisos yo={yo} />; break
     case 'prueba_acceso': contenido = <PruebaAcceso yo={yo} />; break
     case 'detalle': contenido = <Detalle id={vista.id} yo={yo} volver={() => ir(vista.desde || 'inicio')} volverA={origen?.nombre || 'Inicio'} />; break
     default: contenido = actual ? <Proximamente modulo={actual} /> : <Inicio yo={yo} ir={ir} abrir={abrir} />
@@ -66,7 +73,7 @@ export default function App() {
     <div className="aplicacion">
       <a className="saltar" href="#contenido">Saltar al contenido</a>
       {menuAbierto && <button className="telon" aria-label="Cerrar menú" onClick={() => setMenuAbierto(false)} />}
-      <aside className={`lateral ${menuAbierto ? 'abierta' : ''}`}>
+      <aside className={`lateral ${menuAbierto ? 'abierta' : ''}`} aria-label="Barra lateral">
         <div className="marca"><Logo /><div><strong>SIGET</strong><small>Gestión y trazabilidad</small></div></div>
         <nav aria-label="Módulos">
           <div className="nav-grupo">

@@ -18,7 +18,8 @@ export class ApiError extends Error {
 
 export const alPerderLaSesion = (f) => { alPerderSesion = f }
 export const hayToken = () => tokenDeAcceso !== null
-export const olvidarToken = () => { tokenDeAcceso = null }
+// Al cerrar la sesión también se descarta cualquier renovación en curso: no debe sobrevivir a la persona que la pidió
+export const olvidarToken = () => { tokenDeAcceso = null; refrescando = null }
 
 async function pedir(ruta, { metodo = 'GET', cuerpo, conToken = true } = {}) {
   const cabeceras = { Accept: 'application/json' }

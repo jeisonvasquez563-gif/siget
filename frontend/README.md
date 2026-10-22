@@ -27,10 +27,14 @@ src/
 ├── Tramites.jsx        # mis trámites, nuevo, bandeja (lista y tablero), detalle con esclusas e historial
 ├── Otras.jsx           # inicio, equipo, mi seguridad (credencial), acceso a trámites, «próximamente»
 ├── Auditoria.jsx       # resumen con gráfico, decisiones, eventos de seguridad, actuaciones
+├── Permisos.jsx        # roles y módulos, matriz de permisos, permisos de la base de datos, capas de defensa
+├── Mfa.jsx             # segundo factor: cómo funciona, prueba en vivo (incluye reuso) y actividad propia
 ├── ui.jsx              # iconos propios, logo, esclusas, insignias, avisos, confirmaciones, esqueletos, estados vacíos, tema
 ├── comun.jsx           # etiquetas, estados, plazos, reautenticación
 ├── modulos.js          # cómo se agrupan y dibujan los módulos que manda el servidor
 ├── mock.js             # servidor de mentira SOLO para desarrollo (no entra en producción)
+├── mock-datos/         # capturas REALES de /politicas/* (matriz y base de datos) para el simulador
+├── pruebas/            # Vitest: api, comun, ui, pantallas por rol, permisos/MFA y seguridad del código
 └── estilos/            # tokens.css, base.css, componentes.css, layout.css, pantallas.css
 ```
 
@@ -41,6 +45,18 @@ npm install
 npm run dev      # http://localhost:5173 (proxy a https://192.168.159.137:8443; SIGET_API para cambiarlo)
 npm run build    # genera dist/, que se copia a /home/siget/frontend en VM1 (runbook sección 27.6)
 ```
+
+## Pruebas
+
+```bash
+npm test            # 113 pruebas (Vitest + Testing Library + axe), sin VM ni credenciales
+npm run lint        # ESLint (hooks, `style=` prohibido por la CSP, sin eval)
+npm run verificar   # lint + pruebas + build
+```
+
+Qué cubren: el cliente de la API y la sesión, el menú y los datos que ve cada rol, las acciones sobre un trámite (reautenticación, confirmación de estados finales, conflicto de interés), la matriz de permisos y los permisos de la base (con una captura real), el segundo factor, la accesibilidad con **axe** y la **seguridad del código** (CSP, sin token en el navegador, sin el simulador en producción). Si tocas una pantalla, agrega o ajusta su prueba en `src/pruebas/`.
+
+Para refrescar la captura real de la matriz y de la base: `python demo-local/capturar_fixtures.py` (necesita las VMs encendidas y las cuentas de demostración).
 
 ### Ver cada pantalla sin la VM: modo de ejemplo
 
@@ -56,6 +72,7 @@ Con `npm run dev`, agrega `?mock` a la dirección y la interfaz usa datos de eje
 | `/?mock=aldo.auditor` | Auditor: consola de auditoría |
 | `/?mock=ines.infra` (y los demás roles de plataforma) | Consola «próximamente» y la prueba de acceso negado |
 | `/?mock=enrolar` | Alta del segundo factor |
+| Cualquier cuenta → «Roles y permisos» / «Segundo factor (MFA)» | Matriz de permisos, base de datos y prueba de MFA |
 
 Es un servidor de mentira: no valida nada. El único que decide es el backend. Al editar un archivo, el recarga en caliente reinicia la sesión de ejemplo.
 

@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  compilacion:
+  verificar:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,11 +25,21 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      # ESLint: hooks de React, accesibilidad básica y prohibición de `style=` (la CSP de nginx lo bloquearía)
+      - run: npm run lint
+      # Vitest: contrato de la API, sesión, pantallas por rol (con el servidor de ejemplo), accesibilidad (axe) y seguridad del código
+      - run: npm test
       - run: npm run build
-      # La CSP de nginx es `default-src 'self'`: la interfaz no puede llevar estilos ni scripts en línea.
+      # El servidor de ejemplo y sus datos jamás deben llegar a producción
+      - name: El simulador de desarrollo no está en el build
+        run: |
+          if grep -rlE "instalarMock|ana\.ciudadana|fabio\.mop|JBSWY3DPEHPK3PXP" dist; then
+            echo "El simulador (src/mock.js) no debe incluirse en producción." >&2
+            exit 1
+          fi
       - name: Sin estilos ni scripts en línea (CSP)
         run: |
-          if grep -rnE "style=\{\{|dangerouslySetInnerHTML|<script>[^<]|style=\"" src index.html; then
+          if grep -rnE "style=\{\{|dangerouslySetInnerHTML|<script>[^<]|style=\"" src index.html --include=*.jsx --include=*.html --exclude-dir=pruebas; then
             echo "La interfaz no puede usar estilos ni scripts en línea (CSP default-src 'self')." >&2
             exit 1
           fi
