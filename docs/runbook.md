@@ -1594,3 +1594,27 @@ SSH en las dos VM (`/etc/ssh/sshd_config.d/00-siget-endurecimiento.conf`: sin ro
 - `tar` en Git Bash interpreta `C:` como un host remoto: usar `--force-local`.
 - Ver la plataforma nueva en `https://…:8443`; el puerto 80 sigue siendo el checkpoint PHP antiguo.
 
+
+## 34. Consolas de plataforma, control dual y recuperación de contraseña (22 de octubre de 2026)
+
+### 34.1 Qué se construyó
+
+Backend en `backend/apps/plataforma/` (modelos, `servicio.py`, `vistas.py`, `secretos.py`), recuperación pública en `backend/apps/autenticacion/restablecimiento.py` y `servicio.py`, interfaz en `frontend/src/Plataforma.jsx`. Detalle de las rutas en [`api.md`](./api.md). Las consolas reutilizan las acciones del PDP (`proponer_alta`, `aprobar_alta`, `restablecer_mfa`, `bloquear_cuenta`, `revocar_sesion`, `rotar_secretos`, `administrar_infraestructura`): no cambió la matriz de permisos.
+
+### 34.2 Migración 010 y despliegue
+
+Respaldo previo (`systemctl start siget-respaldo.service`), después `cat database/migraciones/010-plataforma-y-restablecimiento.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1` en VM2. En VM1: `ejecutar-comando.sh` con `verificar_plataforma`, `verificar_autenticacion` y `verificar_politicas` (79, 71 y 39 pasos), y `desplegar.sh`. **`nginx.conf` ahora incluye `plataforma`** en la lista de prefijos que llegan al backend. Ojo: `desplegar.sh` copia la unidad del repositorio y devuelve la inactividad a 10 minutos; para la demo se vuelve a poner `SIGET_INACTIVIDAD_MINUTOS=2`.
+
+### 34.3 Operadores adicionales
+
+El control dual necesita dos personas por rol: `sembrar_demo` creó `irene.identidades` y `camilo.catalogo` (sus credenciales viven solo en `demo-local/`).
+
+### 34.4 Verificación
+
+`verificar_plataforma` recorre contra la base real (en una transacción que se revierte): quién entra a cada consola, el ciclo completo del código (emisión, hash en la base, uso, reuso, vencimiento a los 16 minutos, mensajes idénticos), la separación de funciones, el control dual en el motor y en la base, bloqueos, secretos de solo inserción, infraestructura con TLS 1.3, privilegios de la base por rol y los eventos de seguridad. El ensayo de la demo (`demo/ensayo.py`, sección 10) repite lo no destructivo contra producción: **86 de 86**.
+
+### 34.5 Gotchas
+
+- Una anotación de Django no puede llamarse igual que una relación inversa del modelo (`sesiones`): daba un 500.
+- El límite de inicios de sesión (10 por minuto por IP) corta un ensayo con muchas cuentas: el script espera un minuto antes de la sección 10.
+- Una corrida interrumpida del ensayo deja una propuesta pendiente; el script la rechaza al empezar.

@@ -8,6 +8,7 @@ import { RolesPermisos } from './Permisos.jsx'
 import { etiquetaDeRol } from './comun.jsx'
 import { agrupar, iconoDe } from './modulos.js'
 import { Equipo, Inicio, Proximamente, PruebaAcceso, Seguridad } from './Otras.jsx'
+import { ConsolaCatalogo, ConsolaIdentidades, ConsolaInfraestructura, ConsolaSecretos, ConsolaSeguridad } from './Plataforma.jsx'
 import { Bandeja, Detalle, MisTramites, NuevoTramite } from './Tramites.jsx'
 import { Avatar, Icono, Logo, useUI } from './ui.jsx'
 
@@ -79,6 +80,11 @@ export default function App() {
     case 'mfa': contenido = <SegundoFactor yo={yo} refrescar={refrescarYo} />; break
     case 'roles_permisos': contenido = <RolesPermisos yo={yo} />; break
     case 'prueba_acceso': contenido = <PruebaAcceso yo={yo} />; break
+    case 'consola_identidades': contenido = <ConsolaIdentidades yo={yo} />; break
+    case 'consola_catalogo': contenido = <ConsolaCatalogo yo={yo} />; break
+    case 'consola_seguridad': contenido = <ConsolaSeguridad yo={yo} />; break
+    case 'consola_secretos': contenido = <ConsolaSecretos />; break
+    case 'consola_infraestructura': contenido = <ConsolaInfraestructura />; break
     case 'detalle': contenido = <Detalle id={vista.id} yo={yo} volver={() => ir(vista.desde || 'inicio')} volverA={origen?.nombre || 'Inicio'} />; break
     default: contenido = actual ? <Proximamente modulo={actual} /> : <Inicio yo={yo} ir={ir} abrir={abrir} />
   }

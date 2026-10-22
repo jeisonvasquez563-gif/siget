@@ -33,3 +33,17 @@ class EventoSeguridad(SoloInsercion):
 
     class Meta(SoloInsercion.Meta):
         db_table = "evento_seguridad"
+
+
+class Restablecimiento(ModeloDeEsquema):
+    """Código de un solo uso para fijar una contraseña nueva (migración 010). Solo se guarda su SHA-256."""
+
+    usuario = models.ForeignKey(Usuario, on_delete=models.DO_NOTHING, db_column="usuario_id", related_name="+")
+    codigo_hash = models.TextField(unique=True)
+    emitido_por = models.ForeignKey(Usuario, on_delete=models.DO_NOTHING, db_column="emitido_por", related_name="+")
+    creado_en = models.DateTimeField(auto_now_add=True)
+    vence_en = models.DateTimeField()
+    usado_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta(ModeloDeEsquema.Meta):
+        db_table = "restablecimiento"

@@ -42,6 +42,9 @@ PERSONAS = [
     ("cata.catalogo", "Operadora de catálogo", "operador_catalogo", [], 2),
     ("sergio.seguridad", "Operador de seguridad", "operador_seguridad", [], 2),
     ("silvia.secretos", "Custodia de secretos", "custodio_secretos", [], 2),
+    # Segundas personas de los roles con control dual: quien propone no aprueba, así que hacen falta dos
+    ("irene.identidades", "Segunda operadora de identidades (control dual)", "operador_identidades", [], 2),
+    ("camilo.catalogo", "Segundo operador de catálogo (control dual)", "operador_catalogo", [], 2),
     ("aldo.auditor", "Auditor", "auditor", [], 3),
 ]
 

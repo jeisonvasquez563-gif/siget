@@ -1,4 +1,6 @@
 # Especificación: trabajo pendiente de SIGET
+> **Actualización del 22-oct:** los paquetes **PT-4** (consolas de los operadores de plataforma con control dual) y **PT-5** (recuperación de contraseña asistida) ya están construidos, probados y desplegados por Jeison; ver [`runbook.md` §34](../../runbook.md). Quedan para Andy el resto de los paquetes.
+
 
 **Responsable de la ejecución:** Andy Martínez · **Aprobador de todo cambio en las VMs:** Jeison Vásquez · **Fecha:** 21 de octubre de 2026
 **Plan de ejecución (tareas, orden y fechas):** [`../../architecture/plan-pendientes-andy.md`](../../architecture/plan-pendientes-andy.md)

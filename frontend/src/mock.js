@@ -7,6 +7,7 @@
 //           cata.catalogo sergio.seguridad silvia.secretos aldo.auditor
 
 import matrizEjemplo from './mock-datos/matriz.json'
+import { plataformaMock } from './mock-plataforma.js'
 import bdEjemplo from './mock-datos/base-de-datos.json'
 import simuladorEjemplo from './mock-datos/simulador.json'
 
@@ -30,6 +31,8 @@ const USUARIOS = {
   'sergio.seguridad': { id: 304, plataforma: 'operador_seguridad', membresias: [] },
   'silvia.secretos': { id: 305, plataforma: 'custodio_secretos', membresias: [] },
   'aldo.auditor': { id: 306, plataforma: 'auditor', membresias: [] },
+  'irene.identidades': { id: 307, plataforma: 'operador_identidades', membresias: [] },
+  'camilo.catalogo': { id: 308, plataforma: 'operador_catalogo', membresias: [] },
 }
 const NOMBRES = Object.fromEntries(Object.entries(USUARIOS).map(([n, u]) => [u.id, n]))
 
@@ -43,11 +46,11 @@ const MODULOS = {
   mfa: ['Segundo factor (MFA)', 'Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.', 'disponible'],
   roles_permisos: ['Roles y permisos', 'Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.', 'disponible'],
   prueba_acceso: ['Acceso a trámites', 'Comprueba en vivo que tu rol de plataforma no puede ver trámites.', 'disponible'],
-  consola_infraestructura: ['Infraestructura', 'Estado de los servidores y contenedores.', 'proximamente'],
-  consola_identidades: ['Identidades', 'Alta de coordinadores y restablecimiento del segundo factor (control dual).', 'proximamente'],
-  consola_catalogo: ['Catálogo', 'Alta de instituciones y de trámites (control dual).', 'proximamente'],
-  consola_seguridad: ['Respuesta a incidentes', 'Bloqueo de cuentas y revocación de sesiones.', 'proximamente'],
-  consola_secretos: ['Custodia de secretos', 'Rotación de claves y certificados.', 'proximamente'],
+  consola_infraestructura: ['Infraestructura', 'Estado de la base de datos y del servicio, y vencimiento del certificado (solo lectura).', 'disponible'],
+  consola_identidades: ['Identidades', 'Restablece contraseñas y segundo factor, y da de alta a las coordinadoras con control dual.', 'disponible'],
+  consola_catalogo: ['Catálogo', 'Alta de instituciones con control dual.', 'disponible'],
+  consola_seguridad: ['Respuesta a incidentes', 'Bloquea cuentas, revoca sesiones y mira los eventos de seguridad.', 'disponible'],
+  consola_secretos: ['Custodia de secretos', 'Registra la rotación de secretos y avisa cuándo toca.', 'disponible'],
   auditoria: ['Auditoría', 'Consulta del registro inalterable de eventos y de decisiones de acceso.', 'disponible'],
 }
 const POR_PLATAFORMA = {
@@ -148,6 +151,11 @@ export function instalarMock(inicial, opciones = {}) {
   let enrolando = inicial === 'enrolar'
   let mfaFresco = false
   let ultimoCodigo = null // un código ya usado no se acepta otra vez, como en el servidor
+  const plataforma = plataformaMock({
+    usuarios: USUARIOS, actual: () => actual, hace,
+    resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
+    negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
+  })
   const demora = (ms = opciones.demora ?? 140) => new Promise((r) => setTimeout(r, ms))
   const resp = (estado, cuerpo) => new Response(cuerpo === null ? null : JSON.stringify(cuerpo), { status: estado, headers: { 'Content-Type': 'application/json' } })
   const yo = () => {
@@ -175,6 +183,12 @@ export function instalarMock(inicial, opciones = {}) {
       return resp(200, { access_token: 'mock', scope: 'completo' })
     }
     if (camino === '/auth/registro/') return resp(201, { detalle: 'Cuenta creada.' })
+    if (camino === '/auth/restablecer/') {
+      const bueno = (cuerpo.codigo || '').replace(/[\s-]/g, '').toUpperCase() === 'K7MQ2XWD9PRT' && USUARIOS[(cuerpo.username || '').trim().toLowerCase()]
+      if (!bueno) return resp(400, { codigo: 'codigo_invalido', detalle: 'El código no es válido, ya se usó o venció.' })
+      if ((cuerpo.password || '').length < 12) return resp(400, { codigo: 'datos_invalidos', errores: ['debe tener al menos 12 caracteres'] })
+      return resp(200, { detalle: 'Contraseña restablecida. Inicia sesión con tu nueva contraseña y tu segundo factor.' })
+    }
     if (camino === '/auth/logout/') { actual = null; enrolando = false; return resp(200, { detalle: 'Sesión cerrada.' }) }
     if (camino === '/auth/yo/') return resp(200, yo())
     if (camino === '/auth/mfa/enrolar/') return resp(201, { secreto: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', uri: 'otpauth://totp/SIGET:nuevo.usuario?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=SIGET' })
@@ -266,6 +280,8 @@ export function instalarMock(inicial, opciones = {}) {
       if (camino === '/auditoria/seguridad/') return resp(200, paginar(p.get('evento') ? SEGURIDAD.filter((e) => e.evento === p.get('evento')) : SEGURIDAD, p))
       if (camino === '/auditoria/tramites/') return resp(200, paginar(p.get('accion') ? ACTUACIONES.filter((e) => e.accion === p.get('accion')) : ACTUACIONES, p))
     }
+    const deConsola = plataforma(camino, metodo, cuerpo, p)
+    if (deConsola) return deConsola
     return resp(404, { detalle: 'No encontrado.' })
   }
 }

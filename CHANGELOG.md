@@ -6,6 +6,13 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Añadido (consolas de plataforma, recuperación de contraseña y matriz, 22-oct)
+- **Las cinco consolas de los operadores de plataforma** (`backend/apps/plataforma/`, `frontend/src/Plataforma.jsx`; ya no son «próximamente»): **Identidades** (restablecer contraseña con código de un solo uso, restablecer el segundo factor, alta de coordinadoras con control dual), **Catálogo** (alta de instituciones con control dual), **Respuesta a incidentes** (bloquear y desbloquear cuentas con motivo, cerrar sesiones, eventos de seguridad), **Custodia de secretos** (registro de rotaciones y estado de los 8 secretos; nunca valores) e **Infraestructura** (salud de la base, TLS, certificado; solo lectura). Ninguna ve trámites ni datos personales. Reutilizan las acciones que el PDP ya tenía. Control dual probado en tres capas: la pantalla (quien propone no ve «Aprobar»), el motor de decisiones (`403`) y la base (`aprobacion_control_dual`). **Separación de funciones adicional**: quien emite el código de contraseña de una cuenta no puede restablecer además su segundo factor en 24 horas, ni al revés.
+- **Recuperación de contraseña asistida**: el operador de identidades emite un código `XXXX-XXXX-XXXX` (60 bits, sin caracteres ambiguos, SHA-256 en la base, vence a los 15 minutos, un solo uso); la persona lo usa en «¿Olvidaste tu contraseña?» (`POST /auth/restablecer/`). Cualquier fallo responde igual (no se enumera); una contraseña débil no gasta el código; al usarlo se cierran todas las sesiones y se levanta el bloqueo; el segundo factor sigue siendo obligatorio.
+- **Migración 010** (`restablecimiento`, `rotacion_secreto`; esta última de solo inserción) aplicada con respaldo previo; ni el auditor ni `pgadmin_lectura` leen los códigos. `nginx` deja pasar `/plataforma/`. Dos operadores más para poder demostrar el control dual (`irene.identidades`, `camilo.catalogo`).
+- **Diagrama de roles y módulos** en SVG (`docs/diagrama-roles-modulos.svg`, generado desde la matriz del backend).
+- Pruebas: 19 del backend para esto (436 en total), 28 del frontend (164 en total; la mutación que ignora «quien propone no aprueba» es detectada), `verificar_plataforma` **79 de 79** contra la base real y el ensayo ampliado **86 de 86** contra producción.
+
 ### Cambiado (solo en VM1, temporal)
 - **Inactividad en 2 minutos para la demostración** (`Environment=SIGET_INACTIVIDAD_MINUTOS=2` en la unidad instalada de VM1; el repositorio conserva 10). Revertir tras la presentación. El ensayo acepta el valor configurado.
 

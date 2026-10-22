@@ -161,7 +161,7 @@ function ModalCodigo({ alCancelar, alVerificar }) {
     <div className="fondo-modal">
       <form className="modal" onSubmit={enviar} role="dialog" aria-modal="true" aria-labelledby="titulo-reauth">
         <h2 id="titulo-reauth"><span className="icono-grande"><Icono nombre="llave" /></span>Confirma que eres tú</h2>
-        <p className="suave">Esta acción cambia un trámite. Escribe el código de 6 dígitos que muestra tu aplicación de autenticación.</p>
+        <p className="suave">Esta acción es sensible y exige una verificación reciente. Escribe el código de 6 dígitos que muestra tu aplicación de autenticación.</p>
         <Alerta>{error}</Alerta>
         <label className="campo">
           <span>Código de 6 dígitos</span>
