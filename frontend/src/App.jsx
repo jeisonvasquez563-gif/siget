@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { alPerderLaSesion, api, cerrarSesion, olvidarToken, renovar } from './api.js'
 import { EnrolarMfa, Login } from './Acceso.jsx'
 import { Auditoria } from './Auditoria.jsx'
+import { AvisoInactividad, useInactividad } from './inactividad.jsx'
 import { SegundoFactor } from './Mfa.jsx'
 import { RolesPermisos } from './Permisos.jsx'
 import { etiquetaDeRol } from './comun.jsx'
@@ -17,9 +18,13 @@ export default function App() {
   const [menuAbierto, setMenuAbierto] = useState(false)
   const { tema, alternarTema, avisar } = useUI()
 
+  const [motivo, setMotivo] = useState('')
+
   const cargarYo = useCallback(async () => {
     const datos = await api('/auth/yo/')
     setYo(datos)
+    // Siempre se aterriza en el Inicio: la vista vive solo en memoria, así que recargar la página (F5) saca a la persona de
+    // un trámite abierto o de un formulario a medias. Es deliberado: nada sensible queda "recordado" por la dirección.
     setVista({ modulo: 'inicio' })
     setFase(datos.scope === 'enrolar_mfa' ? 'enrolar' : 'app')
   }, [])
@@ -27,10 +32,11 @@ export default function App() {
   // Vuelve a pedir quién soy (p. ej. tras verificar el segundo factor) sin cambiar de pantalla
   const refrescarYo = useCallback(async () => { setYo(await api('/auth/yo/')) }, [])
 
-  const salirDelTodo = useCallback(() => { olvidarToken(); setYo(null); setFase('login') }, [])
+  const salirDelTodo = useCallback((porque = '') => { olvidarToken(); setYo(null); setMotivo(porque); setFase('login') }, [])
 
   useEffect(() => {
-    alPerderLaSesion(salirDelTodo)
+    // El servidor rechazó renovar la sesión (venció, se revocó o estuvo inactiva demasiado tiempo)
+    alPerderLaSesion(() => salirDelTodo('vencida'))
     renovar().then((d) => (d ? cargarYo() : setFase('login'))).catch(() => setFase('login'))
   }, [cargarYo, salirDelTodo])
 
@@ -40,11 +46,19 @@ export default function App() {
     avisar('Cerraste tu sesión.')
   }
 
+  // Inactividad: aviso a los 60 s del final y cierre completo (se revoca en el servidor, no solo se oculta la pantalla)
+  const { restante, seguir } = useInactividad({
+    minutos: yo?.inactividad_minutos ?? 10,
+    activo: fase === 'app' || fase === 'enrolar',
+    alExpirar: async () => { await cerrarSesion(); salirDelTodo('inactividad') },
+  })
+  const seguirConectado = () => { seguir(); api('/auth/yo/').catch(() => {}) }
+
   if (fase === 'cargando') {
     return <main className="acceso"><section className="acceso-formulario" role="status" aria-label="Verificando tu sesión"><Logo className="marca-logo" /></section></main>
   }
-  if (fase === 'login') return <Login alEntrar={cargarYo} />
-  if (fase === 'enrolar') return <EnrolarMfa usuario={yo.usuario} alTerminar={cargarYo} alSalir={salir} />
+  if (fase === 'login') return <Login alEntrar={cargarYo} motivo={motivo} />
+  if (fase === 'enrolar') return <><EnrolarMfa usuario={yo.usuario} alTerminar={cargarYo} alSalir={salir} />{restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}</>
 
   const ir = (modulo) => { setVista({ modulo }); setMenuAbierto(false); window.scrollTo({ top: 0 }) }
   const abrir = (id) => { setVista({ modulo: 'detalle', id, desde: vista.modulo }); window.scrollTo({ top: 0 }) }
@@ -113,6 +127,7 @@ export default function App() {
         </header>
         <main className="contenido" id="contenido">{contenido}</main>
       </div>
+      {restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}
     </div>
   )
 }

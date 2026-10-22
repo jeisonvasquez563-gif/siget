@@ -25,7 +25,12 @@ function Faro({ titulo, lema, ilustracion = true }) {
   )
 }
 
-export function Login({ alEntrar }) {
+const MOTIVOS = {
+  inactividad: 'Cerramos tu sesión por inactividad, para proteger tu cuenta. Ingresa de nuevo para continuar.',
+  vencida: 'Tu sesión venció o se cerró desde el servidor. Ingresa de nuevo para continuar.',
+}
+
+export function Login({ alEntrar, motivo = '' }) {
   const [modo, setModo] = useState('entrar')
   const [usuario, setUsuario] = useState('')
   const [clave, setClave] = useState('')
@@ -71,6 +76,7 @@ export function Login({ alEntrar }) {
           <h2>{registro ? 'Crea tu cuenta' : 'Ingresa a tu cuenta'}</h2>
           <p className="subtitulo">{registro ? 'Elige un usuario y una contraseña larga que solo tú conozcas.' : 'Usa tu usuario, tu contraseña y el código de tu aplicación de autenticación.'}</p>
           <form onSubmit={enviar} autoComplete="on">
+            <Alerta tipo="info">{MOTIVOS[motivo]}</Alerta>
             <Alerta>{error}</Alerta>
             <Alerta tipo="ok">{aviso}</Alerta>
             <label className="campo">

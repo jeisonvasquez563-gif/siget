@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from apps.identidad.models import Membresia, Usuario
 
-from . import bloqueo, contrasenas, mfa, tokens
+from . import bloqueo, contrasenas, mfa, politica_sesion, tokens
 from .models import EventoSeguridad, Sesion
 
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,31}$")
@@ -58,12 +58,12 @@ def _scope_para(usuario) -> str:
     return tokens.SCOPE_ENROLAR_MFA if pendiente else tokens.SCOPE_COMPLETO
 
 
-def _crear_sesion(usuario, scope, ip, ahora, evento) -> Resultado:
+def _crear_sesion(usuario, scope, ip, ahora, evento, vencimiento_anterior=None) -> Resultado:
     refresh = tokens.nuevo_refresh()
-    sesion = Sesion.objects.create(
-        usuario=usuario, refresh_hash=tokens.hash_refresh(refresh), ip=ip,
-        expira_en=ahora + timedelta(seconds=settings.SIGET_REFRESH_TTL_SEGUNDOS),
-    )
+    expira = ahora + timedelta(seconds=settings.SIGET_REFRESH_TTL_SEGUNDOS)
+    if vencimiento_anterior is not None:
+        expira = politica_sesion.vencimiento_heredado(vencimiento_anterior, ahora, settings.SIGET_REFRESH_TTL_SEGUNDOS)
+    sesion = Sesion.objects.create(usuario=usuario, refresh_hash=tokens.hash_refresh(refresh), ip=ip, expira_en=expira)
     access = tokens.emitir_access(settings.SIGET_JWT_KEY, usuario.pk, sesion.pk, scope, ahora,
                                   settings.SIGET_ACCESS_TTL_SEGUNDOS, settings.SIGET_EMISOR)
     registrar_evento(usuario.pk, evento, ip, {"scope": scope, "sesion": str(sesion.pk)})
@@ -157,7 +157,12 @@ def refrescar(refresh_token, ip, ahora=None) -> Resultado:
             return Resultado(False, "refresh_invalido")
         if sesion.revocada or sesion.expira_en <= ahora or usuario.estado_cuenta != "activa":
             return Resultado(False, "refresh_invalido")
-        nuevo = _crear_sesion(usuario, _scope_para(usuario), ip, ahora, "refresh_ok")
+        if politica_sesion.inactiva(sesion.creado_en, ahora, settings.SIGET_REFRESH_MAX_EDAD_SEGUNDOS):
+            # Nadie usó la sesión durante demasiado tiempo: se cierra y queda constancia (se devuelve, no se lanza, para que se guarde)
+            Sesion.objects.filter(pk=sesion.pk).update(revocada=True)
+            registrar_evento(usuario.pk, "sesion_cerrada_por_inactividad", ip, {"sesion": str(sesion.pk)})
+            return Resultado(False, "refresh_invalido")
+        nuevo = _crear_sesion(usuario, _scope_para(usuario), ip, ahora, "refresh_ok", vencimiento_anterior=sesion.expira_en)
         nueva_sesion = Sesion.objects.get(refresh_hash=tokens.hash_refresh(nuevo.refresh))
         Sesion.objects.filter(pk=sesion.pk).update(revocada=True, reemplazada_por=nueva_sesion)
         return nuevo
