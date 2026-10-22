@@ -40,6 +40,12 @@ SIGET_EMISOR = "siget"
 SIGET_ACCESS_TTL_SEGUNDOS = int(os.environ.get("SIGET_ACCESS_TTL_SEGUNDOS", "600"))  # 10 minutos
 SIGET_REFRESH_TTL_SEGUNDOS = int(os.environ.get("SIGET_REFRESH_TTL_SEGUNDOS", "28800"))  # 8 horas
 SIGET_COOKIE_REFRESH = "siget_refresh"
+# Inactividad: la interfaz cierra la sesión a los N minutos sin actividad (avisando antes) y el servidor rechaza renovar un
+# refresco más viejo que SIGET_REFRESH_MAX_EDAD (por defecto 15 min: el acceso dura 10 y se renueva solo si la persona actúa).
+SIGET_INACTIVIDAD_MINUTOS = int(os.environ.get("SIGET_INACTIVIDAD_MINUTOS", "10"))
+SIGET_REFRESH_MAX_EDAD_SEGUNDOS = int(os.environ.get("SIGET_REFRESH_MAX_EDAD_SEGUNDOS", "900"))
+if SIGET_REFRESH_MAX_EDAD_SEGUNDOS <= SIGET_ACCESS_TTL_SEGUNDOS:
+    raise ImproperlyConfigured("SIGET_REFRESH_MAX_EDAD_SEGUNDOS debe ser mayor que la vida del token de acceso, o nadie podría renovar.")
 
 INSTALLED_APPS = [
     "rest_framework",
@@ -95,6 +101,11 @@ DATABASES["auditoria"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
 
 # --- API: se deniega todo salvo lo que una política permita explícitamente ---
+# Los límites de tasa (throttling) se cuentan aquí. Con la memoria local cada proceso de gunicorn llevaba su propia cuenta
+# (límite real = N veces el nominal); una caché en archivos la comparten los procesos del contenedor (/tmp es tmpfs).
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+                      "LOCATION": os.environ.get("SIGET_CACHE_DIR", "/tmp/siget-cache")}}
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["apps.autenticacion.autenticacion.AutenticacionJWT"],
     "DEFAULT_PERMISSION_CLASSES": ["apps.autorizacion.permisos.DenegarPorDefecto"],

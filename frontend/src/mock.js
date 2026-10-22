@@ -153,7 +153,7 @@ export function instalarMock(inicial, opciones = {}) {
   const yo = () => {
     if (enrolando) return { id: 999, usuario: 'nuevo.usuario', scope: 'enrolar_mfa', rol_plataforma: 'ninguno', membresias: [], modulos: [], mfa_activo: false, mfa_obligatorio: true, mfa_verificado_en: null, nivel_aseguramiento: 1 }
     const u = USUARIOS[actual]
-    return { id: u.id, usuario: actual, scope: 'completo', rol_plataforma: u.plataforma, membresias: u.membresias, modulos: modulosDe(u), mfa_activo: true, mfa_ventana_minutos: 15, mfa_obligatorio: true,
+    return { id: u.id, usuario: actual, scope: 'completo', rol_plataforma: u.plataforma, membresias: u.membresias, modulos: modulosDe(u), mfa_activo: true, mfa_ventana_minutos: 15, inactividad_minutos: opciones.inactividad ?? 10, mfa_obligatorio: true,
       mfa_verificado_en: hace(mfaFresco ? 2 * 60000 : 9 * 60000), nivel_aseguramiento: u.plataforma === 'auditor' ? 3 : 2 }
   }
 

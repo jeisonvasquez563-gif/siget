@@ -176,6 +176,25 @@ class Command(BaseCommand):
             vencido = self._http("get", "/auth/yo/", token=acceso5).status_code
         self._paso("el token de acceso vence a los 10 minutos", vencido == 401, vencido)
 
+        # ---------------------------------------------------------------- inactividad y duración máxima de la sesión
+        inicio = ahora + timedelta(seconds=400)
+        with mock.patch("django.utils.timezone.now", return_value=inicio):
+            r = self._http("post", "/auth/login/", {"username": "int_ana", "password": CLAVE_BUENA, "codigo": totp.at(inicio.timestamp())})
+        original = Sesion.objects.get(usuario=ana, revocada=False, reemplazada_por__isnull=True, creado_en=inicio)
+        with mock.patch("django.utils.timezone.now", return_value=inicio + timedelta(seconds=600)):
+            r = self._http("post", "/auth/refresh/", HTTP_X_SIGET_CSRF="1")
+        self._paso("quien sigue activo renueva sin problema (10 min después)", r.status_code == 200, r.status_code)
+        renovada = Sesion.objects.get(usuario=ana, creado_en=inicio + timedelta(seconds=600))
+        self._paso("la renovación hereda el vencimiento: la sesión no se puede prolongar renovándola", renovada.expira_en == original.expira_en,
+                   f"{original.expira_en} / {renovada.expira_en}")
+        with mock.patch("django.utils.timezone.now", return_value=inicio + timedelta(seconds=600 + 901)):
+            r = self._http("post", "/auth/refresh/", HTTP_X_SIGET_CSRF="1")
+        self._paso("tras más de 15 minutos sin actividad, el refresco se rechaza (sesión cerrada por inactividad)", r.status_code == 401, r.status_code)
+        renovada.refresh_from_db()
+        self._paso("esa sesión queda revocada en la base", renovada.revocada is True)
+        eventos = set(EventoSeguridad.objects.filter(actor=ana).values_list("evento", flat=True))
+        self._paso("el cierre por inactividad queda registrado como evento de seguridad", "sesion_cerrada_por_inactividad" in eventos)
+
         # ---------------------------------------------------------------- bloqueo por intentos
         self._http("post", "/auth/registro/", {"username": "int_beto", "password": CLAVE_BUENA})
         for _ in range(3):

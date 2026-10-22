@@ -139,7 +139,7 @@ class Yo(_Autenticada):
             "membresias": [{"institucion_id": r["institucion_id"], "institucion": r["institucion__nombre"], "rol": r["rol"]} for r in roles],
             # Solo ayuda para el menú: cada petición se vuelve a autorizar. Sin segundo factor activo no hay módulos.
             "modulos": modulos_para(u.rol_plataforma, [r["rol"] for r in roles]) if completo else [],
-            "mfa_activo": u.mfa_activo, "mfa_ventana_minutos": settings.SIGET_MFA_RECIENTE_MINUTOS, "mfa_obligatorio": servicio.mfa_obligatorio(u, [r["rol"] for r in roles]),
+            "mfa_activo": u.mfa_activo, "mfa_ventana_minutos": settings.SIGET_MFA_RECIENTE_MINUTOS, "inactividad_minutos": settings.SIGET_INACTIVIDAD_MINUTOS, "mfa_obligatorio": servicio.mfa_obligatorio(u, [r["rol"] for r in roles]),
             "mfa_verificado_en": u.mfa_verificado_en, "nivel_aseguramiento": u.nivel_aseguramiento,
         })
 

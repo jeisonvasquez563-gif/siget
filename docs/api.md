@@ -45,11 +45,11 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
   "id": 12, "usuario": "fabio.mop", "scope": "completo", "rol_plataforma": "ninguno",
   "membresias": [{ "institucion_id": 3, "institucion": "MOP", "rol": "funcionario" }],
   "modulos": [{ "id": "bandeja", "nombre": "Bandeja de la institución", "descripcion": "…", "estado": "disponible" }],
-  "mfa_activo": true, "mfa_ventana_minutos": 15, "mfa_obligatorio": true, "mfa_verificado_en": "2026-10-21T18:00:00Z", "nivel_aseguramiento": 2
+  "mfa_activo": true, "mfa_ventana_minutos": 15, "inactividad_minutos": 10, "mfa_obligatorio": true, "mfa_verificado_en": "2026-10-21T18:00:00Z", "nivel_aseguramiento": 2
 }
 ```
 
-`mfa_ventana_minutos` es la duración de un segundo factor «reciente» (la configuración real del servidor): la interfaz **nunca** lo escribe a mano. `modulos` es **solo ayuda para armar el menú** (`estado`: `disponible` o `proximamente`). La interfaz nunca decide qué se puede hacer: el servidor vuelve a autorizar cada petición.
+`inactividad_minutos` es el tiempo sin actividad tras el cual la interfaz cierra la sesión (avisa 60 s antes); el servidor además rechaza renovar un refresco con más de 15 min (`SIGET_REFRESH_MAX_EDAD_SEGUNDOS`) y ninguna sesión supera las 8 h aunque se renueve (cada renovación hereda el vencimiento). `mfa_ventana_minutos` es la duración de un segundo factor «reciente» (la configuración real del servidor): la interfaz **nunca** lo escribe a mano. `modulos` es **solo ayuda para armar el menú** (`estado`: `disponible` o `proximamente`). La interfaz nunca decide qué se puede hacer: el servidor vuelve a autorizar cada petición.
 
 ## Trámites (`/tramites/`) — scope `completo`
 
