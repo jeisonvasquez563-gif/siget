@@ -1,0 +1,1466 @@
+{
+ "meta": {
+  "variables": {
+   "ver_tramite": [
+    "institucion",
+    "solicitante",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "crear_tramite": [
+    "institucion",
+    "solicitante",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "cambiar_estado": [
+    "institucion",
+    "solicitante",
+    "estado",
+    "estado_destino",
+    "asignado",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "reasignar_tramite": [
+    "institucion",
+    "solicitante",
+    "asignado",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "escalar_tramite": [
+    "institucion",
+    "solicitante",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "adjuntar_documento": [
+    "institucion",
+    "solicitante",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "ver_documento": [
+    "institucion",
+    "solicitante",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "gestionar_usuarios_institucion": [
+    "institucion",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "gestionar_catalogo_institucion": [
+    "institucion",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "proponer_alta": [
+    "tipo_alta",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "aprobar_alta": [
+    "tipo_alta",
+    "alta_propuesta_por",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "administrar_infraestructura": [
+    "segundo_factor",
+    "cuenta"
+   ],
+   "restablecer_mfa": [
+    "segundo_factor",
+    "cuenta"
+   ],
+   "bloquear_cuenta": [
+    "segundo_factor",
+    "cuenta"
+   ],
+   "revocar_sesion": [
+    "segundo_factor",
+    "cuenta"
+   ],
+   "rotar_secretos": [
+    "segundo_factor",
+    "cuenta"
+   ],
+   "consultar_auditoria": [
+    "segundo_factor",
+    "cuenta",
+    "nivel"
+   ],
+   "consultar_decisiones": [
+    "segundo_factor",
+    "cuenta",
+    "nivel"
+   ]
+  },
+  "etiquetas": {
+   "segundo_factor": "Segundo factor",
+   "cuenta": "Estado de la cuenta",
+   "institucion": "Institución del recurso",
+   "solicitante": "Quién pidió el trámite",
+   "estado": "Estado actual del trámite",
+   "estado_destino": "Estado al que se quiere pasar",
+   "asignado": "Quién lo atiende",
+   "tipo_alta": "Tipo de alta",
+   "alta_propuesta_por": "Quién propuso el alta",
+   "nivel": "Nivel de aseguramiento"
+  },
+  "valores": {
+   "segundo_factor": [
+    {
+     "valor": "reciente",
+     "etiqueta": "Verificado hace 1 minuto"
+    },
+    {
+     "valor": "vencido",
+     "etiqueta": "Verificado hace 60 minutos (vencido)"
+    },
+    {
+     "valor": "ninguno",
+     "etiqueta": "Nunca verificado"
+    }
+   ],
+   "cuenta": [
+    {
+     "valor": "activa",
+     "etiqueta": "Activa"
+    },
+    {
+     "valor": "bloqueada",
+     "etiqueta": "Bloqueada"
+    },
+    {
+     "valor": "suspendida",
+     "etiqueta": "Suspendida"
+    }
+   ],
+   "institucion": [
+    {
+     "valor": "propia",
+     "etiqueta": "Su propia institución"
+    },
+    {
+     "valor": "ajena",
+     "etiqueta": "Otra institución"
+    }
+   ],
+   "solicitante": [
+    {
+     "valor": "otra_persona",
+     "etiqueta": "Otra persona"
+    },
+    {
+     "valor": "yo",
+     "etiqueta": "La misma persona que actúa"
+    }
+   ],
+   "estado": [
+    {
+     "valor": "Pendiente",
+     "etiqueta": "Pendiente"
+    },
+    {
+     "valor": "En Tramitacion",
+     "etiqueta": "En tramitación"
+    },
+    {
+     "valor": "En Subsanacion",
+     "etiqueta": "En subsanación"
+    },
+    {
+     "valor": "Aprobado",
+     "etiqueta": "Aprobado"
+    },
+    {
+     "valor": "Rechazado",
+     "etiqueta": "Rechazado"
+    }
+   ],
+   "estado_destino": [
+    {
+     "valor": "Pendiente",
+     "etiqueta": "Pendiente"
+    },
+    {
+     "valor": "En Tramitacion",
+     "etiqueta": "En tramitación"
+    },
+    {
+     "valor": "En Subsanacion",
+     "etiqueta": "En subsanación"
+    },
+    {
+     "valor": "Aprobado",
+     "etiqueta": "Aprobado"
+    },
+    {
+     "valor": "Rechazado",
+     "etiqueta": "Rechazado"
+    }
+   ],
+   "asignado": [
+    {
+     "valor": "nadie",
+     "etiqueta": "Nadie (en cola)"
+    },
+    {
+     "valor": "yo",
+     "etiqueta": "La misma persona que actúa"
+    },
+    {
+     "valor": "otra_persona",
+     "etiqueta": "Otra persona"
+    }
+   ],
+   "tipo_alta": [
+    {
+     "valor": "alta_coordinador",
+     "etiqueta": "Alta de un coordinador"
+    },
+    {
+     "valor": "alta_institucion",
+     "etiqueta": "Alta de una institución"
+    }
+   ],
+   "alta_propuesta_por": [
+    {
+     "valor": "otra_persona",
+     "etiqueta": "Otra persona"
+    },
+    {
+     "valor": "yo",
+     "etiqueta": "La misma persona que actúa"
+    }
+   ],
+   "nivel": [
+    {
+     "valor": 1,
+     "etiqueta": "Nivel 1"
+    },
+    {
+     "valor": 2,
+     "etiqueta": "Nivel 2"
+    },
+    {
+     "valor": 3,
+     "etiqueta": "Nivel 3"
+    }
+   ]
+  },
+  "defectos": {
+   "segundo_factor": "reciente",
+   "cuenta": "activa",
+   "institucion": "propia",
+   "solicitante": "otra_persona",
+   "estado": "En Tramitacion",
+   "estado_destino": "Aprobado",
+   "asignado": "nadie",
+   "tipo_alta": "alta_institucion",
+   "alta_propuesta_por": "otra_persona",
+   "nivel": 2
+  }
+ },
+ "casos": [
+  {
+   "entrada": {
+    "rol": "funcionario",
+    "accion": "cambiar_estado",
+    "institucion": "propia",
+    "solicitante": "otra_persona",
+    "estado": "En Tramitacion",
+    "estado_destino": "Aprobado",
+    "asignado": "nadie",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "funcionario",
+     "accion": "cambiar_estado",
+     "institucion": "propia",
+     "solicitante": "otra_persona",
+     "estado": "En Tramitacion",
+     "estado_destino": "Aprobado",
+     "asignado": "nadie",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": true,
+     "politica": "funcionario_cambia_estado",
+     "motivo": ""
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la ciudadanía",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del personal de trámites (funcionario y supervisor)",
+      "resultado": "permite",
+      "politica": "funcionario_cambia_estado",
+      "motivo": ""
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "institucion",
+      "valor": "ajena",
+      "etiqueta_variable": "Institución del recurso",
+      "etiqueta_valor": "Otra institución",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "solicitante",
+      "valor": "yo",
+      "etiqueta_variable": "Quién pidió el trámite",
+      "etiqueta_valor": "La misma persona que actúa",
+      "permitido": false,
+      "politica": "conflicto_de_interes"
+     },
+     {
+      "variable": "estado",
+      "valor": "Pendiente",
+      "etiqueta_variable": "Estado actual del trámite",
+      "etiqueta_valor": "Pendiente",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "estado",
+      "valor": "En Subsanacion",
+      "etiqueta_variable": "Estado actual del trámite",
+      "etiqueta_valor": "En subsanación",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "estado",
+      "valor": "Aprobado",
+      "etiqueta_variable": "Estado actual del trámite",
+      "etiqueta_valor": "Aprobado",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "estado",
+      "valor": "Rechazado",
+      "etiqueta_variable": "Estado actual del trámite",
+      "etiqueta_valor": "Rechazado",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "estado_destino",
+      "valor": "Pendiente",
+      "etiqueta_variable": "Estado al que se quiere pasar",
+      "etiqueta_valor": "Pendiente",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "estado_destino",
+      "valor": "En Tramitacion",
+      "etiqueta_variable": "Estado al que se quiere pasar",
+      "etiqueta_valor": "En tramitación",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "asignado",
+      "valor": "otra_persona",
+      "etiqueta_variable": "Quién lo atiende",
+      "etiqueta_valor": "Otra persona",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "segundo_factor",
+      "valor": "vencido",
+      "etiqueta_variable": "Segundo factor",
+      "etiqueta_valor": "Verificado hace 60 minutos (vencido)",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "segundo_factor",
+      "valor": "ninguno",
+      "etiqueta_variable": "Segundo factor",
+      "etiqueta_valor": "Nunca verificado",
+      "permitido": false,
+      "politica": "sin_regla_que_permita"
+     },
+     {
+      "variable": "cuenta",
+      "valor": "bloqueada",
+      "etiqueta_variable": "Estado de la cuenta",
+      "etiqueta_valor": "Bloqueada",
+      "permitido": false,
+      "politica": "cuenta_no_activa"
+     },
+     {
+      "variable": "cuenta",
+      "valor": "suspendida",
+      "etiqueta_variable": "Estado de la cuenta",
+      "etiqueta_valor": "Suspendida",
+      "permitido": false,
+      "politica": "cuenta_no_activa"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "funcionario",
+    "accion": "cambiar_estado",
+    "institucion": "ajena",
+    "solicitante": "otra_persona",
+    "estado": "En Tramitacion",
+    "estado_destino": "Aprobado",
+    "asignado": "nadie",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "funcionario",
+     "accion": "cambiar_estado",
+     "institucion": "ajena",
+     "solicitante": "otra_persona",
+     "estado": "En Tramitacion",
+     "estado_destino": "Aprobado",
+     "asignado": "nadie",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "sin_regla_que_permita",
+     "motivo": "ninguna política permite la acción"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la ciudadanía",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del personal de trámites (funcionario y supervisor)",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de los operadores de plataforma",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del auditor",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "final",
+      "regla": "Ninguna política permite la acción",
+      "resultado": "niega",
+      "politica": "sin_regla_que_permita",
+      "motivo": "denegar por defecto"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "institucion",
+      "valor": "propia",
+      "etiqueta_variable": "Institución del recurso",
+      "etiqueta_valor": "Su propia institución",
+      "permitido": true,
+      "politica": "funcionario_cambia_estado"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "funcionario",
+    "accion": "cambiar_estado",
+    "institucion": "propia",
+    "solicitante": "yo",
+    "estado": "En Tramitacion",
+    "estado_destino": "Aprobado",
+    "asignado": "nadie",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "funcionario",
+     "accion": "cambiar_estado",
+     "institucion": "propia",
+     "solicitante": "yo",
+     "estado": "En Tramitacion",
+     "estado_destino": "Aprobado",
+     "asignado": "nadie",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "conflicto_de_interes",
+     "motivo": "no se gestiona un trámite propio como funcionario"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "niega",
+      "politica": "conflicto_de_interes",
+      "motivo": "no se gestiona un trámite propio como funcionario"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "solicitante",
+      "valor": "otra_persona",
+      "etiqueta_variable": "Quién pidió el trámite",
+      "etiqueta_valor": "Otra persona",
+      "permitido": true,
+      "politica": "funcionario_cambia_estado"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "funcionario",
+    "accion": "cambiar_estado",
+    "institucion": "propia",
+    "solicitante": "otra_persona",
+    "estado": "En Tramitacion",
+    "estado_destino": "Aprobado",
+    "asignado": "nadie",
+    "segundo_factor": "vencido",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "funcionario",
+     "accion": "cambiar_estado",
+     "institucion": "propia",
+     "solicitante": "otra_persona",
+     "estado": "En Tramitacion",
+     "estado_destino": "Aprobado",
+     "asignado": "nadie",
+     "segundo_factor": "vencido",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "sin_regla_que_permita",
+     "motivo": "ninguna política permite la acción"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la ciudadanía",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del personal de trámites (funcionario y supervisor)",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de los operadores de plataforma",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del auditor",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "final",
+      "regla": "Ninguna política permite la acción",
+      "resultado": "niega",
+      "politica": "sin_regla_que_permita",
+      "motivo": "denegar por defecto"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "segundo_factor",
+      "valor": "reciente",
+      "etiqueta_variable": "Segundo factor",
+      "etiqueta_valor": "Verificado hace 1 minuto",
+      "permitido": true,
+      "politica": "funcionario_cambia_estado"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "funcionario",
+    "accion": "cambiar_estado",
+    "institucion": "propia",
+    "solicitante": "otra_persona",
+    "estado": "En Tramitacion",
+    "estado_destino": "Aprobado",
+    "asignado": "otra_persona",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "funcionario",
+     "accion": "cambiar_estado",
+     "institucion": "propia",
+     "solicitante": "otra_persona",
+     "estado": "En Tramitacion",
+     "estado_destino": "Aprobado",
+     "asignado": "otra_persona",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "sin_regla_que_permita",
+     "motivo": "ninguna política permite la acción"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la ciudadanía",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del personal de trámites (funcionario y supervisor)",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de los operadores de plataforma",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del auditor",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "final",
+      "regla": "Ninguna política permite la acción",
+      "resultado": "niega",
+      "politica": "sin_regla_que_permita",
+      "motivo": "denegar por defecto"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "asignado",
+      "valor": "nadie",
+      "etiqueta_variable": "Quién lo atiende",
+      "etiqueta_valor": "Nadie (en cola)",
+      "permitido": true,
+      "politica": "funcionario_cambia_estado"
+     },
+     {
+      "variable": "asignado",
+      "valor": "yo",
+      "etiqueta_variable": "Quién lo atiende",
+      "etiqueta_valor": "La misma persona que actúa",
+      "permitido": true,
+      "politica": "funcionario_cambia_estado"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "supervisor",
+    "accion": "cambiar_estado",
+    "institucion": "propia",
+    "solicitante": "otra_persona",
+    "estado": "Pendiente",
+    "estado_destino": "Aprobado",
+    "asignado": "nadie",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "supervisor",
+     "accion": "cambiar_estado",
+     "institucion": "propia",
+     "solicitante": "otra_persona",
+     "estado": "Pendiente",
+     "estado_destino": "Aprobado",
+     "asignado": "nadie",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "sin_regla_que_permita",
+     "motivo": "ninguna política permite la acción"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la ciudadanía",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del personal de trámites (funcionario y supervisor)",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de los operadores de plataforma",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del auditor",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "final",
+      "regla": "Ninguna política permite la acción",
+      "resultado": "niega",
+      "politica": "sin_regla_que_permita",
+      "motivo": "denegar por defecto"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "estado",
+      "valor": "En Tramitacion",
+      "etiqueta_variable": "Estado actual del trámite",
+      "etiqueta_valor": "En tramitación",
+      "permitido": true,
+      "politica": "supervisor_cambia_estado"
+     },
+     {
+      "variable": "estado_destino",
+      "valor": "En Tramitacion",
+      "etiqueta_variable": "Estado al que se quiere pasar",
+      "etiqueta_valor": "En tramitación",
+      "permitido": true,
+      "politica": "supervisor_cambia_estado"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "operador_infraestructura",
+    "accion": "ver_tramite",
+    "institucion": "propia",
+    "solicitante": "otra_persona",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "operador_infraestructura",
+     "accion": "ver_tramite",
+     "institucion": "propia",
+     "solicitante": "otra_persona",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "plataforma_sin_acceso_a_tramites",
+     "motivo": "los roles de plataforma no acceden a trámites ni a documentos"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "niega",
+      "politica": "plataforma_sin_acceso_a_tramites",
+      "motivo": "los roles de plataforma no acceden a trámites ni a documentos"
+     }
+    ],
+    "alternativas": [],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "ciudadano",
+    "accion": "crear_tramite",
+    "institucion": "propia",
+    "solicitante": "yo",
+    "segundo_factor": "reciente",
+    "cuenta": "bloqueada"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "ciudadano",
+     "accion": "crear_tramite",
+     "institucion": "propia",
+     "solicitante": "yo",
+     "segundo_factor": "reciente",
+     "cuenta": "bloqueada"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "cuenta_no_activa",
+     "motivo": "estado de la cuenta: bloqueada"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "niega",
+      "politica": "cuenta_no_activa",
+      "motivo": "estado de la cuenta: bloqueada"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "cuenta",
+      "valor": "activa",
+      "etiqueta_variable": "Estado de la cuenta",
+      "etiqueta_valor": "Activa",
+      "permitido": true,
+      "politica": "ciudadano_crea_su_tramite"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "operador_identidades",
+    "accion": "aprobar_alta",
+    "tipo_alta": "alta_coordinador",
+    "alta_propuesta_por": "yo",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "operador_identidades",
+     "accion": "aprobar_alta",
+     "tipo_alta": "alta_coordinador",
+     "alta_propuesta_por": "yo",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "control_dual",
+     "motivo": "quien propone un alta no puede aprobarla"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "niega",
+      "politica": "control_dual",
+      "motivo": "quien propone un alta no puede aprobarla"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "alta_propuesta_por",
+      "valor": "otra_persona",
+      "etiqueta_variable": "Quién propuso el alta",
+      "etiqueta_valor": "Otra persona",
+      "permitido": true,
+      "politica": "operador_identidades_aprobar_alta"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "coordinador_institucional",
+    "accion": "ver_tramite",
+    "institucion": "propia",
+    "solicitante": "otra_persona",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "coordinador_institucional",
+     "accion": "ver_tramite",
+     "institucion": "propia",
+     "solicitante": "otra_persona",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "sin_regla_que_permita",
+     "motivo": "ninguna política permite la acción"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la ciudadanía",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del personal de trámites (funcionario y supervisor)",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de los operadores de plataforma",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del auditor",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "final",
+      "regla": "Ninguna política permite la acción",
+      "resultado": "niega",
+      "politica": "sin_regla_que_permita",
+      "motivo": "denegar por defecto"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "solicitante",
+      "valor": "yo",
+      "etiqueta_variable": "Quién pidió el trámite",
+      "etiqueta_valor": "La misma persona que actúa",
+      "permitido": true,
+      "politica": "ciudadano_sobre_lo_propio"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "auditor",
+    "accion": "consultar_auditoria",
+    "segundo_factor": "reciente",
+    "cuenta": "activa",
+    "nivel": 2
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "auditor",
+     "accion": "consultar_auditoria",
+     "segundo_factor": "reciente",
+     "cuenta": "activa",
+     "nivel": 2
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "sin_regla_que_permita",
+     "motivo": "ninguna política permite la acción"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la ciudadanía",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del personal de trámites (funcionario y supervisor)",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de los operadores de plataforma",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del auditor",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "final",
+      "regla": "Ninguna política permite la acción",
+      "resultado": "niega",
+      "politica": "sin_regla_que_permita",
+      "motivo": "denegar por defecto"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "nivel",
+      "valor": 3,
+      "etiqueta_variable": "Nivel de aseguramiento",
+      "etiqueta_valor": "Nivel 3",
+      "permitido": true,
+      "politica": "auditor_consulta"
+     }
+    ],
+    "hipotetico": true
+   }
+  },
+  {
+   "entrada": {
+    "rol": "ciudadano",
+    "accion": "ver_tramite",
+    "institucion": "propia",
+    "solicitante": "otra_persona",
+    "segundo_factor": "reciente",
+    "cuenta": "activa"
+   },
+   "respuesta": {
+    "entrada": {
+     "rol": "ciudadano",
+     "accion": "ver_tramite",
+     "institucion": "propia",
+     "solicitante": "otra_persona",
+     "segundo_factor": "reciente",
+     "cuenta": "activa"
+    },
+    "decision": {
+     "permitido": false,
+     "politica": "sin_regla_que_permita",
+     "motivo": "ninguna política permite la acción"
+    },
+    "traza": [
+     {
+      "fase": "denegacion",
+      "regla": "La cuenta debe estar activa",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Los roles de plataforma no ven trámites ni documentos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Nadie gestiona un trámite que él mismo pidió",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la ciudadanía",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del personal de trámites (funcionario y supervisor)",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de los operadores de plataforma",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas del auditor",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "final",
+      "regla": "Ninguna política permite la acción",
+      "resultado": "niega",
+      "politica": "sin_regla_que_permita",
+      "motivo": "denegar por defecto"
+     }
+    ],
+    "alternativas": [
+     {
+      "variable": "solicitante",
+      "valor": "yo",
+      "etiqueta_variable": "Quién pidió el trámite",
+      "etiqueta_valor": "La misma persona que actúa",
+      "permitido": true,
+      "politica": "ciudadano_sobre_lo_propio"
+     }
+    ],
+    "hipotetico": true
+   }
+  }
+ ]
+}

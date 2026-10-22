@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
+from django.db import connections, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -39,6 +39,20 @@ class Command(BaseCommand):
         cache.clear()
         transaction.set_rollback(False)
         return r
+
+    def _post(self, ruta, cuerpo, token=None, formato="json"):
+        cabeceras = dict(HOST)
+        if token:
+            cabeceras["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+        r = self.cliente.post(ruta, cuerpo, format=formato, secure=True, **cabeceras)
+        cache.clear()
+        transaction.set_rollback(False)
+        return r
+
+    def _decisiones_registradas(self):
+        with connections["auditoria"].cursor() as c:
+            c.execute("select count(*) from siget.decision_pdp")
+            return c.fetchone()[0]
 
     def _persona(self, nombre, rol_plataforma="ninguno"):
         return Usuario.objects.create(username=f"int_p_{nombre}", password_hash="x", rol_plataforma=rol_plataforma, mfa_activo=True,
@@ -121,3 +135,30 @@ class Command(BaseCommand):
         eventos = r.json()["eventos"] if r.status_code == 200 else []
         self._paso("cada persona ve su propia actividad de seguridad", r.status_code == 200 and [e["evento"] for e in eventos] == ["mfa_verificado", "login_ok"], [e["evento"] for e in eventos])
         self._paso("y solo la suya: nunca la de otra persona", all("198.51.100.10" != e["ip"] for e in eventos))
+
+        # ---------------------------------------------------------------- simulador de «qué pasaría si…»
+        self._paso("el simulador sin token responde 401", self._post("/politicas/simular/", {"rol": "funcionario", "accion": "ver_tramite"}).status_code == 401)
+        antes = self._decisiones_registradas()
+        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado"}, t[ana.username])
+        c = r.json() if r.status_code == 200 else {}
+        self._paso("una ciudadana simula qué pasaría si un funcionario cambia un estado: se permite", r.status_code == 200 and c.get("decision", {}).get("permitido") is True and c["decision"]["politica"] == "funcionario_cambia_estado", r.status_code)
+        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado", "solicitante": "yo"}, t[ana.username])
+        c = r.json() if r.status_code == 200 else {}
+        self._paso("y si el trámite lo pidió él mismo, se niega por conflicto de interés, con la traza que lo explica",
+                   c.get("decision", {}).get("politica") == "conflicto_de_interes" and c["traza"][-1]["resultado"] == "niega" and c.get("hipotetico") is True)
+        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado", "segundo_factor": "vencido"}, t[ana.username])
+        c = r.json() if r.status_code == 200 else {}
+        self._paso("con el segundo factor vencido se niega y la alternativa dice que con uno reciente se permitiría",
+                   c.get("decision", {}).get("permitido") is False and any(a["variable"] == "segundo_factor" and a["valor"] == "reciente" and a["permitido"] for a in c.get("alternativas", [])))
+        for cuerpo in ({"rol": ["x"], "accion": "ver_tramite"}, {"rol": "funcionario", "accion": "borrar_todo"}, {"rol": "funcionario", "accion": "ver_tramite", "cuenta": "root"}, [1, 2], "texto"):
+            r = self._post("/politicas/simular/", cuerpo, t[ana.username])
+            if r.status_code != 400:
+                self._paso(f"una entrada inválida ({cuerpo!r}) se rechaza con 400 y no con un error del servidor", False, r.status_code)
+                break
+        else:
+            self._paso("las entradas inválidas (rol o acción desconocidos, valores fuera de la lista, formatos raros) se rechazan con 400", True)
+        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "ver_tramite"}, t[ana.username], formato="multipart")
+        self._paso("un cuerpo que no es JSON se rechaza (415)", r.status_code == 415, r.status_code)
+        r = self._http("/politicas/simular/", t[ana.username])
+        self._paso("el formulario del simulador (GET) lista las variables de las 18 acciones", r.status_code == 200 and len(r.json()["variables"]) == 18)
+        self._paso("el simulador no registró ninguna decisión: es hipotético y no ensucia la auditoría", self._decisiones_registradas() == antes, f"{antes} -> {self._decisiones_registradas()}")

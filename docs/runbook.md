@@ -1449,7 +1449,7 @@ Fecha: 21 de octubre de 2026.
 
 ### 30.1 Pruebas automáticas del frontend
 
-- **Vitest + Testing Library + jest-axe + ESLint** (`npm run verificar` = lint + pruebas + build). **113 pruebas** en 6 archivos (`frontend/src/pruebas/`):
+- **Vitest + Testing Library + jest-axe + ESLint** (`npm run verificar` = lint + pruebas + build). **113 pruebas** en 6 archivos (128 con el simulador, ver sección 31) (`frontend/src/pruebas/`):
   - `api`: el token vive solo en memoria; el refresco lleva la cabecera anti-CSRF y es único aunque fallen varias peticiones a la vez; un 401 se renueva y se repite; `pideReautenticar` solo acepta un booleano verdadero.
   - `comun`: plazos, estados (las transiciones de ayuda coinciden con el contrato) y agrupación del menú.
   - `ui`: las esclusas describen cada estado a los lectores de pantalla; avisos, confirmaciones, tema.
@@ -1484,4 +1484,40 @@ Fecha: 21 de octubre de 2026.
 
 - Playwright (recorrido real contra las VMs) y revisión de contraste AA con herramienta.
 - Simulador de decisiones («¿qué pasaría si…?») sobre la matriz y exportación de la matriz a PDF/CSV para el informe.
+
+## 31. Simulador de «qué pasaría si…»
+
+Fecha: 21 de octubre de 2026. Pestaña «¿Qué pasaría si…?» dentro de «Roles y permisos».
+
+### 31.1 Qué es
+
+Se arma una situación (rol, acción y solo las circunstancias que importan para esa acción) y **el PDP real** responde qué pasaría, por qué y qué lo cambiaría. No es una copia de las reglas: la decisión sale de `decidir()`, el mismo motor que usa la plataforma.
+
+- **Veredicto** con la política que decidió y su explicación.
+- **Cómo se evaluó:** la traza regla por regla (primero las que anulan, luego las que permiten; se detiene en la primera que decide).
+- **Qué lo cambiaría:** los cambios de una sola variable que invertirían el resultado («se permitiría si tuviera un segundo factor reciente», «se negaría si la cuenta estuviera bloqueada»), con un botón «Probarlo».
+- **12 escenarios** que enseñan cada protección: aprobar con normalidad, otra institución, conflicto de interés, segundo factor vencido, trámite asignado a un compañero, saltarse un paso, un rol de plataforma que quiere ver un trámite, cuenta bloqueada, control dual, coordinación que quiere ver un trámite, auditor sin nivel 3 y una ciudadana que mira lo ajeno.
+
+### 31.2 Seguridad
+
+- Endpoint `POST /politicas/simular/` (`apps/autorizacion/simulador.py`): **puro** (no consulta la base) y **no registra decisiones**: es hipotético y no debe ensuciar la auditoría inalterable (comprobado contra la base real: `decision_pdp` 74 → 74).
+- Entrada **estrictamente validada** con listas cerradas; un rol que llega como lista o un booleano como nivel se rechazan con 400, no con un error del servidor.
+- Solo autenticación (scope completo) y límite de tasa: es información de las reglas, no datos de nadie.
+
+### 31.3 Verificación
+
+- **53 pruebas** del simulador (348 en el backend), incluida una **propiedad**: en un barrido de más de 3 000 combinaciones de rol, acción y circunstancias, **la traza siempre termina con la misma decisión y la misma política que `decidir()`**; si alguien tocara el motor y la traza se desfasara, la prueba falla. También: validación, cada protección, alternativas y que un fallo del PDP se traduce en denegación.
+- `verificar_politicas` contra la base real: **38 de 38** (incluye 401 sin token, 400/415 ante entradas inválidas y que no registra decisiones).
+- **15 pruebas** de la pantalla (128 en el frontend), apoyadas en **respuestas reales capturadas** de producción (`src/mock-datos/simulador.json`), con accesibilidad (axe).
+
+### 31.4 Hallazgos corregidos
+
+1. Un `rol` enviado como lista hacía fallar la validación con `TypeError` (un 500 en la API): ahora se comprueba el tipo antes de buscar en el conjunto.
+2. Al cambiar de rol, el simulador arrastraba circunstancias que nadie había elegido (por ejemplo, «otra persona» como solicitante para la ciudadanía): ahora solo se conserva lo que la persona **tocó**.
+3. Una expectativa equivocada de prueba aclaró una regla: ver el propio trámite SÍ se permite (como ciudadano); el conflicto de interés aplica al **gestionarlo**.
+
+### 31.5 Pendiente
+
+- Exportar la traza de un escenario (para el informe) y guardar escenarios propios.
+- Comparar dos roles lado a lado sobre la misma situación.
 
