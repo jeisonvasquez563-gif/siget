@@ -12,6 +12,7 @@ import './estilos/permisos.css'
 import './estilos/simulador.css'
 import './estilos/plataforma.css'
 import './estilos/seguimiento.css'
+import './estilos/mapa.css'
 import App from './App.jsx'
 import { ProveedorUI } from './ui.jsx'
 

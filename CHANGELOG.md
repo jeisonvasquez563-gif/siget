@@ -6,6 +6,9 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Cambiado (portada con el mapa de Panamá, 22-oct)
+- **La portada muestra el mapa de Panamá con el recorrido de un trámite** (`frontend/src/Mapa.jsx`): silueta real (Natural Earth 50m, dominio público, 5 polígonos y 237 puntos), el Canal, y una ruta naranja de la recepción (David) a la tramitación (Penonomé, con la boya) hasta la resolución (Ciudad de Panamá); se dibuja al cargar y respeta «reducir movimiento». Solo con los colores de la plataforma (azul petróleo y naranja boya). Se genera con `docs/identidad/generar_mapa.py` desde la geometría guardada en `docs/identidad/panama-natural-earth-50m.json`. Se retiró la bandera.
+
 ### Cambiado (seguimiento del trámite, 22-oct)
 - **El recorrido del trámite deja las «esclusas» y pasa a un seguimiento que se entiende** (`frontend/src/Seguimiento.jsx`): tres pasos en línea (Recepción, Tramitación, Resolución) con círculos que se llenan al avanzar, un anillo que late en el paso actual, el tramo que sigue con rayas que fluyen, y **una frase en lenguaje llano** debajo («Un funcionario lo está revisando. Si falta algo, aquí te avisaremos.»). La subsanación se ve como una alerta naranja en Tramitación (no como un paso nuevo); aprobado y rechazado cierran con su color e ícono. Respeta «reducir movimiento». Se retiraron el componente `Esclusas` y sus estilos; 189 pruebas del frontend (15 nuevas del seguimiento).
 
