@@ -6,6 +6,9 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Cambiado (seguimiento del trámite, 22-oct)
+- **El recorrido del trámite deja las «esclusas» y pasa a un seguimiento que se entiende** (`frontend/src/Seguimiento.jsx`): tres pasos en línea (Recepción, Tramitación, Resolución) con círculos que se llenan al avanzar, un anillo que late en el paso actual, el tramo que sigue con rayas que fluyen, y **una frase en lenguaje llano** debajo («Un funcionario lo está revisando. Si falta algo, aquí te avisaremos.»). La subsanación se ve como una alerta naranja en Tramitación (no como un paso nuevo); aprobado y rechazado cierran con su color e ícono. Respeta «reducir movimiento». Se retiraron el componente `Esclusas` y sus estilos; 189 pruebas del frontend (15 nuevas del seguimiento).
+
 ### Cambiado (lo técnico no es para la ciudadanía, 22-oct)
 - **La ciudadanía ya no ve las pestañas «Matriz de permisos» y «Base de datos»** de «Roles y permisos» (siguen viéndose «Roles y módulos», «Módulos por rol», el simulador y «Cómo se decide»), y ni siquiera las pide al servidor. **El servidor también lo niega**: `GET /politicas/base-de-datos/` responde `403` a las cuentas de la puerta de ciudadanía (esconder un botón no protege nada si la ruta sigue abierta). Personal, operadores y auditor lo ven igual. `verificar_politicas` 40 de 40, 185 pruebas del frontend (3 nuevas), ensayo 98 de 98.
 
