@@ -42,17 +42,17 @@ El proyecto se divide en **dos frentes con una frontera clara**: el [contrato de
 
 | Prioridad | Tarea | Por qué |
 |---|---|---|
-| Alta | **Sistema de diseño**: tokens (color, tipografía, espacio, sombras, radios), componentes base (botón, campo, tabla, insignia, tarjeta, modal, pestañas) y modo claro/oscuro | Consistencia y velocidad para todo lo demás |
-| Alta | Pulido visual de las 4 pantallas clave: login, inicio por rol, bandeja y detalle del trámite (línea de tiempo) | Es lo que se proyecta |
-| Alta | Estados completos: *skeletons* de carga, vacíos con ilustración y mensaje útil, errores amables, avisos (*toasts*) y confirmaciones | Se siente producto, no prototipo |
+| ✅ v1 hecha | **Sistema de diseño**: tokens (color, tipografía, espacio, sombras, radios), componentes base (botón, campo, tabla, insignia, tarjeta, modal, pestañas) y modo claro/oscuro | Consistencia y velocidad para todo lo demás |
+| ✅ v1 hecha | Pulido visual de las 4 pantallas clave: login, inicio por rol, bandeja y detalle del trámite (línea de tiempo) | Es lo que se proyecta |
+| ✅ v1 hecha | Estados completos: *skeletons* de carga, vacíos con ilustración y mensaje útil, errores amables, avisos (*toasts*) y confirmaciones | Se siente producto, no prototipo |
 | Alta | Accesibilidad AA (contraste, foco, teclado, `aria-*`, reducir movimiento) y responsive real | Funciona para todas las personas |
-| Media | Bandeja tipo tablero (columnas por estado) con búsqueda, orden y filtros guardados | Productividad del funcionario |
-| Media | Gráficos de auditoría más ricos (tendencias por hora, mapa de calor de denegaciones) | Valor para el rol auditor |
-| Media | Tipografía y gráficos **propios** (autohospedados): la CSP no permite CDNs ni estilos en línea | Mantener Zero Trust también en el cliente |
+| ✅ tablero y búsqueda; faltan orden y filtros guardados | Bandeja tipo tablero (columnas por estado) con búsqueda, orden y filtros guardados | Productividad del funcionario |
+| ✅ gráfico por política; faltan tendencias | Gráficos de auditoría más ricos (tendencias por hora, mapa de calor de denegaciones) | Valor para el rol auditor |
+| ✅ hecho | Tipografía y gráficos **propios** (autohospedados): la CSP no permite CDNs ni estilos en línea | Mantener Zero Trust también en el cliente |
 | Media | Pruebas: ESLint, Vitest + Testing Library para los flujos, Playwright para el recorrido por rol | Que lo bonito no se rompa |
 | Baja | Internacionalización (es/en), impresión del trámite, atajos de teclado | Detalle |
 
-**Decisión técnica pendiente (frontend):** la intención inicial era Tailwind + shadcn/ui. Esas librerías suelen inyectar estilos en línea (posicionamiento), lo que choca con la CSP estricta de nginx (`default-src 'self'`). Recomendación: **mantener un sistema de diseño propio con variables CSS** (ya hay una base en `src/estilos.css`) y, si hace falta, usar primitivas sin estilo (p. ej. Radix) vestidas con esas variables; relajar la CSP con `unsafe-inline` queda descartado porque debilita justo lo que defendemos.
+**Decisión técnica tomada (frontend):** la intención inicial era Tailwind + shadcn/ui. Esas librerías suelen inyectar estilos en línea (posicionamiento), lo que choca con la CSP estricta de nginx (`default-src 'self'`). Recomendación: **mantener un sistema de diseño propio con variables CSS** (ya hay una base en `src/estilos.css`) y, si hace falta, usar primitivas sin estilo (p. ej. Radix) vestidas con esas variables; relajar la CSP con `unsafe-inline` queda descartado porque debilita justo lo que defendemos.
 
 ## Reparto del equipo
 

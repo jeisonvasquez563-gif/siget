@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api.js'
-import { ACCIONES_EVENTO, Alerta, Cargando, ESTADOS, fecha, mensajeDe, useReautenticacion } from './comun.jsx'
+import { ACCIONES_EVENTO, ESTADOS, fecha, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { Alerta, Avatar, BloquesEsqueleto, Esqueleto, Icono, Insignia, Vacio } from './ui.jsx'
 
 const PESTANAS = [
   ['resumen', 'Resumen'],
@@ -18,8 +19,11 @@ const NOMBRES_EVENTO = {
   refresh_ok: 'Sesión renovada', refresh_invalido: 'Renovación inválida', refresh_reuso: 'Reuso de token de sesión (posible robo)',
   logout: 'Cierre de sesión',
 }
+const EVENTOS_ALERTA = ['login_fallido', 'cuenta_bloqueada', 'refresh_reuso', 'login_rechazado_bloqueada', 'mfa_verificacion_fallida', 'mfa_confirmacion_fallida', 'refresh_invalido']
 
-const quien = (actor) => (actor ? actor.usuario : 'Sistema / anónimo')
+const Quien = ({ actor }) => (actor
+  ? <span className="quien-fila"><Avatar nombre={actor.usuario} /><span>{actor.usuario}</span></span>
+  : <span className="tenue">Sistema / anónimo</span>)
 
 export function Auditoria() {
   const [pestana, setPestana] = useState('resumen')
@@ -31,16 +35,14 @@ export function Auditoria() {
           <p>Registro inalterable de lo que pasa en la plataforma. Lees por una conexión de solo lectura: desde aquí no se puede escribir ni borrar nada.</p>
         </div>
       </div>
-      <div className="filtros" role="tablist" aria-label="Secciones de auditoría">
-        {PESTANAS.map(([k, n]) => (
-          <button key={k} role="tab" aria-selected={pestana === k} className={pestana === k ? 'activa' : 'secundario'} onClick={() => setPestana(k)}>{n}</button>
-        ))}
+      <div className="pestanas" role="tablist" aria-label="Secciones de auditoría">
+        {PESTANAS.map(([k, n]) => <button key={k} role="tab" aria-selected={pestana === k} onClick={() => setPestana(k)}>{n}</button>)}
       </div>
       {pestana === 'resumen' && <Resumen alAbrirDecisiones={() => setPestana('decisiones')} />}
       {pestana === 'decisiones' && <Decisiones />}
-      {pestana === 'seguridad' && <Listado ruta="/auditoria/seguridad/" columnas={COLUMNAS_SEGURIDAD} filtros={[['evento', 'Evento (p. ej. login_fallido)']]} />}
-      {pestana === 'tramites' && <Listado ruta="/auditoria/tramites/" columnas={COLUMNAS_TRAMITES} filtros={[['accion', 'Acción (p. ej. cambio_estado)']]} />}
-      <p className="nota">Quién audita al auditor: cada consulta que haces pasa por el punto de decisión de acceso y queda registrada como una decisión más.</p>
+      {pestana === 'seguridad' && <Listado ruta="/auditoria/seguridad/" columnas={COLUMNAS_SEGURIDAD} filtro={['evento', 'Evento', 'p. ej. login_fallido']} vacio="No hay eventos de seguridad con ese filtro." />}
+      {pestana === 'tramites' && <Listado ruta="/auditoria/tramites/" columnas={COLUMNAS_TRAMITES} filtro={['accion', 'Acción', 'p. ej. cambio_estado']} vacio="No hay actuaciones con ese filtro." />}
+      <p className="nota"><Icono nombre="escudo" className="en-linea" /> Quién audita al auditor: cada consulta que haces pasa por el punto de decisión de acceso y queda registrada como una decisión más.</p>
     </>
   )
 }
@@ -64,45 +66,52 @@ function usarConsulta(ruta, parametros) {
   return { datos, error, modal }
 }
 
-// ---------------------------------------------------------------- resumen
+/* ---------------------------------------------------------------- resumen */
 
 function Resumen({ alAbrirDecisiones }) {
   const { datos, error, modal } = usarConsulta('/auditoria/resumen/', {})
-  if (datos === null) return <Cargando texto="Consultando el registro…" />
+  // El modal de reautenticación debe pintarse también mientras se espera: si no, el esqueleto quedaría para siempre
+  if (datos === null) return <><BloquesEsqueleto n={4} />{modal}</>
   if (datos === false) return <><Alerta>{error}</Alerta>{modal}</>
   const d = datos.decisiones
   const pct = d.total ? Math.round((d.negadas / d.total) * 100) : 0
   return (
     <>
-      <div className="resumen">
-        <div><strong>{d.total}</strong><span>Decisiones de acceso</span></div>
-        <div><strong className="num-ok">{d.permitidas}</strong><span>Permitidas</span></div>
-        <div className={d.negadas ? 'alerta-num' : ''}><strong>{d.negadas}</strong><span>Negadas ({pct} %)</span></div>
-        <div><strong>{d.ultimas_24h}</strong><span>Últimas 24 horas</span></div>
+      <div className="indicadores">
+        <div className="indicador"><strong>{d.total}</strong><span>Decisiones de acceso</span></div>
+        <div className="indicador ok-ind"><strong>{d.permitidas}</strong><span>Permitidas</span></div>
+        <div className={`indicador ${d.negadas ? 'alerta-ind' : ''}`}><strong>{d.negadas}</strong><span>Negadas ({pct} %)</span></div>
+        <div className="indicador"><strong>{d.ultimas_24h}</strong><span>En las últimas 24 horas</span></div>
       </div>
       <div className="rejilla-detalle">
         <section className="panel">
-          <h3>Qué políticas deciden</h3>
-          <p className="nota">Cada decisión indica la regla que la motivó. En verde lo permitido; en rojo, lo negado.</p>
+          <div className="panel-cabecera"><h3>Qué políticas deciden</h3><button className="btn btn-sec btn-s" onClick={alAbrirDecisiones}>Ver decisiones</button></div>
+          <p className="suave">Cada decisión indica la regla que la motivó. Las políticas que más niegan, primero.</p>
+          <div className="leyenda-grafico"><span><i className="l-ok" />Permitidas</span><span><i className="l-no" />Negadas</span></div>
           <GraficoPoliticas filas={datos.por_politica} />
-          <button className="secundario" onClick={alAbrirDecisiones}>Ver todas las decisiones</button>
         </section>
-        <section className="panel">
-          <h3>Personas con más denegaciones</h3>
-          {datos.denegaciones_por_persona.length === 0 ? <p className="vacio">Sin denegaciones registradas.</p> : (
-            <ul className="lista-equipo">
-              {datos.denegaciones_por_persona.map((p) => <li key={p.id}><span>{p.usuario}</span><span className="chip e-rechazado">{p.total}</span></li>)}
+        <div>
+          <section className="panel">
+            <h3>Personas con más denegaciones</h3>
+            {datos.denegaciones_por_persona.length === 0 ? <p className="suave">Sin denegaciones registradas.</p> : (
+              <ul className="lista-simple">
+                {datos.denegaciones_por_persona.map((p) => <li key={p.id}><Quien actor={p} /><Insignia clase="e-rechazado" punto={false}>{p.total} negadas</Insignia></li>)}
+              </ul>
+            )}
+          </section>
+          <section className="panel">
+            <h3>Eventos de seguridad</h3>
+            <ul className="lista-simple">
+              {datos.seguridad.map((s) => <li key={s.evento}><span>{NOMBRES_EVENTO[s.evento] || s.evento}</span><Insignia clase={EVENTOS_ALERTA.includes(s.evento) ? 'insignia-boya' : ''} punto={false}>{s.total}</Insignia></li>)}
             </ul>
-          )}
-          <h3 className="separado">Actuaciones en trámites</h3>
-          <ul className="lista-equipo">
-            {datos.tramites.map((t) => <li key={t.accion}><span>{ACCIONES_EVENTO[t.accion] || t.accion}</span><span className="chip">{t.total}</span></li>)}
-          </ul>
-          <h3 className="separado">Eventos de seguridad</h3>
-          <ul className="lista-equipo">
-            {datos.seguridad.map((s) => <li key={s.evento}><span>{NOMBRES_EVENTO[s.evento] || s.evento}</span><span className="chip">{s.total}</span></li>)}
-          </ul>
-        </section>
+          </section>
+          <section className="panel">
+            <h3>Actuaciones en trámites</h3>
+            <ul className="lista-simple">
+              {datos.tramites.map((t) => <li key={t.accion}><span>{ACCIONES_EVENTO[t.accion] || t.accion}</span><Insignia punto={false}>{t.total}</Insignia></li>)}
+            </ul>
+          </section>
+        </div>
       </div>
       {modal}
     </>
@@ -110,22 +119,23 @@ function Resumen({ alAbrirDecisiones }) {
 }
 
 function GraficoPoliticas({ filas }) {
-  if (!filas.length) return <p className="vacio">Aún no hay decisiones.</p>
+  if (!filas.length) return <p className="suave">Aún no hay decisiones.</p>
   const maximo = Math.max(...filas.map((f) => f.permitidas + f.negadas), 1)
-  const ancho = 420
-  const alto = 26
+  const alto = 30
+  const inicio = 236
+  const util = 280
   return (
-    <svg className="grafico" viewBox={`0 0 ${ancho + 150} ${filas.length * alto + 4}`} role="img" aria-label="Decisiones por política, permitidas y negadas">
+    <svg className="grafico" viewBox={`0 0 ${inicio + util + 34} ${filas.length * alto + 4}`} role="img" aria-label="Decisiones por política, permitidas y negadas">
       {filas.map((f, i) => {
         const y = i * alto + 2
-        const wOk = (f.permitidas / maximo) * (ancho - 50)
-        const wNo = (f.negadas / maximo) * (ancho - 50)
+        const wOk = (f.permitidas / maximo) * util
+        const wNo = (f.negadas / maximo) * util
         return (
           <g key={f.politica || 'sin'}>
-            <text x="0" y={y + 14} className="grafico-texto">{(f.politica || '(sin política)').slice(0, 34)}</text>
-            <rect x="215" y={y + 2} width={wOk} height="16" className="barra-ok" rx="3" />
-            <rect x={215 + wOk} y={y + 2} width={wNo} height="16" className="barra-no" rx="3" />
-            <text x={215 + wOk + wNo + 6} y={y + 14} className="grafico-cifra">{f.permitidas + f.negadas}</text>
+            <text className="grafico-texto" x="0" y={y + 17}>{(f.politica || '(sin política)').slice(0, 36)}</text>
+            <rect x={inicio} y={y + 4} width={wOk} height="18" className="barra-ok" rx="3" />
+            <rect x={inicio + wOk} y={y + 4} width={wNo} height="18" className="barra-no" rx="3" />
+            <text className="grafico-cifra" x={inicio + wOk + wNo + 8} y={y + 17}>{f.permitidas + f.negadas}</text>
           </g>
         )
       })}
@@ -133,43 +143,46 @@ function GraficoPoliticas({ filas }) {
   )
 }
 
-// ---------------------------------------------------------------- listados
+/* ---------------------------------------------------------------- listados */
+
+const TAM = 15
 
 function Decisiones() {
   const [resultado, setResultado] = useState('')
   const [politica, setPolitica] = useState('')
   const [pagina, setPagina] = useState(0)
-  const parametros = { limite: 15, desplazamiento: pagina * 15 }
+  const parametros = { limite: TAM, desplazamiento: pagina * TAM }
   if (resultado) parametros.resultado = resultado
   if (politica) parametros.politica = politica
   const { datos, error, modal } = usarConsulta('/auditoria/decisiones/', parametros)
 
-  const aplicar = (f) => (e) => { f(e.target.value); setPagina(0) }
   return (
     <>
       <div className="barra-filtros">
-        <label>Resultado
-          <select value={resultado} onChange={aplicar(setResultado)}>
+        <label className="campo">
+          <span>Resultado</span>
+          <select className="seleccion" value={resultado} onChange={(e) => { setResultado(e.target.value); setPagina(0) }}>
             <option value="">Todas</option><option value="negadas">Solo negadas</option><option value="permitidas">Solo permitidas</option>
           </select>
         </label>
-        <label>Política
-          <input value={politica} onChange={aplicar((v) => setPolitica(v.toLowerCase().replace(/[^a-z0-9_]/g, '')))} placeholder="p. ej. conflicto_de_interes" maxLength={64} />
+        <label className="campo">
+          <span>Política</span>
+          <input className="entrada" value={politica} onChange={(e) => { setPolitica(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')); setPagina(0) }} placeholder="p. ej. conflicto_de_interes" maxLength={64} />
         </label>
       </div>
       <Alerta>{error}</Alerta>
-      {datos === null ? <Cargando /> : datos && (
+      {datos === null ? <Esqueleto filas={5} /> : datos && (datos.resultados.length === 0 ? <Vacio titulo="Ninguna decisión coincide" texto="Quita un filtro para ver más resultados." /> : (
         <>
-          <div className="tabla-envoltura">
-            <table>
-              <thead><tr><th>Fecha</th><th>Persona</th><th>Acción</th><th>Resultado</th><th>Política</th></tr></thead>
+          <div className="tabla-caja">
+            <table className="tabla">
+              <thead><tr><th>Cuándo</th><th>Persona</th><th>Acción</th><th>Resultado</th><th>Política</th></tr></thead>
               <tbody>
                 {datos.resultados.map((d) => (
-                  <tr key={d.id} className="sin-clic" title={d.motivo || ''}>
-                    <td>{fecha(d.creado_en)}</td>
-                    <td>{quien(d.actor)}</td>
-                    <td>{d.accion}{d.recurso ? <small className="suave"> · {d.recurso}</small> : null}</td>
-                    <td><span className={`chip ${d.permitido ? 'e-aprobado' : 'e-rechazado'}`}>{d.permitido ? 'Permitida' : 'Negada'}</span></td>
+                  <tr key={d.id} title={d.motivo || ''}>
+                    <td className="num" title={fecha(d.creado_en)}>{hace(d.creado_en)}</td>
+                    <td><Quien actor={d.actor} /></td>
+                    <td><span className="mono">{d.accion}</span>{d.recurso ? <small className="tenue"> · {d.recurso}</small> : null}</td>
+                    <td><Insignia clase={d.permitido ? 'e-aprobado' : 'e-rechazado'}>{d.permitido ? 'Permitida' : 'Negada'}</Insignia></td>
                     <td><code>{d.politica || '—'}</code></td>
                   </tr>
                 ))}
@@ -178,55 +191,52 @@ function Decisiones() {
           </div>
           <Paginador datos={datos} pagina={pagina} cambiar={setPagina} />
         </>
-      )}
-      {datos && datos.resultados.length === 0 && <p className="vacio">Ninguna decisión coincide con el filtro.</p>}
+      ))}
       {modal}
     </>
   )
 }
 
 const COLUMNAS_SEGURIDAD = [
-  ['Fecha', (e) => fecha(e.creado_en)],
-  ['Persona', (e) => quien(e.actor)],
-  ['Evento', (e) => NOMBRES_EVENTO[e.evento] || e.evento],
-  ['Dirección', (e) => e.ip || '—'],
+  ['Cuándo', (e) => <span className="num" title={fecha(e.creado_en)}>{hace(e.creado_en)}</span>],
+  ['Persona', (e) => <Quien actor={e.actor} />],
+  ['Evento', (e) => <Insignia clase={EVENTOS_ALERTA.includes(e.evento) ? 'insignia-boya' : ''} punto={false}>{NOMBRES_EVENTO[e.evento] || e.evento}</Insignia>],
+  ['Dirección', (e) => <span className="mono">{e.ip || '—'}</span>],
 ]
 const COLUMNAS_TRAMITES = [
-  ['Fecha', (e) => fecha(e.creado_en)],
-  ['Persona', (e) => quien(e.actor)],
-  ['Trámite', (e) => `#${e.tramite_id}`],
+  ['Cuándo', (e) => <span className="num" title={fecha(e.creado_en)}>{hace(e.creado_en)}</span>],
+  ['Persona', (e) => <Quien actor={e.actor} />],
+  ['Trámite', (e) => <span className="mono">#{e.tramite_id}</span>],
   ['Acción', (e) => ACCIONES_EVENTO[e.accion] || e.accion],
   ['Cambio', (e) => (e.estado_nuevo && e.estado_anterior !== e.estado_nuevo ? `${e.estado_anterior ? `${ESTADOS[e.estado_anterior]?.texto} → ` : ''}${ESTADOS[e.estado_nuevo]?.texto}` : '—')],
 ]
 
-function Listado({ ruta, columnas, filtros }) {
-  const [valores, setValores] = useState({})
+function Listado({ ruta, columnas, filtro: [clave, etiqueta, ejemplo], vacio }) {
+  const [valor, setValor] = useState('')
   const [pagina, setPagina] = useState(0)
-  const parametros = { limite: 15, desplazamiento: pagina * 15 }
-  filtros.forEach(([k]) => { if (valores[k]) parametros[k] = valores[k] })
+  const parametros = { limite: TAM, desplazamiento: pagina * TAM }
+  if (valor) parametros[clave] = valor
   const { datos, error, modal } = usarConsulta(ruta, parametros)
   return (
     <>
       <div className="barra-filtros">
-        {filtros.map(([k, etiqueta]) => (
-          <label key={k}>{etiqueta}
-            <input value={valores[k] || ''} onChange={(e) => { setValores({ ...valores, [k]: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }); setPagina(0) }} maxLength={64} />
-          </label>
-        ))}
+        <label className="campo">
+          <span>{etiqueta}</span>
+          <input className="entrada" value={valor} onChange={(e) => { setValor(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')); setPagina(0) }} placeholder={ejemplo} maxLength={64} />
+        </label>
       </div>
       <Alerta>{error}</Alerta>
-      {datos === null ? <Cargando /> : datos && (
+      {datos === null ? <Esqueleto filas={5} /> : datos && (datos.resultados.length === 0 ? <Vacio titulo={vacio} texto="Quita el filtro para ver todos los registros." /> : (
         <>
-          <div className="tabla-envoltura">
-            <table>
+          <div className="tabla-caja">
+            <table className="tabla">
               <thead><tr>{columnas.map(([n]) => <th key={n}>{n}</th>)}</tr></thead>
-              <tbody>{datos.resultados.map((e) => <tr key={e.id} className="sin-clic">{columnas.map(([n, f]) => <td key={n}>{f(e)}</td>)}</tr>)}</tbody>
+              <tbody>{datos.resultados.map((e) => <tr key={e.id}>{columnas.map(([n, f]) => <td key={n}>{f(e)}</td>)}</tr>)}</tbody>
             </table>
           </div>
-          {datos.resultados.length === 0 && <p className="vacio">Sin registros para este filtro.</p>}
           <Paginador datos={datos} pagina={pagina} cambiar={setPagina} />
         </>
-      )}
+      ))}
       {modal}
     </>
   )
@@ -238,8 +248,8 @@ function Paginador({ datos, pagina, cambiar }) {
     <div className="paginador">
       <span>{datos.total} registros · página {pagina + 1} de {paginas}</span>
       <div className="fila-botones">
-        <button className="secundario" disabled={pagina === 0} onClick={() => cambiar(pagina - 1)}>← Anterior</button>
-        <button className="secundario" disabled={pagina + 1 >= paginas} onClick={() => cambiar(pagina + 1)}>Siguiente →</button>
+        <button className="btn btn-sec btn-s" disabled={pagina === 0} onClick={() => cambiar(pagina - 1)}><Icono nombre="izquierda" />Anterior</button>
+        <button className="btn btn-sec btn-s" disabled={pagina + 1 >= paginas} onClick={() => cambiar(pagina + 1)}>Siguiente<Icono nombre="derecha" /></button>
       </div>
     </div>
   )

@@ -1,0 +1,60 @@
+/* SIGET · base: reinicio, tipografía y accesibilidad. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { margin: 0; }
+
+body {
+  font-family: var(--f-texto);
+  font-size: var(--t-base);
+  line-height: 1.5;
+  color: var(--tinta);
+  background: var(--lienzo);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--f-titulo);
+  font-stretch: 112%;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.4rem;
+  color: var(--tinta);
+}
+h1 { font-size: var(--t-xl); font-stretch: 125%; font-weight: 800; }
+h2 { font-size: var(--t-l); }
+h3 { font-size: var(--t-m); }
+h4 { font-size: var(--t-s); font-stretch: 100%; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tinta-suave); }
+p { margin: 0 0 0.75rem; }
+a { color: var(--agua-media); }
+small { font-size: var(--t-s); }
+strong { font-weight: 650; }
+
+code, .mono {
+  font-family: var(--f-mono);
+  font-size: 0.88em;
+  background: var(--superficie-3);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radio-s);
+  word-break: break-all;
+}
+.mono { background: none; padding: 0; word-break: normal; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+
+:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; border-radius: var(--radio-s); }
+
+.solo-lector {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}
+
+.saltar { position: absolute; left: 0.75rem; top: -3rem; z-index: 100; padding: 0.6rem 1rem; background: var(--agua); color: #fff; border-radius: var(--radio); font-weight: 650; text-decoration: none; transition: top 0.15s; }
+.saltar:focus { top: 0.75rem; }
