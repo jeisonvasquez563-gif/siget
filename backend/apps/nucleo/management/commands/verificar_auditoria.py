@@ -17,7 +17,7 @@ from django.db import DatabaseError, connections, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.autenticacion import tokens
+from apps.autenticacion import contrasenas, tokens
 from apps.autenticacion.models import Sesion
 from apps.autorizacion import permisos
 from apps.catalogo.models import Institucion
@@ -53,7 +53,7 @@ class Command(BaseCommand):
         return r
 
     def _persona(self, nombre, rol_plataforma="ninguno", nivel=1, mfa_hace_min=1):
-        return Usuario.objects.create(username=f"int_a_{nombre}", password_hash="x", rol_plataforma=rol_plataforma, mfa_activo=True,
+        return Usuario.objects.create(username=f"int_a_{nombre}", password_hash=contrasenas.inutilizable(), rol_plataforma=rol_plataforma, mfa_activo=True,
                                       nivel_aseguramiento=nivel, mfa_verificado_en=timezone.now() - timedelta(minutes=mfa_hace_min))
 
     def _token(self, usuario):

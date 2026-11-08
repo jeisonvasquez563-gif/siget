@@ -14,7 +14,7 @@ from django.db import connection, connections, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.autenticacion import tokens
+from apps.autenticacion import contrasenas, tokens
 from apps.autenticacion.models import Sesion
 from apps.autorizacion import permisos
 from apps.catalogo.models import Institucion, TipoTramite
@@ -58,7 +58,7 @@ class Command(BaseCommand):
 
     def _persona(self, nombre, rol_plataforma="ninguno", mfa_hace_min=1):
         ahora = timezone.now()
-        return Usuario.objects.create(username=f"int_t_{nombre}", password_hash="x", rol_plataforma=rol_plataforma, mfa_activo=True,
+        return Usuario.objects.create(username=f"int_t_{nombre}", password_hash=contrasenas.inutilizable(), rol_plataforma=rol_plataforma, mfa_activo=True,
                                       mfa_verificado_en=ahora - timedelta(minutes=mfa_hace_min))
 
     def _token(self, usuario, scope=tokens.SCOPE_COMPLETO):
