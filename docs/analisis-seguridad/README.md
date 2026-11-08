@@ -35,9 +35,9 @@ Requiere Playwright para Python (usa el Microsoft Edge instalado). La carpeta lo
 | `nginx.conf` con el `map` de nombres de host permitidos | `/home/siget/config/nginx.conf.respaldo-2026-11-08` |
 | Imagen del backend reconstruida desde el commit corregido | imagen `localhost/siget-backend:respaldo-2026-11-08` |
 | `/etc/httpd/conf.d/endurecimiento.conf`: `TraceEnable Off`, `ServerTokens Prod`, `ServerSignature Off` | borrar el archivo y `systemctl reload httpd` |
-| `/etc/php.d/99-siget-endurecimiento.ini`: `expose_php = Off` | borrar el archivo y `systemctl restart php-fpm` |
+| `/etc/php.d/99-siget-endurecimiento.ini`: `expose_php = Off`, `session.cookie_httponly = 1`, `session.cookie_samesite = Strict`, `session.use_strict_mode = 1` | borrar el archivo y `systemctl restart php-fpm` |
 
 ## Recomendaciones que quedan
 
-- Cookie de sesión del checkpoint PHP: agregar `session.cookie_httponly = 1`, `session.cookie_samesite = Strict` y `session.use_strict_mode = 1`. La medida definitiva es retirar el checkpoint y cerrar el puerto 80 (PT-13).
+- Retirar el checkpoint PHP y cerrar el puerto 80 (PT-13): mientras siga en HTTP, la cookie no puede llevar `Secure`.
 - Rotar la contraseña de PostgreSQL que guarda la configuración local del checkpoint (archivo ignorado por git).
