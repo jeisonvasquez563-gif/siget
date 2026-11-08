@@ -1,0 +1,9 @@
+# VM1 — PHP: no anunciar la versión (expose_php = Off) y reiniciar php-fpm
+# 2026-11-08 14:29:11  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "set -e; F=/etc/php.d/99-siget-endurecimiento.ini; printf \"%s\n\" \"; SIGET: no anunciar la versión de PHP en la cabecera X-Powered-By (análisis dinámico del 8-nov-2026)\" \"expose_php = Off\" | sudo tee $F; sudo chmod 644 $F; sudo restorecon $F || true; sudo php-fpm -t 2>&1 | tail -1; sudo systemctl restart php-fpm; sleep 2; systemctl is-active php-fpm; php -i | grep ^expose_php"
+; SIGET: no anunciar la versión de PHP en la cabecera X-Powered-By (análisis dinámico del 8-nov-2026)
+expose_php = Off
+[08-Nov-2026 14:29:12] NOTICE: configuration file /etc/php-fpm.conf test is successful
+active
+expose_php => Off => Off
+# código de salida: 0

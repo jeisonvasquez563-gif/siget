@@ -1,0 +1,5 @@
+# pip-audit — dependencias de Python del backend (inicial)
+# 2026-11-08 13:37:49  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ pip-audit -r backend/requirements.txt -r backend/requirements-dev.txt --desc on
+No known vulnerabilities found
+# código de salida: 0

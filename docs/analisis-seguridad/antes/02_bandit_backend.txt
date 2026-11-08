@@ -1,0 +1,234 @@
+# Bandit — análisis estático del backend (inicial)
+# 2026-11-08 13:36:04  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ bandit -r backend/apps backend/config backend/manage.py -x backend/tests,backend/.venv
+Working... ---------------------------------------- 100% 0:00:01
+Run started:2026-11-08 18:36:07.335359+00:00
+
+Test results:
+>> Issue: [B101:assert_used] Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html
+   Location: backend/apps\nucleo\management\commands\sembrar_demo.py:119:8
+118	        r = self._http("post", "/tramites/", usuario, {"tipo_tramite": tipo.pk})
+119	        assert r.status_code == 201, (usuario, r.status_code, r.content[:200])
+120	        return r.json()["id"]
+
+--------------------------------------------------
+>> Issue: [B101:assert_used] Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html
+   Location: backend/apps\nucleo\management\commands\sembrar_demo.py:124:8
+123	        r = self._http("post", f"/tramites/{tramite}/estado/", usuario, {"estado": estado})
+124	        assert r.status_code == 200, (usuario, tramite, estado, r.status_code, r.content[:200])
+125	
+
+--------------------------------------------------
+>> Issue: [B101:assert_used] Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html
+   Location: backend/apps\nucleo\management\commands\sembrar_demo.py:128:8
+127	        r = self._http("post", f"/tramites/{tramite}/reasignar/", usuario, {"funcionario_id": destino.pk})
+128	        assert r.status_code == 200, (usuario, tramite, r.status_code, r.content[:200])
+129	
+
+--------------------------------------------------
+>> Issue: [B106:hardcoded_password_funcarg] Possible hardcoded password: 'x'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html
+   Location: backend/apps\nucleo\management\commands\verificar_auditoria.py:56:15
+55	    def _persona(self, nombre, rol_plataforma="ninguno", nivel=1, mfa_hace_min=1):
+56	        return Usuario.objects.create(username=f"int_a_{nombre}", password_hash="x", rol_plataforma=rol_plataforma, mfa_activo=True,
+57	                                      nivel_aseguramiento=nivel, mfa_verificado_en=timezone.now() - timedelta(minutes=mfa_hace_min))
+58	
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'corta'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_autenticacion.py:88:74
+87	        # ---------------------------------------------------------------- registro
+88	        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": "corta"})
+89	        self._paso("rechaza una contraseña débil", r.status_code == 400, r.status_code)
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'passwordpassword'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_autenticacion.py:90:74
+89	        self._paso("rechaza una contraseña débil", r.status_code == 400, r.status_code)
+90	        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": "passwordpassword"})
+91	        self._paso("rechaza una contraseña común aunque sea larga", r.status_code == 400)
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'incorrecta-incorrecta'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_autenticacion.py:117:74
+116	        # ---------------------------------------------------------------- login sin enumerar usuarios
+117	        mala = self._http("post", "/auth/login/", {"username": "int_ana", "password": "incorrecta-incorrecta"})
+118	        inexistente = self._http("post", "/auth/login/", {"username": "no_existe_nadie", "password": "incorrecta-incorrecta"})
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'incorrecta-incorrecta'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_autenticacion.py:118:89
+117	        mala = self._http("post", "/auth/login/", {"username": "int_ana", "password": "incorrecta-incorrecta"})
+118	        inexistente = self._http("post", "/auth/login/", {"username": "no_existe_nadie", "password": "incorrecta-incorrecta"})
+119	        self._paso("usuario inexistente y contraseña mala dan la MISMA respuesta (no se enumera)",
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: '12345'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_autenticacion.py:123:73
+122	        self._paso("un login sin contraseña no rompe nada", r.status_code == 401)
+123	        r = self._http("post", "/auth/login/", {"username": ["int_ana"], "password": 12345})
+124	        self._paso("tipos de datos inesperados no provocan un error 500", r.status_code == 401, r.status_code)
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'mala-mala-mala-1'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_autenticacion.py:229:72
+228	        for _ in range(3):
+229	            self._http("post", "/auth/login/", {"username": "int_beto", "password": "mala-mala-mala-1"})
+230	        r = self._http("post", "/auth/login/", {"username": "int_beto", "password": CLAVE_BUENA})
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'mala-mala-mala-1'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_autenticacion.py:242:45
+241	        dani = Usuario.objects.get(username="int_dani")
+242	        mala_dani = {"username": "int_dani", "password": "mala-mala-mala-1"}
+243	        buena_dani = {"username": "int_dani", "password": CLAVE_BUENA}
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'x'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_autenticacion.py:323:75
+322	        self._limpiar()
+323	        codigos = [self.cliente.post("/auth/login/", {"username": "nadie", "password": "x"}, format="json", secure=True, **HOST).status_code for _ in range(12)]
+324	        self._limpiar()
+
+--------------------------------------------------
+>> Issue: [B106:hardcoded_password_funcarg] Possible hardcoded password: 'x'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html
+   Location: backend/apps\nucleo\management\commands\verificar_integracion.py:65:14
+64	        minsa = Institucion.objects.create(nombre="MINSA (integración)", tipo="demostracion")
+65	        ana = Usuario.objects.create(username="int_ana", password_hash="x")
+66	        beto = Usuario.objects.create(username="int_beto", password_hash="x")
+
+--------------------------------------------------
+>> Issue: [B106:hardcoded_password_funcarg] Possible hardcoded password: 'x'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html
+   Location: backend/apps\nucleo\management\commands\verificar_integracion.py:66:15
+65	        ana = Usuario.objects.create(username="int_ana", password_hash="x")
+66	        beto = Usuario.objects.create(username="int_beto", password_hash="x")
+67	        func_mop = Usuario.objects.create(username="int_func_mop", password_hash="x")
+
+--------------------------------------------------
+>> Issue: [B106:hardcoded_password_funcarg] Possible hardcoded password: 'x'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html
+   Location: backend/apps\nucleo\management\commands\verificar_integracion.py:67:19
+66	        beto = Usuario.objects.create(username="int_beto", password_hash="x")
+67	        func_mop = Usuario.objects.create(username="int_func_mop", password_hash="x")
+68	        func_minsa = Usuario.objects.create(username="int_func_minsa", password_hash="x")
+
+--------------------------------------------------
+>> Issue: [B106:hardcoded_password_funcarg] Possible hardcoded password: 'x'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html
+   Location: backend/apps\nucleo\management\commands\verificar_integracion.py:68:21
+67	        func_mop = Usuario.objects.create(username="int_func_mop", password_hash="x")
+68	        func_minsa = Usuario.objects.create(username="int_func_minsa", password_hash="x")
+69	        tipo_mop = TipoTramite.objects.create(institucion=mop, nombre="Trámite MOP", sla_dias=10)
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'corta'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: backend/apps\nucleo\management\commands\verificar_plataforma.py:126:89
+125	                   mala.status_code == inexistente.status_code == ajeno.status_code == 400 and mala.json() == inexistente.json() == ajeno.json(), mala.json())
+126	        r = self._publica("/auth/restablecer/", {"username": "vp_ana", "codigo": codigo, "password": "corta"})
+127	        self._paso("una contraseña débil se rechaza diciendo por qué", r.status_code == 400 and r.json().get("errores"), r.status_code)
+
+--------------------------------------------------
+>> Issue: [B106:hardcoded_password_funcarg] Possible hardcoded password: 'x'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html
+   Location: backend/apps\nucleo\management\commands\verificar_politicas.py:58:15
+57	    def _persona(self, nombre, rol_plataforma="ninguno"):
+58	        return Usuario.objects.create(username=f"int_p_{nombre}", password_hash="x", rol_plataforma=rol_plataforma, mfa_activo=True,
+59	                                      mfa_verificado_en=timezone.now() - timedelta(minutes=1))
+60	
+
+--------------------------------------------------
+>> Issue: [B106:hardcoded_password_funcarg] Possible hardcoded password: 'x'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html
+   Location: backend/apps\nucleo\management\commands\verificar_tramites.py:61:15
+60	        ahora = timezone.now()
+61	        return Usuario.objects.create(username=f"int_t_{nombre}", password_hash="x", rol_plataforma=rol_plataforma, mfa_activo=True,
+62	                                      mfa_verificado_en=ahora - timedelta(minutes=mfa_hace_min))
+63	
+
+--------------------------------------------------
+>> Issue: [B108:hardcoded_tmp_directory] Probable insecure usage of temp file/directory.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-377 (https://cwe.mitre.org/data/definitions/377.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html
+   Location: backend/config\settings.py:110:68
+109	CACHES = {"default": {"BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+110	                      "LOCATION": os.environ.get("SIGET_CACHE_DIR", "/tmp/siget-cache")}}
+111	
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 4491
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 19
+		Medium: 1
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 17
+		High: 3
+Files skipped (0):
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+[main]	INFO	running on Python 3.14.6
+# código de salida: 1

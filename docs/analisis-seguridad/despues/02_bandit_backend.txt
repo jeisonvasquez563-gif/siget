@@ -1,0 +1,74 @@
+# Bandit — análisis estático del backend (después de las correcciones)
+# 2026-11-08 14:09:19  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ bandit -r backend/apps backend/config backend/manage.py -x backend/tests,backend/.venv
+Working... ---------------------------------------- 100% 0:00:01
+Run started:2026-11-08 19:09:22.555533+00:00
+
+Test results:
+	No issues identified.
+
+Code scanned:
+	Total lines of code: 4511
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 9
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+Files skipped (0):
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+[main]	INFO	running on Python 3.14.6
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:90
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:90
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:90
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:90
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:90
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:92
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:92
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:92
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:92
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:92
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:119
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:119
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:119
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:119
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:119
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:120
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:120
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:120
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:120
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:120
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:125
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:125
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:125
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:125
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:231
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:231
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:231
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:231
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:231
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:244
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:244
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:244
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:325
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:325
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:325
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:325
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_autenticacion.py:325
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_plataforma.py:128
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_plataforma.py:128
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_plataforma.py:128
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_plataforma.py:128
+[tester]	WARNING	nosec encountered (B105), but no failed test on file backend/apps\nucleo\management\commands\verificar_plataforma.py:128
+# código de salida: 0

@@ -1,0 +1,20 @@
+# Control: la API responde con el nombre legítimo (después)
+# 2026-11-08 14:08:16  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ curl -sS -i --cacert infra/pki/siget-ca.crt --ssl-no-revoke https://192.168.159.137:8443/salud/
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sun, 08 Nov 2026 19:08:16 GMT
+Content-Type: application/json
+Content-Length: 15
+Connection: keep-alive
+Allow: GET, OPTIONS
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: same-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Cross-Origin-Opener-Policy: same-origin
+
+{"estado":"ok"}
+# código de salida: 0

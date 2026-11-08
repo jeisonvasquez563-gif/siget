@@ -1,0 +1,156 @@
+# Backend en producción: verificar_autenticacion contra la base real (transacción revertida)
+# 2026-11-08 14:32:46  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "bash /tmp/ejecutar-comando.sh /tmp/verificar_autenticacion.out verificar_autenticacion; tail -1 /tmp/ejec.log; cat /tmp/verificar_autenticacion.out; shred -u /tmp/verificar_autenticacion.out"
+FIN
+2026-11-08 14:32:49,030 WARNING django.request Bad Request: /auth/registro/
+PASA  rechaza una contraseña débil - 400
+2026-11-08 14:32:49,040 WARNING django.request Bad Request: /auth/registro/
+PASA  rechaza una contraseña común aunque sea larga
+PASA  registra una cuenta - 201
+2026-11-08 14:32:49,643 WARNING django.request Conflict: /auth/registro/
+PASA  no permite registrar dos veces el mismo usuario - 409
+2026-11-08 14:32:49,827 WARNING django.request Conflict: /auth/registro/
+2026-11-08 14:32:49,993 WARNING django.request Conflict: /auth/registro/
+PASA  no permite repetir la cédula, y responde igual que un usuario repetido (no revela quién está registrado)
+2026-11-08 14:32:50,153 WARNING django.request Conflict: /auth/registro/
+PASA  no permite repetir el correo (sin distinguir mayúsculas) - 409
+2026-11-08 14:32:50,156 WARNING django.request Bad Request: /auth/registro/
+PASA  sin datos personales no se crea la cuenta - 400
+2026-11-08 14:32:50,158 WARNING django.request Bad Request: /auth/registro/
+PASA  una persona menor de 18 años no puede registrarse - 400
+PASA  las altas rechazadas no dejaron cuentas a medias (ni usuario ni perfil)
+PASA  el perfil quedó guardado con sus datos
+PASA  la cédula NO está en claro: solo cifrada y como huella
+PASA  la cédula cifrada se puede recuperar con la clave del servidor
+PASA  la contraseña quedó con hash Argon2 (nunca en claro)
+2026-11-08 14:32:50,340 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:50,664 WARNING django.request Unauthorized: /auth/login/
+PASA  usuario inexistente y contraseña mala dan la MISMA respuesta (no se enumera)
+2026-11-08 14:32:50,840 WARNING django.request Unauthorized: /auth/login/
+PASA  un login sin contraseña no rompe nada
+2026-11-08 14:32:51,007 WARNING django.request Unauthorized: /auth/login/
+PASA  tipos de datos inesperados no provocan un error 500 - 401
+PASA  login correcto: acceso limitado hasta activar el segundo factor
+PASA  el refresco viaja en una cookie HttpOnly, Secure y SameSite=Strict, y no en el cuerpo
+PASA  la cookie solo se envía a /auth/
+2026-11-08 14:32:51,212 WARNING django.request Unauthorized: /auth/yo/
+PASA  sin token se responde 401
+2026-11-08 14:32:51,221 WARNING django.request Unauthorized: /auth/yo/
+PASA  con un token alterado se responde 401
+PASA  con el token válido responde 200
+PASA  inicia el enrolamiento del segundo factor
+PASA  el secreto TOTP está CIFRADO en la base (no se ve en claro)
+PASA  hasta confirmarlo, el segundo factor no está activo
+2026-11-08 14:32:51,300 WARNING django.request Bad Request: /auth/mfa/confirmar/
+PASA  un código incorrecto no activa el segundo factor
+PASA  el código correcto activa el segundo factor y entrega un acceso completo
+PASA  queda activo y con la verificación reciente registrada
+2026-11-08 14:32:51,546 WARNING django.request Unauthorized: /auth/login/
+PASA  con el segundo factor activo, la contraseña sola ya no basta
+2026-11-08 14:32:51,727 WARNING django.request Unauthorized: /auth/login/
+PASA  el mismo código no sirve dos veces (anti-repetición) - 401
+PASA  el código del siguiente paso entra - 200
+PASA  la reautenticación renueva la vigencia del segundo factor
+2026-11-08 14:32:51,942 WARNING django.request Forbidden: /auth/refresh/
+PASA  el refresco exige la cabecera de verificación (anti-CSRF)
+PASA  refresca y entrega un token nuevo - 200
+PASA  el token de refresco rota en cada uso
+2026-11-08 14:32:51,997 WARNING django.request Unauthorized: /auth/refresh/
+PASA  reusar un refresco ya gastado se rechaza - 401
+2026-11-08 14:32:52,009 WARNING django.request Unauthorized: /auth/yo/
+PASA  y revoca TODAS las sesiones de la persona (el token nuevo deja de servir)
+PASA  el reuso quedó registrado como evento de seguridad
+PASA  inicia otra sesión - 200
+PASA  cierra la sesión - yo=200 logout=200
+2026-11-08 14:32:52,206 WARNING django.request Unauthorized: /auth/yo/
+PASA  un token de una sesión cerrada deja de servir de inmediato (no espera a que venza)
+2026-11-08 14:32:52,412 WARNING django.request Unauthorized: /auth/yo/
+PASA  el token de acceso vence a los 10 minutos - 401
+PASA  quien sigue activo renueva sin problema (10 min después) - 200
+PASA  la renovación hereda el vencimiento: la sesión no se puede prolongar renovándola - 2026-11-09 03:39:29.023894+00:00 / 2026-11-09 03:39:29.023894+00:00
+2026-11-08 14:32:52,635 WARNING django.request Unauthorized: /auth/refresh/
+PASA  tras más de 15 minutos sin actividad, el refresco se rechaza (sesión cerrada por inactividad) - 401
+PASA  esa sesión queda revocada en la base
+PASA  el cierre por inactividad queda registrado como evento de seguridad
+2026-11-08 14:32:52,957 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:53,101 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:53,262 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:53,421 WARNING django.request Unauthorized: /auth/login/
+PASA  tras 3 fallos, ni la contraseña correcta entra (bloqueo de 5 minutos) - 401
+PASA  el bloqueo no se distingue de una contraseña mala (misma respuesta)
+PASA  pasados 5 minutos vuelve a poder entrar - 200
+PASA  al entrar se reinicia el contador de intentos
+2026-11-08 14:32:53,889 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:54,040 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:54,197 WARNING django.request Unauthorized: /auth/login/
+PASA  el primer bloqueo dura 5 minutos
+2026-11-08 14:32:54,361 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:54,512 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:54,665 WARNING django.request Unauthorized: /auth/login/
+PASA  el segundo bloqueo seguido dura 15 minutos
+2026-11-08 14:32:54,850 WARNING django.request Unauthorized: /auth/login/
+PASA  a los 5 minutos del segundo bloqueo sigue bloqueada (ni la contraseña correcta entra)
+2026-11-08 14:32:55,007 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:55,160 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:55,324 WARNING django.request Unauthorized: /auth/login/
+PASA  el tercer bloqueo seguido dura 60 minutos
+2026-11-08 14:32:55,478 WARNING django.request Unauthorized: /auth/login/
+PASA  a los 59 minutos del tercer bloqueo sigue bloqueada
+PASA  cada bloqueo quedó registrado con su duración - [5, 15, 60]
+PASA  pasada la hora vuelve a poder entrar
+2026-11-08 14:32:55,882 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:56,044 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:56,196 WARNING django.request Unauthorized: /auth/login/
+PASA  un inicio de sesión exitoso reinicia la escalera: el siguiente bloqueo vuelve a durar 5 minutos
+PASA  la lista pública de instituciones se ve sin iniciar sesión y trae solo id y nombre
+PASA  la ciudadanía entra por la puerta pública
+2026-11-08 14:32:57,124 WARNING django.request Unauthorized: /auth/login/
+PASA  pero no por la del personal: se le dice cuál es la suya y no se abre sesión
+PASA  el personal entra por SU institución
+2026-11-08 14:32:57,585 WARNING django.request Unauthorized: /auth/login/
+PASA  no por otra institución: se le indica la suya - {'codigo': 'canal_incorrecto', 'detalle': 'Tu cuenta no corresponde a este acceso.', 'acceso_correcto': 'institucion', 'instituciones': ['Alcaldía (Municipio de Panamá)']}
+2026-11-08 14:32:57,739 WARNING django.request Unauthorized: /auth/login/
+PASA  el personal no usa la puerta pública
+2026-11-08 14:32:58,048 WARNING django.request Unauthorized: /auth/login/
+PASA  un operador de plataforma entra por la suya y no por la pública
+PASA  un cliente de la API sin `canal` entra como siempre
+2026-11-08 14:32:58,202 WARNING django.request Unauthorized: /auth/login/
+PASA  una puerta inexistente responde como cualquier credencial inválida
+2026-11-08 14:32:58,359 WARNING django.request Unauthorized: /auth/login/
+PASA  con contraseña mala la respuesta es la genérica: la puerta no se comprueba sin credenciales válidas (no filtra quién es personal)
+2026-11-08 14:32:58,547 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:58,703 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:58,859 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:32:59,018 WARNING django.request Unauthorized: /auth/login/
+PASA  equivocarse de puerta no cuenta como intento fallido ni bloquea la cuenta
+PASA  entrar por la puerta equivocada queda registrado como evento de seguridad
+PASA  y no se abrió ninguna sesión por esos intentos
+2026-11-08 14:32:59,607 WARNING django.request Unauthorized: /auth/yo/
+PASA  suspender una cuenta invalida su sesión de inmediato
+2026-11-08 14:32:59,791 WARNING django.request Unauthorized: /auth/login/
+PASA  y no puede volver a entrar
+2026-11-08 14:32:59,948 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:00,101 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:00,252 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:00,397 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:00,557 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:00,707 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:00,850 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:00,998 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:01,148 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:01,293 WARNING django.request Unauthorized: /auth/login/
+2026-11-08 14:33:01,294 WARNING django.request Too Many Requests: /auth/login/
+2026-11-08 14:33:01,295 WARNING django.request Too Many Requests: /auth/login/
+PASA  el límite de tasa corta una ráfaga de logins (429) - 10x401, 2x429
+PASA  los eventos de seguridad quedaron registrados - 641 eventos
+PASA  el ORM no modifica el registro de seguridad
+PASA  la base no deja modificar el registro de seguridad
+PASA  la base no deja modificar un perfil (ni a la propia aplicación)
+PASA  la base no deja borrar un perfil (ni a la propia aplicación)
+PASA  la bitácora de seguridad no lleva cédula, correo ni nombre
+PASA  ningún evento contiene contraseñas, códigos ni tokens
+PASA  el token de refresco no está en claro en la base (solo su hash)
+PASA  todo se ejecutó como app_role, sin superusuario
+
+84 de 84 pasos correctos; no quedó ningún dato (transacción revertida).
+# código de salida: 0

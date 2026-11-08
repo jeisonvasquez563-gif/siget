@@ -1,0 +1,19 @@
+# Control: la redirección con el nombre legítimo sigue funcionando (después)
+# 2026-11-08 14:08:11  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ curl -sS -i http://192.168.159.137:8080/tramites/
+HTTP/1.1 301 Moved Permanently
+Server: nginx
+Date: Sun, 08 Nov 2026 19:08:11 GMT
+Content-Type: text/html
+Content-Length: 162
+Connection: keep-alive
+Location: https://192.168.159.137:8443/tramites/
+
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body>
+<center><h1>301 Moved Permanently</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+# código de salida: 0

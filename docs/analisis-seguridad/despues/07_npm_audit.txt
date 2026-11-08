@@ -1,0 +1,5 @@
+# npm audit — dependencias del frontend (después)
+# 2026-11-08 13:59:31  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5\frontend
+$ npm audit
+found 0 vulnerabilities
+# código de salida: 0

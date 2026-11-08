@@ -1,0 +1,13 @@
+# Control: el checkpoint PHP sigue respondiendo y ya no anuncia versiones (después)
+# 2026-11-08 14:29:27  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ curl -sS -I http://192.168.159.137/gestion/
+HTTP/1.1 302 Found
+Date: Sun, 08 Nov 2026 19:29:27 GMT
+Server: Apache
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Set-Cookie: PHPSESSID=dsshi8hkvm049r8ev64brfpcer; path=/
+Location: login.php
+Content-Type: text/html; charset=UTF-8
+# código de salida: 0
