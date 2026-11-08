@@ -1127,7 +1127,8 @@
     "institucion": "propia",
     "solicitante": "yo",
     "segundo_factor": "reciente",
-    "cuenta": "bloqueada"
+    "cuenta": "bloqueada",
+    "audiencia": "ciudadania"
    },
    "respuesta": {
     "entrada": {
