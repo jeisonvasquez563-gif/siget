@@ -10,10 +10,13 @@ Cómo se protege cada petición (Zero Trust, "nunca confiar, siempre verificar")
 
 Lo que la persona no puede ver, para ella no existe (404): no se distingue "no existe" de "no es tuyo".
 """
+from django.conf import settings
 from django.db import DatabaseError, transaction
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -26,9 +29,11 @@ from apps.autorizacion.permisos import _membresias, autorizar
 from apps.catalogo.models import TipoTramite
 from apps.identidad.models import Membresia
 from apps.nucleo.contexto import fijar_contexto
-from apps.tramites.models import Tramite
+from apps.autenticacion.servicio import registrar_evento
+from apps.tramites import almacen, documentos
+from apps.tramites.models import Documento, Tramite
 
-from .serializacion import (ESTADOS_VALIDOS, calcular_fecha_limite, entero_positivo, evento_a_dict, paginacion,
+from .serializacion import (ESTADOS_FINALES, ESTADOS_VALIDOS, calcular_fecha_limite, entero_positivo, evento_a_dict, paginacion,
                             texto, tramite_a_dict)
 
 
@@ -165,3 +170,100 @@ class TramiteHistorial(_Base):
         personal = self._es_personal(tramite)
         eventos = EventoAuditoria.objects.filter(tramite_id=tramite.pk).order_by("id")[:500]  # orden de inserción: `creado_en` no sirve, el trigger usa la hora de su transacción
         return Response({"tramite": tramite.pk, "eventos": [evento_a_dict(e, personal) for e in eventos]})
+
+
+# --------------------------------------------------------------------------- documentos adjuntos (PT-8)
+
+def _recurso_documento(tramite):
+    return Recurso(tipo="documento", institucion_id=tramite.institucion_id, solicitante_id=tramite.solicitante_id,
+                   funcionario_asignado_id=tramite.funcionario_asignado_id, estado=tramite.estado)
+
+
+def _documento_a_dict(d, personal):
+    datos = {"id": d.pk, "nombre": d.nombre, "tipo": d.tipo_mime, "tamano": d.tamano, "creado_en": d.creado_en.isoformat()}
+    if personal:
+        datos.update(subido_por=d.subido_por_id, sha256=d.sha256)
+    return datos
+
+
+MENSAJES_DOCUMENTO = {
+    "vacio": "El archivo está vacío.",
+    "demasiado_grande": "El archivo supera los 5 MB.",
+    "extension_no_permitida": "Solo se aceptan PDF, PNG o JPEG.",
+    "contenido_no_permitido": "El contenido del archivo no es un PDF, PNG ni JPEG válido.",
+    "extension_no_coincide": "La extensión del archivo no coincide con su contenido.",
+}
+
+
+class TramiteDocumentos(_Base):
+    """Lista los documentos de un trámite y recibe uno nuevo. Es la ÚNICA vista que acepta multipart; el resto, solo JSON."""
+
+    parser_classes = [MultiPartParser]
+
+    def get(self, request, pk):
+        tramite = self._tramite_visible(pk)
+        autorizar(request, Accion.VER_DOCUMENTO, _recurso_documento(tramite))
+        personal = self._es_personal(tramite)
+        filas = Documento.objects.filter(tramite_id=tramite.pk).order_by("id")
+        return Response({"tramite": tramite.pk, "documentos": [_documento_a_dict(d, personal) for d in filas]})
+
+    def post(self, request, pk):
+        tramite = self._tramite_visible(pk)
+        autorizar(request, Accion.ADJUNTAR_DOCUMENTO, _recurso_documento(tramite))
+        if not settings.SIGET_DOCS_KEY:
+            return _error("documentos_no_disponibles", "La carga de documentos no está habilitada.", status.HTTP_503_SERVICE_UNAVAILABLE)
+        if tramite.estado in ESTADOS_FINALES:
+            return _error("tramite_cerrado", "El trámite ya tiene una resolución final: no admite documentos.", status.HTTP_409_CONFLICT)
+        if Documento.objects.filter(tramite_id=tramite.pk).count() >= settings.SIGET_DOCS_POR_TRAMITE:
+            return _error("demasiados_documentos", f"Un trámite admite hasta {settings.SIGET_DOCS_POR_TRAMITE} documentos.", status.HTTP_409_CONFLICT)
+        archivos = request.FILES.getlist("archivo")
+        if len(archivos) != 1:
+            return _error("datos_invalidos", "Envía exactamente un archivo en el campo `archivo`.", status.HTTP_400_BAD_REQUEST)
+        archivo = archivos[0]
+        if archivo.size > documentos.TAMANO_MAXIMO:  # antes de leerlo
+            return _error("demasiado_grande", MENSAJES_DOCUMENTO["demasiado_grande"], status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        contenido = archivo.read(documentos.TAMANO_MAXIMO + 1)
+        tipo, motivo = documentos.validar(archivo.name, contenido)
+        if tipo is None:
+            http = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE if motivo == "demasiado_grande" else status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
+            return _error(motivo, MENSAJES_DOCUMENTO[motivo], http)
+        ubicacion = documentos.nueva_ubicacion()
+        almacen.guardar(ubicacion, documentos.cifrar(settings.SIGET_DOCS_KEY, contenido, tramite.pk, ubicacion))
+        usuario = request.user.usuario
+        try:
+            with transaction.atomic():
+                fila = Documento.objects.create(tramite=tramite, institucion_id=tramite.institucion_id, subido_por=usuario,
+                                                nombre=documentos.sanear_nombre(archivo.name), tipo_mime=tipo, tamano=len(contenido),
+                                                sha256=documentos.huella(contenido), ubicacion=ubicacion)
+                EventoAuditoria.objects.create(tramite=tramite, institucion_id=tramite.institucion_id, actor_id=usuario.pk,
+                                               accion="documento_adjuntado", estado_anterior=tramite.estado, estado_nuevo=tramite.estado,
+                                               atributos={"documento": fila.pk, "tipo": tipo, "tamano": len(contenido)})
+        except Exception:
+            almacen.descartar(ubicacion)  # la fila no quedó: que no quede un archivo huérfano
+            raise
+        return Response(_documento_a_dict(fila, self._es_personal(tramite)), status=status.HTTP_201_CREATED)
+
+
+class DocumentoDescarga(_Base):
+    def get(self, request, pk, documento_id):
+        tramite = self._tramite_visible(pk)
+        autorizar(request, Accion.VER_DOCUMENTO, _recurso_documento(tramite))
+        if entero_positivo(documento_id) is None:
+            raise NotFound()
+        fila = Documento.objects.filter(tramite_id=tramite.pk, pk=documento_id).first()
+        if fila is None:
+            raise NotFound()
+        try:
+            contenido = documentos.descifrar(settings.SIGET_DOCS_KEY, almacen.leer(fila.ubicacion), tramite.pk, fila.ubicacion)
+        except (documentos.DocumentoAlterado, OSError, ValueError):
+            contenido = None
+        if contenido is None or documentos.huella(contenido) != fila.sha256:
+            registrar_evento(request.user.usuario.pk, "documento_alterado", None, {"documento": fila.pk, "tramite": tramite.pk})
+            return _error("documento_no_disponible", "El documento no se puede entregar: no supera la verificación de integridad.",
+                          status.HTTP_500_INTERNAL_SERVER_ERROR)
+        respuesta = HttpResponse(contenido, content_type=fila.tipo_mime)
+        respuesta["Content-Disposition"] = documentos.content_disposition(fila.nombre)
+        respuesta["X-Content-Type-Options"] = "nosniff"
+        respuesta["Cache-Control"] = "no-store"
+        respuesta["Content-Security-Policy"] = "default-src 'none'; sandbox"
+        return respuesta

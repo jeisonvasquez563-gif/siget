@@ -1622,3 +1622,18 @@ Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/ps
 - Una anotación de Django no puede llamarse igual que una relación inversa del modelo (`sesiones`): daba un 500.
 - El límite de inicios de sesión (10 por minuto por IP) corta un ensayo con muchas cuentas: el script espera un minuto antes de la sección 10.
 - Una corrida interrumpida del ensayo deja una propuesta pendiente; el script la rechaza al empezar.
+
+## 37. Documentos adjuntos (PT-8)
+
+**Qué cambia.** Las personas adjuntan PDF, PNG o JPEG a sus trámites. Los archivos se guardan **cifrados con AES-256-GCM** en el volumen `siget-documentos` de VM1, montado en `/datos` dentro del backend; el resto del contenedor sigue siendo de solo lectura. La base solo tiene los metadatos (migración 015).
+
+### 37.1 Aplicar
+
+1. VM2: respaldo y migración 015 (`database/psql-contenedor.sh < database/migraciones/015-documentos.sql`).
+2. VM1, como `siget`: crear la clave de documentos **sin mostrarla**: `head -c 32 /dev/urandom | base64 | podman secret create siget-docs-key -`.
+3. VM1: copiar `siget-documentos.volume` y `siget-backend.container` a `~/.config/containers/systemd/`, reconstruir la imagen del backend y la interfaz, `systemctl --user daemon-reload` y reiniciar el backend.
+4. Comprobar con `verificar_tramites` (sección de documentos) y adjuntar un PDF desde la interfaz.
+
+**Importante:** sin `siget-docs-key` los archivos no se pueden descifrar. La clave se respalda **aparte** de los archivos (nunca en el mismo lugar) y su rotación se registra en la consola de secretos. El respaldo de VM1 debe incluir el volumen `siget-documentos`.
+
+**Volver atrás:** volver al `siget-backend.container` anterior y reiniciar. La carga responde `503` mientras no haya clave. La tabla y el volumen pueden quedarse.
