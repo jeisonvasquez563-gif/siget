@@ -154,3 +154,10 @@ def test_la_matriz_informa_la_ventana_configurada_y_el_vencido_siempre_la_supera
         assert m["matriz"]["funcionario"]["cambiar_estado"]["exige_segundo_factor"] is True
         assert m["matriz"]["funcionario"]["ver_tramite"]["exige_segundo_factor"] is False
         assert m["ningun_rol_puede_todo"] is True
+
+
+def test_el_personal_inicia_en_otra_institucion_y_no_en_la_suya():
+    for rol in ("funcionario", "supervisor", "coordinador_institucional"):
+        assert celda(rol, Accion.CREAR_TRAMITE)["permitido"] is True, rol
+        c = celda(rol, Accion.CREAR_TRAMITE, "desfavorable")
+        assert c["permitido"] is False and c["politica"] == "personal_no_inicia_en_su_institucion", (rol, c)

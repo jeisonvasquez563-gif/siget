@@ -75,6 +75,8 @@ class Recurso:
     estado: Optional[str] = None
     estado_destino: Optional[str] = None
     propuesto_por: Optional[int] = None
+    # a quién va dirigido el trámite que se inicia: ciudadania, institucion (de una institución a otra) o ambas
+    audiencia: str = "ciudadania"
 
 
 @dataclass(frozen=True)
@@ -140,7 +142,23 @@ def _control_dual(s, a, r, e):
         return Decision(False, "control_dual", "quien propone un alta no puede aprobarla")
 
 
-DENEGACIONES: list[Callable] = [_cuenta_activa, _plataforma_sin_tramites, _conflicto_de_interes, _control_dual]
+def _personal_no_inicia_en_su_institucion(s, a, r, e):
+    if a == Accion.CREAR_TRAMITE and r.tipo == "tramite" and _roles_en(s, r.institucion_id):
+        return Decision(False, "personal_no_inicia_en_su_institucion",
+                        "el personal de una institución no inicia trámites en su propia institución")
+
+
+def _audiencia_no_corresponde(s, a, r, e):
+    if a != Accion.CREAR_TRAMITE or r.tipo != "tramite" or r.audiencia == "ambas":
+        return None
+    es_personal = bool(s.membresias)
+    if (es_personal and r.audiencia == "ciudadania") or (not es_personal and r.audiencia == "institucion"):
+        return Decision(False, "audiencia_no_corresponde",
+                        f"este trámite es para {'la ciudadanía' if r.audiencia == 'ciudadania' else 'otras instituciones'}")
+
+
+DENEGACIONES: list[Callable] = [_cuenta_activa, _plataforma_sin_tramites, _conflicto_de_interes, _control_dual,
+                                _personal_no_inicia_en_su_institucion, _audiencia_no_corresponde]
 
 
 # ----------------------------------------------------------------------------- permisos

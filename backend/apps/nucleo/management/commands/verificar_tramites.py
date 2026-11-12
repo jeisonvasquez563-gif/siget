@@ -5,20 +5,22 @@ distintos roles. Atraviesa todo: autenticación, límites, contexto RLS, PDP, ba
 Las decisiones del PDP se capturan en memoria SOLO en esta prueba (escribirlas dejaría filas permanentes: la tabla
 es de solo inserción); en producción van por una conexión aparte que no se revierte.
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest import mock
 
 from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connection, connections, transaction
+from django.db import DatabaseError, connection, connections, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.autenticacion import tokens
 from apps.autenticacion.models import Sesion
 from apps.autorizacion import permisos
-from apps.catalogo.models import Institucion, TipoTramite
+from apps.catalogo.models import Institucion, TipoTramite, feriados_entre
 from apps.identidad.models import Membresia, Usuario
+from apps.tramites.serializacion import sumar_dias_habiles
+from apps.tramites.models import Tramite
 
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.9"}
 
@@ -86,8 +88,10 @@ class Command(BaseCommand):
     def _recorrer(self):
         mop = Institucion.objects.get(nombre="MOP")
         minsa = Institucion.objects.get(nombre="MINSA")
-        tipo_mop = TipoTramite.objects.get(institucion=mop)
-        tipo_minsa = TipoTramite.objects.get(institucion=minsa)
+        tipo_mop = TipoTramite.objects.get(institucion=mop, audiencia="ciudadania")
+        tipo_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="ciudadania")
+        inter_mop = TipoTramite.objects.get(institucion=mop, audiencia="institucion")
+        inter_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="institucion")
 
         coord = self._persona("coord")
         ana, beto = self._persona("ana"), self._persona("beto")
@@ -118,7 +122,7 @@ class Command(BaseCommand):
         r = self._http("get", "/catalogo/instituciones/", tok(ana))
         self._paso("el catálogo lista las 6 instituciones", r.status_code == 200 and len(r.json()) >= 6, len(r.json()) if r.status_code == 200 else r.status_code)
         r = self._http("get", f"/catalogo/tipos-tramite/?institucion={mop.pk}", tok(ana))
-        self._paso("el catálogo se filtra por institución", r.status_code == 200 and len(r.json()) == 1 and r.json()[0]["sla_dias"] == 10)
+        self._paso("el catálogo se filtra por institución", r.status_code == 200 and len(r.json()) == 2 and {t["audiencia"] for t in r.json()} == {"ciudadania", "institucion"})
         self._paso("un filtro inválido se rechaza", self._http("get", "/catalogo/tipos-tramite/?institucion=abc", tok(ana)).status_code == 400)
 
         # ---------------------------------------------------------------- crear
@@ -127,6 +131,24 @@ class Command(BaseCommand):
         self._paso("la ciudadana crea un trámite", r.status_code == 201 and cuerpo["estado"] == "Pendiente", r.status_code)
         tramite_ana = cuerpo["id"]
         self._paso("el plazo se calcula con el SLA del catálogo (10 días)", cuerpo["fecha_limite"] is not None and cuerpo["vencido"] is False)
+        creado = datetime.fromisoformat(cuerpo["creado_en"])
+        esperado = sumar_dias_habiles(creado, tipo_mop.sla_dias, feriados_entre(creado.date(), creado.date() + timedelta(days=90)))
+        self._paso("el plazo cuenta días hábiles: sin fines de semana ni feriados de la tabla feriado",
+                   abs(datetime.fromisoformat(cuerpo["fecha_limite"]) - esperado) < timedelta(seconds=5), cuerpo["fecha_limite"])
+        self._paso("un trámite nuevo no está escalado", cuerpo["escalado"] is False)
+        try:
+            with transaction.atomic():
+                with connection.cursor() as c:
+                    c.execute("SELECT siget.escalar_vencidos()")
+            self._paso("la aplicación (app_role) NO puede ejecutar el escalamiento", False)
+        except DatabaseError:
+            self._paso("la aplicación (app_role) NO puede ejecutar el escalamiento", True)
+        try:
+            with transaction.atomic():
+                Tramite.objects.filter(pk=tramite_ana).update(escalado_en=timezone.now())
+            self._paso("la aplicación (app_role) NO puede marcar un trámite como escalado", False)
+        except DatabaseError:
+            self._paso("la aplicación (app_role) NO puede marcar un trámite como escalado", True)
         self._paso("la ciudadana no ve datos de otras personas en su propio trámite", "solicitante_id" not in cuerpo and "funcionario_asignado_id" not in cuerpo and cuerpo["asignado"] is False)
         r = self._http("post", "/tramites/", tok(ana), {"tipo_tramite": tipo_mop.pk, "solicitante": beto.pk, "solicitante_id": beto.pk,
                                                         "estado": "Aprobado", "funcionario_asignado_id": func_mop.pk})
@@ -165,6 +187,9 @@ class Command(BaseCommand):
         self._paso("el personal de la institución lo ve", self._http("get", f"/tramites/{tramite_ana}/", tok(func_mop)).status_code == 200)
         self._paso("un id enorme no rompe nada (404)", self._http("get", f"/tramites/{10**30}/", tok(ana)).status_code == 404)
         self._paso("una paginación inválida se rechaza", self._http("get", "/tramites/?limite=0", tok(ana)).status_code == 400 and self._http("get", "/tramites/?limite=1", tok(ana)).json()["limite"] == 1)
+        r = self._http("get", "/tramites/?escalados=1&limite=100", tok(ana))
+        self._paso("el filtro de escalados solo devuelve trámites escalados", r.status_code == 200 and all(t["escalado"] for t in r.json()["resultados"]))
+        self._paso("un valor inválido del filtro de escalados se rechaza", self._http("get", "/tramites/?escalados=si", tok(ana)).status_code == 400)
 
         # ---------------------------------------------------------------- cambio de estado
         r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(ana), {"estado": "En Tramitacion"})
@@ -186,11 +211,22 @@ class Command(BaseCommand):
         r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), {"estado": "En Tramitacion"})
         self._paso("el funcionario con el segundo factor reciente lo pasa a En Tramitación", r.status_code == 200 and r.json()["estado"] == "En Tramitacion", r.status_code)
 
-        # conflicto de interés: una persona que es funcionaria y también pidió un trámite
+        # quién inicia qué: el personal solo hacia otras instituciones y solo trámites interinstitucionales
         r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": tipo_mop.pk})
-        propio = r.json()["id"]
+        self._paso("el personal del MOP no inicia un trámite en el MOP", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": inter_mop.pk})
+        self._paso("ni siquiera la solicitud interinstitucional de su propia institución", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": tipo_minsa.pk})
+        self._paso("el personal no inicia en otra institución un trámite pensado para la ciudadanía", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": inter_minsa.pk})
+        self._paso("el personal del MOP inicia una solicitud interinstitucional en el MINSA", r.status_code == 201, r.status_code)
+        propio = r.json()["id"] if r.status_code == 201 else None
+        self._paso("quien la inició la ve (es suya) y el personal del MINSA también",
+                   self._http("get", f"/tramites/{propio}/", tok(func_mop)).status_code == 200 and self._http("get", f"/tramites/{propio}/", tok(func_minsa)).status_code == 200)
         r = self._http("post", f"/tramites/{propio}/estado/", tok(func_mop), {"estado": "En Tramitacion"})
-        self._paso("un funcionario no gestiona un trámite que él mismo pidió (conflicto de interés)", r.status_code == 403)
+        self._paso("quien la inició no la gestiona: pertenece a otra institución", r.status_code in (403, 404), r.status_code)
+        r = self._http("post", "/tramites/", tok(ana), {"tipo_tramite": inter_minsa.pk})
+        self._paso("la ciudadanía no inicia solicitudes interinstitucionales", r.status_code == 403)
 
         # ---------------------------------------------------------------- reasignación
         r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(func_mop), {"funcionario_id": func2_mop.pk})

@@ -1,5 +1,5 @@
 """Pruebas de la API de trámites que no usan la base: entrada, salida y la auditoría de rutas."""
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -45,8 +45,66 @@ def test_paginacion_invalida_se_rechaza(params):
 
 # --------------------------------------------------------------------------- plazos
 
-def test_la_fecha_limite_suma_los_dias_del_plazo():
-    assert ser.calcular_fecha_limite(AHORA, 15) == AHORA + timedelta(days=15)
+PANAMA = timezone(timedelta(hours=-5))  # America/Panama no tiene horario de verano
+
+
+def panama(anio, mes, dia, hora=10):
+    return datetime(anio, mes, dia, hora, 0, tzinfo=PANAMA)
+
+
+def test_un_dia_habil_desde_un_martes_es_el_miercoles():
+    assert ser.sumar_dias_habiles(panama(2026, 10, 20), 1, set()) == panama(2026, 10, 21)
+
+
+def test_el_fin_de_semana_no_cuenta():
+    # viernes + 1 día hábil = lunes, a la misma hora
+    assert ser.sumar_dias_habiles(panama(2026, 10, 23), 1, set()) == panama(2026, 10, 26)
+    # viernes + 5 días hábiles = viernes siguiente
+    assert ser.sumar_dias_habiles(panama(2026, 10, 23), 5, set()) == panama(2026, 10, 30)
+
+
+def test_si_se_inicia_en_fin_de_semana_cuenta_desde_el_lunes():
+    assert ser.sumar_dias_habiles(panama(2026, 10, 24), 1, set()) == panama(2026, 10, 26)   # sábado
+    assert ser.sumar_dias_habiles(panama(2026, 10, 25), 1, set()) == panama(2026, 10, 26)   # domingo
+
+
+def test_los_feriados_no_cuentan_ni_seguidos():
+    # tres feriados seguidos (martes, miércoles y jueves): lunes 2 + 1 día hábil llega al viernes 6
+    fiestas = {date(2026, 11, 3), date(2026, 11, 4), date(2026, 11, 5)}
+    assert ser.sumar_dias_habiles(panama(2026, 11, 2), 1, fiestas) == panama(2026, 11, 6)
+
+
+def test_el_plazo_cruza_el_cambio_de_anio():
+    feriados = {date(2025, 12, 25), date(2026, 1, 1), date(2026, 1, 9)}
+    # miércoles 24-dic-2025 + 5 días hábiles: 26, 29, 30, 31 de diciembre y 2 de enero
+    assert ser.sumar_dias_habiles(panama(2025, 12, 24), 5, feriados) == panama(2026, 1, 2)
+
+
+def test_cero_dias_es_el_mismo_momento():
+    assert ser.sumar_dias_habiles(panama(2026, 10, 20), 0, set()) == panama(2026, 10, 20)
+
+
+def test_conserva_la_hora_y_devuelve_hora_de_panama_aunque_llegue_en_utc():
+    resultado = ser.sumar_dias_habiles(AHORA, 1, set())   # 20-oct 12:00 UTC = 07:00 en Panamá
+    assert resultado == panama(2026, 10, 21, 7) and resultado.utcoffset() == timedelta(hours=-5)
+
+
+@pytest.mark.parametrize("dias", [-1, 1.5, True, "3", None])
+def test_un_plazo_invalido_se_rechaza(dias):
+    with pytest.raises(ValueError):
+        ser.sumar_dias_habiles(panama(2026, 10, 20), dias, set())
+
+
+def test_la_fecha_limite_usa_dias_habiles():
+    assert ser.calcular_fecha_limite(panama(2026, 10, 23), 1, set()) == panama(2026, 10, 26)
+
+
+def test_escalado_se_muestra_al_personal_y_a_la_ciudadania():
+    escalado = ser.tramite_a_dict(un_tramite(escalado_en=AHORA), personal=False, ahora=AHORA)
+    assert escalado["escalado"] is True and "escalado_en" not in escalado
+    personal = ser.tramite_a_dict(un_tramite(escalado_en=AHORA), personal=True, ahora=AHORA)
+    assert personal["escalado"] is True and personal["escalado_en"] == AHORA.isoformat()
+    assert ser.tramite_a_dict(un_tramite(), personal=True, ahora=AHORA)["escalado"] is False
 
 
 @pytest.mark.parametrize("segundos,estado,vencido", [
@@ -67,7 +125,7 @@ def test_sin_fecha_limite_no_esta_vencido():
 def un_tramite(**kw):
     base = dict(pk=9, tipo_tramite_id=1, tipo_tramite=SimpleNamespace(nombre="Permiso"), institucion_id=3,
                 institucion=SimpleNamespace(nombre="MOP"), estado="En Tramitacion", fecha_limite=AHORA + timedelta(days=3),
-                creado_en=AHORA, solicitante_id=77, funcionario_asignado_id=88, sensibilidad=2)
+                creado_en=AHORA, solicitante_id=77, funcionario_asignado_id=88, sensibilidad=2, escalado_en=None)
     base.update(kw)
     return SimpleNamespace(**base)
 

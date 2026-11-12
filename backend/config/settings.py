@@ -100,6 +100,12 @@ DATABASES["auditoria"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
                           "USER": os.environ.get("SIGET_DB_AUDITOR_USER", "auditor_role"),
                           "PASSWORD": _leer("SIGET_DB_AUDITOR_PASSWORD", "")}
 
+# El escalamiento automático de trámites vencidos corre con SU PROPIO rol (escalador_role, migración 013): solo puede
+# EXECUTE sobre siget.escalar_vencidos(); no lee ni escribe ninguna tabla directamente. Lo usa un temporizador de systemd.
+DATABASES["escalador"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
+                          "USER": os.environ.get("SIGET_DB_ESCALADOR_USER", "escalador_role"),
+                          "PASSWORD": _leer("SIGET_DB_ESCALADOR_PASSWORD", "")}
+
 # --- Contraseñas: Argon2 primero ---
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
 
