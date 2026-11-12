@@ -49,6 +49,7 @@ export const ACCIONES_EVENTO = {
   creacion: 'Trámite iniciado',
   cambio_estado: 'Cambio de estado',
   reasignacion: 'Reasignación',
+  documento_adjuntado: 'Documento adjuntado',
 }
 
 export function Estado({ valor }) {
