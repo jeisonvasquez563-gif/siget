@@ -1642,3 +1642,12 @@ Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/ps
 ### 35.2 Volver atrás
 
 `systemctl --user disable --now siget-escalar.timer` detiene el escalamiento sin tocar datos. La columna y la tabla pueden quedarse; los eventos `escalamiento` ya escritos son inalterables, como toda la auditoría.
+
+### 35.3 Registro de la aplicación (12 de noviembre de 2026)
+
+1. VM2: respaldo con `systemctl start siget-respaldo.service`, restauración verificada (`tramites_demo-20261112-165343.dump`). Las migraciones 011 y 012 ya estaban aplicadas.
+2. VM2: ensayo de la migración 013 junto con sus pruebas, en una sola transacción terminada en `ROLLBACK` (10 de 10, sin dejar nada). Después se aplicó de verdad y se repitieron las pruebas: 10 de 10.
+3. VM2: línea de `escalador_role` en `/home/siget/config/pg_hba.conf` (respaldo: `pg_hba.conf.respaldo-2026-11-12`). **Ojo:** el archivo está montado en el contenedor por inodo. Si se reemplaza el archivo, por ejemplo con `install`, el contenedor sigue viendo el viejo y `pg_reload_conf()` no alcanza: hay que reiniciar `siget-postgres.service`, que reaplica la etiqueta `:Z`. El archivo debe quedar en `644` para que lo lea el usuario `postgres` del contenedor.
+4. Contraseña de `escalador_role`: se generó en VM2 (`openssl rand`), se fijó con `ALTER ROLE` por la entrada estándar de psql (con `log_statement = none`) y se pasó por una tubería SSH a `podman secret create siget-db-escalador-password -` en VM1. Nunca se mostró ni se guardó en un archivo.
+5. VM1: imagen del backend reconstruida con las correcciones del análisis (PR #7) y PT-3 combinadas (respaldo: `siget-backend:respaldo-2026-11-12`). Antes de construir se normalizaron los finales de línea a LF. Se crearon `~/.config/systemd/user/siget-escalar.{service,timer}` y se activó el temporizador. La primera corrida escaló 41 trámites vencidos.
+6. `verificar_tramites` 63 de 63 y `verificar_autenticacion` 84 de 84 contra la base real.
