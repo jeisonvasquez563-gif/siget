@@ -49,6 +49,7 @@ export const ACCIONES_EVENTO = {
   creacion: 'Trámite iniciado',
   cambio_estado: 'Cambio de estado',
   reasignacion: 'Reasignación',
+  escalamiento: 'Escalado a supervisión',
 }
 
 export function Estado({ valor }) {
@@ -94,6 +95,7 @@ export function Plazo({ tramite }) {
     <div>
       <progress className={`plazo ${p.clase}`} max="100" value={Math.round(p.valor * 100)} aria-label="Tiempo transcurrido del plazo" />
       <span className={`plazo-texto ${p.clase}`}>{p.texto}</span>
+      {tramite.escalado && !FINALES.includes(tramite.estado) && <span className="etiqueta-escalado">Escalado a supervisión</span>}
     </div>
   )
 }
