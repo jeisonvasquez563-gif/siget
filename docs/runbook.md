@@ -1637,3 +1637,11 @@ Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/ps
 **Importante:** sin `siget-docs-key` los archivos no se pueden descifrar. La clave se respalda **aparte** de los archivos (nunca en el mismo lugar) y su rotación se registra en la consola de secretos. El respaldo de VM1 debe incluir el volumen `siget-documentos`.
 
 **Volver atrás:** volver al `siget-backend.container` anterior y reiniciar. La carga responde `503` mientras no haya clave. La tabla y el volumen pueden quedarse.
+
+### 37.2 Registro de la aplicación (12 de noviembre de 2026)
+
+1. VM2: respaldo verificado (`tramites_demo-20261112-174700.dump`, 16 tablas), ensayo de la migración 015 con 4 comprobaciones terminado en `ROLLBACK`, y después la migración real.
+2. VM1: la clave `siget-docs-key` se generó con `head -c 32 /dev/urandom | base64 -w0 | podman secret create siget-docs-key -` (nunca se mostró). **Pendiente: respaldarla fuera de VM1**, separada de los archivos.
+3. **La unidad del backend en producción tenía `Environment=SIGET_INACTIVIDAD_MINUTOS=2`, que no está en el repositorio** (ajuste de la demo, rama `chore/inactividad-demo`). La unidad nueva se armó sobre la de producción agregando solo las líneas de PT-8; la anterior quedó en `/home/siget/siget-backend.container.respaldo-2026-11-12c`. Antes de copiar cualquier unidad del repositorio, compararla con la de producción.
+4. Backend e interfaz con el PR #7, PT-3, PT-2 y PT-8 combinados (respaldos `siget-backend:respaldo-2026-11-12c` y `frontend.respaldo-2026-11-12c`). Dentro del contenedor: el volumen `/datos` pertenece al usuario 1001 (opción `U`) y se puede escribir; el resto sigue de solo lectura; la clave está montada. Se probó un cifrado y descifrado real con la clave y el volumen de producción, sin dejar rastro.
+5. `verificar_tramites` 77 de 77, `verificar_plataforma` 91 de 91, `verificar_autenticacion` 84 de 84 y ensayo 101 de 101.

@@ -204,7 +204,9 @@ class Command(BaseCommand):
             self._paso("el personal de la institución ve los documentos (con la huella SHA-256)", r.status_code == 200 and len(r.json()["documentos"]) == 1 and "sha256" in r.json()["documentos"][0])
             self._paso("el personal no adjunta documentos en nombre de la persona (403)", subir(tok(func_mop), "a.pdf", pdf).status_code == 403)
             self._paso("el personal de otra institución no los ve (404)", self._http("get", f"/tramites/{tramite_ana}/documentos/{doc.get('id')}/", tok(func_minsa)).status_code == 404)
-            self._paso("un rol de plataforma no ve documentos (403)", self._http("get", f"/tramites/{tramite_ana}/documentos/", tok(operador)).status_code == 403)
+            # La seguridad por filas oculta el trámite antes de llegar al PDP: para el operador no existe (404, no 403)
+            self._paso("un rol de plataforma no ve documentos (para él el trámite no existe: 404)",
+                       self._http("get", f"/tramites/{tramite_ana}/documentos/", tok(operador)).status_code == 404)
             pathlib.Path(carpeta, fila.ubicacion[:2], fila.ubicacion).write_bytes(en_disco[:-1] + bytes([en_disco[-1] ^ 1]))
             r = self._http("get", f"/tramites/{tramite_ana}/documentos/{doc.get('id')}/", tok(ana))
             self._paso("un archivo alterado en disco no se entrega (falla la verificación de integridad)", r.status_code == 500 and r.json()["codigo"] == "documento_no_disponible")
@@ -280,10 +282,11 @@ class Command(BaseCommand):
         eventos = r.json()["eventos"]
         acciones = [e["accion"] for e in eventos]
         self._paso("el solicitante ve el historial completo de su trámite, en orden",
-                   r.status_code == 200 and acciones == ["creacion", "cambio_estado", "reasignacion", "cambio_estado"], acciones)
+                   r.status_code == 200 and acciones == ["creacion", "documento_adjuntado", "cambio_estado", "reasignacion", "cambio_estado"], acciones)
         self._paso("pero sin saber quién actuó ni el detalle interno", all("actor_id" not in e and "atributos" not in e for e in eventos))
         r = self._http("get", f"/tramites/{tramite_ana}/historial/", tok(func_mop))
-        self._paso("el personal ve quién actuó en cada paso", all("actor_id" in e for e in r.json()["eventos"]) and r.json()["eventos"][1]["actor_id"] == func_mop.pk)
+        self._paso("el personal ve quién actuó en cada paso", all("actor_id" in e for e in r.json()["eventos"])
+                   and next(e for e in r.json()["eventos"] if e["accion"] == "cambio_estado")["actor_id"] == func_mop.pk)
         self._paso("otra ciudadana recibe 404 al pedir el historial", self._http("get", f"/tramites/{tramite_ana}/historial/", tok(beto)).status_code == 404)
 
         # ---------------------------------------------------------------- decisiones registradas
