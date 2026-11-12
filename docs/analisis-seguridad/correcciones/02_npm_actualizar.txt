@@ -1,0 +1,12 @@
+# Corrección: actualizar vite, vitest, plugin-react y eslint a versiones sin vulnerabilidades
+# 2026-11-08 13:46:40  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5\frontend
+$ npm install -D vite@7.3.7 vitest@4.1.12 @vitejs/plugin-react@5 eslint@^9 @eslint/js@^9
+
+added 9 packages, removed 11 packages, changed 24 packages, and audited 403 packages in 1m
+
+136 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+# código de salida: 0

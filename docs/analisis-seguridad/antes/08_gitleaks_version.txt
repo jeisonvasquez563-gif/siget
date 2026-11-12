@@ -1,0 +1,5 @@
+# Versión de Gitleaks
+# 2026-11-08 13:43:30  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ gitleaks version
+8.30.1
+# código de salida: 0

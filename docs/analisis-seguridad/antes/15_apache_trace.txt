@@ -1,0 +1,14 @@
+# Prueba del método TRACE y de la cabecera Server en Apache, puerto 80 (inicial)
+# 2026-11-08 14:03:35  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ curl -sS -i -X TRACE http://192.168.159.137/
+HTTP/1.1 200 OK
+Date: Sun, 08 Nov 2026 19:03:35 GMT
+Server: Apache/2.4.62 (Rocky Linux) mod_wsgi/4.7.1 Python/3.9
+Transfer-Encoding: chunked
+Content-Type: message/http
+
+TRACE / HTTP/1.1
+Host: 192.168.159.137
+User-Agent: curl/8.21.0
+Accept: */*
+# código de salida: 0

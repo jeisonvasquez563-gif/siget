@@ -1,0 +1,13 @@
+# Control: el checkpoint PHP sigue respondiendo, sin versiones y con la cookie protegida (después)
+# 2026-11-08 14:45:06  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ curl -sS -I http://192.168.159.137/gestion/
+HTTP/1.1 302 Found
+Date: Sun, 08 Nov 2026 19:45:06 GMT
+Server: Apache
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Set-Cookie: PHPSESSID=5as1os533rf05c48b55og1v1a7; path=/; HttpOnly; SameSite=Strict
+Location: login.php
+Content-Type: text/html; charset=UTF-8
+# código de salida: 0

@@ -86,6 +86,9 @@ const TIPOS = [
   { id: 5, nombre: 'Denuncia ciudadana 311', sla_dias: 5, institucion: { id: 5, nombre: 'Ministerio Público / 311' } },
   { id: 6, nombre: 'Registro de microempresa', sla_dias: 10, institucion: { id: 6, nombre: 'AMPYME' } },
 ]
+TIPOS.forEach((t) => { t.audiencia = 'ciudadania' })
+// Cada institución recibe también solicitudes de otras instituciones (audiencia «institucion»)
+for (const base of TIPOS.slice(0, 6)) TIPOS.push({ id: TIPOS.length + 1, nombre: 'Solicitud interinstitucional de información', sla_dias: 5, institucion: base.institucion, audiencia: 'institucion' })
 
 let siguiente = 40
 const T = (id, tipo, estado, solicitante, asignado, creadoDias, sla, extra = {}) => {
@@ -240,6 +243,8 @@ export function instalarMock(inicial, opciones = {}) {
     if (camino === '/tramites/' && metodo === 'POST') {
       const tipo = TIPOS.find((t) => t.id === cuerpo.tipo_tramite)
       if (!tipo) return resp(404, { codigo: 'tipo_tramite_inexistente' })
+      if (u.membresias.some((m) => m.institucion_id === tipo.institucion.id)) return negado()
+      if (u.membresias.length > 0 ? tipo.audiencia === 'ciudadania' : tipo.audiencia === 'institucion') return negado()
       const t = T(siguiente++, tipo.id, 'Pendiente', u.id, null, 0, tipo.sla_dias)
       TRAMITES.push(t)
       EVENTOS[t.id] = [ev(Date.now(), t.id, 'creacion', null, 'Pendiente', u.id, 1000)]

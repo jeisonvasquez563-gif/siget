@@ -20,6 +20,7 @@ class TipoTramite(ModeloDeEsquema):
     institucion = models.ForeignKey(Institucion, on_delete=models.DO_NOTHING, db_column="institucion_id")
     nombre = models.TextField()
     sla_dias = models.IntegerField()
+    audiencia = models.TextField(default="ciudadania")  # ciudadania | institucion | ambas
 
     class Meta(ModeloDeEsquema.Meta):
         db_table = "tipo_tramite"

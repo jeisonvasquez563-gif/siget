@@ -1,0 +1,6 @@
+# Versión de Bandit
+# 2026-11-08 13:35:58  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ bandit --version
+python.exe <carpeta-herramientas>\sast\Scripts\bandit 1.9.4
+  python version = 3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]
+# código de salida: 0

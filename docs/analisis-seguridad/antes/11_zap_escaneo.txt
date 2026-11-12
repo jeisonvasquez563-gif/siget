@@ -1,0 +1,79 @@
+# OWASP ZAP 2.17.0 — exploración y escaneo activo de la plataforma (inicial)
+# 2026-11-08 13:56:51  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ java -Xmx2g -jar <carpeta-herramientas>/zap/ZAP_2.17.0/zap-2.17.0.jar -cmd -port 8099 -dir <carpeta-herramientas>/zaphome -autorun C:/Users/jeiva/Desktop/Proyecto-Ciber5/docs/analisis-seguridad/herramientas/zap-plan.yaml
+Defaulting ZAP install dir to <carpeta-herramientas>\zap\ZAP_2.17.0
+Job semillas set url = https://192.168.159.137:8443/
+Job semillas set url = https://192.168.159.137:8443/index.html
+Job semillas set url = https://192.168.159.137:8443/salud/
+Job semillas set url = https://192.168.159.137:8443/auth/yo/
+Job semillas set url = https://192.168.159.137:8443/auth/actividad/
+Job semillas set url = https://192.168.159.137:8443/catalogo/instituciones/
+Job semillas set url = https://192.168.159.137:8443/catalogo/tipos-tramite/?institucion=1
+Job semillas set url = https://192.168.159.137:8443/tramites/
+Job semillas set url = https://192.168.159.137:8443/equipo/
+Job semillas set url = https://192.168.159.137:8443/politicas/simular/
+Job semillas set url = https://192.168.159.137:8443/auth/login/
+Job semillas set method = POST
+Job semillas set headers = [Content-Type: application/json]
+Job semillas set data = {"username":"zap.prueba","password":"no-es-una-clave"}
+Job semillas set url = https://192.168.159.137:8443/auth/registro/
+Job semillas set method = POST
+Job semillas set headers = [Content-Type: application/json]
+Job semillas set data = {"username":"zap.prueba","password":"corta"}
+Job semillas set url = https://192.168.159.137:8443/auth/restablecer/
+Job semillas set method = POST
+Job semillas set headers = [Content-Type: application/json]
+Job semillas set data = {"username":"zap.prueba","codigo":"AAAA-BBBB-CCCC","password":"corta"}
+Job semillas set url = https://192.168.159.137:8443/auth/refresh/
+Job semillas set method = POST
+Job semillas set headers = [Content-Type: application/json]
+Job semillas set data = {}
+Job semillas set url = http://192.168.159.137:8080/
+Job spider set context = SIGET
+Job spider set maxDuration = 3
+Job passiveScan-wait set maxDuration = 5
+Job activeScan set context = SIGET
+Job activeScan set maxScanDurationInMins = 25
+Job activeScan set threadPerHost = 2
+Job activeScan set delayInMs = 60
+Job report set template = traditional-html
+Job report set reportDir = ${ZAP_SALIDA}
+Job report set reportFile = zap_reporte
+Job report set reportTitle = SIGET � OWASP ZAP
+Job report set template = traditional-json
+Job report set reportDir = ${ZAP_SALIDA}
+Job report set reportFile = zap_reporte
+Job requestor started
+Job semillas requesting URL https://192.168.159.137:8443/
+Job semillas requesting URL https://192.168.159.137:8443/index.html
+Job semillas requesting URL https://192.168.159.137:8443/salud/
+Job semillas requesting URL https://192.168.159.137:8443/auth/yo/
+Job semillas requesting URL https://192.168.159.137:8443/auth/actividad/
+Job semillas requesting URL https://192.168.159.137:8443/catalogo/instituciones/
+Job semillas requesting URL https://192.168.159.137:8443/catalogo/tipos-tramite/?institucion=1
+Job semillas requesting URL https://192.168.159.137:8443/tramites/
+Job semillas requesting URL https://192.168.159.137:8443/equipo/
+Job semillas requesting URL https://192.168.159.137:8443/politicas/simular/
+Job semillas requesting URL https://192.168.159.137:8443/auth/login/
+Job semillas requesting URL https://192.168.159.137:8443/auth/registro/
+Job semillas requesting URL https://192.168.159.137:8443/auth/restablecer/
+Job semillas requesting URL https://192.168.159.137:8443/auth/refresh/
+Job semillas requesting URL http://192.168.159.137:8080/
+Job requestor finished, time taken: 00:00:04
+Job spider started
+Job spider requesting URL https://192.168.159.137:8443
+Job spider found 42 URLs
+Job spider finished, time taken: 00:00:01
+Job passiveScan-wait started
+Job passiveScan-wait finished, time taken: 00:00:01
+Job activeScan started
+Job activeScan finished, time taken: 00:03:53
+Job report started
+Job report generated report C:\Users\jeiva\Desktop\Proyecto-Ciber5\docs\analisis-seguridad\antes\zap_reporte.html
+Job report finished, time taken: 00:00:00
+Job report started
+Job report generated report C:\Users\jeiva\Desktop\Proyecto-Ciber5\docs\analisis-seguridad\antes\zap_reporte.json
+Job report finished, time taken: 00:00:00
+Automation plan succeeded!
+No check for updates for over 3 month - add-ons may well be out of date
+# código de salida: 0

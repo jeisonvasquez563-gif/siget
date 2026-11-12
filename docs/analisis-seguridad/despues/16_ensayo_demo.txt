@@ -1,0 +1,132 @@
+# Ensayo de la demostración contra producción, con cuentas de prueba (después del despliegue)
+# 2026-11-12 16:36:06  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ python demo/ensayo.py
+Esperando el siguiente intervalo del segundo factor (23 s)…
+
+== 0. Preparación: servidores, certificado, hora y seguridad de la puerta
+  OK    la plataforma responde por HTTPS (/salud/)  [{'estado': 'ok'}]
+  OK    la hora de VM1 coincide con la del PC (el segundo factor depende de ella)  [0.3 s de diferencia]
+  OK    cabecera de seguridad strict-transport-security
+  OK    cabecera de seguridad content-security-policy
+  OK    cabecera de seguridad x-content-type-options
+  OK    cabecera de seguridad x-frame-options
+  OK    el certificado vence dentro de más de 30 días  [vence 20-10-2027]
+  OK    se negocia TLS 1.3  [TLSv1.3]
+  OK    GET / responde 200  [200]
+  OK    GET /index.html responde 200  [200]
+  OK    GET /admin responde 404  [404]
+  OK    GET /assets/inexistente.js responde 404  [404]
+  OK    GET /tramites/ responde 401  [401]
+  OK    los archivos de la interfaz (JS y CSS) se sirven  [3 archivos]
+
+== 1. Ana (ciudadana): login, menú, iniciar un trámite, historial
+  OK    paso 1: contraseña correcta sin código -> el servidor pide el código  [401]
+  OK    un usuario inexistente no responde «pide código» (no delata quién tiene segundo factor)  [401]
+  OK    crear cuenta sin datos personales se rechaza (400, dice qué falta)  [400]
+  OK    entra con usuario, contraseña y código del segundo factor  [200]
+  OK    el servidor informa el tiempo de inactividad (la interfaz no lo escribe a mano)  [2 min]
+  OK    su menú es el de la ciudadanía  [['mis_tramites', 'nuevo_tramite', 'seguridad', 'mfa', 'roles_permisos']]
+  OK    ve sus trámites y ningún dato interno del personal  [40]
+  OK    inicia un trámite del MOP  [#116]
+  OK    el historial muestra la creación y no revela quién actuó
+  OK    no puede cambiar el estado (403)  [403]
+  OK    no ve el equipo (403)  [403]
+  OK    ve la matriz de permisos: no hay superusuario
+  OK    los permisos de la base de datos (información técnica) no son para la ciudadanía (403)  [403]
+
+== 2. Fabio (funcionario del MOP): bandeja, cambiar estado, conflicto de interés
+  OK    entra  [200]
+  OK    ve el trámite nuevo de Ana en su bandeja  [59 trámites]
+  OK    solo ve trámites del MOP y sus propias solicitudes a otras instituciones
+  OK    lo pasa a «En tramitación» (el segundo factor del login sigue vigente 15 minutos)  [200]
+  OK    lo aprueba  [200]
+  OK    un estado final no admite más cambios (403)  [403]
+  OK    no puede iniciar un trámite en su propia institución (el MOP no se hace trámites a sí mismo)  [403]
+  OK    sí puede iniciar una solicitud interinstitucional hacia el MINSA  [201]
+  OK    pero no la gestiona: la atiende el personal del MINSA  [403]
+  OK    y la ciudadanía no puede iniciar solicitudes interinstitucionales  [403]
+  OK    el personal ve el historial completo con quién actuó
+  OK    y Ana lo ve (sin actores)
+
+== 3. Saúl (supervisor): reasignar y equipo
+  OK    entra  [200]
+  OK    ve al equipo del MOP  [['carla.mop', 'fabio.mop', 'flor.mop', 'saul.mop']]
+  OK    reasigna un trámite a Flor  [200]
+  OK    un funcionario no puede reasignar (403)  [403]
+  OK    Fabio no mueve lo asignado a Flor (403)  [403]
+
+== 4. Félix (MINSA) y Carla (coordinadora)
+  OK    Félix solo ve el MINSA: lo del MOP no existe para él
+  OK    pedir un trámite del MOP da 404 (no revela que existe)  [404]
+  OK    Carla ve el equipo pero ningún trámite de la institución  [equipo 200, trámites 0]
+
+== 5. Ines (operadora de infraestructura): su menú y el acceso negado
+  OK    su menú es distinto: solo su consola
+  OK    ver trámites: 403 del servidor  [403]
+
+== 6. Aldo (auditor): consola de auditoría
+  OK    el resumen muestra decisiones permitidas y negadas  [{'total': 903, 'permitidas': 620, 'negadas': 283, 'ultimas_24h': 25, 'negadas_24h': 9}]
+  OK    las negadas incluyen el conflicto de interés y a Ines intentando ver trámites  [['audiencia_no_corresponde', 'conflicto_de_interes', 'control_dual', 'personal_no_inicia_en_su_institucion', 'plataforma_sin_acceso_a_tramites', 'sin_regla_que_permita']]
+  OK    las actuaciones recientes incluyen lo que acabamos de hacer en el ensayo
+  OK    el auditor tampoco ve trámites (403)  [403]
+  OK    un supervisor no accede a la auditoría (403)  [403]
+
+== 7. Segundo factor: verificar y comprobar que un código no se reutiliza
+  OK    un código nuevo se acepta y renueva la ventana  [200]
+  OK    el MISMO código se rechaza (anti-repetición)  [400]
+  OK    su actividad de seguridad muestra el inicio de sesión y la verificación  [['mfa_verificacion_fallida', 'mfa_verificado', 'login_ok', 'logout', 'refresh_ok', 'login_ok']]
+  OK    el estado de MFA: activo y obligatorio
+
+== 8. Roles y permisos, base de datos y simulador
+  OK    la base de datos: ningún rol de la aplicación es superusuario
+  OK    simulador: el conflicto de interés se niega con su política
+  OK    simulador: con el factor vencido se niega y dice qué lo arreglaría
+
+== 9. Cierre de sesión y token
+  OK    Ana cierra sesión  [200]
+  OK    su token ya no sirve tras cerrar la sesión (401)  [401]
+
+== 10. Consolas de plataforma, control dual y recuperación de contraseña
+  (se espera un minuto: el límite de intentos de inicio de sesión es de 10 por minuto)
+  OK    ivan.identidades entra  [200]
+  OK    irene.identidades entra  [200]
+  OK    sergio.seguridad entra  [200]
+  OK    silvia.secretos entra  [200]
+  OK    ines.infra entra  [200]
+  OK    su consola figura como disponible en el menú que arma el servidor
+  OK    identidades lista las personas sin hashes ni datos personales  [200]
+  OK    la ciudadanía no entra a las consolas  [401]
+  OK    infraestructura no ve las personas (403)  [403]
+  OK    ninguna consola da acceso a trámites: identidades recibe 403  [403]
+  OK    identidades no ve los secretos (403)  [403]
+  OK    identidades propone un alta de coordinadora  [201]
+  OK    CONTROL DUAL: quien propone no puede aprobar (403)  [403]
+  OK    otro rol de plataforma tampoco aprueba (403)  [403]
+  OK    otra persona de identidades revisa y rechaza (el ensayo no deja altas aplicadas)  [200]
+  OK    queda registrado quién propuso y quién resolvió
+  OK    emite un código de restablecimiento (se muestra una sola vez)  [201]
+  OK    nadie se emite un código a sí mismo (409)  [409]
+  OK    un código inválido y un usuario inexistente responden IGUAL (no se enumera)  [400/400]
+  OK    una contraseña débil se rechaza y NO gasta el código  [400]
+  OK    seguridad ve los eventos de seguridad recientes  [200]
+  OK    nadie bloquea su propia cuenta (409)  [409]
+  OK    identidades no bloquea cuentas (403)  [403]
+  OK    seguridad no ve la infraestructura (403)  [403]
+  OK    el custodio ve el estado de sus 8 secretos, sin valores  [200]
+  OK    infraestructura ve la base viva con la conexión cifrada TLS 1.3  [TLSv1.3]
+  OK    y el certificado de nginx vence dentro de más de 30 días  [342]
+  OK    carla.mop entra para la gestión del equipo  [200]
+  OK    saul.mop entra para la gestión del equipo  [200]
+  OK    la coordinadora ve su equipo y puede gestionar al personal, no a sí misma ni a las coordinaciones  [200]
+  OK    el supervisor ve el equipo pero no lo puede gestionar  [200]
+  OK    el supervisor no asigna personal (403)  [403]
+  OK    nadie se asigna a sí mismo (409)  [409]
+  OK    una cuenta de plataforma no puede ser personal de una institución (400)  [400]
+  OK    un operador de plataforma no gestiona equipos (403)  [403]
+  OK    la lista de instituciones de la puerta del personal es pública y solo trae id y nombre  [200]
+  OK    una puerta que no existe responde como cualquier credencial inválida  [401]
+  OK    equivocarse de puerta sin credenciales válidas no revela quién es personal de una institución  [401]
+
+ENSAYO: 101 de 101 comprobaciones correctas
+Se creó el trámite #116 (aprobado) y el #118 (asignado a Flor) durante el ensayo; la solicitud interinstitucional #117 es de Fabio.
+# código de salida: 0

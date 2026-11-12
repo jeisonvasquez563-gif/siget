@@ -13,7 +13,7 @@ from unittest import mock
 
 from django.conf import settings
 from django.core.cache import cache
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -116,16 +116,19 @@ class Command(BaseCommand):
     def _crear(self, usuario, institucion):
         tipo = TipoTramite.objects.filter(institucion__nombre=institucion).order_by("id").first()
         r = self._http("post", "/tramites/", usuario, {"tipo_tramite": tipo.pk})
-        assert r.status_code == 201, (usuario, r.status_code, r.content[:200])
+        if not (r.status_code == 201):
+            raise CommandError(f"respuesta inesperada de la API: {usuario, r.status_code, r.content[:200]}")
         return r.json()["id"]
 
     def _estado(self, usuario, tramite, estado):
         r = self._http("post", f"/tramites/{tramite}/estado/", usuario, {"estado": estado})
-        assert r.status_code == 200, (usuario, tramite, estado, r.status_code, r.content[:200])
+        if not (r.status_code == 200):
+            raise CommandError(f"respuesta inesperada de la API: {usuario, tramite, estado, r.status_code, r.content[:200]}")
 
     def _asignar(self, usuario, tramite, destino):
         r = self._http("post", f"/tramites/{tramite}/reasignar/", usuario, {"funcionario_id": destino.pk})
-        assert r.status_code == 200, (usuario, tramite, r.status_code, r.content[:200])
+        if not (r.status_code == 200):
+            raise CommandError(f"respuesta inesperada de la API: {usuario, tramite, r.status_code, r.content[:200]}")
 
     def _tramites(self, n, instituciones):
         if not {"ana.ciudadana", "beto.ciudadano", "fabio.mop", "flor.mop", "saul.mop", "felix.minsa"} <= set(n):

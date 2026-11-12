@@ -1,0 +1,76 @@
+# Nmap — puertos, servicios y cifrados TLS de VM1 (inicial)
+# 2026-11-08 13:55:45  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ nmap -Pn -sV -p 22,80,443,5432,8080,8443,9090 --script ssl-enum-ciphers,http-security-headers,http-methods 192.168.159.137
+Starting Nmap 7.991 ( https://nmap.org ) at 2026-11-08 13:55 -0500
+Nmap scan report for 192.168.159.137
+Host is up (0.00080s latency).
+
+PORT     STATE    SERVICE    VERSION
+22/tcp   open     ssh        OpenSSH 8.7 (protocol 2.0)
+80/tcp   open     http       Apache httpd 2.4.62 ((Rocky Linux) mod_wsgi/4.7.1 Python/3.9)
+|_http-server-header: Apache/2.4.62 (Rocky Linux) mod_wsgi/4.7.1 Python/3.9
+| http-methods: 
+|   Supported Methods: GET POST OPTIONS HEAD TRACE
+|_  Potentially risky methods: TRACE
+443/tcp  filtered https
+5432/tcp filtered postgresql
+8080/tcp open     http       nginx
+| http-security-headers: 
+|   Strict_Transport_Security: 
+|     Header: Strict-Transport-Security: max-age=31536000; includeSubDomains
+|   X_Frame_Options: 
+|     Header: X-Frame-Options: DENY
+|     Description: The browser must not display this content in any frame.
+|   X_Content_Type_Options: 
+|     Header: X-Content-Type-Options: nosniff
+|     Description: Will prevent the browser from MIME-sniffing a response away from the declared content-type. 
+|   Content_Security_Policy: 
+|     Header: Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+|     Description: Define the base uri for relative uri.
+|     Description: Define loading policy for all resources type in case of a resource type dedicated directive is not defined (fallback).
+|     Description: Define from where the protected resource can be embedded in frames.
+|     Description: Define which URIs can be used as the action of HTML form elements.
+|   Cache_Control: 
+|     Header: Cache-Control: no-cache
+|   Expires: 
+|_    Header: Expires: Sun, 08 Nov 2026 18:56:06 GMT
+| http-methods: 
+|_  Supported Methods: GET HEAD POST OPTIONS
+8443/tcp open     ssl/http   nginx
+| http-security-headers: 
+|   Strict_Transport_Security: 
+|     Header: Strict-Transport-Security: max-age=31536000; includeSubDomains
+|   X_Frame_Options: 
+|     Header: X-Frame-Options: DENY
+|     Description: The browser must not display this content in any frame.
+|   X_Content_Type_Options: 
+|     Header: X-Content-Type-Options: nosniff
+|     Description: Will prevent the browser from MIME-sniffing a response away from the declared content-type. 
+|   Content_Security_Policy: 
+|     Header: Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+|     Description: Define the base uri for relative uri.
+|     Description: Define loading policy for all resources type in case of a resource type dedicated directive is not defined (fallback).
+|     Description: Define from where the protected resource can be embedded in frames.
+|     Description: Define which URIs can be used as the action of HTML form elements.
+|   Cache_Control: 
+|     Header: Cache-Control: no-cache
+|   Expires: 
+|_    Header: Expires: Sun, 08 Nov 2026 18:56:06 GMT
+| ssl-enum-ciphers: 
+|   TLSv1.3: 
+|     ciphers: 
+|       TLS_AKE_WITH_AES_128_CCM_SHA256 (secp256r1) - A
+|       TLS_AKE_WITH_AES_128_GCM_SHA256 (secp256r1) - A
+|       TLS_AKE_WITH_AES_256_GCM_SHA384 (secp256r1) - A
+|       TLS_AKE_WITH_CHACHA20_POLY1305_SHA256 (secp256r1) - A
+|     cipher preference: client
+|_  least strength: A
+| http-methods: 
+|_  Supported Methods: GET HEAD
+9090/tcp filtered zeus-admin
+MAC Address: 00:0C:29:FE:93:79 (VMware)
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 21.99 seconds
+Bug in http-security-headers: no string output.
+# código de salida: 0

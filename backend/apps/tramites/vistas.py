@@ -101,7 +101,8 @@ class TramitesColeccion(_Base):
         if tipo is None:
             return _error("tipo_tramite_inexistente", "Ese trámite no existe en el catálogo.", status.HTTP_404_NOT_FOUND)
         # El solicitante siempre es quien actúa: cualquier otro campo del cuerpo se ignora
-        autorizar(request, Accion.CREAR_TRAMITE, Recurso(tipo="tramite", institucion_id=tipo.institucion_id, solicitante_id=usuario.pk))
+        autorizar(request, Accion.CREAR_TRAMITE, Recurso(tipo="tramite", institucion_id=tipo.institucion_id, solicitante_id=usuario.pk,
+                                                                     audiencia=tipo.audiencia))
         ahora = timezone.now()
         tramite = Tramite.objects.create(tipo_tramite=tipo, institucion=tipo.institucion, solicitante=usuario,
                                          fecha_limite=calcular_fecha_limite(ahora, tipo.sla_dias))

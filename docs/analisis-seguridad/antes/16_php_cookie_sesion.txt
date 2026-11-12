@@ -1,0 +1,12 @@
+# Cookie de sesión del checkpoint PHP: atributos de seguridad (inicial)
+# 2026-11-08 14:41:15  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ curl -sS -I http://192.168.159.137/gestion/login.php
+HTTP/1.1 200 OK
+Date: Sun, 08 Nov 2026 19:41:15 GMT
+Server: Apache
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Set-Cookie: PHPSESSID=qhbr49kfqjq581dl673vcs7gha; path=/
+Content-Type: text/html; charset=UTF-8
+# código de salida: 0

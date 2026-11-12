@@ -1,0 +1,38 @@
+# Semgrep — reglas OWASP Top 10, Django, Python, React y secretos (después)
+# 2026-11-08 14:09:41  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ semgrep scan --metrics=off --config p/owasp-top-ten --config p/django --config p/python --config p/javascript --config p/react --config p/secrets --exclude .venv --exclude node_modules --exclude dist --exclude *.min.js --json-output=docs/analisis-seguridad/despues/semgrep.json backend frontend/src infra demo database
+               
+               
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 181 files tracked by git with 603 Code rules:
+                                                                                                                        
+  Language      Rules   Files          Origin      Rules                                                                
+ ─────────────────────────────        ───────────────────                                                               
+  <multilang>      48     181          Community     603                                                                
+  python          151      85                                                                                           
+  js               68      34                                                                                           
+  bash              1       5                                                                                           
+  json              3       4                                                                                           
+                                                                                                                        
+                
+                
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 0 (0 blocking)
+ • Rules run: 271
+ • Targets scanned: 181
+ • Parsed lines: ~100.0%
+ • Scan skipped: 
+   ◦ Files matching .semgrepignore patterns: 15
+ • Scan was limited to files tracked by git
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 271 rules on 181 files: 0 findings.
+(need more rules? `semgrep login` for additional free Semgrep Registry rules)
+
+If Semgrep missed a finding, please send us feedback to let us know!
+See https://semgrep.dev/docs/reporting-false-negatives/
+# código de salida: 0

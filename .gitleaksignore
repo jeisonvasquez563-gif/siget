@@ -1,0 +1,7 @@
+# Hallazgos de Gitleaks revisados y aceptados (ver docs/analisis-seguridad/).
+# Son contraseñas de PRUEBA del ensayo (demo/ensayo.py) que nunca fueron credenciales reales:
+# se usan para pedir un registro incompleto o un restablecimiento con un código falso, y el servidor
+# las rechaza antes de guardarlas. Desde la corrección, el ensayo genera esa contraseña al ejecutarse.
+e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5:demo/ensayo.py:generic-api-key:319
+e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5:demo/ensayo.py:generic-api-key:320
+39644bd260da5ca854240e9e24d41f03b0fc9d6e:demo/ensayo.py:generic-api-key:139
