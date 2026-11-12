@@ -19,7 +19,7 @@ from apps.catalogo.models import Institucion
 from apps.identidad.models import Membresia, Perfil, Usuario
 
 from . import bloqueo, canales, contrasenas, mfa, perfil, politica_sesion, restablecimiento, tokens
-from .models import EventoSeguridad, Restablecimiento, Sesion
+from .models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,31}$")
 ROLES_CON_MFA_SIEMPRE = {"funcionario", "supervisor", "coordinador_institucional"}
@@ -93,8 +93,17 @@ def _registrar_fallo(usuario, ip, ahora, motivo) -> Resultado:
 
 # --------------------------------------------------------------------------- registro e inicio de sesión
 
-def registrar_usuario(username, password, ip, datos_personales=None, hoy=None) -> Resultado:
-    """Crea la cuenta y su perfil en una sola transacción: o quedan las dos cosas o ninguna."""
+def registrar_usuario(username, password, ip, datos_personales=None, hoy=None, invitacion=None, modo=None, ahora=None) -> Resultado:
+    """Crea la cuenta y su perfil en una sola transacción: o quedan las dos cosas o ninguna.
+
+    Según SIGET_REGISTRO: «cerrado» no crea cuentas; «invitacion» exige un código vigente, que se gasta en la MISMA transacción
+    en que se crea la cuenta (si algo falla, el código sigue sirviendo). Los datos se validan ANTES que el código, así un error
+    de formulario no gasta la invitación. Cualquier problema con el código responde lo mismo («invitación inválida»)."""
+    modo = modo or settings.SIGET_REGISTRO
+    ahora = ahora or timezone.now()
+    if modo == "cerrado":
+        registrar_evento(None, "registro_rechazado", ip, {"motivo": "registro_cerrado"})
+        return Resultado(False, "registro_cerrado")
     username = (username or "").strip().lower() if isinstance(username, str) else ""
     errores = []
     if not USERNAME_RE.match(username):
@@ -107,7 +116,17 @@ def registrar_usuario(username, password, ip, datos_personales=None, hoy=None) -
     clave = settings.SIGET_MFA_KEY
     try:
         with transaction.atomic():
+            fila_invitacion = None
+            if modo == "invitacion":
+                normal = restablecimiento.normalizar(invitacion)
+                fila_invitacion = (Invitacion.objects.select_for_update().filter(codigo_hash=restablecimiento.huella(normal)).first()
+                                   if normal else None)
+                if fila_invitacion is None or not restablecimiento.vigente(fila_invitacion.vence_en, fila_invitacion.usada_en, ahora):
+                    registrar_evento(None, "registro_rechazado", ip, {"motivo": "invitacion_invalida", "huella": _huella(username)})
+                    return Resultado(False, "invitacion_invalida")
             usuario = Usuario.objects.create(username=username, password_hash=contrasenas.hashear(password))
+            if fila_invitacion is not None:
+                Invitacion.objects.filter(pk=fila_invitacion.pk).update(usada_en=ahora, usada_por=usuario.pk)
             Perfil.objects.create(
                 usuario=usuario, nombre=perfil_datos["nombre"], apellidos=perfil_datos["apellidos"],
                 cedula_cifrada=perfil.cifrar_cedula(clave, perfil_datos["cedula"]), cedula_huella=perfil.huella_cedula(clave, perfil_datos["cedula"]),
@@ -117,7 +136,8 @@ def registrar_usuario(username, password, ip, datos_personales=None, hoy=None) -
     except IntegrityError:
         # Usuario, cédula o correo ya registrados: se responde igual para no revelar quién está registrado
         return Resultado(False, "usuario_existente")
-    registrar_evento(usuario.pk, "registro", ip)  # sin datos personales: la bitácora de seguridad nunca lleva cédula ni correo
+    # sin datos personales: la bitácora de seguridad nunca lleva cédula ni correo
+    registrar_evento(usuario.pk, "registro", ip, {"invitacion": fila_invitacion.pk} if fila_invitacion is not None else None)
     return Resultado(True, "registrado", detalle={"id": usuario.pk})
 
 
@@ -291,6 +311,31 @@ def emitir_restablecimiento(operador, objetivo, ip, ahora=None) -> Resultado:
                                         emitido_por=operador, vence_en=ahora + restablecimiento.VIGENCIA)
         registrar_evento(operador.pk, "restablecimiento_emitido", ip, {"objetivo": objetivo.pk, "vence_minutos": int(restablecimiento.VIGENCIA.total_seconds() // 60)})
     return Resultado(True, "restablecimiento_emitido", detalle={"codigo_restablecimiento": codigo, "vence_en": (ahora + restablecimiento.VIGENCIA).isoformat()})
+
+
+def emitir_invitacion(operador, nota, ip, ahora=None) -> Resultado:
+    """El operador de identidades emite una invitación para crear UNA cuenta. El código en claro se devuelve UNA vez; en la base
+    solo queda su hash. La nota (para quién es, sin datos personales) ayuda a saber qué invitaciones siguen pendientes."""
+    ahora = ahora or timezone.now()
+    nota = nota.strip() if isinstance(nota, str) else ""
+    if len(nota) > 120:
+        return Resultado(False, "datos_invalidos", detalle={"errores": ["la nota admite hasta 120 caracteres"]})
+    codigo = restablecimiento.nuevo_codigo()
+    vence = ahora + timedelta(days=settings.SIGET_INVITACION_DIAS)
+    with transaction.atomic():
+        fila = Invitacion.objects.create(codigo_hash=restablecimiento.huella(restablecimiento.normalizar(codigo)), emitida_por=operador,
+                                         nota=nota, vence_en=vence)
+        registrar_evento(operador.pk, "invitacion_emitida", ip, {"invitacion": fila.pk, "vence_dias": settings.SIGET_INVITACION_DIAS})
+    return Resultado(True, "invitacion_emitida", detalle={"id": fila.pk, "codigo_invitacion": codigo, "vence_en": vence.isoformat()})
+
+
+def invitaciones(ahora=None, limite=50):
+    """Metadatos de las invitaciones más recientes (nunca el código): para que el operador vea cuáles siguen pendientes."""
+    ahora = ahora or timezone.now()
+    filas = Invitacion.objects.order_by("-creado_en", "-id")[:limite]
+    return [{"id": f.pk, "nota": f.nota, "emitida_por": f.emitida_por_id, "creado_en": f.creado_en.isoformat(),
+             "vence_en": f.vence_en.isoformat(), "usada": f.usada_en is not None,
+             "estado": "usada" if f.usada_en else ("vigente" if ahora < f.vence_en else "vencida")} for f in filas]
 
 
 def restablecer_contrasena(username, codigo, nueva, ip, ahora=None) -> Resultado:

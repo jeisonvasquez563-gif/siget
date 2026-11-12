@@ -124,6 +124,17 @@ REST_FRAMEWORK = {
 SIGET_MFA_RECIENTE_MINUTOS = int(os.environ.get("SIGET_MFA_RECIENTE_MINUTOS", "15"))
 SIGET_MFA_CIUDADANO_OBLIGATORIO = _bool("SIGET_MFA_CIUDADANO_OBLIGATORIO", True)
 
+# Registro de cuentas: «abierto» (cualquiera crea su cuenta, como hasta ahora), «invitacion» (hace falta un código de un solo
+# uso que emite el operador de identidades) o «cerrado» (nadie crea cuentas desde la web). Un valor inválido no deja arrancar.
+SIGET_REGISTRO = os.environ.get("SIGET_REGISTRO", "abierto").strip().lower()
+if SIGET_REGISTRO not in {"abierto", "invitacion", "cerrado"}:
+    raise ImproperlyConfigured("SIGET_REGISTRO debe ser abierto, invitacion o cerrado.")
+SIGET_INVITACION_DIAS = int(os.environ.get("SIGET_INVITACION_DIAS", "7"))
+if not 1 <= SIGET_INVITACION_DIAS <= 30:
+    raise ImproperlyConfigured("SIGET_INVITACION_DIAS debe estar entre 1 y 30.")
+# Aviso visible de «demostración académica» en la interfaz (recomendado si la plataforma se abre a internet)
+SIGET_AVISO_DEMOSTRACION = _bool("SIGET_AVISO_DEMOSTRACION", False)
+
 # --- Cabeceras y cookies seguras (en producción detrás de nginx con TLS) ---
 if not DEBUG:
     SECURE_SSL_REDIRECT = _bool("SIGET_SSL_REDIRECT", True)

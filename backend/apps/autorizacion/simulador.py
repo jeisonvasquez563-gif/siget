@@ -69,6 +69,7 @@ VARIABLES_POR_ACCION = {
     Accion.APROBAR_ALTA: ("tipo_alta", "alta_propuesta_por", *_COMUN),
     Accion.ADMINISTRAR_INFRAESTRUCTURA: _COMUN,
     Accion.RESTABLECER_MFA: _COMUN,
+    Accion.EMITIR_INVITACION: _COMUN,
     Accion.BLOQUEAR_CUENTA: _COMUN,
     Accion.REVOCAR_SESION: _COMUN,
     Accion.ROTAR_SECRETOS: _COMUN,
