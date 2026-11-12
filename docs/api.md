@@ -61,6 +61,9 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 | `POST /tramites/<id>/estado/` | `{estado}` | `200 Tramite`; `403`/`409` |
 | `POST /tramites/<id>/reasignar/` | `{funcionario_id: <id>\|null}` | `200 Tramite` (solo supervisión) |
 | `GET /tramites/<id>/historial/` | — | `{tramite, eventos: [Evento]}` |
+| `GET /tramites/<id>/documentos/` | — | `{tramite, documentos: [{id, nombre, tipo, tamano, creado_en}]}`; el personal ve además `subido_por` y `sha256` |
+| `POST /tramites/<id>/documentos/` | **multipart** con un solo campo `archivo` (la única ruta que no es JSON) | `201 Documento`. Solo quien pidió el trámite y mientras no tenga resolución final. `413 demasiado_grande` (más de 5 MB), `415` (`extension_no_permitida`, `contenido_no_permitido`, `extension_no_coincide`), `409 tramite_cerrado`, `409 demasiados_documentos` (20), `503 documentos_no_disponibles` (sin clave configurada) |
+| `GET /tramites/<id>/documentos/<doc>/` | — | El archivo, con `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff` y `Cache-Control: no-store`. Si el archivo no supera la verificación de integridad: `500 documento_no_disponible` y un evento de seguridad `documento_alterado` |
 
 Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) → Aprobado \| Rechazado`. Los estados finales no admiten cambios.
 
@@ -81,7 +84,7 @@ Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) �
 | Ruta | Respuesta |
 |---|---|
 | `GET /catalogo/instituciones/` | `[{id, nombre, tipo}]` |
-| `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, institucion: {id, nombre}}]` |
+| `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, audiencia, institucion: {id, nombre}}]` (`audiencia`: `ciudadania`, `institucion` o `ambas`; quién puede iniciarlo) |
 | `GET /equipo/` | `{equipos: [{institucion: {id, nombre}, personal: [{usuario_id, usuario, rol}]}]}` — coordinación y supervisión de esa institución |
 
 ## Auditoría (`/auditoria/`) — solo rol `auditor`, nivel 3 y segundo factor reciente

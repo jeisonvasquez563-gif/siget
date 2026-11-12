@@ -4,6 +4,8 @@ Zero Trust desde el arranque: nada de secretos en el código (se leen de variabl
 archivos montados por `podman secret`), todo se deniega por defecto y la conexión a la base de datos
 va por TLS verificando el certificado del servidor.
 """
+import base64
+import binascii
 import os
 from datetime import date
 from pathlib import Path
@@ -99,6 +101,22 @@ DATABASES["decisiones"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False}
 DATABASES["auditoria"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
                           "USER": os.environ.get("SIGET_DB_AUDITOR_USER", "auditor_role"),
                           "PASSWORD": _leer("SIGET_DB_AUDITOR_PASSWORD", "")}
+
+# --- Documentos adjuntos (PT-8) ---
+# Clave AES-256 (32 bytes en base64) que cifra cada archivo; llega como podman secret. Sin ella, la carga de documentos
+# responde 503 en lugar de guardar archivos en claro. Los archivos viven en un volumen propio, nunca en la imagen.
+_clave_documentos = _leer("SIGET_DOCS_KEY", "")
+try:
+    SIGET_DOCS_KEY = base64.b64decode(_clave_documentos, validate=True) if _clave_documentos else b""
+except binascii.Error as error:
+    raise ImproperlyConfigured("SIGET_DOCS_KEY debe estar en base64.") from error
+if SIGET_DOCS_KEY and len(SIGET_DOCS_KEY) != 32:
+    raise ImproperlyConfigured("SIGET_DOCS_KEY debe tener 32 bytes (AES-256).")
+SIGET_DOCS_DIR = os.environ.get("SIGET_DOCS_DIR", "/datos/documentos")
+SIGET_DOCS_POR_TRAMITE = 20
+# Un archivo de hasta 5 MB se procesa en memoria: nunca toca el disco en claro (ni siquiera como temporal)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 
 # --- Contraseñas: Argon2 primero ---
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
