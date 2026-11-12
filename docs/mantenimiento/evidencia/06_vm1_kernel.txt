@@ -1,0 +1,9 @@
+# VM1: kernel instalado frente al disponible en la versión menor 9.8
+# 2026-11-12 18:55:29  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-plazos
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 "echo \"Instalado:\"; rpm -q kernel; echo; echo \"Disponible:\"; sudo dnf -q list --upgrades kernel | tail -1"
+Instalado:
+kernel-5.14.0-611.5.1.el9_7.x86_64
+
+Disponible:
+kernel.x86_64                    5.14.0-687.61.1.el9_8                    baseos
+# código de salida: 0
