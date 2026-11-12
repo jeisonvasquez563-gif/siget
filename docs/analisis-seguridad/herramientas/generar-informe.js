@@ -310,9 +310,11 @@ const dinamico = [
   p("Las suites de verificación del proyecto se ejecutaron con la imagen nueva contra la base de datos real; cada una corre en una transacción que se revierte, así que no deja datos:"),
   ...figura("despues/18_verificar_autenticacion_03.png", "verificar_autenticacion en producción: 84 de 84 pasos correctos."),
   ...figura("despues/18_verificar_plataforma_03.png", "verificar_plataforma en producción: 79 de 79 pasos correctos."),
+  p("Para comprobar que las correcciones son permanentes y no solo del proceso en ejecución, se reiniciaron ambas máquinas virtuales y se repitieron las pruebas: los servicios arrancaron solos y cada corrección siguió vigente."),
+  ...figura("despues/19_tras_reinicio.png", "Tras reiniciar las VMs: Host falso → 421, TRACE → 405, sin versión de PHP y cookie con HttpOnly y SameSite."),
   ...(zapDespues ? [
     ...figura("despues/11_zap_escaneo_02.png", "OWASP ZAP después de las correcciones: el plan termina con éxito."),
-    ...figura("despues/11b_zap_reporte_html.png", "Reporte de OWASP ZAP después: sin alertas de riesgo alto; la regla 40018 queda como falso positivo documentado."),
+    ...figura("despues/11b_zap_reporte_html.png", "Reporte de OWASP ZAP después: 0 alertas de riesgo alto, medio o bajo; la regla 40018 queda como falso positivo documentado y solo hay alertas informativas."),
   ] : [p("[El escaneo de ZAP del «después» se agrega en la sección 3.4 al completarse.]")]),
   ...(ensayoPngs.length ? [
     p(`El ensayo de la demostración recorre la plataforma con las cuentas de prueba (login con segundo factor, permisos por rol, aislamiento entre instituciones, control dual y recuperación de contraseña). Se ejecutó después del despliegue para comprobar que la corrección de nginx no rompió nada: **${ensayoRes || "ver captura"}**.`),
@@ -324,6 +326,7 @@ const dinamico = [
     ["Host falso en https://…:8443", "Llega a Django, que responde 400", "421 en nginx, no llega al backend"],
     ["Host legítimo (control)", "301 y 200", "301 y 200 (sin cambios)"],
     ["ZAP: SQL Injection en /auth/*", "Riesgo alto", "Falso positivo verificado y documentado"],
+    ["ZAP: alertas alto / medio / bajo", "1 / 0 / 0 (más 5 informativas)", "0 / 0 / 0 (4 informativas)"],
     ["TLS de nginx (Nmap)", "Solo TLS 1.3, calificación A", "Solo TLS 1.3, calificación A"],
     ["Apache :80: método TRACE", "200 (devuelve la petición)", "405 Method Not Allowed"],
     ["Apache :80: cabecera Server", "Apache/2.4.62 (Rocky Linux) mod_wsgi/4.7.1 Python/3.9", "Apache"],
@@ -332,6 +335,7 @@ const dinamico = [
     ["Caché del backend (B108)", "/tmp/siget-cache (ruta fija)", "/tmp/siget-cache-1001 con permisos 700"],
     ["verificar_autenticacion / verificar_plataforma", "—", "84/84 y 79/79 con la imagen nueva"],
     ...(ensayoRes ? [["Ensayo funcional (regresión)", "—", ensayoRes]] : []),
+    ["Correcciones tras reiniciar las VMs", "—", "Todas vigentes; servicios arrancan solos"],
   ], [2700, 3300, 3360]),
   salto(),
 ];
