@@ -1,0 +1,10 @@
+# VM1: avisos de seguridad críticos pendientes
+# 2026-11-12 18:55:23  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-plazos
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 "sudo dnf -q updateinfo list --security | grep -i \"Crít\" | sort -u"
+RLSA-2026:25049 Crítico/Seg.    libldb-4.23.5-10.el9_8.x86_64
+RLSA-2026:25049 Crítico/Seg.    libwbclient-4.23.5-10.el9_8.x86_64
+RLSA-2026:25049 Crítico/Seg.    samba-client-libs-4.23.5-10.el9_8.x86_64
+RLSA-2026:25049 Crítico/Seg.    samba-common-4.23.5-10.el9_8.noarch
+RLSA-2026:25049 Crítico/Seg.    samba-common-libs-4.23.5-10.el9_8.x86_64
+RLSA-2026:88459 Crítico/Seg.    ca-certificates-2026.2.92_v9.0.319-90.3.el9_8.noarch
+# código de salida: 0

@@ -1,0 +1,8 @@
+# VM1 (app-backend): versión del sistema, kernel y Podman
+# 2026-11-12 18:54:58  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-plazos
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 "cat /etc/rocky-release; uname -r; podman --version; rpm -q kernel"
+Rocky Linux release 9.7 (Blue Onyx)
+5.14.0-611.5.1.el9_7.x86_64
+podman version 5.8.2
+kernel-5.14.0-611.5.1.el9_7.x86_64
+# código de salida: 0
