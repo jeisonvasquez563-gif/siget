@@ -93,6 +93,32 @@ describe('qué datos ve cada persona', () => {
     await user.click(await screen.findByRole('button', { name: 'Todos' }))
     expect(await screen.findAllByText('flor.mop')).not.toHaveLength(0)
   })
+
+  it('la supervisión filtra los trámites escalados por plazo vencido', async () => {
+    const { user } = await abrirComo('saul.mop')
+    await irA(user, 'Supervisión')
+    await user.click(await screen.findByRole('button', { name: 'Escalados' }))
+    const filas = await screen.findAllByRole('row', { name: /^Trámite \d+:/ })
+    expect(filas).toHaveLength(1)
+    expect(filas[0].getAttribute('aria-label')).toMatch(/^Trámite 41:/)
+    expect(within(filas[0]).getByText('Escalado a supervisión')).toBeInTheDocument()
+  })
+
+  it('el funcionario no tiene el filtro de escalados (lo atiende la supervisión)', async () => {
+    const { user } = await abrirComo('fabio.mop')
+    await irA(user, 'Bandeja de la institución')
+    await screen.findByRole('button', { name: 'Vencidos' })
+    expect(screen.queryByRole('button', { name: 'Escalados' })).not.toBeInTheDocument()
+  })
+
+  it('el detalle de un trámite escalado lo marca y el historial explica el escalamiento', async () => {
+    const { user } = await abrirComo('saul.mop')
+    await irA(user, 'Bandeja de la institución')
+    await user.click(await screen.findByRole('button', { name: 'Todos' }))
+    await user.click(await screen.findByRole('row', { name: /^Trámite 41:/ }))
+    expect(await screen.findAllByText('Escalado a supervisión')).toHaveLength(2)   // la marca del plazo y el evento
+    expect(screen.getByText(/Superó el plazo: el sistema lo pasó a la supervisión/)).toBeInTheDocument()
+  })
 })
 
 describe('acciones sobre un trámite', () => {
