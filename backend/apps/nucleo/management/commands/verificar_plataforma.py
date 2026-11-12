@@ -155,7 +155,9 @@ class Command(BaseCommand):
         fila_inv = Invitacion.objects.get(pk=r.json()["id"])
         self._paso("en la base solo queda el hash de la invitación, y vence en los días configurados",
                    invitacion.replace("-", "") not in fila_inv.codigo_hash and len(fila_inv.codigo_hash) == 64
-                   and (fila_inv.vence_en - fila_inv.creado_en).days == settings.SIGET_INVITACION_DIAS)
+                   # creado_en lo fija Django al insertar, milisegundos después de calcular el vencimiento: margen de un minuto
+                   and abs(fila_inv.vence_en - fila_inv.creado_en - timedelta(days=settings.SIGET_INVITACION_DIAS)) < timedelta(minutes=1),
+                   fila_inv.vence_en - fila_inv.creado_en)
         r = self._llamar(ida, "get", "/plataforma/invitaciones/")
         self._paso("la lista de invitaciones muestra su estado y NUNCA el código",
                    r.status_code == 200 and invitacion not in json.dumps(r.json()) and any(i["estado"] == "vigente" for i in r.json()["invitaciones"]))
