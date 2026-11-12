@@ -1634,3 +1634,10 @@ Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/ps
 3. Comprobar: `curl https://…:8443/auth/configuracion/` devuelve el modo, y `verificar_plataforma` pasa con los pasos de invitaciones.
 
 **Volver atrás:** quitar la variable (vuelve a `abierto`) y reiniciar el backend. La tabla `invitacion` puede quedarse.
+
+### 36.2 Registro de la aplicación (12 de noviembre de 2026)
+
+1. VM2: respaldo verificado (`tramites_demo-20261112-171700.dump`, 15 tablas), ensayo de la migración 014 con 4 comprobaciones en una transacción que terminó en `ROLLBACK`, y después la migración real.
+2. VM1: backend e interfaz construidos con el PR #7, PT-3 y PT-2 combinados (respaldos `siget-backend:respaldo-2026-11-12b` y `frontend.respaldo-2026-11-12b`). Modo `abierto`: `GET /auth/configuracion/` devuelve `{"registro":"abierto","aviso_demostracion":false}`.
+3. Verificación contra la base real: `verificar_plataforma` 91 de 91 (incluye los 12 pasos de invitaciones), `verificar_tramites` 63 de 63 y `verificar_autenticacion` 84 de 84.
+4. **Para usar `ejecutar-comando.sh` desde Windows:** el paquete del código debe llevar finales de línea LF (`.py`, `Containerfile`, `requirements*.txt`); conviene armarlo con `git archive` o normalizándolo antes de subirlo. Si no, la imagen se construye con CRLF.
