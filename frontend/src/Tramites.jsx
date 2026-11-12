@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from './api.js'
 import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Plazo, SIGUIENTES, fecha, fechaCorta, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { Documentos } from './Documentos.jsx'
 import { Seguimiento } from './Seguimiento.jsx'
 import { Alerta, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
 
@@ -296,7 +297,7 @@ export function Bandeja({ yo, abrir, modo }) {
 
 /* ---------------------------------------------------------------- detalle */
 
-const ICONO_EVENTO = { creacion: 'mas', cambio_estado: 'flujo', reasignacion: 'reasignar' }
+const ICONO_EVENTO = { creacion: 'mas', cambio_estado: 'flujo', reasignacion: 'reasignar', documento_adjuntado: 'documento' }
 
 export function Detalle({ id, yo, volver, volverA }) {
   const [tramite, setTramite] = useState(null)
@@ -457,6 +458,8 @@ export function Detalle({ id, yo, volver, volverA }) {
           {!esPersonal && <p className="nota">El historial es inalterable. Por privacidad no muestra qué funcionario actuó.</p>}
         </section>
       </div>
+      {/* Adjunta quien pidió el trámite (no el personal en su nombre) y solo mientras no tiene resolución final */}
+      <Documentos tramiteId={tramite.id} puedeAdjuntar={!esPersonal && !FINALES.includes(tramite.estado)} alAdjuntar={cargar} />
       {modal}
     </>
   )

@@ -151,6 +151,7 @@ export function instalarMock(inicial, opciones = {}) {
   // Cada instalación parte del mismo estado: lo que se cambie en una sesión de ejemplo no contamina la siguiente
   const TRAMITES = structuredClone(TRAMITES_BASE)
   const EVENTOS = structuredClone(EVENTOS_BASE)
+  const DOCUMENTOS = { 36: [{ id: 1, nombre: 'plano-del-local.pdf', tipo: 'application/pdf', tamano: 482133, creado_en: hace(3600000 * 30) }] }
   let actual = USUARIOS[inicial] ? inicial : null
   let enrolando = inicial === 'enrolar'
   let mfaFresco = false
@@ -178,7 +179,7 @@ export function instalarMock(inicial, opciones = {}) {
     const url = new URL(typeof ruta === 'string' ? ruta : ruta.url, location.origin)
     const p = url.searchParams
     const metodo = (opciones.method || 'GET').toUpperCase()
-    const cuerpo = opciones.body ? JSON.parse(opciones.body) : {}
+    const cuerpo = typeof opciones.body === 'string' ? JSON.parse(opciones.body) : {} // FormData (documentos) se lee aparte
     const camino = url.pathname
     await demora()
     if (camino === '/auth/refresh/') return actual || enrolando ? resp(200, { access_token: 'mock', scope: enrolando ? 'enrolar_mfa' : 'completo' }) : resp(401, { codigo: 'sesion_invalida' })
@@ -249,6 +250,25 @@ export function instalarMock(inicial, opciones = {}) {
       TRAMITES.push(t)
       EVENTOS[t.id] = [ev(Date.now(), t.id, 'creacion', null, 'Pendiente', u.id, 1000)]
       return resp(201, dto(u, t))
+    }
+    const d = camino.match(/^\/tramites\/(\d+)\/documentos\/(?:(\d+)\/)?$/)
+    if (d) {
+      const t = TRAMITES.find((x) => x.id === Number(d[1]))
+      if (!t || !visibles(u, t)) return resp(404, { detalle: 'No encontrado.' })
+      const lista = (DOCUMENTOS[t.id] ||= [])
+      if (d[2]) {
+        const doc = lista.find((x) => x.id === Number(d[2]))
+        if (!doc) return resp(404, { detalle: 'No encontrado.' })
+        return new Response(new Blob(['%PDF-1.7 ejemplo'], { type: doc.tipo }), { status: 200, headers: { 'Content-Type': doc.tipo } })
+      }
+      if (metodo === 'GET') return resp(200, { tramite: t.id, documentos: lista })
+      if (esPersonal(u, t)) return negado()
+      const archivo = opciones.body?.get?.('archivo')
+      if (!archivo || !/\.(pdf|png|jpe?g)$/i.test(archivo.name)) return resp(415, { codigo: 'extension_no_permitida', detalle: 'Solo se aceptan PDF, PNG o JPEG.' })
+      const nuevo = { id: Date.now(), nombre: archivo.name, tipo: /\.pdf$/i.test(archivo.name) ? 'application/pdf' : /\.png$/i.test(archivo.name) ? 'image/png' : 'image/jpeg', tamano: archivo.size, creado_en: new Date().toISOString() }
+      lista.push(nuevo)
+      EVENTOS[t.id].push({ ...ev(Date.now(), t.id, 'documento_adjuntado', t.estado, t.estado, u.id, 0), atributos: { documento: nuevo.id } })
+      return resp(201, nuevo)
     }
     const m = camino.match(/^\/tramites\/(\d+)\/(estado\/|reasignar\/|historial\/)?$/)
     if (m) {
