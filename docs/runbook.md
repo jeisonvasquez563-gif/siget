@@ -1622,3 +1622,23 @@ Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/ps
 - Una anotación de Django no puede llamarse igual que una relación inversa del modelo (`sesiones`): daba un 500.
 - El límite de inicios de sesión (10 por minuto por IP) corta un ensayo con muchas cuentas: el script espera un minuto antes de la sección 10.
 - Una corrida interrumpida del ensayo deja una propuesta pendiente; el script la rechaza al empezar.
+
+## 35. Plazos en días hábiles y escalamiento automático (PT-3)
+
+**Qué cambia.** Los trámites nuevos vencen en días hábiles de Panamá (sin fines de semana ni los feriados de `siget.feriado`, ver [`feriados-panama.md`](./feriados-panama.md)). Cada hora, un temporizador de systemd en VM1 ejecuta `manage.py escalar_vencidos`. Ese comando marca `escalado_en` en los trámites abiertos que superaron su fecha límite y escribe un evento `escalamiento` en la auditoría. La supervisión los ve con el filtro «Escalados».
+
+**Mínimo privilegio.** El temporizador se conecta como `escalador_role`, que solo puede `EXECUTE` sobre `siget.escalar_vencidos()`: no lee ni escribe ninguna tabla, no es superusuario y no salta la seguridad por filas. Su contenedor recibe solo dos secretos (`siget-db-escalador-password` y `siget-ca`) y usa `config.settings_escalador`, que se niega a arrancar si le llegan las claves reales de Django, JWT o el segundo factor. `app_role` no puede ejecutar el escalamiento ni escribir `escalado_en`.
+
+### 35.1 Aplicar (Jeison)
+
+1. **Respaldo** de la base (sección 32.2) y migración 012 aplicada.
+2. VM2: `database/psql-contenedor.sh < database/migraciones/013-plazos-y-escalamiento.sql`.
+3. VM2: fijar la contraseña de `escalador_role` sin mostrarla (`\password escalador_role` en psql) y agregar a `pg_hba.conf` la línea de `escalador_role` desde VM1 con `hostssl` y `scram-sha-256`, igual que `auditor_role`. Después, `SELECT pg_reload_conf();`.
+4. VM2: correr las pruebas, que terminan en `ROLLBACK`: `database/psql-contenedor.sh < database/pruebas-escalamiento.sql`. Todas deben decir `PASA`.
+5. VM1, como `siget`: crear el secreto `siget-db-escalador-password` con la misma contraseña (`podman secret create … -`, leyendo de la entrada estándar).
+6. VM1: reconstruir la imagen del backend, copiar `siget-escalar.service` y `siget-escalar.timer` a `~/.config/systemd/user/` y luego `systemctl --user daemon-reload && systemctl --user enable --now siget-escalar.timer`.
+7. Comprobar: `systemctl --user start siget-escalar.service && journalctl --user -u siget-escalar -n 5` muestra `escalar_vencidos: N trámite(s) escalado(s)`. Después correr `verificar_tramites` y el ensayo.
+
+### 35.2 Volver atrás
+
+`systemctl --user disable --now siget-escalar.timer` detiene el escalamiento sin tocar datos. La columna y la tabla pueden quedarse; los eventos `escalamiento` ya escritos son inalterables, como toda la auditoría.

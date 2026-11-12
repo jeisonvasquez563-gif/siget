@@ -12,6 +12,7 @@ Cambios incrementales sobre el esquema `siget` que ya está aplicado. Se ejecuta
 | 007 | `007-auditor-login.sql` | `auditor_role` puede conectarse (solo lectura) y ve solo `id`, `username` y rol de plataforma de las personas | 21-oct-2026 |
 | 008 | `008-perfil-ciudadano.sql` | Tabla `perfil` con los datos personales del registro (cédula cifrada); solo `app_role` la lee e inserta | 22-oct-2026 |
 | 009 | `009-pgadmin-minimo-privilegio.sql` | `pgadmin_lectura` deja de leer todo (`pg_read_all_data`): solo lo no sensible | 22-oct-2026 |
+| 013 | `013-plazos-y-escalamiento.sql` | Tabla `feriado` (feriados de ley 2026–2027), `tramite.escalado_en`, función `siget.escalar_vencidos()` y rol `escalador_role` (solo `EXECUTE` sobre ella). Pruebas: [`../pruebas-escalamiento.sql`](../pruebas-escalamiento.sql) | pendiente |
 
 ## Para una base nueva
 

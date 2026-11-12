@@ -4,12 +4,14 @@ Qué se muestra depende de quién mira. La persona que pidió el trámite ve la 
 fechas (la "unidad responsable" y la fase que reconoce la Ley 83 de 2012, Art. 4 num. 8); el personal de la
 institución ve además los identificadores de las personas y el detalle interno. Nunca se muestra de más.
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 ESTADOS_VALIDOS = {"Pendiente", "En Tramitacion", "En Subsanacion", "Aprobado", "Rechazado"}
 ESTADOS_FINALES = {"Aprobado", "Rechazado"}
 LIMITE_DEFECTO, LIMITE_MAXIMO = 20, 100
 BIGINT_MAXIMO = 2**63 - 1
+ZONA_PANAMA = ZoneInfo("America/Panama")
 
 
 def entero_positivo(valor):
@@ -41,9 +43,26 @@ def paginacion(parametros):
     return limite, desplazamiento
 
 
-def calcular_fecha_limite(ahora, sla_dias):
-    """Plazo del trámite en días calendario (parámetro de diseño; los días hábiles quedan por modelar)."""
-    return ahora + timedelta(days=sla_dias)
+def sumar_dias_habiles(inicio, dias, feriados):
+    """`inicio` más `dias` días hábiles (lunes a viernes que no son feriado), a la misma hora y en hora de Panamá.
+
+    Se cuentan los días hábiles siguientes al de inicio: si se inicia un viernes, el primer día hábil es el lunes; si se
+    inicia en fin de semana o feriado, se cuenta desde el siguiente día hábil. `feriados` es un conjunto de `date`.
+    """
+    if isinstance(dias, bool) or not isinstance(dias, int) or dias < 0:
+        raise ValueError(f"el plazo debe ser un entero de días mayor o igual a cero: {dias!r}")
+    local = inicio.astimezone(ZONA_PANAMA)
+    fecha, restantes = local.date(), dias
+    while restantes:
+        fecha += timedelta(days=1)
+        if fecha.weekday() < 5 and fecha not in feriados:
+            restantes -= 1
+    return datetime.combine(fecha, local.timetz())
+
+
+def calcular_fecha_limite(ahora, sla_dias, feriados):
+    """Plazo del trámite en días hábiles de Panamá (los feriados vienen de la tabla `feriado`)."""
+    return sumar_dias_habiles(ahora, sla_dias, feriados)
 
 
 def esta_vencido(fecha_limite, estado, ahora):
@@ -62,11 +81,12 @@ def tramite_a_dict(tramite, personal, ahora):
         "estado": tramite.estado,
         "fecha_limite": _iso(tramite.fecha_limite),
         "vencido": esta_vencido(tramite.fecha_limite, tramite.estado, ahora),
+        "escalado": tramite.escalado_en is not None,  # superó su plazo y lo atiende la supervisión
         "creado_en": _iso(tramite.creado_en),
     }
     if personal:
         datos.update(solicitante_id=tramite.solicitante_id, funcionario_asignado_id=tramite.funcionario_asignado_id,
-                     sensibilidad=tramite.sensibilidad)
+                     sensibilidad=tramite.sensibilidad, escalado_en=_iso(tramite.escalado_en))
     else:
         datos["asignado"] = tramite.funcionario_asignado_id is not None  # quién, no: es dato del personal
     return datos

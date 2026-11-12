@@ -6,7 +6,7 @@ import pytest
 from apps.auditoria.models import DecisionPdp, EventoAuditoria
 from apps.autenticacion.models import EventoSeguridad, Restablecimiento, Sesion
 from apps.plataforma.models import RotacionSecreto
-from apps.catalogo.models import Institucion, TipoTramite
+from apps.catalogo.models import Feriado, Institucion, TipoTramite
 from apps.identidad.models import Aprobacion, Membresia, Perfil, Usuario
 from apps.identidad.sujeto import construir_sujeto
 from apps.nucleo.esquema import columnas_del_modelo, diferencias, modelos_de_dominio
@@ -17,7 +17,7 @@ TABLAS = {
     Aprobacion: "aprobacion", Tramite: "tramite", Transicion: "transicion",
     EventoAuditoria: "evento_auditoria", DecisionPdp: "decision_pdp",
     Sesion: "sesion", EventoSeguridad: "evento_seguridad", Perfil: "perfil",
-    Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto",
+    Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto", Feriado: "feriado",
 }
 
 
@@ -27,12 +27,13 @@ def test_ningun_modelo_crea_ni_migra_tablas(modelo, tabla):
     assert modelo._meta.db_table == tabla
 
 
-def test_estan_los_catorce_modelos_del_esquema():
+def test_estan_los_quince_modelos_del_esquema():
     assert {m._meta.db_table for m in modelos_de_dominio()} == set(TABLAS.values())
 
 
 def test_las_columnas_de_las_claves_foraneas_coinciden_con_la_base():
-    assert columnas_del_modelo(Tramite) >= {"tipo_tramite_id", "institucion_id", "solicitante_id", "funcionario_asignado_id", "estado"}
+    assert columnas_del_modelo(Tramite) >= {"tipo_tramite_id", "institucion_id", "solicitante_id", "funcionario_asignado_id", "estado",
+                                            "escalado_en"}
     assert columnas_del_modelo(Membresia) >= {"usuario_id", "institucion_id", "rol", "asignado_por"}
     assert "usuario_id" not in columnas_del_modelo(Usuario)
 

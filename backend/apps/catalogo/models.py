@@ -27,3 +27,21 @@ class TipoTramite(ModeloDeEsquema):
 
     def __str__(self):
         return f"{self.nombre} ({self.institucion_id})"
+
+
+class Feriado(ModeloDeEsquema):
+    """Días feriados nacionales de Panamá: no cuentan para los plazos en días hábiles (migración 013)."""
+
+    fecha = models.DateField(primary_key=True)
+    descripcion = models.TextField()
+
+    class Meta(ModeloDeEsquema.Meta):
+        db_table = "feriado"
+
+    def __str__(self):
+        return f"{self.fecha} {self.descripcion}"
+
+
+def feriados_entre(desde, hasta):
+    """Conjunto de fechas feriadas en el rango (inclusivo)."""
+    return set(Feriado.objects.filter(fecha__gte=desde, fecha__lte=hasta).values_list("fecha", flat=True))
