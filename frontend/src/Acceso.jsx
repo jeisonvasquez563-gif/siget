@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { api, ApiError, confirmarMfa, iniciarSesion, instituciones, registrar, restablecerContrasena } from './api.js'
+import { api, ApiError, configuracion, confirmarMfa, iniciarSesion, instituciones, registrar, restablecerContrasena } from './api.js'
 import { Alerta, Icono, Logo } from './ui.jsx'
 import { MapaPanama } from './Mapa.jsx'
 
@@ -147,6 +147,20 @@ export function Acceso({ alEntrar, motivo = '' }) {
   return <Login alEntrar={alEntrar} motivo={motivo} puerta={puerta} />
 }
 
+// Aviso visible cuando la plataforma se muestra como demostración (SIGET_AVISO_DEMOSTRACION): nadie debe confundirla con un
+// servicio oficial del Estado ni cargar datos reales.
+export function AvisoDemostracion() {
+  const [ver, setVer] = useState(false)
+  useEffect(() => { configuracion().then((c) => setVer(Boolean(c.aviso_demostracion))) }, [])
+  if (!ver) return null
+  return (
+    <div className="aviso-demostracion" role="note">
+      <Icono nombre="info" />
+      <span><strong>Demostración académica.</strong> SIGET es un proyecto universitario: no es un servicio oficial del Estado. No ingreses datos reales.</span>
+    </div>
+  )
+}
+
 export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } }) {
   const [modo, setModo] = useState('entrar')
   const [paso, setPaso] = useState('credenciales') // «codigo»: la contraseña ya la validó el servidor y falta el segundo factor
@@ -160,6 +174,9 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
   const [personales, setPersonales] = useState(PERSONALES_VACIOS)
   const [codigoReset, setCodigoReset] = useState('')
   const [equivocada, setEquivocada] = useState(null) // la cuenta es válida pero corresponde a otra puerta
+  const [modoRegistro, setModoRegistro] = useState('abierto') // abierto | invitacion | cerrado (lo decide el servidor)
+  const [invitacion, setInvitacion] = useState('')
+  useEffect(() => { configuracion().then((c) => setModoRegistro(c.registro)) }, [])
   const poner = (campo) => (e) => setPersonales((p) => ({ ...p, [campo]: e.target.value }))
 
   function volver() {
@@ -179,7 +196,7 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
         setAviso('Contraseña restablecida. Ingresa con tu nueva contraseña y el código de tu aplicación de autenticación.')
         setModo('entrar'); setClave(''); setCodigoReset('')
       } else if (modo === 'registro') {
-        await registrar(usuario, clave, { ...personales, cedula: personales.cedula.trim().toUpperCase() })
+        await registrar(usuario, clave, { ...personales, cedula: personales.cedula.trim().toUpperCase() }, modoRegistro === 'invitacion' ? invitacion.trim() : '')
         try {
           // Cuenta nueva: se entra de inmediato y el servidor guía al alta del segundo factor (QR), sin volver a escribir nada
           await iniciarSesion(usuario, clave, '', puerta)
@@ -198,6 +215,8 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
       if (e instanceof ApiError && e.codigo === 'mfa_requerido') { setPaso('codigo'); setCodigo('') }
       else if (e instanceof ApiError && e.codigo === 'canal_incorrecto') { setEquivocada(e.datos); setPaso('credenciales'); setClave(''); setCodigo('') }
       else if (e instanceof ApiError && e.datos.errores) setError(`${e.datos.errores.join('. ')}.`)
+      else if (e instanceof ApiError && e.codigo === 'invitacion_invalida') setError('La invitación no es válida, ya se usó o venció. Pide una nueva al equipo de identidades de SIGET.')
+      else if (e instanceof ApiError && e.codigo === 'registro_cerrado') { setError('La creación de cuentas está cerrada en este momento.'); setModoRegistro('cerrado'); setModo('entrar') }
       else if (e instanceof ApiError && e.codigo === 'codigo_invalido') setError('El código no es válido, ya se usó o venció. Pide uno nuevo al equipo de identidades.')
       else if (e instanceof ApiError && e.estado === 401 && paso === 'codigo') setError('Ese código no sirve: es incorrecto o ya se usó. Espera al siguiente e inténtalo otra vez. Tras 3 fallos la cuenta se bloquea (5, 15 y luego 60 minutos).')
       else if (e instanceof ApiError && e.estado === 401) setError('Usuario o contraseña incorrectos, o la cuenta está bloqueada temporalmente.')
@@ -289,6 +308,12 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
               </fieldset>
             )}
             {registro && <h3 className="subtitulo-form">Tu acceso</h3>}
+            {registro && modoRegistro === 'invitacion' && (
+              <label className="campo"><span>Código de invitación</span>
+                <input className="entrada codigo" value={invitacion} onChange={(e) => setInvitacion(e.target.value.toUpperCase())} autoComplete="off" autoCapitalize="characters" spellCheck="false" maxLength={14} placeholder="XXXX-XXXX-XXXX" aria-describedby="ayuda-invitacion" required />
+                <small id="ayuda-invitacion">Por ahora las cuentas se crean por invitación: el equipo de identidades de SIGET te entrega un código de un solo uso.</small>
+              </label>
+            )}
             {!pideCodigo && !recuperar && (
               <>
                 <label className="campo">
@@ -318,7 +343,10 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
           {!registro && !pideCodigo && !recuperar && <p className="cambio-modo"><button type="button" onClick={() => { setModo('recuperar'); setError(''); setAviso(''); setClave('') }}>¿Olvidaste tu contraseña?</button></p>}
           {recuperar && <p className="cambio-modo"><button type="button" onClick={() => { setModo('entrar'); setError(''); setClave(''); setCodigoReset('') }}>Volver a ingresar</button></p>}
           {!pideCodigo && !recuperar && !esCiudadania && <p className="nota-sin-registro">¿No tienes acceso? Pídelo a la coordinación de tu institución: en esta puerta no se crean cuentas.</p>}
-          {!pideCodigo && !recuperar && esCiudadania && (
+          {!pideCodigo && !recuperar && esCiudadania && modoRegistro === 'cerrado' && (
+            <p className="nota-sin-registro">La creación de cuentas está cerrada en este momento. Si ya tienes cuenta, ingresa con ella.</p>
+          )}
+          {!pideCodigo && !recuperar && esCiudadania && modoRegistro !== 'cerrado' && (
             <div className="alta-cuenta">
               <span>{registro ? '¿Ya tienes cuenta?' : '¿Primera vez en SIGET?'}</span>
               <button type="button" className="btn btn-sec btn-ancho" onClick={() => { setModo(registro ? 'entrar' : 'registro'); setError(''); setAviso(''); setClave('') }}>
