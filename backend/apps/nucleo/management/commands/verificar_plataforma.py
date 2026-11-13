@@ -10,12 +10,13 @@ from unittest import mock
 from django.conf import settings
 from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
+from django.test import override_settings
 from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.autenticacion import contrasenas, mfa, tokens
-from apps.autenticacion.models import EventoSeguridad, Restablecimiento, Sesion
+from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 from apps.autorizacion import permisos
 from apps.catalogo.models import Institucion
 from apps.identidad.models import Aprobacion, Membresia, Usuario
@@ -145,6 +146,58 @@ class Command(BaseCommand):
         self._paso("un código vencido (16 minutos) se rechaza igual que uno inválido", r.status_code == 400 and r.json() == mala.json())
         self._llamar(ida, "post", f"/plataforma/personas/{ana.pk}/restablecer-contrasena/")
         self._paso("emitir un código nuevo invalida el anterior (solo uno vigente)", Restablecimiento.objects.filter(usuario=ana, usado_en__isnull=True).count() == 1)
+
+        # ------------------------------------------------------------ invitaciones para crear cuenta (registro por invitación)
+        r = self._llamar(ida, "post", "/plataforma/invitaciones/", {"nota": "verificación"})
+        invitacion = r.json().get("codigo_invitacion")
+        self._paso("el operador de identidades emite una invitación (se muestra una sola vez, sin caché)",
+                   r.status_code == 201 and len(invitacion or "") == 14 and r.headers.get("Cache-Control") == "no-store", r.status_code)
+        fila_inv = Invitacion.objects.get(pk=r.json()["id"])
+        self._paso("en la base solo queda el hash de la invitación, y vence en los días configurados",
+                   invitacion.replace("-", "") not in fila_inv.codigo_hash and len(fila_inv.codigo_hash) == 64
+                   # creado_en lo fija Django al insertar, milisegundos después de calcular el vencimiento: margen de un minuto
+                   and abs(fila_inv.vence_en - fila_inv.creado_en - timedelta(days=settings.SIGET_INVITACION_DIAS)) < timedelta(minutes=1),
+                   fila_inv.vence_en - fila_inv.creado_en)
+        r = self._llamar(ida, "get", "/plataforma/invitaciones/")
+        self._paso("la lista de invitaciones muestra su estado y NUNCA el código",
+                   r.status_code == 200 and invitacion not in json.dumps(r.json()) and any(i["estado"] == "vigente" for i in r.json()["invitaciones"]))
+        self._paso("otro rol de plataforma no emite invitaciones (403)", self._llamar(seg, "post", "/plataforma/invitaciones/", {}).status_code == 403)
+        datos_nuevo = {"username": "vp_invitada", "password": CLAVE, "nombre": "Invitada", "apellidos": "Prueba", "cedula": "8-901-2345",
+                       "fecha_nacimiento": "1991-03-04", "provincia": "Panamá", "ciudad": "Panamá", "correo": "vp_invitada@ejemplo.com"}
+        with override_settings(SIGET_REGISTRO="cerrado"):
+            r = self._publica("/auth/registro/", datos_nuevo)
+        self._paso("con el registro cerrado no se crea ninguna cuenta (403)", r.status_code == 403 and not Usuario.objects.filter(username="vp_invitada").exists(), r.status_code)
+        with override_settings(SIGET_REGISTRO="invitacion"):
+            sin = self._publica("/auth/registro/", datos_nuevo)
+            mala = self._publica("/auth/registro/", {**datos_nuevo, "invitacion": "AAAA-BBBB-CCCC"})
+            self._paso("con registro por invitación, sin código o con uno falso no se crea la cuenta (misma respuesta)",
+                       sin.status_code == mala.status_code == 400 and sin.json() == mala.json() and not Usuario.objects.filter(username="vp_invitada").exists())
+            r = self._publica("/auth/registro/", {**datos_nuevo, "password": "corta", "invitacion": invitacion})
+            self._paso("un error en los datos NO gasta la invitación", r.status_code == 400 and Invitacion.objects.get(pk=fila_inv.pk).usada_en is None)
+            r = self._publica("/auth/registro/", {**datos_nuevo, "invitacion": invitacion})
+            nueva = Usuario.objects.filter(username="vp_invitada").first()
+            self._paso("con una invitación vigente se crea la cuenta y la invitación queda gastada por esa persona",
+                       r.status_code == 201 and nueva is not None and Invitacion.objects.get(pk=fila_inv.pk).usada_por_id == nueva.pk, r.status_code)
+            r = self._publica("/auth/registro/", {**datos_nuevo, "username": "vp_otra", "cedula": "8-901-2346", "correo": "vp_otra@ejemplo.com",
+                                                  "invitacion": invitacion})
+            self._paso("una invitación ya usada no sirve otra vez", r.status_code == 400 and r.json() == mala.json())
+            vieja = self._llamar(ida, "post", "/plataforma/invitaciones/", {}).json()["codigo_invitacion"]
+            with mock.patch("django.utils.timezone.now", return_value=ahora + timedelta(days=settings.SIGET_INVITACION_DIAS, minutes=1)):
+                r = self._publica("/auth/registro/", {**datos_nuevo, "username": "vp_tarde", "cedula": "8-901-2347", "correo": "vp_tarde@ejemplo.com",
+                                                      "invitacion": vieja})
+            self._paso("una invitación vencida se rechaza igual que una inválida", r.status_code == 400 and r.json() == mala.json())
+        try:
+            with transaction.atomic():
+                Invitacion.objects.filter(pk=fila_inv.pk).update(vence_en=ahora + timedelta(days=365))
+            self._paso("la aplicación no puede alargar la vigencia de una invitación", False)
+        except DatabaseError:
+            self._paso("la aplicación no puede alargar la vigencia de una invitación", True)
+        try:
+            with transaction.atomic():
+                Invitacion.objects.filter(pk=fila_inv.pk).delete()
+            self._paso("la aplicación no puede borrar invitaciones", False)
+        except DatabaseError:
+            self._paso("la aplicación no puede borrar invitaciones", True)
 
         # ------------------------------------------------------------ separación de funciones sobre el segundo factor
         r = self._llamar(ida, "post", f"/plataforma/personas/{ana.pk}/restablecer-mfa/")

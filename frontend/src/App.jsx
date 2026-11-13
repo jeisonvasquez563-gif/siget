@@ -72,7 +72,7 @@ export default function App() {
   switch (vista.modulo) {
     case 'inicio': contenido = <Inicio yo={yo} ir={ir} abrir={abrir} />; break
     case 'mis_tramites': contenido = <MisTramites yo={yo} abrir={abrir} nuevo={() => ir('nuevo_tramite')} />; break
-    case 'nuevo_tramite': contenido = <NuevoTramite abrir={abrir} />; break
+    case 'nuevo_tramite': contenido = <NuevoTramite yo={yo} abrir={abrir} />; break
     case 'bandeja': contenido = <Bandeja yo={yo} abrir={abrir} modo="bandeja" />; break
     case 'supervision': contenido = <Bandeja yo={yo} abrir={abrir} modo="supervision" />; break
     case 'equipo': contenido = <Equipo />; break

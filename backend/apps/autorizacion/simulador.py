@@ -17,6 +17,7 @@ VALORES = {
     "segundo_factor": ("reciente", "vencido", "ninguno"),
     "cuenta": ("activa", "bloqueada", "suspendida"),
     "institucion": ("propia", "ajena"),
+    "audiencia": ("ciudadania", "institucion"),
     "solicitante": ("otra_persona", "yo"),
     "estado": ESTADOS,
     "estado_destino": ESTADOS,
@@ -27,7 +28,7 @@ VALORES = {
 }
 
 ETIQUETAS_VARIABLE = {
-    "segundo_factor": "Segundo factor", "cuenta": "Estado de la cuenta", "institucion": "Institución del recurso",
+    "segundo_factor": "Segundo factor", "cuenta": "Estado de la cuenta", "institucion": "Institución del recurso", "audiencia": "Trámite para",
     "solicitante": "Quién pidió el trámite", "estado": "Estado actual del trámite", "estado_destino": "Estado al que se quiere pasar",
     "asignado": "Quién lo atiende", "tipo_alta": "Tipo de alta", "alta_propuesta_por": "Quién propuso el alta", "nivel": "Nivel de aseguramiento",
 }
@@ -36,6 +37,7 @@ ETIQUETAS_VALOR = {
     "segundo_factor": {"reciente": "Verificado hace 1 minuto", "vencido": "Verificado hace 60 minutos (vencido)", "ninguno": "Nunca verificado"},  # `vencido` se ajusta en meta()
     "cuenta": {"activa": "Activa", "bloqueada": "Bloqueada", "suspendida": "Suspendida"},
     "institucion": {"propia": "Su propia institución", "ajena": "Otra institución"},
+    "audiencia": {"ciudadania": "La ciudadanía", "institucion": "Otras instituciones"},
     "solicitante": {"otra_persona": "Otra persona", "yo": "La misma persona que actúa"},
     "asignado": {"nadie": "Nadie (en cola)", "yo": "La misma persona que actúa", "otra_persona": "Otra persona"},
     "tipo_alta": {"alta_coordinador": "Alta de un coordinador", "alta_institucion": "Alta de una institución"},
@@ -46,7 +48,7 @@ ETIQUETAS_VALOR = {
 }
 
 DEFECTOS = {
-    "segundo_factor": "reciente", "cuenta": "activa", "institucion": "propia", "solicitante": "otra_persona",
+    "segundo_factor": "reciente", "cuenta": "activa", "institucion": "propia", "audiencia": "ciudadania", "solicitante": "otra_persona",
     "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "nadie", "tipo_alta": "alta_institucion",
     "alta_propuesta_por": "otra_persona", "nivel": 2,
 }
@@ -55,7 +57,7 @@ _COMUN = ("segundo_factor", "cuenta")
 _TRAMITE = ("institucion", "solicitante")
 VARIABLES_POR_ACCION = {
     Accion.VER_TRAMITE: (*_TRAMITE, *_COMUN),
-    Accion.CREAR_TRAMITE: (*_TRAMITE, *_COMUN),
+    Accion.CREAR_TRAMITE: (*_TRAMITE, "audiencia", *_COMUN),
     Accion.CAMBIAR_ESTADO: (*_TRAMITE, "estado", "estado_destino", "asignado", *_COMUN),
     Accion.REASIGNAR_TRAMITE: (*_TRAMITE, "asignado", *_COMUN),
     Accion.ESCALAR_TRAMITE: (*_TRAMITE, *_COMUN),
@@ -67,6 +69,7 @@ VARIABLES_POR_ACCION = {
     Accion.APROBAR_ALTA: ("tipo_alta", "alta_propuesta_por", *_COMUN),
     Accion.ADMINISTRAR_INFRAESTRUCTURA: _COMUN,
     Accion.RESTABLECER_MFA: _COMUN,
+    Accion.EMITIR_INVITACION: _COMUN,
     Accion.BLOQUEAR_CUENTA: _COMUN,
     Accion.REVOCAR_SESION: _COMUN,
     Accion.ROTAR_SECRETOS: _COMUN,
@@ -157,7 +160,7 @@ def _recurso(entrada, accion, sujeto):
         cambia = accion == Accion.CAMBIAR_ESTADO
         return Recurso(tipo="tramite" if accion in matriz._TRAMITE else "documento", institucion_id=institucion, solicitante_id=solicitante,
                        funcionario_asignado_id=asignado, estado=None if accion == Accion.CREAR_TRAMITE else entrada.get("estado", "En Tramitacion"),
-                       estado_destino=entrada.get("estado_destino") if cambia else None)
+                       estado_destino=entrada.get("estado_destino") if cambia else None, audiencia=entrada.get("audiencia", "ciudadania"))
     if accion == Accion.GESTIONAR_USUARIOS_INSTITUCION:
         return Recurso(tipo="usuario", institucion_id=institucion)
     if accion == Accion.GESTIONAR_CATALOGO_INSTITUCION:

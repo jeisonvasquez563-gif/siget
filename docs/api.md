@@ -28,7 +28,8 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
-| `POST /auth/registro/` | `{username, password, nombre, apellidos, cedula, fecha_nacimiento (AAAA-MM-DD), provincia, ciudad, correo}`; todos obligatorios, mayor de 18 años, provincia de las 13 de Panamá, cédula con formato panameño (p. ej. `8-123-456`) | `201`; `400 {codigo, errores[]}` (dice qué campo falla); `409` genérico si el usuario, la cédula o el correo ya existen (no revela cuál) |
+| `GET /auth/configuracion/` | — (pública) | `{registro: "abierto"\|"invitacion"\|"cerrado", aviso_demostracion: bool}` |
+| `POST /auth/registro/` | `{username, password, nombre, apellidos, cedula, fecha_nacimiento (AAAA-MM-DD), provincia, ciudad, correo, invitacion?}`; todos obligatorios, mayor de 18 años, provincia de las 13 de Panamá, cédula con formato panameño (p. ej. `8-123-456`). `invitacion` (`XXXX-XXXX-XXXX`) solo cuando el registro es por invitación | `201`; `400 {codigo, errores[]}` (dice qué campo falla); `400 invitacion_invalida` (código malo, usado o vencido: misma respuesta); `403 registro_cerrado`; `409` genérico si el usuario, la cédula o el correo ya existen (no revela cuál) |
 | `POST /auth/login/` | `{username, password, codigo?}` (`codigo` = 6 dígitos TOTP) | `200 {access_token, tipo, expira_en, scope, mfa_enrolamiento_requerido?}` + cookie; `401 {codigo: "mfa_requerido"\|"credenciales_invalidas"}` |
 | `POST /auth/refresh/` | — (cookie + `X-SIGET-CSRF: 1`) | igual que el login |
 | `POST /auth/logout/` | `{}` | `200` y borra la cookie |
@@ -81,7 +82,7 @@ Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) �
 | Ruta | Respuesta |
 |---|---|
 | `GET /catalogo/instituciones/` | `[{id, nombre, tipo}]` |
-| `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, institucion: {id, nombre}}]` |
+| `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, audiencia, institucion: {id, nombre}}]` (`audiencia`: `ciudadania`, `institucion` o `ambas`; quién puede iniciarlo) |
 | `GET /equipo/` | `{equipos: [{institucion: {id, nombre}, personal: [{usuario_id, usuario, rol}]}]}` — coordinación y supervisión de esa institución |
 
 ## Auditoría (`/auditoria/`) — solo rol `auditor`, nivel 3 y segundo factor reciente
@@ -150,6 +151,7 @@ Todas exigen acceso completo y que el rol de plataforma correspondiente tenga el
 | `GET /plataforma/personas/?q=` | identidades, seguridad | Cuentas: `id`, `usuario`, `estado_cuenta`, `rol_plataforma`, `mfa_activo`, `sesiones_activas`, `bloqueada_hasta` |
 | `POST /plataforma/personas/<id>/restablecer-contrasena/` | identidades | `201 {codigo_restablecimiento, vence_en}`: el código en claro **solo en esta respuesta** (`Cache-Control: no-store`) |
 | `POST /plataforma/personas/<id>/restablecer-mfa/` | identidades | Desactiva el segundo factor y cierra sus sesiones |
+| `GET/POST /plataforma/invitaciones/` `{nota?}` | identidades | Lista (`modo_registro`, `invitaciones: [{id, nota, emitida_por, creado_en, vence_en, usada, estado}]`, nunca el código) y emite: `201 {id, codigo_invitacion, vence_en}`, el código **solo en esta respuesta** (`Cache-Control: no-store`) |
 | `POST /plataforma/personas/<id>/bloquear/` `{motivo}` · `…/desbloquear/` · `…/revocar-sesiones/` | seguridad | Bloqueo de cuenta (motivo de 5 a 200 caracteres) y cierre de sesiones |
 | `GET /plataforma/eventos/` | seguridad | Últimos eventos de seguridad |
 | `GET/POST /plataforma/aprobaciones/` | identidades (altas de coordinadora), catálogo (altas de institución) | Lista y propone. El tipo sale del rol, nunca del cliente |

@@ -86,8 +86,10 @@ class Command(BaseCommand):
     def _recorrer(self):
         mop = Institucion.objects.get(nombre="MOP")
         minsa = Institucion.objects.get(nombre="MINSA")
-        tipo_mop = TipoTramite.objects.get(institucion=mop)
-        tipo_minsa = TipoTramite.objects.get(institucion=minsa)
+        tipo_mop = TipoTramite.objects.get(institucion=mop, audiencia="ciudadania")
+        tipo_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="ciudadania")
+        inter_mop = TipoTramite.objects.get(institucion=mop, audiencia="institucion")
+        inter_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="institucion")
 
         coord = self._persona("coord")
         ana, beto = self._persona("ana"), self._persona("beto")
@@ -118,7 +120,7 @@ class Command(BaseCommand):
         r = self._http("get", "/catalogo/instituciones/", tok(ana))
         self._paso("el catálogo lista las 6 instituciones", r.status_code == 200 and len(r.json()) >= 6, len(r.json()) if r.status_code == 200 else r.status_code)
         r = self._http("get", f"/catalogo/tipos-tramite/?institucion={mop.pk}", tok(ana))
-        self._paso("el catálogo se filtra por institución", r.status_code == 200 and len(r.json()) == 1 and r.json()[0]["sla_dias"] == 10)
+        self._paso("el catálogo se filtra por institución", r.status_code == 200 and len(r.json()) == 2 and {t["audiencia"] for t in r.json()} == {"ciudadania", "institucion"})
         self._paso("un filtro inválido se rechaza", self._http("get", "/catalogo/tipos-tramite/?institucion=abc", tok(ana)).status_code == 400)
 
         # ---------------------------------------------------------------- crear
@@ -186,11 +188,22 @@ class Command(BaseCommand):
         r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), {"estado": "En Tramitacion"})
         self._paso("el funcionario con el segundo factor reciente lo pasa a En Tramitación", r.status_code == 200 and r.json()["estado"] == "En Tramitacion", r.status_code)
 
-        # conflicto de interés: una persona que es funcionaria y también pidió un trámite
+        # quién inicia qué: el personal solo hacia otras instituciones y solo trámites interinstitucionales
         r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": tipo_mop.pk})
-        propio = r.json()["id"]
+        self._paso("el personal del MOP no inicia un trámite en el MOP", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": inter_mop.pk})
+        self._paso("ni siquiera la solicitud interinstitucional de su propia institución", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": tipo_minsa.pk})
+        self._paso("el personal no inicia en otra institución un trámite pensado para la ciudadanía", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": inter_minsa.pk})
+        self._paso("el personal del MOP inicia una solicitud interinstitucional en el MINSA", r.status_code == 201, r.status_code)
+        propio = r.json()["id"] if r.status_code == 201 else None
+        self._paso("quien la inició la ve (es suya) y el personal del MINSA también",
+                   self._http("get", f"/tramites/{propio}/", tok(func_mop)).status_code == 200 and self._http("get", f"/tramites/{propio}/", tok(func_minsa)).status_code == 200)
         r = self._http("post", f"/tramites/{propio}/estado/", tok(func_mop), {"estado": "En Tramitacion"})
-        self._paso("un funcionario no gestiona un trámite que él mismo pidió (conflicto de interés)", r.status_code == 403)
+        self._paso("quien la inició no la gestiona: pertenece a otra institución", r.status_code in (403, 404), r.status_code)
+        r = self._http("post", "/tramites/", tok(ana), {"tipo_tramite": inter_minsa.pk})
+        self._paso("la ciudadanía no inicia solicitudes interinstitucionales", r.status_code == 403)
 
         # ---------------------------------------------------------------- reasignación
         r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(func_mop), {"funcionario_id": func2_mop.pk})
