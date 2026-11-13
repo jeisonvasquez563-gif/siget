@@ -9,6 +9,7 @@
 import matrizEjemplo from './mock-datos/matriz.json'
 import { equipoMock } from './mock-equipo.js'
 import { plataformaMock } from './mock-plataforma.js'
+import { olvidarConfiguracion } from './api.js'
 import bdEjemplo from './mock-datos/base-de-datos.json'
 import simuladorEjemplo from './mock-datos/simulador.json'
 
@@ -148,6 +149,8 @@ function paginar(lista, p) {
 }
 
 export function instalarMock(inicial, opciones = {}) {
+  const ajustes = opciones // dentro de fetch, «opciones» es la de cada petición
+  olvidarConfiguracion()
   // Cada instalación parte del mismo estado: lo que se cambie en una sesión de ejemplo no contamina la siguiente
   const TRAMITES = structuredClone(TRAMITES_BASE)
   const EVENTOS = structuredClone(EVENTOS_BASE)
@@ -200,7 +203,12 @@ export function instalarMock(inicial, opciones = {}) {
       return resp(200, { access_token: 'mock', scope: 'completo' })
     }
     if (camino === '/auth/instituciones/') return resp(200, INSTITUCIONES.map(({ id, nombre }) => ({ id, nombre })))
-    if (camino === '/auth/registro/') return resp(201, { detalle: 'Cuenta creada.' })
+    if (camino === '/auth/configuracion/') return resp(200, { registro: ajustes.registro || 'abierto', aviso_demostracion: Boolean(ajustes.aviso) })
+    if (camino === '/auth/registro/') {
+      if (ajustes.registro === 'cerrado') return resp(403, { codigo: 'registro_cerrado', detalle: 'La creación de cuentas está cerrada en este momento.' })
+      if (ajustes.registro === 'invitacion' && cuerpo.invitacion !== 'K7MQ-2XWD-9PRT') return resp(400, { codigo: 'invitacion_invalida', detalle: 'La invitación no es válida, ya se usó o venció.' })
+      return resp(201, { detalle: 'Cuenta creada.' })
+    }
     if (camino === '/auth/restablecer/') {
       const bueno = (cuerpo.codigo || '').replace(/[\s-]/g, '').toUpperCase() === 'K7MQ2XWD9PRT' && USUARIOS[(cuerpo.username || '').trim().toLowerCase()]
       if (!bueno) return resp(400, { codigo: 'codigo_invalido', detalle: 'El código no es válido, ya se usó o venció.' })

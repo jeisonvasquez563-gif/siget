@@ -97,6 +97,11 @@
 .plazo-texto { display: block; font-size: var(--t-xs); color: var(--tinta-suave); margin-top: 0.3rem; }
 .plazo-texto.atencion { color: var(--boya-texto); font-weight: 650; }
 .plazo-texto.vencido { color: var(--sello-rojo); font-weight: 650; }
+.aviso-demostracion {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 1rem;
+  background: var(--boya-fondo); color: var(--boya-texto); border-bottom: 2px solid var(--boya); font-size: var(--t-s);
+}
+.aviso-demostracion .icono { flex: none; }
 
 /* ---------- estados vacíos, carga, alertas ---------- */
 .vacio { text-align: center; padding: 3rem 1.5rem; background: var(--superficie); border: 1px dashed var(--borde-fuerte); border-radius: var(--radio-l); }
