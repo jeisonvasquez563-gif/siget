@@ -111,7 +111,7 @@ export function MisTramites({ yo, abrir, nuevo }) {
 
 /* ---------------------------------------------------------------- nuevo trámite */
 
-export function NuevoTramite({ abrir }) {
+export function NuevoTramite({ yo, abrir }) {
   const [instituciones, setInstituciones] = useState(null)
   const [tipos, setTipos] = useState(null)
   const [institucion, setInstitucion] = useState(null)
@@ -119,14 +119,17 @@ export function NuevoTramite({ abrir }) {
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(false)
   const { avisar } = useUI()
+  // El personal inicia trámites hacia OTRAS instituciones (solicitudes interinstitucionales); la ciudadanía, los suyos. Nadie inicia en su propia institución.
+  const esPersonal = yo.membresias.length > 0
+  const propias = useMemo(() => new Set(yo.membresias.map((m) => m.institucion_id)), [yo.membresias])
 
-  useEffect(() => { api('/catalogo/instituciones/').then(setInstituciones).catch((e) => setError(mensajeDe(e))) }, [])
+  useEffect(() => { api('/catalogo/instituciones/').then((l) => setInstituciones(l.filter((i) => !propias.has(i.id)))).catch((e) => setError(mensajeDe(e))) }, [propias])
   useEffect(() => {
     setTipo(null)
     setTipos(null)
     if (!institucion) return
-    api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then(setTipos).catch((e) => setError(mensajeDe(e)))
-  }, [institucion])
+    api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then((l) => setTipos(l.filter((t) => t.audiencia === 'ambas' || t.audiencia === (esPersonal ? 'institucion' : 'ciudadania')))).catch((e) => setError(mensajeDe(e)))
+  }, [institucion, esPersonal])
 
   async function crear() {
     setError('')
@@ -143,12 +146,12 @@ export function NuevoTramite({ abrir }) {
 
   return (
     <>
-      <div className="encabezado-vista"><div><h2>Iniciar un trámite</h2><p>Dos pasos: la institución y el trámite. Verás el plazo antes de confirmar.</p></div></div>
+      <div className="encabezado-vista"><div><h2>Iniciar un trámite</h2><p>{esPersonal ? 'Solicitudes de tu institución a otra institución. No puedes iniciar trámites en la tuya.' : 'Dos pasos: la institución y el trámite. Verás el plazo antes de confirmar.'}</p></div></div>
       <Alerta>{error}</Alerta>
       <div className="nuevo">
         <div>
           <section className="panel">
-            <div className="panel-cabecera"><h3>1. ¿Ante qué institución?</h3></div>
+            <div className="panel-cabecera"><h3>{esPersonal ? '1. ¿A qué institución?' : '1. ¿Ante qué institución?'}</h3></div>
             {instituciones === null ? <BloquesEsqueleto n={2} /> : (
               <div className="opciones" role="radiogroup" aria-label="Institución">
                 {instituciones.map((i) => (
