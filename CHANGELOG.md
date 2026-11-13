@@ -6,6 +6,11 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Documentación (SDLC seguro: organización y plantillas, 12-nov)
+- **Organización del equipo** para implementar en SIGET las 8 etapas del ciclo de vida de desarrollo seguro de Red Hat ([`docs/SIGET_Organizacion_SDLC_Seguro.docx`](./docs/SIGET_Organizacion_SDLC_Seguro.docx)). Cada integrante tiene una etapa con pasos, entregable, revisor y criterio de «terminado», y hay un calendario del 12 al 26 de noviembre.
+- **Plantillas de trabajo**, una por etapa y con ejemplos resueltos, en [`docs/sdlc/`](./docs/sdlc/README.md) y en [`docs/SIGET_Plantillas_SDLC_Seguro.docx`](./docs/SIGET_Plantillas_SDLC_Seguro.docx): registro de riesgos, requisitos y cumplimiento, modelo de amenazas STRIDE, codificación segura, inventario de controles, plan de pruebas, revisión del entorno y bitácoras de supervisión y de parches.
+- **`SECURITY.md`**: cómo reportar una vulnerabilidad en privado, versiones con soporte y plazos de respuesta (a completar por el equipo).
+
 ### Cambiado (quién puede iniciar qué trámite, 22-oct)
 - **El personal de una institución ya no puede iniciar trámites en su propia institución** (el MOP no se hace trámites a sí mismo) y **cada trámite tiene una audiencia**: `ciudadania` (lo inicia una persona de la ciudadanía), `institucion` (lo inicia el personal de OTRA institución; p. ej. la «Solicitud interinstitucional de información», que ya existe en cada institución con plazo de 5 días) o `ambas`. Dos reglas de denegación nuevas en el PDP (`personal_no_inicia_en_su_institucion`, `audiencia_no_corresponde`), reflejadas en la matriz y en el simulador (variable «Trámite para»). El personal sigue siendo solicitante de lo que inicia en otra institución y no lo gestiona (conflicto de interés). La pantalla «Iniciar un trámite» filtra instituciones y trámites según quien eres; el catálogo (`GET /catalogo/tipos-tramite/`) devuelve `audiencia`.
 - **Segunda barrera en la base** (migración 012): `tipo_tramite.audiencia` y un trigger `BEFORE INSERT` en `tramite` que rechaza iniciar en la propia institución y la audiencia equivocada, aunque alguien saltara el PDP. 463 pruebas del backend (7 nuevas), 191 del frontend. **Pendiente de aplicar en producción** (migración 012 + despliegue).
