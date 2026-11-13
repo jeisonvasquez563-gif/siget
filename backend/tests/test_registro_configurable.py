@@ -1,6 +1,7 @@
 """Registro configurable (PT-2): modos abierto / invitación / cerrado, configuración pública y validación de la configuración.
 Lo que necesita la base (gastar una invitación, que no se reutilice) se prueba en verificar_autenticacion contra PostgreSQL."""
 import os
+import secrets
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,8 @@ from rest_framework.test import APIClient
 from apps.autenticacion import servicio
 
 BACKEND = Path(__file__).resolve().parent.parent
+# Contraseña válida generada al ejecutar: no queda ninguna escrita en el código (Gitleaks)
+CLAVE = "Prueba-" + secrets.token_urlsafe(18)
 DATOS = {"nombre": "Ana", "apellidos": "Pérez", "cedula": "8-123-456", "fecha_nacimiento": "1990-01-01",
          "provincia": "Panamá", "ciudad": "Panamá", "correo": "ana@example.com"}
 
@@ -25,7 +28,7 @@ def eventos(monkeypatch):
 
 def test_con_el_registro_cerrado_no_se_crea_nada_y_queda_el_evento(eventos, monkeypatch):
     monkeypatch.setattr(servicio.Usuario.objects, "create", lambda **kw: pytest.fail("no debe crear la cuenta"))
-    r = servicio.registrar_usuario("ana.nueva", "Una-clave-larga-y-segura-2026", "10.0.0.1", DATOS, modo="cerrado")
+    r = servicio.registrar_usuario("ana.nueva", CLAVE, "10.0.0.1", DATOS, modo="cerrado")
     assert (r.ok, r.codigo) == (False, "registro_cerrado")
     assert eventos == [("registro_rechazado", {"motivo": "registro_cerrado"})]
 
@@ -41,7 +44,7 @@ def test_con_invitacion_los_datos_se_validan_antes_que_el_codigo(eventos, monkey
 def test_una_invitacion_mal_formada_se_rechaza_sin_consultar_la_base(eventos, monkeypatch, codigo):
     monkeypatch.setattr(servicio.Invitacion.objects, "select_for_update", lambda: pytest.fail("no debe consultar"))
     monkeypatch.setattr(servicio.transaction, "atomic", lambda: _SinTransaccion())
-    r = servicio.registrar_usuario("ana.nueva", "Una-clave-larga-y-segura-2026", "10.0.0.1", DATOS, modo="invitacion", invitacion=codigo)
+    r = servicio.registrar_usuario("ana.nueva", CLAVE, "10.0.0.1", DATOS, modo="invitacion", invitacion=codigo)
     assert (r.ok, r.codigo) == (False, "invitacion_invalida")
     assert eventos[-1][0] == "registro_rechazado" and eventos[-1][1]["motivo"] == "invitacion_invalida"
 
@@ -69,7 +72,7 @@ def test_la_configuracion_publica_dice_el_modo_y_el_aviso(modo, aviso):
 
 def test_con_el_registro_cerrado_la_api_responde_403_sin_crear_nada(eventos):
     with override_settings(SIGET_REGISTRO="cerrado", ALLOWED_HOSTS=["localhost"]):
-        r = APIClient().post("/auth/registro/", {"username": "ana.nueva", "password": "Una-clave-larga-y-segura-2026", **DATOS},
+        r = APIClient().post("/auth/registro/", {"username": "ana.nueva", "password": CLAVE, **DATOS},
                              format="json", secure=True, HTTP_HOST="localhost")
     assert r.status_code == 403 and r.json()["codigo"] == "registro_cerrado"
 
