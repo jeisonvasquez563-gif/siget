@@ -1,0 +1,7 @@
+# Etapa 8 — Temporizadores de mantenimiento: respaldo diario (VM2)
+# 2026-11-16 22:12:33  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.100.20 "systemctl list-timers siget-respaldo.timer --no-pager | head -2; sudo journalctl -u siget-respaldo -n 30 --no-pager -o cat | grep ^OK | tail -1"
+NEXT                        LEFT          LAST                        PASSED      UNIT                 ACTIVATES
+Tue 2026-11-17 02:34:11 EST 4h 21min left Mon 2026-11-16 22:09:31 EST 3min 2s ago siget-respaldo.timer siget-respaldo.service
+OK: tramites_demo-20261116-220931.dump (159418 bytes, 17 tablas), restauración probada y verificada contra la base viva
+# código de salida: 0

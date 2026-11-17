@@ -1,0 +1,27 @@
+# Corrección — VM2: actualización completa del sistema (dnf update)
+# 2026-11-16 22:35:26  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR -o ServerAliveInterval=30 jeison_vasquez@192.168.100.20 "sudo dnf -y -q update > /tmp/dnf-update.log 2>&1; rc=$?; echo \"dnf update terminó con código $rc\"; tail -3 /tmp/dnf-update.log; echo; sudo dnf history info last | sed -n \"1,14p\"; echo; echo \"Sistema tras actualizar: $(cat /etc/rocky-release)\"; echo \"Kernel nuevo instalado: $(rpm -q --last kernel | head -1)\"; sudo needs-restarting -r || true"
+dnf update terminó con código 0
+  samba-core-libs-4.24.5-2.el9.x86_64                                           
+  samba-ndr-libs-4.24.5-2.el9.x86_64                                            
+
+
+ID de transacción: 7
+Hora inicial     : lun 16 nov 2026 22:36:26
+Rpmdb inicial    : fc240d77c5815c2f29ed2213f451e55e74c40ba1a87ddc1c926b0df6d1d5fd73
+Hora final       : lun 16 nov 2026 22:40:42 (256 segundos)
+Rpmdb final      : 826fa56c8f6b9aa5a09d04213e6e5da8ac310f402ee52b0b098e0d2105031541
+Usuario          : jeison_vasquez <jeison_vasquez>
+Código de retorno: Éxito
+Publicación      : 9
+Línea de comando : -y -q update
+Persistence    : Persist
+Comentario       : 
+Paquetes modificados:
+    Instalar    freetype-2.10.4-10.el9_5.x86_64                          @baseos
+    Instalar    graphite2-1.3.14-9.el9.x86_64                            @baseos
+
+Sistema tras actualizar: Rocky Linux release 9.9 (Blue Onyx)
+Kernel nuevo instalado: kernel-5.14.0-741.22.1.el9_9.x86_64           lun 16 nov 2026 22:38:21
+sudo: needs-restarting: command not found
+# código de salida: 0

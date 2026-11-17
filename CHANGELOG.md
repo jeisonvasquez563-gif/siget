@@ -6,6 +6,50 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Seguridad (checkpoint PHP y pgAdmin web retirados, puerto 80 cerrado, PT-13, 17-nov)
+- **Retirados el checkpoint PHP (`/gestion/`) y pgAdmin 4 web (`/pgadmin4/`)**, que Apache servía por HTTP sin cifrar en el puerto 80 de VM1. pgAdmin apareció al revisar Apache: era el primer intento de checkpoint y seguía abierto a toda la red. SIGET no usa ninguno de los dos.
+- Con respaldo previo en `/root/respaldo-pt13-2026-11-17/` se detuvieron y deshabilitaron `httpd` y `php-fpm`, se quitó `http` del cortafuegos y el rol `checkpoint_app` quedó sin inicio de sesión (`NOLOGIN`), así que la contraseña que guardaba su configuración ya no sirve. Los paquetes siguen instalados pero apagados; volver atrás está en el runbook §38.2.
+- Después: el 80 no responde, la plataforma sí; `verificar_tramites` 77/77, `verificar_plataforma` 91/91, `verificar_autenticacion` 84/84 y ensayo 101/101 (`docs/sdlc/evidencia/13_*`).
+- **Copia de `siget-docs-key` fuera de VM1**, en el equipo anfitrión, verificada por huella SHA-256 sin mostrar el valor. Falta una segunda copia fuera de ese PC.
+- Efecto en el SDLC: R8 mitigado y R6 parcial; RS-13 pasa a «Cumple» (21 cumplen); amenazas A3 mitigada y A2 parcial (25 mitigadas, 15 parciales, 1 abierta); los 5 hallazgos de la revisión del entorno quedan corregidos.
+
+### Mantenimiento (VMs actualizadas a Rocky Linux 9.9, 16-nov)
+- **Primera actualización completa del sistema desde la instalación.** Las dos VMs pasaron de Rocky 9.7 (sin soporte desde el 28-may-2026) a **9.9**, la última versión menor, con kernel 5.14.0-741.22.1 y Podman 5.8.5.
+- **Avisos pendientes:** se aplicaron todos los avisos de seguridad pendientes (203 en VM1 y 192 en VM2, más 5 correcciones de errores en cada una, según la línea base del mismo día), entre ellos los 2 críticos (`ca-certificates` RLSA-2026:88459 y Samba RLSA-2026:25049). Quedan **0 críticos y 0 actualizaciones pendientes**.
+- **Cómo se hizo:**
+  - respaldo verificado de la base (`tramites_demo-20261116-222436.dump`);
+  - instantáneas de VMware de las dos VMs (`antes-de-rocky-9.8-2026-11-16`);
+  - VM2 primero y, verificada, VM1;
+  - reinicio de cada una para cargar el kernel nuevo.
+- **Después del reinicio** todo arrancó solo: servicios de SIGET, temporizador de escalamiento, Apache y PHP con su endurecimiento, PostgreSQL y respaldo diario. `verificar_tramites` 77/77, `verificar_plataforma` 91/91, `verificar_autenticacion` 84/84 y ensayo 101/101.
+- **VM2:** se quitó la regla del cortafuegos que permitía el puerto 5432 (PostgreSQL nativo sin uso); queda solo la del 5433.
+- **Hallazgo nuevo en VM1, corregido el 17-nov:** los repositorios externos de PostgreSQL (`pgdg-common` y `pgdg14` a `pgdg18`), que quedaron de pgAdmin, fallaban la verificación de firma GPG. Se respaldó su archivo y se deshabilitaron los seis; `dnf` actualiza sin errores y siguen 0 avisos pendientes (`docs/sdlc/evidencia/11_vm1_repos_pgdg`).
+- **Instantáneas borradas (17-nov):** confirmado que todo seguía bien, se borraron las instantáneas `antes-de-rocky-9.8-2026-11-16` de las dos VMs. VMware dejó los discos marcados para consolidar porque la consola los tenía abiertos; se completa con «Clean Up Disks» con las VMs apagadas (`docs/sdlc/evidencia/12_instantaneas_borradas`).
+- Evidencia: `docs/sdlc/evidencia/09_*`, `10_*`, `11_*` y `12_*`.
+
+### Documentación (informe final del trabajo realizado, 17-nov)
+- **[`docs/SIGET_Informe_Final_Trabajo_Realizado.docx`](./docs/SIGET_Informe_Final_Trabajo_Realizado.docx)**: reúne el análisis estático y dinámico, las correcciones en producción, PT-3, PT-2 y PT-8, las 8 etapas del SDLC seguro y el mantenimiento de las VMs, con quién hizo y quién revisó cada parte según la organización del 12-nov, 19 figuras de evidencia, pendientes, conclusiones por integrante y bibliografía. Se genera con `docs/sdlc/generadores/generar-informe-final.js`.
+
+### Documentación (SDLC seguro implementado, 16-nov)
+- **Las 8 etapas del SDLC seguro de Red Hat están completas en [`docs/sdlc/`](./docs/sdlc/README.md)**, con datos reales de SIGET:
+  - 23 riesgos;
+  - 26 requisitos con 11 artículos de leyes panameñas;
+  - un modelo STRIDE de 41 amenazas;
+  - 14 reglas de codificación segura;
+  - un inventario de 43 controles;
+  - el plan de pruebas con revisión de PR;
+  - la revisión del entorno de VM1 y VM2;
+  - las bitácoras de supervisión y de parches.
+- **Evidencia:** las comprobaciones de las VMs se hicieron solo con comandos de lectura y están en [`docs/sdlc/evidencia/`](./docs/sdlc/evidencia/).
+- **Guía de defensa** ([`docs/SIGET_Guia_de_Defensa_SDLC_Seguro.docx`](./docs/SIGET_Guia_de_Defensa_SDLC_Seguro.docx)): tiene una parte común (qué es SIGET, las 8 etapas, shift left, DevSecOps, Zero Trust y un glosario) y una sección por integrante con las preguntas probables del profesor y sus respuestas. Se genera desde los propios archivos de las etapas (`docs/sdlc/generadores/generar-guia-defensa.js`).
+- **Hallazgos que quedan abiertos:**
+  - parches del sistema sin aplicar (2 críticos por VM);
+  - la clave de documentos sin copia fuera de VM1;
+  - el checkpoint PHP sirve en HTTP por el puerto 80;
+  - un solo administrador con sudo;
+  - SIGET no permite a la persona ver, corregir ni eliminar sus datos personales (Ley 81 de 2019, arts. 15 y 16) ni le informa cómo se usan;
+  - una regla del cortafuegos de VM2 sobra (5432).
+
 ### Integración (rama que reproduce producción, 17-nov)
 - **`integracion/produccion` junta en una sola rama lo que corre en producción**: el análisis estático y dinámico (#7), el CI de seguridad (#16), PT-3 (#8 y #9), PT-2 (#10 y #11) y PT-8 (#12 y #13), fusionados en ese orden sobre `develop`. Hasta ahora producción era una combinación hecha a mano que no existía como rama.
 - **Conflictos resueltos:** los de documentación (CHANGELOG, runbook y README de migraciones) uniendo las dos entradas; los de código (`settings.py`, `tramites/vistas.py`, `verificar_tramites.py`, `test_modelos.py`, `componentes.css`, `Tramites.jsx` y `comun.jsx`) a mano, conservando lo de las dos ramas. Las secciones 35 a 37 del runbook y la tabla de migraciones quedaron en orden.

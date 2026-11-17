@@ -1200,7 +1200,7 @@ Un pod rootless `siget` del usuario de servicio `siget`, gestionado por Quadlet,
 | Firewall | `8443/tcp` y `8080/tcp` abiertos en VM1 |
 | Acceso | `https://192.168.159.137:8443` (red del anfitrión) o `https://100.104.206.118:8443` (Tailscale) |
 
-El checkpoint PHP sigue en Apache (puerto 80) hasta que se retire (semana 6): por eso nginx usa los puertos altos 8443 y 8080.
+El checkpoint PHP estuvo en Apache (puerto 80) hasta su retiro el 17-nov-2026 (sección 38): por eso nginx usa los puertos altos 8443 y 8080.
 
 ### 24.2 Certificado de nginx
 
@@ -1694,3 +1694,35 @@ Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/ps
 3. **La unidad del backend en producción tenía `Environment=SIGET_INACTIVIDAD_MINUTOS=2`, que no está en el repositorio** (ajuste de la demo, rama `chore/inactividad-demo`). La unidad nueva se armó sobre la de producción agregando solo las líneas de PT-8; la anterior quedó en `/home/siget/siget-backend.container.respaldo-2026-11-12c`. Antes de copiar cualquier unidad del repositorio, compararla con la de producción.
 4. Backend e interfaz con el PR #7, PT-3, PT-2 y PT-8 combinados (respaldos `siget-backend:respaldo-2026-11-12c` y `frontend.respaldo-2026-11-12c`). Dentro del contenedor: el volumen `/datos` pertenece al usuario 1001 (opción `U`) y se puede escribir; el resto sigue de solo lectura; la clave está montada. Se probó un cifrado y descifrado real con la clave y el volumen de producción, sin dejar rastro.
 5. `verificar_tramites` 77 de 77, `verificar_plataforma` 91 de 91, `verificar_autenticacion` 84 de 84 y ensayo 101 de 101.
+
+## 38. Retiro del checkpoint PHP, pgAdmin web y puerto 80 (PT-13, 17 de noviembre de 2026)
+
+
+
+El checkpoint PHP (`/gestion/`) y pgAdmin 4 web (`/pgadmin4/`, primer intento de checkpoint) los servía Apache en el puerto 80 de VM1, **por HTTP sin cifrar** y abiertos a toda la red. SIGET no usa ninguno de los dos (nginx en 8443 y 8080) y el registro de accesos de Apache estaba vacío desde el 16-nov. Aprobado por Jeison.
+
+### 38.1 Qué se hizo
+
+1. **Estado previo** (`docs/sdlc/evidencia/13_puerto80_antes`): Apache escuchando en `*:80`, `httpd` y `php-fpm` activos y habilitados, servicio `http` en el cortafuegos; `/gestion/login.php` respondía 200 y `/pgadmin4/` 302.
+2. **Respaldo** en `/root/respaldo-pt13-2026-11-17/` (700, archivos 600): `checkpoint-apache-php-pgadmin.tar.gz` con `/var/www/html/gestion`, `/etc/httpd`, `/etc/php.ini`, `/etc/php.d`, `/etc/php-fpm.conf`, `/etc/php-fpm.d` y `/var/lib/pgadmin` (80 entradas; SHA-256 `78af6703…30cdef`), y `cortafuegos-antes.txt`.
+3. `sudo systemctl disable --now httpd php-fpm`.
+4. `sudo firewall-cmd --permanent --remove-service=http && sudo firewall-cmd --reload`. Quedan `ssh`, `dhcpv6-client`, 8080/tcp y 8443/tcp.
+5. **VM2:** `ALTER ROLE checkpoint_app NOLOGIN` (no tenía sesiones abiertas). La contraseña que guardaba `config.php` ya no sirve para entrar a la base. El rol y sus permisos se conservan (el diseño de roles y `verificar_equipo` lo nombran).
+6. **Verificación** (`13_puerto80_despues`): el 80 no responde, `https://…:8443/salud/` 200, `verificar_tramites` 77/77, `verificar_plataforma` 91/91, `verificar_autenticacion` 84/84 y ensayo 101/101.
+
+Los paquetes (`httpd`, `php-fpm`, `pgadmin4-*`, `python3-mod_wsgi`) **no se desinstalaron**: quedan apagados. Desinstalarlos es un paso aparte, después de la entrega.
+
+### 38.2 Volver atrás (solo si hiciera falta)
+
+```bash
+sudo systemctl enable --now php-fpm httpd
+sudo firewall-cmd --permanent --add-service=http && sudo firewall-cmd --reload
+# VM2, con database/psql-contenedor.sh:
+psql-contenedor.sh -d tramites_demo -c "ALTER ROLE checkpoint_app LOGIN"
+```
+
+Si faltara algún archivo: `sudo tar xzf /root/respaldo-pt13-2026-11-17/checkpoint-apache-php-pgadmin.tar.gz -C /` y `sudo restorecon -R /var/www/html /etc/httpd`.
+
+### 38.3 Copia de `siget-docs-key` fuera de VM1
+
+El mismo día se sacó una copia de la clave de documentos al equipo anfitrión, en una carpeta fuera de todo repositorio y con permisos solo para el administrador. El valor viajó de `podman secret inspect --showsecret` directo al archivo, sin mostrarse, y se comprobó con la huella SHA-256 que la copia es idéntica (45 bytes). **Pendiente:** una segunda copia fuera del PC anfitrión (memoria USB cifrada o gestor de contraseñas), porque las VMs corren en ese mismo equipo. Para restaurarla: `podman secret create siget-docs-key <archivo>` como `siget` (ver la sección de documentos, rama `feature/backend-documentos`).

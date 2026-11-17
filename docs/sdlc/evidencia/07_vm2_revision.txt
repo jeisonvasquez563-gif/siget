@@ -1,0 +1,23 @@
+# Etapa 7 — VM2: revisión de seguridad del entorno (solo lectura)
+# 2026-11-16 22:11:45  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.100.20 "echo \"== SELinux: $(getenforce)\"; echo \"== Sistema: $(cat /etc/rocky-release)\"; echo \"== SSH:\"; sudo sshd -T | grep -E \"^(passwordauthentication|permitrootlogin|pubkeyauthentication) \"; echo \"== Cortafuegos (servicios / puertos / reglas):\"; sudo firewall-cmd --list-services; sudo firewall-cmd --list-ports; sudo firewall-cmd --list-rich-rules; echo \"== Puertos en escucha (TCP):\"; sudo ss -tlnH | awk \"{print \$4}\" | sort -u; echo \"== Avisos de seguridad críticos pendientes: $(sudo dnf -q updateinfo list --security | grep Crít | awk \"{print \$1}\" | sort -u | tr \"\n\" \" \")\"; echo \"== Sudo: grupo wheel = $(getent group wheel | cut -d: -f4); reglas en sudoers.d: $(sudo ls /etc/sudoers.d/ | tr \"\n\" \" \")\""
+== SELinux: Enforcing
+== Sistema: Rocky Linux release 9.7 (Blue Onyx)
+== SSH:
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+== Cortafuegos (servicios / puertos / reglas):
+dhcpv6-client ssh
+
+rule family="ipv4" source address="192.168.100.10/32" port port="5432" protocol="tcp" accept
+rule family="ipv4" source address="192.168.100.10/32" port port="5433" protocol="tcp" accept
+== Puertos en escucha (TCP):
+0.0.0.0:22
+100.120.115.100:61326
+192.168.100.20:5433
+[::]:22
+[fd7a:115c:a1e0::d738:7365]:53976
+== Avisos de seguridad críticos pendientes: RLSA-2026:25049 RLSA-2026:88459 
+== Sudo: grupo wheel = jeison_vasquez; reglas en sudoers.d: 90-jeison-nopasswd 
+# código de salida: 0
