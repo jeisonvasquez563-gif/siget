@@ -25,7 +25,7 @@ Estado al **17 de noviembre de 2026**. Este documento dice dónde quedó cada co
 - Carpeta: `C:\Users\jeiva\Desktop\siget-derechos`.
 - Backend: `feature/backend-derechos-datos` (`b26b252`).
 - Frontend: `feature/frontend-derechos-datos` (`a3247e4`).
-- Las dos ramas están **solo en local**: sin push y sin PR.
+- Las dos ramas están subidas a GitHub como respaldo (17-nov), todavía sin PR.
 
 **Contenido:**
 - Migración `016-derechos-datos.sql`.
