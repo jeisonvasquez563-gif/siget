@@ -1,0 +1,14 @@
+# Gitleaks — historial de git con los hallazgos revisados (después)
+# 2026-11-08 13:59:40  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ gitleaks git . --redact -v --no-color --report-format json --report-path docs/analisis-seguridad/despues/gitleaks.json
+
+    ○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+
+2:00PM INF 81 commits scanned.
+2:00PM INF scanned ~5428398 bytes (5.43 MB) in 37.5s
+2:00PM INF no leaks found
+# código de salida: 0

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from './api.js'
 import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Plazo, SIGUIENTES, fecha, fechaCorta, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { Documentos } from './Documentos.jsx'
 import { Seguimiento } from './Seguimiento.jsx'
 import { Alerta, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
 
@@ -250,12 +251,13 @@ export function Bandeja({ yo, abrir, modo }) {
     if (filtro === 'abiertos') return esAbierto(t)
     if (filtro === 'sin_asignar') return esAbierto(t) && !t.funcionario_asignado_id
     if (filtro === 'vencidos') return t.vencido
+    if (filtro === 'escalados') return t.escalado && esAbierto(t)
     if (filtro === 'mios') return t.funcionario_asignado_id === yo.id
     return true
   }), [ajenos, filtro, q, yo])
   const cuenta = (f) => ajenos.filter(f).length
   const filtros = supervision
-    ? [['abiertos', 'Abiertos'], ['sin_asignar', 'Sin asignar'], ['vencidos', 'Vencidos'], ['todos', 'Todos']]
+    ? [['abiertos', 'Abiertos'], ['sin_asignar', 'Sin asignar'], ['escalados', 'Escalados'], ['vencidos', 'Vencidos'], ['todos', 'Todos']]
     : [['abiertos', 'Abiertos'], ['mios', 'Asignados a mí'], ['vencidos', 'Vencidos'], ['todos', 'Todos']]
   const vencidos = cuenta((t) => t.vencido)
   return (
@@ -296,7 +298,7 @@ export function Bandeja({ yo, abrir, modo }) {
 
 /* ---------------------------------------------------------------- detalle */
 
-const ICONO_EVENTO = { creacion: 'mas', cambio_estado: 'flujo', reasignacion: 'reasignar' }
+const ICONO_EVENTO = { creacion: 'mas', cambio_estado: 'flujo', reasignacion: 'reasignar', escalamiento: 'alerta', documento_adjuntado: 'documento' }
 
 export function Detalle({ id, yo, volver, volverA }) {
   const [tramite, setTramite] = useState(null)
@@ -447,6 +449,7 @@ export function Detalle({ id, yo, volver, volverA }) {
                 <div className="evento">
                   <strong>{ACCIONES_EVENTO[e.accion] || e.accion}</strong>
                   {e.accion === 'cambio_estado' && <span className="cambio"><Estado valor={e.estado_anterior} /><Icono nombre="derecha" className="tenue" /><Estado valor={e.estado_nuevo} /></span>}
+                  {e.accion === 'escalamiento' && <span className="quien">Superó el plazo: el sistema lo pasó a la supervisión de la institución</span>}
                   {e.accion === 'reasignacion' && e.atributos && <span className="quien">{e.atributos.de ? `De ${quien(e.atributos.de)} a ` : 'Asignado a '}{e.atributos.a ? quien(e.atributos.a) : 'la cola'}</span>}
                   <time dateTime={e.creado_en} title={fecha(e.creado_en)}>{fecha(e.creado_en)} · {hace(e.creado_en)}</time>
                   {'actor_id' in e && <span className="quien">Por {quien(e.actor_id)}</span>}
@@ -457,6 +460,8 @@ export function Detalle({ id, yo, volver, volverA }) {
           {!esPersonal && <p className="nota">El historial es inalterable. Por privacidad no muestra qué funcionario actuó.</p>}
         </section>
       </div>
+      {/* Adjunta quien pidió el trámite (no el personal en su nombre) y solo mientras no tiene resolución final */}
+      <Documentos tramiteId={tramite.id} puedeAdjuntar={!esPersonal && !FINALES.includes(tramite.estado)} alAdjuntar={cargar} />
       {modal}
     </>
   )

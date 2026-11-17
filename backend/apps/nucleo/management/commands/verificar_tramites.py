@@ -5,20 +5,28 @@ distintos roles. Atraviesa todo: autenticación, límites, contexto RLS, PDP, ba
 Las decisiones del PDP se capturan en memoria SOLO en esta prueba (escribirlas dejaría filas permanentes: la tabla
 es de solo inserción); en producción van por una conexión aparte que no se revierte.
 """
-from datetime import timedelta
+import os
+import pathlib
+import tempfile
+from datetime import datetime, timedelta
 from unittest import mock
 
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connection, connections, transaction
+from django.db import DatabaseError, connection, connections, transaction
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.autenticacion import tokens
+from apps.auditoria.models import EventoAuditoria
+from apps.autenticacion import contrasenas, tokens
 from apps.autenticacion.models import Sesion
 from apps.autorizacion import permisos
-from apps.catalogo.models import Institucion, TipoTramite
+from apps.catalogo.models import Institucion, TipoTramite, feriados_entre
 from apps.identidad.models import Membresia, Usuario
+from apps.tramites.models import Documento, Tramite
+from apps.tramites.serializacion import sumar_dias_habiles
 
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.9"}
 
@@ -58,7 +66,7 @@ class Command(BaseCommand):
 
     def _persona(self, nombre, rol_plataforma="ninguno", mfa_hace_min=1):
         ahora = timezone.now()
-        return Usuario.objects.create(username=f"int_t_{nombre}", password_hash="x", rol_plataforma=rol_plataforma, mfa_activo=True,
+        return Usuario.objects.create(username=f"int_t_{nombre}", password_hash=contrasenas.inutilizable(), rol_plataforma=rol_plataforma, mfa_activo=True,
                                       mfa_verificado_en=ahora - timedelta(minutes=mfa_hace_min))
 
     def _token(self, usuario, scope=tokens.SCOPE_COMPLETO):
@@ -129,6 +137,24 @@ class Command(BaseCommand):
         self._paso("la ciudadana crea un trámite", r.status_code == 201 and cuerpo["estado"] == "Pendiente", r.status_code)
         tramite_ana = cuerpo["id"]
         self._paso("el plazo se calcula con el SLA del catálogo (10 días)", cuerpo["fecha_limite"] is not None and cuerpo["vencido"] is False)
+        creado = datetime.fromisoformat(cuerpo["creado_en"])
+        esperado = sumar_dias_habiles(creado, tipo_mop.sla_dias, feriados_entre(creado.date(), creado.date() + timedelta(days=90)))
+        self._paso("el plazo cuenta días hábiles: sin fines de semana ni feriados de la tabla feriado",
+                   abs(datetime.fromisoformat(cuerpo["fecha_limite"]) - esperado) < timedelta(seconds=5), cuerpo["fecha_limite"])
+        self._paso("un trámite nuevo no está escalado", cuerpo["escalado"] is False)
+        try:
+            with transaction.atomic():
+                with connection.cursor() as c:
+                    c.execute("SELECT siget.escalar_vencidos()")
+            self._paso("la aplicación (app_role) NO puede ejecutar el escalamiento", False)
+        except DatabaseError:
+            self._paso("la aplicación (app_role) NO puede ejecutar el escalamiento", True)
+        try:
+            with transaction.atomic():
+                Tramite.objects.filter(pk=tramite_ana).update(escalado_en=timezone.now())
+            self._paso("la aplicación (app_role) NO puede marcar un trámite como escalado", False)
+        except DatabaseError:
+            self._paso("la aplicación (app_role) NO puede marcar un trámite como escalado", True)
         self._paso("la ciudadana no ve datos de otras personas en su propio trámite", "solicitante_id" not in cuerpo and "funcionario_asignado_id" not in cuerpo and cuerpo["asignado"] is False)
         r = self._http("post", "/tramites/", tok(ana), {"tipo_tramite": tipo_mop.pk, "solicitante": beto.pk, "solicitante_id": beto.pk,
                                                         "estado": "Aprobado", "funcionario_asignado_id": func_mop.pk})
@@ -167,6 +193,55 @@ class Command(BaseCommand):
         self._paso("el personal de la institución lo ve", self._http("get", f"/tramites/{tramite_ana}/", tok(func_mop)).status_code == 200)
         self._paso("un id enorme no rompe nada (404)", self._http("get", f"/tramites/{10**30}/", tok(ana)).status_code == 404)
         self._paso("una paginación inválida se rechaza", self._http("get", "/tramites/?limite=0", tok(ana)).status_code == 400 and self._http("get", "/tramites/?limite=1", tok(ana)).json()["limite"] == 1)
+        r = self._http("get", "/tramites/?escalados=1&limite=100", tok(ana))
+        self._paso("el filtro de escalados solo devuelve trámites escalados", r.status_code == 200 and all(t["escalado"] for t in r.json()["resultados"]))
+        self._paso("un valor inválido del filtro de escalados se rechaza", self._http("get", "/tramites/?escalados=si", tok(ana)).status_code == 400)
+
+        # ---------------------------------------------------------------- documentos adjuntos (PT-8)
+        pdf = b"%PDF-1.7\n%verificacion SIGET\n%%EOF\n"
+        with tempfile.TemporaryDirectory() as carpeta, override_settings(SIGET_DOCS_KEY=os.urandom(32), SIGET_DOCS_DIR=carpeta):
+            def subir(token, nombre, contenido, tramite=tramite_ana):
+                cab = dict(HOST, HTTP_AUTHORIZATION=f"Bearer {token}")
+                r = self.cliente.post(f"/tramites/{tramite}/documentos/", {"archivo": SimpleUploadedFile(nombre, contenido)},
+                                      format="multipart", secure=True, **cab)
+                cache.clear()
+                transaction.set_rollback(False)
+                return r
+            r = subir(tok(ana), "../../requisito.pdf", pdf)
+            doc = r.json() if r.status_code == 201 else {}
+            self._paso("la ciudadana adjunta un PDF a su trámite (el nombre se sanea)", r.status_code == 201 and doc.get("nombre") == "requisito.pdf", r.status_code)
+            fila = Documento.objects.filter(pk=doc.get("id")).first()
+            en_disco = (pathlib.Path(carpeta) / fila.ubicacion[:2] / fila.ubicacion).read_bytes() if fila else b""
+            self._paso("en disco el archivo está cifrado (no aparece el contenido) y la ruta la generó el servidor",
+                       fila is not None and pdf not in en_disco and en_disco.startswith(b"SGD1") and "requisito" not in fila.ubicacion)
+            r = self._http("get", f"/tramites/{tramite_ana}/documentos/{doc.get('id')}/", tok(ana))
+            self._paso("al descargarlo vuelve idéntico, como adjunto y sin que el navegador lo interprete",
+                       r.status_code == 200 and r.content == pdf and r["Content-Disposition"].startswith("attachment")
+                       and r["X-Content-Type-Options"] == "nosniff" and r["Cache-Control"] == "no-store", r.status_code)
+            self._paso("un ejecutable con extensión .pdf se rechaza (415)", subir(tok(ana), "factura.pdf", b"MZ\x90\x00binario").status_code == 415)
+            self._paso("un HTML o un SVG se rechazan (415)", subir(tok(ana), "x.html", b"<script>").status_code == subir(tok(ana), "x.svg", b"<svg>").status_code == 415)
+            self._paso("otro ciudadano no ve ni adjunta en un trámite ajeno (404: para él no existe)",
+                       self._http("get", f"/tramites/{tramite_ana}/documentos/", tok(beto)).status_code == 404 and subir(tok(beto), "a.pdf", pdf).status_code == 404)
+            r = self._http("get", f"/tramites/{tramite_ana}/documentos/", tok(func_mop))
+            self._paso("el personal de la institución ve los documentos (con la huella SHA-256)", r.status_code == 200 and len(r.json()["documentos"]) == 1 and "sha256" in r.json()["documentos"][0])
+            self._paso("el personal no adjunta documentos en nombre de la persona (403)", subir(tok(func_mop), "a.pdf", pdf).status_code == 403)
+            self._paso("el personal de otra institución no los ve (404)", self._http("get", f"/tramites/{tramite_ana}/documentos/{doc.get('id')}/", tok(func_minsa)).status_code == 404)
+            # La seguridad por filas oculta el trámite antes de llegar al PDP: para el operador no existe (404, no 403)
+            self._paso("un rol de plataforma no ve documentos (para él el trámite no existe: 404)",
+                       self._http("get", f"/tramites/{tramite_ana}/documentos/", tok(operador)).status_code == 404)
+            pathlib.Path(carpeta, fila.ubicacion[:2], fila.ubicacion).write_bytes(en_disco[:-1] + bytes([en_disco[-1] ^ 1]))
+            r = self._http("get", f"/tramites/{tramite_ana}/documentos/{doc.get('id')}/", tok(ana))
+            self._paso("un archivo alterado en disco no se entrega (falla la verificación de integridad)", r.status_code == 500 and r.json()["codigo"] == "documento_no_disponible")
+            for operacion, accion in (("modificar", lambda: Documento.objects.filter(pk=fila.pk).update(nombre="otro.pdf")),
+                                      ("borrar", lambda: Documento.objects.filter(pk=fila.pk).delete())):
+                try:
+                    with transaction.atomic():
+                        accion()
+                    self._paso(f"la aplicación no puede {operacion} un documento", False)
+                except DatabaseError:
+                    self._paso(f"la aplicación no puede {operacion} un documento", True)
+            self._paso("el documento queda en el historial del trámite",
+                       EventoAuditoria.objects.filter(tramite_id=tramite_ana, accion="documento_adjuntado").count() == 1)
 
         # ---------------------------------------------------------------- cambio de estado
         r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(ana), {"estado": "En Tramitacion"})
@@ -229,10 +304,11 @@ class Command(BaseCommand):
         eventos = r.json()["eventos"]
         acciones = [e["accion"] for e in eventos]
         self._paso("el solicitante ve el historial completo de su trámite, en orden",
-                   r.status_code == 200 and acciones == ["creacion", "cambio_estado", "reasignacion", "cambio_estado"], acciones)
+                   r.status_code == 200 and acciones == ["creacion", "documento_adjuntado", "cambio_estado", "reasignacion", "cambio_estado"], acciones)
         self._paso("pero sin saber quién actuó ni el detalle interno", all("actor_id" not in e and "atributos" not in e for e in eventos))
         r = self._http("get", f"/tramites/{tramite_ana}/historial/", tok(func_mop))
-        self._paso("el personal ve quién actuó en cada paso", all("actor_id" in e for e in r.json()["eventos"]) and r.json()["eventos"][1]["actor_id"] == func_mop.pk)
+        self._paso("el personal ve quién actuó en cada paso", all("actor_id" in e for e in r.json()["eventos"])
+                   and next(e for e in r.json()["eventos"] if e["accion"] == "cambio_estado")["actor_id"] == func_mop.pk)
         self._paso("otra ciudadana recibe 404 al pedir el historial", self._http("get", f"/tramites/{tramite_ana}/historial/", tok(beto)).status_code == 404)
 
         # ---------------------------------------------------------------- decisiones registradas

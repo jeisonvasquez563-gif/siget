@@ -72,6 +72,20 @@ class InstitucionesPublicas(APIView):
         return Response([{"id": i.pk, "nombre": i.nombre} for i in Institucion.objects.order_by("nombre")])
 
 
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
+class Configuracion(APIView):
+    """Lo que la interfaz necesita saber antes de iniciar sesión: cómo se crean cuentas y si mostrar el aviso de demostración.
+    No revela nada sensible: es la misma información que ve cualquiera al abrir la página."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "anon"
+
+    def get(self, request):
+        return Response({"registro": settings.SIGET_REGISTRO, "aviso_demostracion": settings.SIGET_AVISO_DEMOSTRACION})
+
+
 class _Publica(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -85,11 +99,16 @@ class Registro(_Publica):
     def post(self, request):
         datos = request.data if isinstance(request.data, dict) else {}
         personales = {k: datos.get(k) for k in ("nombre", "apellidos", "cedula", "fecha_nacimiento", "provincia", "ciudad", "correo")}
-        r = servicio.registrar_usuario(_campo(request, "username"), _campo(request, "password"), _ip(request), personales)
+        r = servicio.registrar_usuario(_campo(request, "username"), _campo(request, "password"), _ip(request), personales,
+                                       invitacion=_campo(request, "invitacion"))
         if r.ok:
             return Response({"detalle": "Cuenta creada. Inicia sesión y activa el segundo factor."}, status=status.HTTP_201_CREATED)
         if r.codigo == "datos_invalidos":
             return Response({"codigo": r.codigo, "errores": r.detalle["errores"]}, status=status.HTTP_400_BAD_REQUEST)
+        if r.codigo == "registro_cerrado":
+            return Response({"codigo": r.codigo, "detalle": "La creación de cuentas está cerrada en este momento."}, status=status.HTTP_403_FORBIDDEN)
+        if r.codigo == "invitacion_invalida":
+            return Response({"codigo": r.codigo, "detalle": "La invitación no es válida, ya se usó o venció."}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"codigo": r.codigo, "detalle": "No se pudo crear la cuenta con esos datos."}, status=status.HTTP_409_CONFLICT)
 
 

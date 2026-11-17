@@ -35,6 +35,11 @@ export function plataformaMock({ usuarios, actual, resp, negado, hace }) {
     return { estado: restantes < 0 ? 'vencida' : restantes < 30 ? 'por_vencer' : 'al_dia', dias_restantes: restantes }
   }
 
+  const invitaciones = [
+    { id: 2, nota: 'Prueba de usabilidad (grupo B)', emitida_por: 302, creado_en: hace(86400000), vence_en: new Date(Date.now() + 6 * 86400000).toISOString(), usada: false, estado: 'vigente' },
+    { id: 1, nota: 'Entrevista con la Alcaldía', emitida_por: 302, creado_en: hace(5 * 86400000), vence_en: new Date(Date.now() + 2 * 86400000).toISOString(), usada: true, estado: 'usada' },
+  ]
+
   return (camino, metodo, cuerpo, parametros) => {
     if (!camino.startsWith('/plataforma/')) return null
     const yo = usuarios[actual()]
@@ -70,6 +75,14 @@ export function plataformaMock({ usuarios, actual, resp, negado, hace }) {
       return resp(200, { codigo: 'sesiones_revocadas', cuantas })
     }
     if (camino === '/plataforma/eventos/') return rol === 'operador_seguridad' ? resp(200, { eventos }) : negado()
+    if (camino === '/plataforma/invitaciones/') {
+      if (rol !== 'operador_identidades') return negado()
+      if (metodo === 'GET') return resp(200, { modo_registro: 'invitacion', invitaciones })
+      const nueva = { id: invitaciones.length + 1, nota: String(cuerpo.nota || ''), emitida_por: yo.id, creado_en: new Date().toISOString(),
+        vence_en: new Date(Date.now() + 7 * 86400000).toISOString(), usada: false, estado: 'vigente' }
+      invitaciones.unshift(nueva)
+      return resp(201, { codigo: 'invitacion_emitida', id: nueva.id, codigo_invitacion: 'K7MQ-2XWD-9PRT', vence_en: nueva.vence_en })
+    }
     if (camino === '/plataforma/aprobaciones/') {
       if (!tipoAlta) return negado()
       if (metodo === 'GET') return resp(200, { accion: tipoAlta, aprobaciones: aprobaciones.filter((a) => a.accion === tipoAlta).sort((a, b) => b.id - a.id) })

@@ -1,0 +1,4 @@
+# SIGET: volumen de los documentos adjuntos (PT-8). Solo contiene archivos CIFRADOS con AES-256-GCM (siget-docs-key).
+# ~/.config/containers/systemd/siget-documentos.volume   (usuario siget en VM1). Lo incluye el respaldo de VM1.
+[Volume]
+VolumeName=siget-documentos
