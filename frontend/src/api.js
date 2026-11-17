@@ -73,8 +73,17 @@ export async function iniciarSesion(username, password, codigo, puerta = {}) {
 
 export const instituciones = () => api('/auth/instituciones/', { conToken: false })
 
-export const registrar = (username, password, personales = {}) =>
-  api('/auth/registro/', { metodo: 'POST', cuerpo: { username, password, ...personales }, conToken: false })
+export const registrar = (username, password, personales = {}, invitacion = '') =>
+  api('/auth/registro/', { metodo: 'POST', cuerpo: { username, password, ...personales, ...(invitacion ? { invitacion } : {}) }, conToken: false })
+
+// Cómo se crean cuentas (abierto / invitacion / cerrado) y si mostrar el aviso de demostración. Se pide una sola vez.
+let configuracionPublica = null
+export function configuracion() {
+  configuracionPublica ??= api('/auth/configuracion/', { conToken: false })
+    .catch(() => { configuracionPublica = null; return { registro: 'abierto', aviso_demostracion: false } })
+  return configuracionPublica
+}
+export const olvidarConfiguracion = () => { configuracionPublica = null }
 
 export const restablecerContrasena = (username, codigo, password) =>
   api('/auth/restablecer/', { metodo: 'POST', cuerpo: { username, codigo, password }, conToken: false })

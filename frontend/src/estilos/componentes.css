@@ -102,6 +102,12 @@
   border-radius: 999px; color: var(--sello-rojo); font-size: var(--t-xs); font-weight: 650;
 }
 
+.aviso-demostracion {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 1rem;
+  background: var(--boya-fondo); color: var(--boya-texto); border-bottom: 2px solid var(--boya); font-size: var(--t-s);
+}
+.aviso-demostracion .icono { flex: none; }
+
 /* ---------- estados vacíos, carga, alertas ---------- */
 .vacio { text-align: center; padding: 3rem 1.5rem; background: var(--superficie); border: 1px dashed var(--borde-fuerte); border-radius: var(--radio-l); }
 .vacio svg { width: 120px; height: auto; margin: 0 auto 1rem; display: block; }
