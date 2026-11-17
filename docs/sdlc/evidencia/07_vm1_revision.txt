@@ -1,0 +1,27 @@
+# Etapa 7 — VM1: revisión de seguridad del entorno (solo lectura)
+# 2026-11-16 22:11:37  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 "echo \"== SELinux: $(getenforce)\"; echo \"== Sistema: $(cat /etc/rocky-release)\"; echo \"== SSH:\"; sudo sshd -T | grep -E \"^(passwordauthentication|permitrootlogin|pubkeyauthentication) \"; echo \"== Cortafuegos (servicios / puertos / reglas):\"; sudo firewall-cmd --list-services; sudo firewall-cmd --list-ports; sudo firewall-cmd --list-rich-rules; echo \"== Puertos en escucha (TCP):\"; sudo ss -tlnH | awk \"{print \$4}\" | sort -u; echo \"== Avisos de seguridad críticos pendientes: $(sudo dnf -q updateinfo list --security | grep Crít | awk \"{print \$1}\" | sort -u | tr \"\n\" \" \")\"; echo \"== Sudo: grupo wheel = $(getent group wheel | cut -d: -f4); reglas en sudoers.d: $(sudo ls /etc/sudoers.d/ | tr \"\n\" \" \")\"; echo '== Contenedor del backend:'; sudo -H -u siget bash -lc 'cd /tmp && export XDG_RUNTIME_DIR=/run/user/$(id -u) && echo \"usuario dentro: $(podman exec siget-backend id -u)\" && podman inspect siget-backend --format \"raíz de solo lectura={{.HostConfig.ReadonlyRootfs}}\"'"
+== SELinux: Enforcing
+== Sistema: Rocky Linux release 9.7 (Blue Onyx)
+== SSH:
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+== Cortafuegos (servicios / puertos / reglas):
+dhcpv6-client http ssh
+8080/tcp 8443/tcp
+
+== Puertos en escucha (TCP):
+0.0.0.0:22
+100.104.206.118:60739
+[::]:22
+*:80
+*:8080
+*:8443
+[fd7a:115c:a1e0::738:ce77]:62309
+== Avisos de seguridad críticos pendientes: RLSA-2026:25049 RLSA-2026:88459 
+== Sudo: grupo wheel = jeison_vasquez; reglas en sudoers.d: 90-jeison-nopasswd andy_martinez 
+== Contenedor del backend:
+usuario dentro: 1001
+raíz de solo lectura=true
+# código de salida: 0

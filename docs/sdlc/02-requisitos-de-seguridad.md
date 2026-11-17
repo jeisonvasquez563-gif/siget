@@ -4,13 +4,13 @@
 
 > Incluir los requisitos de seguridad desde el principio y entender los requisitos de cumplimiento normativo. (Red Hat, *Seguridad en el ciclo de vida de desarrollo del software*.)
 
-## Cómo completarla
+## Cómo se elaboró
 
-1. Las filas de **Autenticación** están resueltas como ejemplo.
-2. Completá las otras áreas: autorización, protección de datos personales, auditoría, cifrado, disponibilidad y registro de cuentas (al menos 3 requisitos por área).
-3. En «Evidencia en SIGET» poné el archivo, la prueba o la sección del documento que lo demuestra. Buscá en `docs/api.md`, `docs/modulos.md`, `docs/runbook.md` y `CHANGELOG.md`.
-4. Estado: **Cumple / Parcial / No cumple**.
-5. Para la sección legal, buscá en Legispan (Asamblea Nacional) la ley panameña de protección de datos personales. **Copiá el número de ley y del artículo tal como aparecen**: no los escribas de memoria.
+1. Partimos de las tres filas de **Autenticación** que venían resueltas como ejemplo (RS-01 a RS-03) y las conservamos.
+2. Para cada área (autorización, datos personales, auditoría, cifrado, disponibilidad y registro de cuentas) escribimos al menos tres requisitos. Cuando encontramos algo importante que SIGET **no** hace (por ejemplo, que la persona pueda ver y corregir sus datos), lo agregamos como requisito aunque no se cumpla: un requisito que falta también es un hallazgo (RS-22 a RS-26).
+3. Cada evidencia se comprobó abriendo el archivo, la prueba o la sección citada en el repositorio: `docs/api.md`, `docs/runbook.md`, `CHANGELOG.md`, `docs/zero-trust-cobertura.md`, `backend/apps/autorizacion/pdp.py`, `database/diseno-roles-permisos.sql`, `database/migraciones/` y las pruebas de `backend/tests/`. Tres funciones están en ramas propias ya desplegadas en producción el 12 de noviembre de 2026; las citamos con su rama: `feature/backend-plazos` (días hábiles y escalamiento, migración 013), `feature/backend-registro-configurable` (registro abierto, por invitación o cerrado, migración 014) y `feature/backend-documentos` (documentos cifrados, migración 015). Las correcciones del análisis estático y dinámico están en la rama `fix/analisis-estatico-dinamico`.
+4. El estado es **Cumple**, **Parcial** o **No cumple**, y lo pusimos con honestidad: si algo funciona a medias, dice Parcial.
+5. Para la parte legal leímos el texto de cada norma en fuentes oficiales (Legispan de la Asamblea Nacional, que reproduce las páginas de la Gaceta Oficial, y ANTAI). Solo citamos un artículo si lo leímos; lo que no pudimos leer dice **«artículo por confirmar»**. Las fuentes están al final, en «Referencias».
 
 ## Matriz de requisitos
 
@@ -19,30 +19,92 @@
 | RS-01 | Autenticación | Las contraseñas se guardan con un algoritmo resistente (nunca en texto plano) | Argon2 (`backend/config/settings.py`, `PASSWORD_HASHERS`) | Cumple |
 | RS-02 | Autenticación | El personal y los operadores usan segundo factor | TOTP obligatorio (`apps/autenticacion/mfa.py`, `verificar_autenticacion`) | Cumple |
 | RS-03 | Autenticación | Los intentos fallidos bloquean la cuenta de forma progresiva | 5, 15 y 60 minutos (CHANGELOG, «bloqueo progresivo») | Cumple |
-| RS-04 | Autorización | [completar] |  |  |
-| RS-05 | Autorización | [completar] |  |  |
-| RS-06 | Autorización | [completar] |  |  |
-| RS-07 | Datos personales | [completar] |  |  |
-| RS-08 | Datos personales | [completar] |  |  |
-| RS-09 | Datos personales | [completar] |  |  |
-| RS-10 | Auditoría | [completar] |  |  |
-| RS-11 | Auditoría | [completar] |  |  |
-| RS-12 | Auditoría | [completar] |  |  |
-| RS-13 | Cifrado | [completar] |  |  |
-| RS-14 | Cifrado | [completar] |  |  |
-| RS-15 | Cifrado | [completar] |  |  |
-| RS-16 | Disponibilidad | [completar] |  |  |
-| RS-17 | Disponibilidad | [completar] |  |  |
-| RS-18 | Disponibilidad | [completar] |  |  |
-| RS-19 | Registro de cuentas | [completar] |  |  |
-| RS-20 | Registro de cuentas | [completar] |  |  |
-| RS-21 | Registro de cuentas | [completar] |  |  |
+| RS-04 | Autorización | Todo está prohibido salvo que una regla lo permita, y si el motor de decisiones falla, se niega el acceso. La interfaz nunca decide: el servidor vuelve a autorizar cada petición | `decidir()` en `backend/apps/autorizacion/pdp.py` devuelve `sin_regla_que_permita` y, ante un error, `fallo_del_pdp`; `docs/api.md` («La interfaz nunca decide qué se puede hacer»); pruebas en `backend/tests/test_pdp.py` | Cumple |
+| RS-05 | Autorización | Un funcionario solo ve los trámites de su propia institución, con dos barreras independientes (la aplicación y la base de datos) | Regla `_personal_de_tramites` en `pdp.py` y prueba `test_no_ve_tramites_de_otra_institucion` (`test_pdp.py`); seguridad por filas en `database/diseno-roles-permisos.sql` (`ALTER TABLE siget.tramite ENABLE ROW LEVEL SECURITY`); hallazgo corregido de la coordinadora en `docs/runbook.md` §27.3 | Cumple |
+| RS-06 | Autorización | Separación de funciones: ningún rol puede hacerlo todo, quien propone un alta no la aprueba, nadie gestiona su propio trámite y la plataforma no ve trámites | Reglas `_control_dual`, `_conflicto_de_interes` y `_plataforma_sin_tramites` en `pdp.py`; pruebas `test_control_dual_quien_propone_no_aprueba` y `test_conflicto_de_interes` (`test_pdp.py`) y `test_no_existe_un_superusuario_ningun_rol_puede_todo` (`test_matriz.py`); control dual en la base (`database/migraciones/002-dividir-rol-plataforma.sql`) | Cumple |
+| RS-07 | Datos personales | La cédula nunca se guarda en claro y se pueden detectar cédulas repetidas sin descifrarlas | Cifrado Fernet y huella HMAC con claves derivadas (`backend/apps/autenticacion/perfil.py`, `cifrar_cedula` y `huella_cedula`); paso «la cédula NO está en claro» de `verificar_autenticacion`; `docs/runbook.md` §33.2 | Cumple |
+| RS-08 | Datos personales | Solo la aplicación puede leer los datos personales; el auditor, pgAdmin, el checkpoint y los operadores de plataforma no los ven, y la bitácora de seguridad no los guarda | `database/migraciones/008-perfil-ciudadano.sql` (`GRANT SELECT, INSERT ... TO app_role` y `REVOKE ALL ... FROM pgadmin_lectura, auditor_role, checkpoint_app`); migración 009 para `pgadmin_lectura`; `docs/api.md`, «Consolas de plataforma» («Ninguna devuelve trámites ni datos personales») | Cumple |
+| RS-09 | Datos personales | La persona puede consultar, corregir y pedir que se eliminen sus propios datos personales (derechos de acceso, rectificación y cancelación) | No existe: las rutas de `backend/apps/autenticacion/urls.py` no tienen ninguna para ver o corregir el perfil, `GET /auth/yo/` no devuelve el perfil (`docs/api.md`) y la base prohíbe modificar o borrar un perfil incluso a la aplicación (migración 008, solo `SELECT, INSERT`; paso «la base no deja modificar un perfil» de `verificar_autenticacion`) | No cumple |
+| RS-10 | Auditoría | Las actuaciones sobre trámites, las decisiones de acceso y los eventos de seguridad quedan en registros que nadie puede modificar ni borrar | Triggers `auditoria_inmutable`, `auditoria_sin_truncate` y `decision_inmutable` (`database/diseno-roles-permisos.sql`) y `evento_seguridad_inmutable` (`database/migraciones/004-autenticacion.sql`) | Cumple |
+| RS-11 | Auditoría | También se registran los accesos **negados**, no solo los permitidos | `GET /auditoria/decisiones/?resultado=negadas` y el resumen con `negadas_24h` (`docs/api.md`, «Auditoría»); `docs/zero-trust-cobertura.md`, principio 7 (`decision_pdp`, «también las negadas») | Cumple |
+| RS-12 | Auditoría | El auditor solo puede leer, con su propio usuario de base de datos, y sus propias consultas quedan registradas («quién audita al auditor») | `database/migraciones/007-auditor-login.sql`; `docs/runbook.md` §28; pruebas en `backend/tests/test_auditoria_api.py`; exige rol `auditor`, nivel 3 y segundo factor reciente (`docs/api.md`) | Cumple |
+| RS-13 | Cifrado | Todo el tráfico del navegador viaja cifrado con TLS 1.3 y el navegador no puede volver a HTTP | `ssl_protocols TLSv1.3` y `Strict-Transport-Security` en `infra/podman/vm1-app-backend/nginx.conf`. Falta: el checkpoint PHP antiguo todavía sirve su login por HTTP en el puerto 80 (`docs/zero-trust-cobertura.md`, sección 5, tarea ZT-9) | Parcial |
+| RS-14 | Cifrado | La conexión entre la aplicación y la base de datos va cifrada, se verifica el certificado del servidor y la base rechaza conexiones sin cifrar | `docs/runbook.md` §18 (TLS 1.3, `hostssl`, verificación del certificado) y tarea ZT-2 en `docs/zero-trust-cobertura.md` | Cumple |
+| RS-15 | Cifrado | Los documentos que adjunta la ciudadanía se guardan cifrados, con una clave aparte, y se detecta si alguien los altera | Rama `feature/backend-documentos`: AES-256-GCM y huella SHA-256 comprobada al descargar (`backend/apps/tramites/documentos.py`), clave `siget-docs-key` como `podman secret`, migración `015-documentos.sql`, pruebas en `backend/tests/test_documentos.py` (CHANGELOG, «documentos adjuntos, PT-8») | Cumple |
+| RS-16 | Disponibilidad | Una ráfaga de peticiones no tumba el servicio: se limita y se responde «demasiadas peticiones» (429) | `limit_req_zone` y `limit_req_status 429` en `infra/podman/vm1-app-backend/nginx.conf`; límite de 10 por hora en la recuperación de contraseña (`docs/api.md`) | Cumple |
+| RS-17 | Disponibilidad | La base de datos se respalda todos los días, se prueba que el respaldo se puede restaurar y hay una copia fuera del servidor | `infra/podman/vm2-db-server/respaldo/` (`siget-respaldo.timer`, 02:30 diario, restauración de prueba y huella SHA-256), `docs/runbook.md` §33.4. Falta la copia fuera de VM2 (pendiente en el mismo §33.4 y en `respaldo/README.md`) | Parcial |
+| RS-18 | Disponibilidad | Si un servicio se cae o el servidor se reinicia, vuelve a funcionar solo | `Restart=always` en `siget-backend.container`, `siget-nginx.container` y `siget-postgres.container`; prueba `podman kill siget-backend` en `docs/runbook.md` §24.4; reinicio de las VMs sin pérdida de configuración (CHANGELOG, análisis estático y dinámico) | Cumple |
+| RS-19 | Registro de cuentas | El registro público se puede configurar como abierto, por invitación o cerrado; la invitación es de un solo uso y en la base solo se guarda su huella | Rama `feature/backend-registro-configurable`: `SIGET_REGISTRO`, migración `014-invitaciones.sql` (`codigo_hash` y trigger `invitacion_valida_uso`), pruebas `test_con_el_registro_cerrado_la_api_responde_403_sin_crear_nada` y otras en `backend/tests/test_registro_configurable.py` | Cumple |
+| RS-20 | Registro de cuentas | El servidor valida los datos del registro y no revela si un usuario, una cédula o un correo ya existen | `POST /auth/registro/` (`docs/api.md`: `409` genérico «no revela cuál»); validaciones en `backend/tests/test_perfil.py` (cédula panameña, mayoría de edad, provincia, correo); pasos de `verificar_autenticacion` («no permite registrar dos veces el mismo usuario», respuesta idéntica para cédula repetida) | Cumple |
+| RS-21 | Registro de cuentas | El personal de las instituciones y los operadores no se registran solos: el acceso lo da la coordinación de la institución o la plataforma con control dual | `docs/api.md`, «Puertas de entrada» y «Gestión del equipo» (`POST /equipo/<institucion>/miembros/`, solo la coordinación con segundo factor reciente) y «Consolas de plataforma» (`/plataforma/aprobaciones/`, quien propone recibe `403`) | Cumple |
+| RS-22 | Datos personales | Al registrarse, la persona recibe un aviso claro de para qué se usan sus datos, quién los trata y cómo ejercer sus derechos | No existe: la búsqueda de «privacidad», «consentimiento» y «protección de datos» en `frontend/src` y `backend/apps` no encuentra ningún aviso; el formulario de registro solo pide los datos (`docs/api.md`, `POST /auth/registro/`) | No cumple |
+| RS-23 | Datos personales | Cada persona ve solo los datos que necesita: la ciudadanía no ve qué funcionario actuó en su trámite y el personal no ve datos que no le corresponden | `docs/api.md`, «Tramite — lo que se ve depende de quién mira» y «Evento» (solo el personal ve `actor_id`); aviso «Por privacidad no muestra qué funcionario actuó» en `frontend/src/Tramites.jsx` | Cumple |
+| RS-24 | Auditoría | El sistema avisa solo cuando ve un patrón sospechoso (muchas denegaciones de una persona, reuso de tokens) | No existe: la tarea ZT-8 de `docs/zero-trust-cobertura.md` dice «Falta la alerta automática ante patrones»; no hay código de alertas en `backend/apps` | No cumple |
+| RS-25 | Cifrado | Las claves y contraseñas de servicio nunca están escritas en el código: se entregan como secretos cifrados del sistema de contenedores | Líneas `Secret=` en `infra/podman/vm1-app-backend/siget-backend.container`; `backend/config/settings.py` lee cada secreto de un archivo (`_FILE`) y no arranca sin `SIGET_SECRET_KEY`; Gitleaks en el análisis estático (CHANGELOG, rama `fix/analisis-estatico-dinamico`) | Cumple |
+| RS-26 | Registro de cuentas | Se comprueba que quien se registra es quien dice ser (correo confirmado e identidad contrastada) | No existe: «El correo no se verifica todavía (no hay servidor de correo)» (CHANGELOG, registro completo) y la identidad «no se verifica contra el Registro Civil» (`docs/zero-trust-cobertura.md`, sección 4) | No cumple |
 
 ## Cumplimiento normativo
 
 | Norma (número exacto) | Artículo | Qué exige (en tus palabras) | Cómo lo cumple SIGET | Estado |
 |---|---|---|---|---|
 | Ley 83 de 2012 (gobierno electrónico) | Art. 4, num. 8 | Que la persona sepa en qué fase está su trámite y qué unidad lo atiende | Seguimiento del trámite y su historial (`docs/api.md`, «Trámites») | Cumple |
-| [completar] |  |  |  |  |
-| [completar] |  |  |  |  |
-| [completar] |  |  |  |  |
+| Ley 83 de 2012 (gobierno electrónico) | Art. 4, num. 12 | Que las entidades protejan la información confidencial o de acceso restringido mientras facilitan el acceso por medios electrónicos | Aislamiento entre instituciones en dos barreras (RS-05), mínimo privilegio sobre los datos personales (RS-08) y respuesta 404 que no distingue «no existe» de «no tienes acceso» (`docs/api.md`, «Errores») | Cumple |
+| Ley 83 de 2012 (gobierno electrónico) | Art. 4, num. 11 | Lo que se presenta en hora o día inhábil se tiene por presentado en la primera hora hábil del día hábil siguiente | Los plazos se cuentan en días hábiles de Panamá con feriados (rama `feature/backend-plazos`, `sumar_dias_habiles`, migración 013) y un inicio en fin de semana empieza a contar desde el siguiente día hábil. Pero el plazo conserva la **hora** de inicio, no la «primera hora hábil» | Parcial |
+| Ley 81 de 2019 (protección de datos personales) | Art. 2, num. 5, y art. 7 | El responsable debe tomar medidas técnicas y organizativas para proteger los datos, tener protocolos de gestión segura e **informar al titular** lo antes posible si sus datos fueron sustraídos | Medidas técnicas: cédula cifrada (RS-07), TLS (RS-13 y RS-14), segundo factor (RS-02), mínimo privilegio (RS-08). Falta un procedimiento escrito para avisar a las personas afectadas por una filtración (no aparece en `SECURITY.md` ni en `docs/`) | Parcial |
+| Ley 81 de 2019 (protección de datos personales) | Art. 2, num. 7, y art. 9 | Quien trata datos personales debe guardar confidencialidad, incluso después de terminar su relación | Nadie fuera de la aplicación lee los perfiles (RS-08); la plataforma no ve trámites (RS-06); el auditor no lee hashes ni secretos (RS-12) | Cumple |
+| Ley 81 de 2019 (protección de datos personales) | Art. 2, num. 3 | Pedir solo los datos adecuados y limitados al mínimo necesario para la finalidad | Se piden siete datos obligatorios (nombre, apellidos, cédula, fecha de nacimiento, provincia, ciudad y correo). Algunos tienen uso claro (mayoría de edad, cédula única), pero no está escrito para qué sirve cada uno | Parcial |
+| Ley 81 de 2019 (protección de datos personales) | Art. 2, num. 6, y art. 6 (último párrafo) | Informar al titular, en lenguaje sencillo, para qué se usan sus datos y cómo ejercer sus derechos ARCO. (El art. 8, num. 2, dice que no se requiere autorización para los datos que la Administración Pública recolecta en sus funciones, pero el deber de transparencia sigue) | No hay aviso de privacidad en el registro (RS-22) | No cumple |
+| Ley 81 de 2019 (protección de datos personales) | Arts. 15 y 16 | Derechos de acceso, rectificación, cancelación, oposición y portabilidad; la información pedida debe entregarse en no más de 10 días hábiles y gratis | No hay forma de ver, corregir, exportar ni eliminar el propio perfil, y la base impide modificarlo (RS-09) | No cumple |
+| Ley 81 de 2019 (protección de datos personales) | Art. 2, num. 2 | No conservar los datos más tiempo del necesario para la finalidad | No hay una política de conservación de los perfiles y la base no permite borrarlos (migración 008, sin `DELETE`) | No cumple |
+| Ley 6 de 2002 (transparencia y hábeas data) | Art. 3 | Toda persona puede obtener su información personal en poder del Estado y corregir o eliminar la que sea incorrecta | La persona ve sus trámites, su historial y su actividad de seguridad (`GET /auth/actividad/`), pero no los datos personales de su perfil (RS-09) | No cumple |
+| Ley 6 de 2002 (transparencia y hábeas data) | Art. 13 (y art. 1, num. 5) | La información confidencial (por ejemplo, datos médicos o expedientes de personal) no puede ser divulgada por agentes del Estado | Cada trámite solo lo ven su solicitante y el personal de esa institución (RS-05); la plataforma y la coordinación no ven trámites (RS-06 y `docs/runbook.md` §27.3); los documentos se descargan solo con permiso y cifrados en disco (RS-15) | Cumple |
+
+**Norma que no pudimos verificar:** el **Decreto Ejecutivo 285 de 28 de mayo de 2021**, que reglamenta la Ley 81 de 2019 (así lo indica `docs/antecedentes.md`). No pudimos leer su texto en la Gaceta Oficial (el archivo supera el tamaño que pudimos abrir), así que sus requisitos concretos (por ejemplo, plazos para notificar una vulneración o la figura del oficial de protección de datos) quedan con **artículo por confirmar** y sin evaluar. Es la primera tarea pendiente de esta etapa.
+
+## Resumen
+
+- **26 requisitos** (3 de ejemplo y 23 nuevos): 20 cumplen, 2 son parciales (RS-13 y RS-17) y **4 no cumplen** (RS-09, RS-22, RS-24 y RS-26).
+- **11 filas normativas**: 4 cumplen, 3 son parciales y 4 no cumplen.
+- Lo más urgente: los **derechos del titular** sobre sus datos personales (ver, corregir, eliminar) y el **aviso de privacidad** en el registro. Ambos los exige la Ley 81 de 2019 y hoy SIGET no los tiene.
+
+## Referencias
+
+Todas consultadas el 16 de noviembre de 2026.
+
+- Asamblea Nacional de Panamá. (2019). *Ley 81 de 26 de marzo de 2019, sobre protección de datos personales* (Gaceta Oficial 28743-A, 29 de marzo de 2019). Legispan. https://s3-legispan.asamblea.gob.pa/legispan/NORMAS/2010/2019/LEY/Administrador%20Legispan_28743-A_2019_3_29_ASAMBLEA%20NACIONAL_81.pdf
+- Gaceta Oficial de Panamá. (2019). *Gaceta Oficial Digital No. 28743-A, 29 de marzo de 2019* (edición completa; se identificó, pero el texto se leyó en la copia de Legispan, que reproduce sus páginas). https://www.gacetaoficial.gob.pa/pdfTemp/28743_A/GacetaNo_28743a_20190329.pdf
+- Asamblea Nacional de Panamá. (2012). *Ley 83 de 9 de noviembre de 2012, que regula el uso de medios electrónicos para los trámites gubernamentales* (Gaceta Oficial 27160, 9 de noviembre de 2012). Legispan. https://s3-legispan.asamblea.gob.pa/legispan/NORMAS/2010/2012/LEY/Administrador%20Legispan_27160_2012_11_9_ASAMBLEA%20NACIONAL_83.pdf
+- Autoridad Nacional de Transparencia y Acceso a la Información (ANTAI). (2021). *Ley No. 6 de 22 de enero de 2002, que dicta normas para la transparencia en la gestión pública, establece la acción de Hábeas Data y dicta otras disposiciones* (texto de la ley con aportes de una consulta pública; los artículos citados se tomaron del texto de la ley, no de los aportes). https://www.antai.gob.pa/wp-content/uploads/2021/01/Ley6-22enero2002-aportes-incluidos.pdf
+- Gaceta Oficial de Panamá. (2021). *Gaceta Oficial Digital No. 29296-A, 28 de mayo de 2021* (donde se publicaría el Decreto Ejecutivo 285 de 2021; número de Gaceta y artículos por confirmar: no se pudo leer). https://www.gacetaoficial.gob.pa/pdfTemp/29296_A/GacetaNo_29296a_20210528.pdf
+
+## Preguntas que puede hacer el profesor
+
+**1. ¿Qué es un requisito de seguridad?**
+Es una condición que el sistema tiene que cumplir para proteger la información y a las personas, escrita de forma que se pueda comprobar. Por ejemplo, «la cédula nunca se guarda en claro» es un requisito; «el sistema es seguro» no lo es, porque no se puede verificar. Los definimos en esta etapa, antes de diseñar, porque agregarlos al final sale mucho más caro.
+
+**2. ¿Cuál es la diferencia entre un requisito funcional y uno no funcional?**
+El funcional dice **qué hace** el sistema: «la persona puede crear un trámite». El no funcional dice **cómo debe hacerlo**: rápido, disponible, seguro. Muchos requisitos de seguridad son no funcionales (cifrar, registrar, limitar peticiones), pero algunos son funcionales, como «la persona puede ver y corregir sus datos», que la ley exige y SIGET todavía no tiene.
+
+**3. ¿Qué ley de datos personales aplica a SIGET y qué exige?**
+La Ley 81 de 2019 de Panamá, reglamentada por el Decreto Ejecutivo 285 de 2021. Exige, entre otras cosas, pedir solo los datos necesarios (art. 2), protegerlos con medidas técnicas (art. 2 y art. 7), guardar confidencialidad (art. 9) y respetar los derechos de acceso, rectificación, cancelación, oposición y portabilidad (art. 15), respondiendo en no más de 10 días hábiles (art. 16). La fiscaliza la ANTAI.
+
+**4. ¿Qué no cumple SIGET y por qué?**
+Hay cuatro requisitos que no se cumplen: la persona no puede ver ni corregir sus datos personales, no hay aviso de privacidad al registrarse, no hay alertas automáticas ante patrones sospechosos y no se verifica la identidad de quien se registra. Nos concentramos primero en proteger los datos (cifrado, permisos, auditoría) y dejamos para después la parte de derechos del titular y de verificación de identidad, que necesita un servidor de correo o una integración con el Registro Civil que el laboratorio no tiene.
+
+**5. ¿Cómo se verifica un requisito?**
+Cada requisito tiene una evidencia que cualquiera puede revisar: un archivo de configuración, una prueba automática o una sección del runbook. Por ejemplo, el aislamiento entre instituciones lo comprueba la prueba `test_no_ve_tramites_de_otra_institucion`, y la cédula cifrada, un paso que revisa la base real. Si no encontramos la evidencia, no marcamos «Cumple».
+
+**6. ¿Por qué ponen «Parcial» en vez de «Cumple» si casi todo funciona?**
+Porque un requisito a medias puede ser justo por donde entra un atacante. Por ejemplo, la plataforma nueva usa TLS 1.3, pero el checkpoint PHP antiguo sigue con su login por HTTP en el puerto 80. Preferimos decirlo y tener un plan para retirarlo antes que aparentar un cumplimiento que no es real.
+
+**7. Si SIGET es del Estado, ¿necesita el consentimiento de la persona para guardar sus datos?**
+El artículo 8 de la Ley 81 dice que no se requiere autorización para los datos que la Administración Pública recolecta en ejercicio de sus funciones. Pero eso no elimina el deber de informar: el principio de transparencia (art. 2) exige explicar en lenguaje sencillo para qué se usan los datos y cómo ejercer los derechos ARCO. Por eso marcamos el aviso de privacidad como «No cumple».
+
+**8. ¿Por qué cifran la cédula si la base de datos ya está protegida?**
+Porque las barreras pueden fallar. Si alguien roba una copia de la base o un respaldo, la cédula sigue ilegible sin la clave, que está guardada aparte. Además guardamos una «huella» que permite saber si una cédula ya está registrada sin tener que descifrarla.
+
+**9. ¿Para qué sirve que la auditoría no se pueda borrar?**
+Si un funcionario cambia un trámite indebidamente, lo primero que intentaría es borrar el rastro. En SIGET la propia base de datos rechaza modificar o borrar los registros de auditoría, incluso a la aplicación. Así podemos reconstruir quién hizo qué y cuándo, y también registramos los accesos negados, que suelen ser la primera señal de un ataque.
+
+**10. ¿Qué otras leyes revisaron además de la de datos personales?**
+La Ley 83 de 2012 de gobierno electrónico, que pide que la persona pueda consultar el estado de su trámite (art. 4, num. 8) y que se proteja la información confidencial (art. 4, num. 12), y la Ley 6 de 2002 de transparencia, que reconoce el derecho a obtener y corregir la propia información personal (art. 3) y prohíbe divulgar la información confidencial (art. 13).

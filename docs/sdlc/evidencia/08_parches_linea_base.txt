@@ -1,0 +1,21 @@
+# Etapa 8 — Parches: avisos de seguridad pendientes en VM1 y VM2 (línea base)
+# 2026-11-16 22:12:14  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ bash -c "echo '== VM1'; ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 'sudo dnf -q updateinfo summary'; echo; echo '== VM2'; ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.100.20 'sudo dnf -q updateinfo summary'"
+== VM1
+Resumen de la información de actualización: disponible
+    203 Aviso(s) de seguridad
+          2 Avisos de seguridad críticos
+        112 Avisos de seguridad importantes
+         83 Avisos de seguridad moderados
+          6 Avisos de seguridad bajos
+      5 Aviso(s) de errores corregidos
+
+== VM2
+Resumen de la información de actualización: disponible
+    192 Aviso(s) de seguridad
+          2 Avisos de seguridad críticos
+        103 Avisos de seguridad importantes
+         82 Avisos de seguridad moderados
+          5 Avisos de seguridad bajos
+      5 Aviso(s) de errores corregidos
+# código de salida: 0

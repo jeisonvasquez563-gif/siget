@@ -6,6 +6,26 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Documentación (SDLC seguro implementado, 16-nov)
+- **Las 8 etapas del SDLC seguro de Red Hat están completas en [`docs/sdlc/`](./docs/sdlc/README.md)**, con datos reales de SIGET:
+  - 23 riesgos;
+  - 26 requisitos con 11 artículos de leyes panameñas;
+  - un modelo STRIDE de 41 amenazas;
+  - 14 reglas de codificación segura;
+  - un inventario de 43 controles;
+  - el plan de pruebas con revisión de PR;
+  - la revisión del entorno de VM1 y VM2;
+  - las bitácoras de supervisión y de parches.
+- **Evidencia:** las comprobaciones de las VMs se hicieron solo con comandos de lectura y están en [`docs/sdlc/evidencia/`](./docs/sdlc/evidencia/).
+- **Guía de defensa** ([`docs/SIGET_Guia_de_Defensa_SDLC_Seguro.docx`](./docs/SIGET_Guia_de_Defensa_SDLC_Seguro.docx)): tiene una parte común (qué es SIGET, las 8 etapas, shift left, DevSecOps, Zero Trust y un glosario) y una sección por integrante con las preguntas probables del profesor y sus respuestas. Se genera desde los propios archivos de las etapas (`docs/sdlc/generadores/generar-guia-defensa.js`).
+- **Hallazgos que quedan abiertos:**
+  - parches del sistema sin aplicar (2 críticos por VM);
+  - la clave de documentos sin copia fuera de VM1;
+  - el checkpoint PHP sirve en HTTP por el puerto 80;
+  - un solo administrador con sudo;
+  - SIGET no permite a la persona ver, corregir ni eliminar sus datos personales (Ley 81 de 2019, arts. 15 y 16) ni le informa cómo se usan;
+  - una regla del cortafuegos de VM2 sobra (5432).
+
 ### Documentación (SDLC seguro: organización y plantillas, 12-nov)
 - **Organización del equipo** para implementar en SIGET las 8 etapas del ciclo de vida de desarrollo seguro de Red Hat ([`docs/SIGET_Organizacion_SDLC_Seguro.docx`](./docs/SIGET_Organizacion_SDLC_Seguro.docx)). Cada integrante tiene una etapa con pasos, entregable, revisor y criterio de «terminado», y hay un calendario del 12 al 26 de noviembre.
 - **Plantillas de trabajo**, una por etapa y con ejemplos resueltos, en [`docs/sdlc/`](./docs/sdlc/README.md) y en [`docs/SIGET_Plantillas_SDLC_Seguro.docx`](./docs/SIGET_Plantillas_SDLC_Seguro.docx): registro de riesgos, requisitos y cumplimiento, modelo de amenazas STRIDE, codificación segura, inventario de controles, plan de pruebas, revisión del entorno y bitácoras de supervisión y de parches.
