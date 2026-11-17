@@ -1,0 +1,53 @@
+# Gitleaks — secretos en todo el historial de git (inicial)
+# 2026-11-08 13:43:36  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ gitleaks git . --redact -v --no-color --report-format json --report-path docs/analisis-seguridad/antes/gitleaks.json
+Finding:     password": "REDACTED"
+Secret:      REDACTED
+RuleID:      generic-api-key
+Entropy:     3.945465
+File:        demo/ensayo.py
+Line:        319
+Commit:      e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5
+Author:      Jeison Vasquez
+Email:       jeisonvasquez563@gmail.com
+Date:        2026-10-22T17:53:03Z
+Fingerprint: e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5:demo/ensayo.py:generic-api-key:319
+Link:        https://github.com/jeisonvasquez563-gif/siget/blob/e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5/demo/ensayo.py#L319
+
+Finding:     password": "REDACTED"
+Secret:      REDACTED
+RuleID:      generic-api-key
+Entropy:     3.945465
+File:        demo/ensayo.py
+Line:        320
+Commit:      e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5
+Author:      Jeison Vasquez
+Email:       jeisonvasquez563@gmail.com
+Date:        2026-10-22T17:53:03Z
+Fingerprint: e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5:demo/ensayo.py:generic-api-key:320
+Link:        https://github.com/jeisonvasquez563-gif/siget/blob/e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5/demo/ensayo.py#L320
+
+Finding:     password": "REDACTED"
+Secret:      REDACTED
+RuleID:      generic-api-key
+Entropy:     3.945465
+File:        demo/ensayo.py
+Line:        139
+Commit:      39644bd260da5ca854240e9e24d41f03b0fc9d6e
+Author:      Jeison Vasquez
+Email:       jeisonvasquez563@gmail.com
+Date:        2026-10-22T17:13:25Z
+Fingerprint: 39644bd260da5ca854240e9e24d41f03b0fc9d6e:demo/ensayo.py:generic-api-key:139
+Link:        https://github.com/jeisonvasquez563-gif/siget/blob/39644bd260da5ca854240e9e24d41f03b0fc9d6e/demo/ensayo.py#L139
+
+
+    ○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+
+1:44PM INF 81 commits scanned.
+1:44PM INF scanned ~5428398 bytes (5.43 MB) in 35.3s
+1:44PM WRN leaks found: 3
+# código de salida: 1

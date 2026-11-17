@@ -5,6 +5,7 @@ import email.utils
 import http.cookiejar
 import json
 import pathlib
+import secrets
 import socket
 import ssl
 import sys
@@ -13,6 +14,10 @@ import urllib.error
 import urllib.request
 
 import pyotp
+
+# Contraseña robusta para los pasos que no deben llegar a usarla (registro incompleto, código falso).
+# Se genera en cada ejecución: no queda ninguna contraseña escrita en el código (hallazgo de Gitleaks).
+CLAVE_DE_PRUEBA = "Ensayo-" + secrets.token_urlsafe(18)
 
 raiz = pathlib.Path(__file__).parent.parent
 BASE = "https://192.168.159.137:8443"
@@ -136,7 +141,7 @@ e, d = ana.pedir("POST", "/auth/login/", {"username": ana.usuario, "password": a
 paso(e == 401 and (d or {}).get("codigo") == "mfa_requerido", "paso 1: contraseña correcta sin código -> el servidor pide el código", e)
 e, d = ana.pedir("POST", "/auth/login/", {"username": "nadie.existe", "password": "x"})
 paso(e == 401 and (d or {}).get("codigo") == "credenciales_invalidas", "un usuario inexistente no responde «pide código» (no delata quién tiene segundo factor)", e)
-e, d = ana.pedir("POST", "/auth/registro/", {"username": "sin.datos.personales", "password": "una-frase-larga-y-poco-comun-5821"})
+e, d = ana.pedir("POST", "/auth/registro/", {"username": "sin.datos.personales", "password": CLAVE_DE_PRUEBA})
 paso(e == 400 and len((d or {}).get("errores", [])) >= 7, "crear cuenta sin datos personales se rechaza (400, dice qué falta)", e)
 e, _ = ana.entrar()
 paso(e == 200, "entra con usuario, contraseña y código del segundo factor", e)
@@ -326,8 +331,8 @@ paso(e == 201 and len(codigo) == 14, "emite un código de restablecimiento (se m
 yo_id = yo_i["id"]
 e, _ = ivan.pedir("POST", f"/plataforma/personas/{yo_id}/restablecer-contrasena/", {})
 paso(e == 409, "nadie se emite un código a sí mismo (409)", e)
-e, mala = ivan.pedir("POST", "/auth/restablecer/", {"username": "beto.ciudadano", "codigo": "AAAA-BBBB-CCCC", "password": "una-frase-larga-y-poco-comun-1234"})
-e2, otra = ivan.pedir("POST", "/auth/restablecer/", {"username": "nadie.existe", "codigo": codigo, "password": "una-frase-larga-y-poco-comun-1234"})
+e, mala = ivan.pedir("POST", "/auth/restablecer/", {"username": "beto.ciudadano", "codigo": "AAAA-BBBB-CCCC", "password": CLAVE_DE_PRUEBA})
+e2, otra = ivan.pedir("POST", "/auth/restablecer/", {"username": "nadie.existe", "codigo": codigo, "password": CLAVE_DE_PRUEBA})
 paso(e == e2 == 400 and mala == otra, "un código inválido y un usuario inexistente responden IGUAL (no se enumera)", f"{e}/{e2}")
 e, _ = ivan.pedir("POST", "/auth/restablecer/", {"username": "beto.ciudadano", "codigo": codigo, "password": "corta"})
 paso(e == 400, "una contraseña débil se rechaza y NO gasta el código", e)

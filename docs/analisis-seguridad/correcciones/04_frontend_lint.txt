@@ -1,0 +1,7 @@
+# ESLint del frontend tras la actualización
+# 2026-11-08 13:50:20  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5\frontend
+$ npm run lint
+
+> siget-frontend@0.1.0 lint
+> eslint src
+# código de salida: 0

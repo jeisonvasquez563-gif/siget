@@ -3,6 +3,8 @@
 Las peticiones pasan por todo el camino real (autenticación, PDP, permisos, servicios, RLS y triggers de PostgreSQL). Las decisiones
 del PDP se capturan en memoria (la tabla es inalterable y esto no debe dejar nada). No deja ningún dato.
 """
+# Las contraseñas marcadas con «nosec B105» son inválidas a propósito: se envían para comprobar que la API las
+# rechaza (pruebas negativas). Bandit las señala como contraseñas escritas en el código; es un falso positivo revisado.
 import json
 from datetime import timedelta
 from unittest import mock
@@ -123,7 +125,7 @@ class Command(BaseCommand):
         ajeno = self._publica("/auth/restablecer/", {"username": "vp_fer", "codigo": codigo, "password": CLAVE + "x"})
         self._paso("un código incorrecto, uno de otra persona y un usuario inexistente responden IGUAL (no se enumera)",
                    mala.status_code == inexistente.status_code == ajeno.status_code == 400 and mala.json() == inexistente.json() == ajeno.json(), mala.json())
-        r = self._publica("/auth/restablecer/", {"username": "vp_ana", "codigo": codigo, "password": "corta"})
+        r = self._publica("/auth/restablecer/", {"username": "vp_ana", "codigo": codigo, "password": "corta"})  # nosec B105
         self._paso("una contraseña débil se rechaza diciendo por qué", r.status_code == 400 and r.json().get("errores"), r.status_code)
         self._paso("y el código NO se gasta (se puede corregir y reintentar)", Restablecimiento.objects.get(pk=fila.pk).usado_en is None)
         sesion_ana = Sesion.objects.create(usuario=ana, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=ahora + timedelta(hours=1))

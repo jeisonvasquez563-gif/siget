@@ -5,6 +5,7 @@ archivos montados por `podman secret`), todo se deniega por defecto y la conexi�
 va por TLS verificando el certificado del servidor.
 """
 import os
+import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -106,8 +107,24 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
 # --- API: se deniega todo salvo lo que una política permita explícitamente ---
 # Los límites de tasa (throttling) se cuentan aquí. Con la memoria local cada proceso de gunicorn llevaba su propia cuenta
 # (límite real = N veces el nominal); una caché en archivos la comparten los procesos del contenedor (/tmp es tmpfs).
+
+def _directorio_privado(ruta: Path) -> str:
+    """Crea (o valida) el directorio de la caché solo para este usuario: evita que otro usuario lo cree antes o lo
+    reemplace por un enlace en un /tmp compartido (CWE-377, hallazgo B108 de Bandit)."""
+    ruta.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if ruta.is_symlink():
+        raise ImproperlyConfigured(f"El directorio de caché {ruta} no puede ser un enlace simbólico")
+    if hasattr(os, "getuid"):
+        if ruta.stat().st_uid != os.getuid():
+            raise ImproperlyConfigured(f"El directorio de caché {ruta} debe pertenecer al usuario que corre SIGET")
+        ruta.chmod(0o700)
+    return str(ruta)
+
+
+# Nombre propio por usuario (uid en Linux) en lugar de una ruta fija y predecible como /tmp/siget-cache
+_CACHE_POR_DEFECTO = Path(tempfile.gettempdir()) / f"siget-cache-{os.getuid() if hasattr(os, 'getuid') else 'local'}"
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-                      "LOCATION": os.environ.get("SIGET_CACHE_DIR", "/tmp/siget-cache")}}
+                      "LOCATION": _directorio_privado(Path(os.environ.get("SIGET_CACHE_DIR") or _CACHE_POR_DEFECTO))}}
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["apps.autenticacion.autenticacion.AutenticacionJWT"],
