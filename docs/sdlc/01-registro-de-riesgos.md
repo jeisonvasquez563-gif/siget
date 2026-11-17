@@ -40,11 +40,11 @@
 | R21 | Lo que corre en producción no coincide con el repositorio (por ejemplo, la inactividad de 2 minutos de la demo solo está en VM1). Un despliegue desde el repositorio deshace ajustes sin que nadie lo note | Configuración de seguridad | Media | Media | Medio | Parcial: regla de comparar la unidad con la de producción antes de copiarla (runbook 37.2, punto 3). **pendiente**: revertir el ajuste de la demo o llevarlo al repositorio (CHANGELOG, «Cambiado (solo en VM1, temporal)») |
 | R22 | No hay alertas automáticas: un ataque en curso solo se ve si alguien abre la consola de auditoría | Detección y respuesta a incidentes | Alta | Media | Alto | Parcial: todo queda registrado (decisiones del PDP, eventos de seguridad) y se consulta en la consola de auditoría (runbook 28). **pendiente**: alertas ante patrones y exportación firmada (ZT-8 / PT-10) |
 | R23 | Una dependencia o imagen de contenedor trae una vulnerabilidad conocida (cadena de suministro) | Backend, frontend y contenedores | Media | Alta | Alto | Parcial: pip-audit y npm audit en cada cambio (`security-scan.yml`) y Dependabot para pip, npm, GitHub Actions y Docker (`.github/dependabot.yml`). **pendiente**: la imagen de nginx no se reconstruye y PostgreSQL usa una imagen de docker.io fuera del ciclo de Red Hat (informe de mantenimiento) |
-| R24 | VM1 tiene habilitados dos repositorios externos de PostgreSQL (`pgdg-common` y `pgdg14`) con firma GPG inválida. Si algún día dnf los aceptara o alguien forzara la instalación, entrarían paquetes sin verificar; mientras tanto obligan a desactivarlos con `--disablerepo` para medir los parches | VM1 | Baja | Media | Medio | Parcial: dnf se niega a usarlos (`Bad GPG signature`) y solo se instalaron desde ahí `libpq5` y `pgdg-redhat-repo` (`docs/sdlc/evidencia/09_vm1_tras_reinicio.txt`). **pendiente**: deshabilitarlos o quitarlos, decisión de Jeison Vásquez (`docs/sdlc/07-revision-del-entorno.md`, hallazgo 5) |
+| R24 | VM1 tenía habilitados seis repositorios externos de PostgreSQL (`pgdg-common` y `pgdg14` a `pgdg18`) con firma GPG inválida. Si algún día dnf los aceptara o alguien forzara la instalación, entrarían paquetes sin verificar; mientras tanto obligan a desactivarlos con `--disablerepo` para medir los parches | VM1 | Baja | Baja | Bajo | **Mitigado el 17-nov-2026:** los seis quedaron deshabilitados (`dnf config-manager --set-disabled "pgdg*"`), con respaldo del archivo original; `dnf` actualiza sin errores de firma (`docs/sdlc/evidencia/11_vm1_repos_pgdg.png`). Desde ahí solo se habían instalado `libpq5` y `pgdg-redhat-repo` |
 
 ## Riesgos pendientes para Jeison
 
-Ordenados del nivel más alto al más bajo. Dentro del mismo nivel, primero lo que no tiene ningún control. Desde el 16-nov-2026 R5 (parches) ya no figura aquí porque está mitigado, y R10 bajó a Medio porque solo falta migrar Python. R24 es nuevo. Quedan **13** con algo pendiente (6 de nivel Alto y 7 de nivel Medio).
+Ordenados del nivel más alto al más bajo. Dentro del mismo nivel, primero lo que no tiene ningún control. Desde el 16-nov-2026 R5 (parches) ya no figura aquí porque está mitigado, y R10 bajó a Medio porque solo falta migrar Python. R24 apareció al actualizar y se mitigó el 17-nov. Quedan **12** con algo pendiente (6 de nivel Alto y 6 de nivel Medio).
 
 | Nivel | # | Qué falta | Dónde está planificado |
 |---|---|---|---|
@@ -55,7 +55,6 @@ Ordenados del nivel más alto al más bajo. Dentro del mismo nivel, primero lo q
 | Alto | R22 | Alertas automáticas y exportación firmada de la auditoría | ZT-8 / PT-10 |
 | Alto | R23 | Reconstruir la imagen de nginx y revisar el origen de la de PostgreSQL | Informe de mantenimiento |
 | Medio | R19 | Leer la IP real del cliente antes de abrir a internet | `docs/abrir-a-internet.md`, paso 3 |
-| Medio | R24 | Deshabilitar o quitar los repositorios `pgdg-common` y `pgdg14` de VM1 (firma inválida) | `docs/sdlc/07-revision-del-entorno.md`, hallazgo 5 |
 | Medio | R8 | Retirar el checkpoint PHP, cerrar el puerto 80 y rotar su contraseña de base | PT-13 / ZT-9 |
 | Medio | R11 | Rotar o suspender las cuentas de demostración antes de abrir a internet | `docs/abrir-a-internet.md` |
 | Medio | R10 | Migrar Python 3.12 antes de abril de 2027 (la parte de Rocky ya quedó resuelta) | Informe de mantenimiento (plan con fechas) |

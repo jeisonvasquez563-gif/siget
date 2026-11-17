@@ -16,7 +16,7 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
   - reinicio de cada una para cargar el kernel nuevo.
 - **Después del reinicio** todo arrancó solo: servicios de SIGET, temporizador de escalamiento, Apache y PHP con su endurecimiento, PostgreSQL y respaldo diario. `verificar_tramites` 77/77, `verificar_plataforma` 91/91, `verificar_autenticacion` 84/84 y ensayo 101/101.
 - **VM2:** se quitó la regla del cortafuegos que permitía el puerto 5432 (PostgreSQL nativo sin uso); queda solo la del 5433.
-- **Hallazgo nuevo en VM1:** los repositorios externos `pgdg-common` y `pgdg14`, que quedaron de pgAdmin, fallan la verificación de firma GPG y dnf los rechaza. Pendiente deshabilitarlos.
+- **Hallazgo nuevo en VM1, corregido el 17-nov:** los repositorios externos de PostgreSQL (`pgdg-common` y `pgdg14` a `pgdg18`), que quedaron de pgAdmin, fallaban la verificación de firma GPG. Se respaldó su archivo y se deshabilitaron los seis; `dnf` actualiza sin errores y siguen 0 avisos pendientes (`docs/sdlc/evidencia/11_vm1_repos_pgdg`).
 - Evidencia: `docs/sdlc/evidencia/09_*` y `10_*`.
 
 ### Documentación (SDLC seguro implementado, 16-nov)

@@ -27,7 +27,7 @@ Salida en texto: `evidencia/08_parches_linea_base.txt`.
 
 ### Después de actualizar (16-nov-2026)
 
-Después de actualizar y reiniciar, las dos VMs tienen **0 avisos críticos, 0 importantes y 0 actualizaciones pendientes**, y quedaron en Rocky Linux 9.9 con el kernel 5.14.0-741.22.1.el9_9. La regla de 7 días vuelve a cumplirse. En VM1 la medición se hizo desactivando los repositorios externos `pgdg*`, cuya firma es inválida y que dnf ya se niega a usar; deshabilitarlos o quitarlos está pendiente (decisión de Jeison Vásquez; hallazgo 5 de `07-revision-del-entorno.md` y riesgo R24).
+Después de actualizar y reiniciar, las dos VMs tienen **0 avisos críticos, 0 importantes y 0 actualizaciones pendientes**, y quedaron en Rocky Linux 9.9 con el kernel 5.14.0-741.22.1.el9_9. La regla de 7 días vuelve a cumplirse. En VM1 la medición se hizo desactivando los repositorios externos `pgdg*`, cuya firma era inválida. El 17-nov-2026 se deshabilitaron los seis y `dnf` volvió a funcionar sin errores ni avisos pendientes (hallazgo 5 de `07-revision-del-entorno.md` y riesgo R24, ya corregidos).
 
 ![Avisos pendientes después de actualizar](evidencia/10_parches_despues.png)
 
