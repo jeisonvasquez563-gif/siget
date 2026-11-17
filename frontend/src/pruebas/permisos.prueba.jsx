@@ -24,7 +24,7 @@ async function abrirComo(usuario, modulo) {
 }
 
 describe('datos reales: lo que dice la política', () => {
-  it('ningún rol puede las 18 acciones (no hay superusuario)', () => {
+  it('ningún rol puede las 21 acciones (no hay superusuario)', () => {
     expect(matriz.ningun_rol_puede_todo).toBe(true)
     expect(matriz.roles).toHaveLength(10)
     for (const r of matriz.roles) expect(r.acciones_permitidas).toBeLessThan(r.acciones_totales)
@@ -68,13 +68,13 @@ describe('roles y módulos', () => {
     const auditor = await screen.findByRole('article', { name: 'Auditor' })
     expect(within(auditor).getByText('Auditoría')).toBeInTheDocument()
     expect(within(auditor).queryByText('Mis trámites')).not.toBeInTheDocument()
-    expect(within(auditor).getByRole('progressbar', { name: /2 de 18/ })).toBeInTheDocument()
-    expect(within(screen.getByRole('article', { name: 'Supervisor' })).getByRole('progressbar', { name: /6 de 18/ })).toBeInTheDocument()
+    expect(within(auditor).getByRole('progressbar', { name: /2 de 21/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: 'Supervisor' })).getByRole('progressbar', { name: /7 de 21/ })).toBeInTheDocument()
   })
 })
 
 describe('módulos por rol', () => {
-  it('la tabla cruza los 15 módulos con los 10 roles y cuadra con la vista por rol', async () => {
+  it('la tabla cruza los 16 módulos con los 10 roles y cuadra con la vista por rol', async () => {
     const { user } = await abrirComo('ana.ciudadana', 'Roles y permisos')
     await user.click(await screen.findByRole('tab', { name: 'Módulos por rol' }))
     const tabla = await screen.findByRole('table', { name: /Módulos por rol/ })

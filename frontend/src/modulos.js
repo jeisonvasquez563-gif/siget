@@ -1,6 +1,6 @@
 // Cómo se agrupan y dibujan los módulos que devuelve el servidor (/auth/yo/). Es solo presentación: el servidor decide qué módulos hay.
 export const ICONO_MODULO = {
-  mis_tramites: 'documento', nuevo_tramite: 'mas', bandeja: 'bandeja', supervision: 'supervision', equipo: 'equipo',
+  mis_tramites: 'documento', nuevo_tramite: 'mas', mis_datos: 'usuario', bandeja: 'bandeja', supervision: 'supervision', equipo: 'equipo',
   seguridad: 'escudo', mfa: 'llave', roles_permisos: 'tabla', prueba_acceso: 'candado', auditoria: 'auditoria',
   consola_identidades: 'usuario', consola_catalogo: 'tabla', consola_seguridad: 'escudo', consola_secretos: 'llave', consola_infraestructura: 'consola',
 }
@@ -8,7 +8,7 @@ export const ICONO_MODULO = {
 export const iconoDe = (id) => ICONO_MODULO[id] || 'consola'
 
 export const GRUPOS = [
-  { titulo: 'Mi espacio', ids: ['mis_tramites', 'nuevo_tramite'] },
+  { titulo: 'Mi espacio', ids: ['mis_tramites', 'nuevo_tramite', 'mis_datos'] },
   { titulo: 'Mi institución', ids: ['bandeja', 'supervision', 'equipo'] },
   { titulo: 'Plataforma', ids: [], resto: true },
   { titulo: 'Seguridad y permisos', ids: ['seguridad', 'mfa', 'roles_permisos'] },

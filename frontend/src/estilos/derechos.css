@@ -1,0 +1,40 @@
+/* Derechos sobre los datos personales: «Mis datos», aviso de privacidad y solicitudes (Ley 81 de 2019) */
+
+/* Casilla del aviso en el registro */
+.casilla { display: flex; gap: 0.6rem; align-items: center; font-weight: 600; cursor: pointer; }
+.casilla input { width: 1.15rem; height: 1.15rem; flex: none; accent-color: var(--agua-media); }
+.casilla-aviso { margin: 0 0 1rem; padding: 0.8rem 0.9rem; border: 1px solid var(--borde); border-radius: var(--radio); background: var(--superficie-3); }
+.casilla-aviso small { display: block; margin-top: 0.4rem; color: var(--tinta-suave); font-size: var(--t-s); }
+.casilla-aviso a { color: var(--agua-media); text-decoration: underline; }
+fieldset.opciones { border: 0; padding: 0; margin: 0 0 1rem; display: flex; gap: 1.25rem; flex-wrap: wrap; }
+fieldset.opciones legend { font-size: var(--t-s); font-weight: 650; margin-bottom: 0.3rem; padding: 0; }
+
+/* Mi perfil: pares «etiqueta, valor» (cada fila se aplana dentro de la rejilla de .datos) */
+.datos .dato-fila { display: contents; }
+.datos-contacto { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0 1rem; margin: 0.75rem 0 0.25rem; }
+.enlace { color: var(--agua-media); text-decoration: underline; }
+
+/* Solicitudes (de la persona y del operador) */
+.lista-solicitudes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.lista-solicitudes li { display: grid; gap: 0.4rem; justify-items: start; padding: 0.9rem 0; border-bottom: 1px solid var(--borde); }
+.lista-solicitudes li:last-child { border-bottom: 0; }
+.lista-solicitudes small { color: var(--tinta-suave); }
+.cabecera-solicitud { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.detalle-solicitud { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.respuesta-solicitud { margin: 0.2rem 0 0; padding: 0.6rem 0.9rem; border-left: 3px solid var(--agua-media); background: var(--superficie-3); border-radius: 0 var(--radio) var(--radio) 0; width: 100%; }
+.respuesta-solicitud p { margin: 0.2rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.resumen-solicitudes { margin: 0 0 0.5rem; color: var(--tinta-suave); }
+.resumen-solicitudes .vencidas { color: var(--sello-rojo); }
+.filtro-estado { margin: 0; min-width: 11rem; }
+
+/* Aviso de privacidad (página pública) */
+.privacidad { max-width: 52rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+.privacidad-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.privacidad-cuerpo h1 { margin-bottom: 0.4rem; }
+.privacidad-cuerpo section { margin-top: 1.5rem; }
+.privacidad-cuerpo h2 { font-size: var(--t-l); margin-bottom: 0.4rem; }
+.privacidad-cuerpo p { max-width: 70ch; }
+.datos-finalidad { display: grid; gap: 0.75rem; margin: 0.5rem 0 0; }
+.datos-finalidad > div { padding: 0.7rem 0.9rem; border: 1px solid var(--borde); border-radius: var(--radio); background: var(--superficie); }
+.datos-finalidad dt { font-weight: 650; }
+.datos-finalidad dd { margin: 0.15rem 0 0; color: var(--tinta-suave); }

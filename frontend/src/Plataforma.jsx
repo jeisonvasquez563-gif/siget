@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from './api.js'
-import { fecha, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { fecha, fechaCorta, hace, mensajeDe, useReautenticacion } from './comun.jsx'
 import { Alerta, BloquesEsqueleto, Icono, Insignia, Vacio, useUI } from './ui.jsx'
 
 // Consolas de los operadores de plataforma. Ninguna muestra datos de trámites ni datos personales: una persona es su usuario,
@@ -200,6 +200,97 @@ function FormularioAltaCoordinador({ correr, recargar }) {
   )
 }
 
+/* ---------------------------------------------------------------- solicitudes sobre datos personales (Ley 81) */
+
+const TIPO_SOLICITUD = { rectificacion: 'Rectificación', cancelacion: 'Cancelación', oposicion: 'Oposición' }
+const ESTADO_SOLICITUD = { recibida: ['e-pendiente', 'Recibida'], atendida: ['e-aprobado', 'Atendida'], rechazada: ['e-rechazado', 'Rechazada'] }
+
+function ModalRespuesta({ solicitud, alCancelar, alEnviar }) {
+  const [estado, setEstado] = useState('atendida')
+  const [respuesta, setRespuesta] = useState('')
+  return (
+    <div className="fondo-modal">
+      <form className="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-respuesta" onSubmit={(e) => { e.preventDefault(); alEnviar(estado, respuesta.trim()) }}>
+        <h2 id="titulo-respuesta"><span className="icono-grande"><Icono nombre="documento" /></span>Responder a {solicitud.persona.usuario}</h2>
+        <p className="suave"><strong>{TIPO_SOLICITUD[solicitud.tipo]}:</strong> {solicitud.detalle}</p>
+        <p className="suave">Esta respuesta <strong>no borra ni cambia nada</strong>: solo queda registrada. Explica con claridad qué se puede hacer y qué no (los trámites son expediente público con conservación obligatoria). Quien la pidió la verá tal cual.</p>
+        <fieldset className="campo opciones">
+          <legend>Resultado</legend>
+          <label className="casilla"><input type="radio" name="resultado" value="atendida" checked={estado === 'atendida'} onChange={() => setEstado('atendida')} /><span>Atendida</span></label>
+          <label className="casilla"><input type="radio" name="resultado" value="rechazada" checked={estado === 'rechazada'} onChange={() => setEstado('rechazada')} /><span>Rechazada</span></label>
+        </fieldset>
+        <label className="campo"><span>Respuesta para la persona</span>
+          <textarea className="entrada" value={respuesta} onChange={(e) => setRespuesta(e.target.value)} rows={5} minLength={10} maxLength={2000} required autoFocus />
+          <small>Entre 10 y 2000 caracteres ({respuesta.trim().length}/2000).</small>
+        </label>
+        <div className="fila-botones">
+          <button type="button" className="btn btn-sec" onClick={alCancelar}>Cancelar</button>
+          <button type="submit" className="btn" disabled={respuesta.trim().length < 10}>Enviar respuesta</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function SolicitudesDatos({ yo }) {
+  const [filtro, setFiltro] = useState('')
+  const { datos, error, recargar } = useCarga(`/plataforma/solicitudes-datos/${filtro ? `?estado=${filtro}` : ''}`)
+  const { correr, modal, error: errorAccion } = useAccion(recargar)
+  const [objetivo, setObjetivo] = useState(null)
+
+  return (
+    <section className="panel">
+      {modal}
+      {objetivo && <ModalRespuesta solicitud={objetivo} alCancelar={() => setObjetivo(null)}
+        alEnviar={async (estado, respuesta) => {
+          const s = objetivo
+          setObjetivo(null)
+          await correr(() => api(`/plataforma/solicitudes-datos/${s.id}/responder/`, { metodo: 'POST', cuerpo: { estado, respuesta } }), `Respuesta enviada a ${s.persona.usuario}.`)
+        }} />}
+      <div className="panel-cabecera">
+        <h3>Solicitudes sobre datos personales</h3>
+        <label className="campo filtro-estado"><span className="solo-lector">Filtrar por estado</span>
+          <select className="entrada" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
+            <option value="">Todas</option><option value="recibida">Recibidas</option><option value="atendida">Atendidas</option><option value="rechazada">Rechazadas</option>
+          </select>
+        </label>
+      </div>
+      <p className="suave">Rectificación, cancelación y oposición que piden las personas (Ley 81 de 2019). Hay que responder en no más de 10 días hábiles. <strong>Cancelar no borra nada automáticamente:</strong> los trámites son expediente público con conservación obligatoria, así que tu respuesta explica qué se puede eliminar y qué no. Solo ves quién pide por su usuario, nunca sus datos ni sus trámites.</p>
+      <Alerta>{error}</Alerta>
+      <Alerta>{errorAccion}</Alerta>
+      {!datos ? <BloquesEsqueleto n={2} /> : (
+        <>
+          <p className="resumen-solicitudes" role="status">{datos.resumen.recibidas} {datos.resumen.recibidas === 1 ? 'abierta' : 'abiertas'}{datos.resumen.vencidas > 0 && <> · <strong className="vencidas">{datos.resumen.vencidas} {datos.resumen.vencidas === 1 ? 'vencida' : 'vencidas'}</strong></>}</p>
+          {datos.solicitudes.length === 0 ? <Vacio titulo="Sin solicitudes" texto="Cuando alguien pida algo sobre sus datos personales aparecerá aquí." /> : (
+            <ul className="lista-solicitudes">
+              {datos.solicitudes.map((s) => {
+                const [clase, texto] = ESTADO_SOLICITUD[s.estado]
+                const propia = s.persona.id === yo.id
+                return (
+                  <li key={s.id}>
+                    <div className="cabecera-solicitud">
+                      <strong>{s.persona.usuario}{propia && ' (eres tú)'}</strong>
+                      <span className="suave">{TIPO_SOLICITUD[s.tipo]}</span>
+                      <Insignia clase={clase}>{texto}</Insignia>
+                      {s.vencida && <Insignia clase="e-rechazado">Vencida</Insignia>}
+                    </div>
+                    <p className="detalle-solicitud">{s.detalle}</p>
+                    <small>Recibida {hace(s.creada_en)} · {s.estado === 'recibida' ? `vence el ${fechaCorta(s.vence_en)}` : `respondida ${hace(s.respondida_en)} por ${s.respondida_por?.usuario}`}</small>
+                    {s.respuesta && <blockquote className="respuesta-solicitud"><strong>Respuesta</strong><p>{s.respuesta}</p></blockquote>}
+                    {s.estado === 'recibida' && (propia
+                      ? <span className="suave">No puedes responder tu propia solicitud: lo debe hacer otra persona.</span>
+                      : <div className="acciones-fila"><button className="btn" onClick={() => setObjetivo(s)}>Responder</button></div>)}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 export function ConsolaIdentidades({ yo }) {
   const [emitido, setEmitido] = useState(null)
   const { correr, modal, error } = useAccion()
@@ -219,7 +310,7 @@ export function ConsolaIdentidades({ yo }) {
 
   return (
     <>
-      <Encabezado titulo="Identidades" texto="Ayuda a recuperar una cuenta y da de alta a las coordinadoras de las instituciones, siempre con control dual. No ves trámites ni datos personales." />
+      <Encabezado titulo="Identidades" texto="Ayuda a recuperar una cuenta, da de alta a las coordinadoras de las instituciones con control dual y responde las solicitudes sobre datos personales. No ves trámites ni datos personales de nadie." />
       {modal}
       {emitido && <CodigoEmitido datos={emitido} alCerrar={() => setEmitido(null)} />}
       <Alerta>{error}</Alerta>
@@ -233,6 +324,7 @@ export function ConsolaIdentidades({ yo }) {
       <PanelAprobaciones yo={yo} titulo="Altas de coordinadoras" nuevo="Proponer el alta de una coordinadora"
         resumen={(o) => `Alta de ${o.usuario} como coordinadora (institución n.º ${o.institucion_id})`}
         formulario={(props) => <FormularioAltaCoordinador {...props} />} />
+      <SolicitudesDatos yo={yo} />
     </>
   )
 }

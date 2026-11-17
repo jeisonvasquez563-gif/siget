@@ -4,6 +4,12 @@ import { Alerta, Icono, Insignia } from './ui.jsx'
 
 export { Alerta }
 
+// Provincias y comarcas de Panamá. El servidor valida contra su propia lista: esta solo arma los selectores (registro y «Mis datos»).
+export const PROVINCIAS = [
+  'Bocas del Toro', 'Chiriquí', 'Coclé', 'Colón', 'Darién', 'Herrera', 'Los Santos', 'Panamá', 'Panamá Oeste', 'Veraguas',
+  'Comarca Guna Yala', 'Comarca Emberá-Wounaan', 'Comarca Ngäbe-Buglé',
+]
+
 export const ROLES_PLATAFORMA = {
   ninguno: 'Sin rol de plataforma',
   operador_infraestructura: 'Operador de infraestructura',

@@ -30,14 +30,17 @@ src/
 ├── Permisos.jsx        # roles y módulos, matriz de permisos, simulador, permisos de la base de datos, capas de defensa
 ├── Simulador.jsx       # «qué pasaría si…»: veredicto, traza y alternativas del PDP real
 ├── escenarios.json     # los 12 escenarios del simulador (también los usa demo/capturar_simulador.py)
+├── MisDatos.jsx        # «Mis datos» (Ley 81): ver, corregir correo/provincia/ciudad, descargar y pedir rectificación, cancelación u oposición
+├── Privacidad.jsx      # aviso de privacidad público (#/privacidad), con el texto que manda el servidor
 ├── Mfa.jsx             # segundo factor: cómo funciona, prueba en vivo (incluye reuso) y actividad propia
 ├── ui.jsx              # iconos propios, logo, esclusas, insignias, avisos, confirmaciones, esqueletos, estados vacíos, tema
 ├── comun.jsx           # etiquetas, estados, plazos, reautenticación
 ├── modulos.js          # cómo se agrupan y dibujan los módulos que manda el servidor
 ├── mock.js             # servidor de mentira SOLO para desarrollo (no entra en producción)
+├── mock-derechos.js    # el mismo contrato de «Mis datos» y de la consola de solicitudes, con estado en memoria
 ├── mock-datos/         # capturas REALES de /politicas/* (matriz y base de datos) para el simulador
 ├── pruebas/            # Vitest: api, comun, ui, pantallas por rol, permisos/MFA y seguridad del código
-└── estilos/            # tokens.css, base.css, componentes.css, layout.css, pantallas.css
+└── estilos/            # tokens.css, base.css, componentes.css, layout.css, pantallas.css, derechos.css
 ```
 
 ## Desarrollo
