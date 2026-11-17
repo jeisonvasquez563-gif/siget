@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { alPerderLaSesion, api, cerrarSesion, olvidarToken, renovar } from './api.js'
-import { Acceso, EnrolarMfa } from './Acceso.jsx'
+import { Acceso, AvisoDemostracion, EnrolarMfa } from './Acceso.jsx'
 import { Auditoria } from './Auditoria.jsx'
 import { AvisoInactividad, useInactividad } from './inactividad.jsx'
 import { SegundoFactor } from './Mfa.jsx'
@@ -59,7 +59,7 @@ export default function App() {
   if (fase === 'cargando') {
     return <main className="acceso"><section className="acceso-formulario" role="status" aria-label="Verificando tu sesión"><Logo className="marca-logo" /></section></main>
   }
-  if (fase === 'login') return <Acceso alEntrar={cargarYo} motivo={motivo} />
+  if (fase === 'login') return <><AvisoDemostracion /><Acceso alEntrar={cargarYo} motivo={motivo} /></>
   if (fase === 'enrolar') return <><EnrolarMfa usuario={yo.usuario} alTerminar={cargarYo} alSalir={salir} />{restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}</>
 
   const ir = (modulo) => { setVista({ modulo }); setMenuAbierto(false); window.scrollTo({ top: 0 }) }
@@ -72,7 +72,7 @@ export default function App() {
   switch (vista.modulo) {
     case 'inicio': contenido = <Inicio yo={yo} ir={ir} abrir={abrir} />; break
     case 'mis_tramites': contenido = <MisTramites yo={yo} abrir={abrir} nuevo={() => ir('nuevo_tramite')} />; break
-    case 'nuevo_tramite': contenido = <NuevoTramite abrir={abrir} />; break
+    case 'nuevo_tramite': contenido = <NuevoTramite yo={yo} abrir={abrir} />; break
     case 'bandeja': contenido = <Bandeja yo={yo} abrir={abrir} modo="bandeja" />; break
     case 'supervision': contenido = <Bandeja yo={yo} abrir={abrir} modo="supervision" />; break
     case 'equipo': contenido = <Equipo />; break
@@ -132,6 +132,7 @@ export default function App() {
             </button>
           </div>
         </header>
+        <AvisoDemostracion />
         <main className="contenido" id="contenido">{contenido}</main>
       </div>
       {restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}

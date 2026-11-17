@@ -5,6 +5,7 @@ import email.utils
 import http.cookiejar
 import json
 import pathlib
+import secrets
 import socket
 import ssl
 import sys
@@ -13,6 +14,10 @@ import urllib.error
 import urllib.request
 
 import pyotp
+
+# Contraseña robusta para los pasos que no deben llegar a usarla (registro incompleto, código falso).
+# Se genera en cada ejecución: no queda ninguna contraseña escrita en el código (hallazgo de Gitleaks).
+CLAVE_DE_PRUEBA = "Ensayo-" + secrets.token_urlsafe(18)
 
 raiz = pathlib.Path(__file__).parent.parent
 BASE = "https://192.168.159.137:8443"
@@ -136,7 +141,7 @@ e, d = ana.pedir("POST", "/auth/login/", {"username": ana.usuario, "password": a
 paso(e == 401 and (d or {}).get("codigo") == "mfa_requerido", "paso 1: contraseña correcta sin código -> el servidor pide el código", e)
 e, d = ana.pedir("POST", "/auth/login/", {"username": "nadie.existe", "password": "x"})
 paso(e == 401 and (d or {}).get("codigo") == "credenciales_invalidas", "un usuario inexistente no responde «pide código» (no delata quién tiene segundo factor)", e)
-e, d = ana.pedir("POST", "/auth/registro/", {"username": "sin.datos.personales", "password": "una-frase-larga-y-poco-comun-5821"})
+e, d = ana.pedir("POST", "/auth/registro/", {"username": "sin.datos.personales", "password": CLAVE_DE_PRUEBA})
 paso(e == 400 and len((d or {}).get("errores", [])) >= 7, "crear cuenta sin datos personales se rechaza (400, dice qué falta)", e)
 e, _ = ana.entrar()
 paso(e == 200, "entra con usuario, contraseña y código del segundo factor", e)
@@ -150,6 +155,7 @@ antes = len(lista["resultados"])
 paso(antes >= 3 and all("solicitante_id" not in t for t in lista["resultados"]), "ve sus trámites y ningún dato interno del personal", antes)
 _, instituciones = ana.pedir("GET", "/catalogo/instituciones/")
 mop = next(i["id"] for i in instituciones if i["nombre"] == "MOP")
+minsa = next(i["id"] for i in instituciones if i["nombre"] == "MINSA")
 _, tipos = ana.pedir("GET", f"/catalogo/tipos-tramite/?institucion={mop}")
 e, nuevo = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"]})
 paso(e == 201 and nuevo["estado"] == "Pendiente", "inicia un trámite del MOP", f"#{nuevo.get('id')}")
@@ -173,7 +179,7 @@ paso(e == 200, "entra", e)
 _, lista = fabio.pedir("GET", "/tramites/?limite=100")
 ids_visibles = {t["id"] for t in lista["resultados"]}
 paso(tramite in ids_visibles, "ve el trámite nuevo de Ana en su bandeja", f"{len(ids_visibles)} trámites")
-paso(all(t["institucion"]["nombre"] == "MOP" for t in lista["resultados"]), "solo ve trámites del MOP")
+paso(all(t["institucion"]["nombre"] == "MOP" or t["tipo_tramite"]["nombre"].startswith("Solicitud interinstitucional") for t in lista["resultados"]), "solo ve trámites del MOP y sus propias solicitudes a otras instituciones")
 e, r = fabio.pedir("POST", f"/tramites/{tramite}/estado/", {"estado": "En Tramitacion"})
 paso(e == 200 and r["estado"] == "En Tramitacion", "lo pasa a «En tramitación» (el segundo factor del login sigue vigente 15 minutos)", e)
 e, r = fabio.pedir("POST", f"/tramites/{tramite}/estado/", {"estado": "Aprobado"})
@@ -181,9 +187,16 @@ paso(e == 200 and r["estado"] == "Aprobado", "lo aprueba", e)
 e, r = fabio.pedir("POST", f"/tramites/{tramite}/estado/", {"estado": "Rechazado"})
 paso(e == 403, "un estado final no admite más cambios (403)", e)
 _, tipos_mop = fabio.pedir("GET", f"/catalogo/tipos-tramite/?institucion={mop}")
-e, propio = fabio.pedir("POST", "/tramites/", {"tipo_tramite": tipos_mop[0]["id"]})
-e2, r = fabio.pedir("POST", f"/tramites/{propio['id']}/estado/", {"estado": "En Tramitacion"})
-paso(e == 201 and e2 == 403, "no gestiona un trámite que él mismo inició (conflicto de interés)", f"crear {e}, gestionar {e2}")
+e, _ = fabio.pedir("POST", "/tramites/", {"tipo_tramite": tipos_mop[0]["id"]})
+paso(e == 403, "no puede iniciar un trámite en su propia institución (el MOP no se hace trámites a sí mismo)", e)
+_, tipos_minsa = fabio.pedir("GET", f"/catalogo/tipos-tramite/?institucion={minsa}")
+inter = next(t for t in tipos_minsa if t["audiencia"] == "institucion")
+e, solicitud = fabio.pedir("POST", "/tramites/", {"tipo_tramite": inter["id"]})
+paso(e == 201, "sí puede iniciar una solicitud interinstitucional hacia el MINSA", e)
+e, _ = fabio.pedir("POST", f"/tramites/{solicitud['id']}/estado/", {"estado": "En Tramitacion"})
+paso(e in (403, 404), "pero no la gestiona: la atiende el personal del MINSA", e)
+e, _ = ana.pedir("POST", "/tramites/", {"tipo_tramite": inter["id"]})
+paso(e == 403, "y la ciudadanía no puede iniciar solicitudes interinstitucionales", e)
 e, h = fabio.pedir("GET", f"/tramites/{tramite}/historial/")
 paso(e == 200 and [x["accion"] for x in h["eventos"]] == ["creacion", "cambio_estado", "cambio_estado"] and all("actor_id" in x for x in h["eventos"]), "el personal ve el historial completo con quién actuó")
 e, _ = ana.pedir("GET", f"/tramites/{tramite}/historial/")
@@ -318,8 +331,8 @@ paso(e == 201 and len(codigo) == 14, "emite un código de restablecimiento (se m
 yo_id = yo_i["id"]
 e, _ = ivan.pedir("POST", f"/plataforma/personas/{yo_id}/restablecer-contrasena/", {})
 paso(e == 409, "nadie se emite un código a sí mismo (409)", e)
-e, mala = ivan.pedir("POST", "/auth/restablecer/", {"username": "beto.ciudadano", "codigo": "AAAA-BBBB-CCCC", "password": "una-frase-larga-y-poco-comun-1234"})
-e2, otra = ivan.pedir("POST", "/auth/restablecer/", {"username": "nadie.existe", "codigo": codigo, "password": "una-frase-larga-y-poco-comun-1234"})
+e, mala = ivan.pedir("POST", "/auth/restablecer/", {"username": "beto.ciudadano", "codigo": "AAAA-BBBB-CCCC", "password": CLAVE_DE_PRUEBA})
+e2, otra = ivan.pedir("POST", "/auth/restablecer/", {"username": "nadie.existe", "codigo": codigo, "password": CLAVE_DE_PRUEBA})
 paso(e == e2 == 400 and mala == otra, "un código inválido y un usuario inexistente responden IGUAL (no se enumera)", f"{e}/{e2}")
 e, _ = ivan.pedir("POST", "/auth/restablecer/", {"username": "beto.ciudadano", "codigo": codigo, "password": "corta"})
 paso(e == 400, "una contraseña débil se rechaza y NO gasta el código", e)
@@ -370,5 +383,5 @@ paso(e == 401 and sin_filtrar["codigo"] == "credenciales_invalidas" and "acceso_
 
 malos = resultados.count(False)
 print(f"\nENSAYO: {len(resultados) - malos} de {len(resultados)} comprobaciones correctas" + ("" if not malos else f"  ← {malos} FALLARON"))
-print(f"Se creó el trámite #{tramite} (aprobado) y el #{t2['id']} (asignado a Flor) durante el ensayo; el #{propio['id']} es de Fabio.")
+print(f"Se creó el trámite #{tramite} (aprobado) y el #{t2['id']} (asignado a Flor) durante el ensayo; la solicitud interinstitucional #{solicitud['id']} es de Fabio.")
 sys.exit(1 if malos else 0)

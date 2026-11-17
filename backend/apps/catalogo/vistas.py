@@ -33,5 +33,5 @@ class TiposTramiteLista(_Lectura):
             if not crudo.isascii() or not crudo.isdigit() or entero_positivo(int(crudo)) is None:
                 return Response({"codigo": "datos_invalidos", "detalle": "`institucion` debe ser un id válido."}, status=400)
             consulta = consulta.filter(institucion_id=int(crudo))
-        return Response([{"id": t.pk, "nombre": t.nombre, "sla_dias": t.sla_dias,
+        return Response([{"id": t.pk, "nombre": t.nombre, "sla_dias": t.sla_dias, "audiencia": t.audiencia,
                           "institucion": {"id": t.institucion_id, "nombre": t.institucion.nombre}} for t in consulta])

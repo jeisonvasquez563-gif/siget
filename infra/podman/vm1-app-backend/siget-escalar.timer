@@ -1,0 +1,12 @@
+# SIGET: cada hora, a los 5 minutos, escala los trámites vencidos. Persistent: si la VM estaba apagada, corre al encender.
+# ~/.config/systemd/user/siget-escalar.timer   ->   systemctl --user enable --now siget-escalar.timer
+[Unit]
+Description=SIGET: escalamiento de trámites vencidos cada hora
+
+[Timer]
+OnCalendar=*-*-* *:05:00
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

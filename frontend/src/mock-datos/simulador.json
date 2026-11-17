@@ -11,6 +11,7 @@
    "crear_tramite": [
     "institucion",
     "solicitante",
+    "audiencia",
     "segundo_factor",
     "cuenta"
    ],
@@ -104,6 +105,7 @@
    "segundo_factor": "Segundo factor",
    "cuenta": "Estado de la cuenta",
    "institucion": "Institución del recurso",
+   "audiencia": "Trámite para",
    "solicitante": "Quién pidió el trámite",
    "estado": "Estado actual del trámite",
    "estado_destino": "Estado al que se quiere pasar",
@@ -149,6 +151,16 @@
     {
      "valor": "ajena",
      "etiqueta": "Otra institución"
+    }
+   ],
+   "audiencia": [
+    {
+     "valor": "ciudadania",
+     "etiqueta": "La ciudadanía"
+    },
+    {
+     "valor": "institucion",
+     "etiqueta": "Otras instituciones"
     }
    ],
    "solicitante": [
@@ -258,6 +270,7 @@
    "segundo_factor": "reciente",
    "cuenta": "activa",
    "institucion": "propia",
+   "audiencia": "ciudadania",
    "solicitante": "otra_persona",
    "estado": "En Tramitacion",
    "estado_destino": "Aprobado",
@@ -322,6 +335,20 @@
      {
       "fase": "denegacion",
       "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_personal_no_inicia_en_su_institucion",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_audiencia_no_corresponde",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -510,6 +537,20 @@
       "motivo": null
      },
      {
+      "fase": "denegacion",
+      "regla": "_personal_no_inicia_en_su_institucion",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_audiencia_no_corresponde",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
       "fase": "permiso",
       "regla": "Reglas de la ciudadanía",
       "resultado": "no_aplica",
@@ -691,6 +732,20 @@
       "motivo": null
      },
      {
+      "fase": "denegacion",
+      "regla": "_personal_no_inicia_en_su_institucion",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_audiencia_no_corresponde",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
       "fase": "permiso",
       "regla": "Reglas de la ciudadanía",
       "resultado": "no_aplica",
@@ -801,6 +856,20 @@
      {
       "fase": "denegacion",
       "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_personal_no_inicia_en_su_institucion",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_audiencia_no_corresponde",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -929,6 +998,20 @@
       "motivo": null
      },
      {
+      "fase": "denegacion",
+      "regla": "_personal_no_inicia_en_su_institucion",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_audiencia_no_corresponde",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
       "fase": "permiso",
       "regla": "Reglas de la ciudadanía",
       "resultado": "no_aplica",
@@ -1044,7 +1127,8 @@
     "institucion": "propia",
     "solicitante": "yo",
     "segundo_factor": "reciente",
-    "cuenta": "bloqueada"
+    "cuenta": "bloqueada",
+    "audiencia": "ciudadania"
    },
    "respuesta": {
     "entrada": {
@@ -1052,6 +1136,7 @@
      "accion": "crear_tramite",
      "institucion": "propia",
      "solicitante": "yo",
+     "audiencia": "ciudadania",
      "segundo_factor": "reciente",
      "cuenta": "bloqueada"
     },
@@ -1203,6 +1288,20 @@
       "motivo": null
      },
      {
+      "fase": "denegacion",
+      "regla": "_personal_no_inicia_en_su_institucion",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_audiencia_no_corresponde",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
       "fase": "permiso",
       "regla": "Reglas de la ciudadanía",
       "resultado": "no_aplica",
@@ -1305,6 +1404,20 @@
      {
       "fase": "denegacion",
       "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_personal_no_inicia_en_su_institucion",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_audiencia_no_corresponde",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1414,6 +1527,20 @@
      {
       "fase": "denegacion",
       "regla": "Quien propone un alta no puede aprobarla",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_personal_no_inicia_en_su_institucion",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "denegacion",
+      "regla": "_audiencia_no_corresponde",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null

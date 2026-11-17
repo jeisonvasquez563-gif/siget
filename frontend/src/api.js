@@ -21,14 +21,16 @@ export const hayToken = () => tokenDeAcceso !== null
 // Al cerrar la sesión también se descarta cualquier renovación en curso: no debe sobrevivir a la persona que la pidió
 export const olvidarToken = () => { tokenDeAcceso = null; refrescando = null }
 
-async function pedir(ruta, { metodo = 'GET', cuerpo, conToken = true } = {}) {
-  const cabeceras = { Accept: 'application/json' }
-  if (cuerpo !== undefined) cabeceras['Content-Type'] = 'application/json'
+// `formulario` (FormData) es solo para subir documentos; `binario` devuelve el archivo (Blob) en lugar de JSON.
+async function pedir(ruta, { metodo = 'GET', cuerpo, conToken = true, formulario, binario = false } = {}) {
+  const cabeceras = { Accept: binario ? '*/*' : 'application/json' }
+  if (cuerpo !== undefined) cabeceras['Content-Type'] = 'application/json' // con FormData el navegador fija el límite multipart
   if (conToken && tokenDeAcceso) cabeceras.Authorization = `Bearer ${tokenDeAcceso}`
   const r = await fetch(ruta, {
     method: metodo, headers: cabeceras, credentials: 'same-origin',
-    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+    body: formulario ?? (cuerpo === undefined ? undefined : JSON.stringify(cuerpo)),
   })
+  if (binario && r.ok) return { estado: r.status, datos: await r.blob() }
   let datos = null
   try { datos = await r.json() } catch { /* cuerpo vacío o no JSON */ }
   return { estado: r.status, datos }
@@ -73,8 +75,17 @@ export async function iniciarSesion(username, password, codigo, puerta = {}) {
 
 export const instituciones = () => api('/auth/instituciones/', { conToken: false })
 
-export const registrar = (username, password, personales = {}) =>
-  api('/auth/registro/', { metodo: 'POST', cuerpo: { username, password, ...personales }, conToken: false })
+export const registrar = (username, password, personales = {}, invitacion = '') =>
+  api('/auth/registro/', { metodo: 'POST', cuerpo: { username, password, ...personales, ...(invitacion ? { invitacion } : {}) }, conToken: false })
+
+// Cómo se crean cuentas (abierto / invitacion / cerrado) y si mostrar el aviso de demostración. Se pide una sola vez.
+let configuracionPublica = null
+export function configuracion() {
+  configuracionPublica ??= api('/auth/configuracion/', { conToken: false })
+    .catch(() => { configuracionPublica = null; return { registro: 'abierto', aviso_demostracion: false } })
+  return configuracionPublica
+}
+export const olvidarConfiguracion = () => { configuracionPublica = null }
 
 export const restablecerContrasena = (username, codigo, password) =>
   api('/auth/restablecer/', { metodo: 'POST', cuerpo: { username, codigo, password }, conToken: false })

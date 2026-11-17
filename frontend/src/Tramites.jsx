@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from './api.js'
 import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Plazo, SIGUIENTES, fecha, fechaCorta, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { Documentos } from './Documentos.jsx'
 import { Seguimiento } from './Seguimiento.jsx'
 import { Alerta, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
 
@@ -111,7 +112,7 @@ export function MisTramites({ yo, abrir, nuevo }) {
 
 /* ---------------------------------------------------------------- nuevo trámite */
 
-export function NuevoTramite({ abrir }) {
+export function NuevoTramite({ yo, abrir }) {
   const [instituciones, setInstituciones] = useState(null)
   const [tipos, setTipos] = useState(null)
   const [institucion, setInstitucion] = useState(null)
@@ -119,14 +120,17 @@ export function NuevoTramite({ abrir }) {
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(false)
   const { avisar } = useUI()
+  // El personal inicia trámites hacia OTRAS instituciones (solicitudes interinstitucionales); la ciudadanía, los suyos. Nadie inicia en su propia institución.
+  const esPersonal = yo.membresias.length > 0
+  const propias = useMemo(() => new Set(yo.membresias.map((m) => m.institucion_id)), [yo.membresias])
 
-  useEffect(() => { api('/catalogo/instituciones/').then(setInstituciones).catch((e) => setError(mensajeDe(e))) }, [])
+  useEffect(() => { api('/catalogo/instituciones/').then((l) => setInstituciones(l.filter((i) => !propias.has(i.id)))).catch((e) => setError(mensajeDe(e))) }, [propias])
   useEffect(() => {
     setTipo(null)
     setTipos(null)
     if (!institucion) return
-    api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then(setTipos).catch((e) => setError(mensajeDe(e)))
-  }, [institucion])
+    api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then((l) => setTipos(l.filter((t) => t.audiencia === 'ambas' || t.audiencia === (esPersonal ? 'institucion' : 'ciudadania')))).catch((e) => setError(mensajeDe(e)))
+  }, [institucion, esPersonal])
 
   async function crear() {
     setError('')
@@ -143,12 +147,12 @@ export function NuevoTramite({ abrir }) {
 
   return (
     <>
-      <div className="encabezado-vista"><div><h2>Iniciar un trámite</h2><p>Dos pasos: la institución y el trámite. Verás el plazo antes de confirmar.</p></div></div>
+      <div className="encabezado-vista"><div><h2>Iniciar un trámite</h2><p>{esPersonal ? 'Solicitudes de tu institución a otra institución. No puedes iniciar trámites en la tuya.' : 'Dos pasos: la institución y el trámite. Verás el plazo antes de confirmar.'}</p></div></div>
       <Alerta>{error}</Alerta>
       <div className="nuevo">
         <div>
           <section className="panel">
-            <div className="panel-cabecera"><h3>1. ¿Ante qué institución?</h3></div>
+            <div className="panel-cabecera"><h3>{esPersonal ? '1. ¿A qué institución?' : '1. ¿Ante qué institución?'}</h3></div>
             {instituciones === null ? <BloquesEsqueleto n={2} /> : (
               <div className="opciones" role="radiogroup" aria-label="Institución">
                 {instituciones.map((i) => (
@@ -247,12 +251,13 @@ export function Bandeja({ yo, abrir, modo }) {
     if (filtro === 'abiertos') return esAbierto(t)
     if (filtro === 'sin_asignar') return esAbierto(t) && !t.funcionario_asignado_id
     if (filtro === 'vencidos') return t.vencido
+    if (filtro === 'escalados') return t.escalado && esAbierto(t)
     if (filtro === 'mios') return t.funcionario_asignado_id === yo.id
     return true
   }), [ajenos, filtro, q, yo])
   const cuenta = (f) => ajenos.filter(f).length
   const filtros = supervision
-    ? [['abiertos', 'Abiertos'], ['sin_asignar', 'Sin asignar'], ['vencidos', 'Vencidos'], ['todos', 'Todos']]
+    ? [['abiertos', 'Abiertos'], ['sin_asignar', 'Sin asignar'], ['escalados', 'Escalados'], ['vencidos', 'Vencidos'], ['todos', 'Todos']]
     : [['abiertos', 'Abiertos'], ['mios', 'Asignados a mí'], ['vencidos', 'Vencidos'], ['todos', 'Todos']]
   const vencidos = cuenta((t) => t.vencido)
   return (
@@ -293,7 +298,7 @@ export function Bandeja({ yo, abrir, modo }) {
 
 /* ---------------------------------------------------------------- detalle */
 
-const ICONO_EVENTO = { creacion: 'mas', cambio_estado: 'flujo', reasignacion: 'reasignar' }
+const ICONO_EVENTO = { creacion: 'mas', cambio_estado: 'flujo', reasignacion: 'reasignar', escalamiento: 'alerta', documento_adjuntado: 'documento' }
 
 export function Detalle({ id, yo, volver, volverA }) {
   const [tramite, setTramite] = useState(null)
@@ -444,6 +449,7 @@ export function Detalle({ id, yo, volver, volverA }) {
                 <div className="evento">
                   <strong>{ACCIONES_EVENTO[e.accion] || e.accion}</strong>
                   {e.accion === 'cambio_estado' && <span className="cambio"><Estado valor={e.estado_anterior} /><Icono nombre="derecha" className="tenue" /><Estado valor={e.estado_nuevo} /></span>}
+                  {e.accion === 'escalamiento' && <span className="quien">Superó el plazo: el sistema lo pasó a la supervisión de la institución</span>}
                   {e.accion === 'reasignacion' && e.atributos && <span className="quien">{e.atributos.de ? `De ${quien(e.atributos.de)} a ` : 'Asignado a '}{e.atributos.a ? quien(e.atributos.a) : 'la cola'}</span>}
                   <time dateTime={e.creado_en} title={fecha(e.creado_en)}>{fecha(e.creado_en)} · {hace(e.creado_en)}</time>
                   {'actor_id' in e && <span className="quien">Por {quien(e.actor_id)}</span>}
@@ -454,6 +460,8 @@ export function Detalle({ id, yo, volver, volverA }) {
           {!esPersonal && <p className="nota">El historial es inalterable. Por privacidad no muestra qué funcionario actuó.</p>}
         </section>
       </div>
+      {/* Adjunta quien pidió el trámite (no el personal en su nombre) y solo mientras no tiene resolución final */}
+      <Documentos tramiteId={tramite.id} puedeAdjuntar={!esPersonal && !FINALES.includes(tramite.estado)} alAdjuntar={cargar} />
       {modal}
     </>
   )

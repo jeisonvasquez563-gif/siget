@@ -1,0 +1,129 @@
+# Backend en producción: verificar_plataforma contra la base real (transacción revertida)
+# 2026-11-08 14:33:12  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "bash /tmp/ejecutar-comando.sh /tmp/verificar_plataforma.out verificar_plataforma; tail -1 /tmp/ejec.log; cat /tmp/verificar_plataforma.out; shred -u /tmp/verificar_plataforma.out"
+FIN
+PASA  identidades lista las personas - 200
+PASA  la lista nunca trae hashes, secretos ni datos personales
+PASA  seguridad también lista las personas (para bloquear)
+2026-11-08 14:33:15,945 WARNING django.request Forbidden: /plataforma/personas/
+PASA  infraestructura NO ve las personas (403)
+2026-11-08 14:33:15,962 WARNING django.request Forbidden: /plataforma/personas/
+2026-11-08 14:33:15,980 WARNING django.request Forbidden: /plataforma/aprobaciones/
+2026-11-08 14:33:16,002 WARNING django.request Forbidden: /plataforma/secretos/
+2026-11-08 14:33:16,021 WARNING django.request Forbidden: /plataforma/infraestructura/
+2026-11-08 14:33:16,042 WARNING django.request Forbidden: /plataforma/eventos/
+PASA  una persona de la ciudadanía NO entra a ninguna consola (403)
+2026-11-08 14:33:16,069 WARNING django.request Forbidden: /tramites/
+2026-11-08 14:33:16,095 WARNING django.request Forbidden: /tramites/
+2026-11-08 14:33:16,121 WARNING django.request Forbidden: /tramites/
+2026-11-08 14:33:16,146 WARNING django.request Forbidden: /tramites/
+2026-11-08 14:33:16,175 WARNING django.request Forbidden: /tramites/
+PASA  ninguna consola devuelve trámites: /tramites/ le está vedado a los 5 operadores (403)
+2026-11-08 14:33:16,349 WARNING django.request Forbidden: /plataforma/personas/
+PASA  sin segundo factor reciente se niega y se sugiere reautenticar - 403
+PASA  el operador emite un código de restablecimiento - 201
+PASA  la respuesta que lleva el código no se guarda en cachés
+PASA  en la base solo queda el hash del código, nunca el código
+PASA  el código vence a los 15 minutos
+2026-11-08 14:33:16,423 WARNING django.request Conflict: /plataforma/personas/364/restablecer-contrasena/
+PASA  un operador no se emite un código a sí mismo (409; la base también lo impide) - 409
+2026-11-08 14:33:16,444 WARNING django.request Forbidden: /plataforma/personas/371/restablecer-contrasena/
+PASA  el rol equivocado no emite códigos (403)
+2026-11-08 14:33:16,734 WARNING django.request Bad Request: /auth/restablecer/
+2026-11-08 14:33:16,899 WARNING django.request Bad Request: /auth/restablecer/
+2026-11-08 14:33:17,049 WARNING django.request Bad Request: /auth/restablecer/
+PASA  un código incorrecto, uno de otra persona y un usuario inexistente responden IGUAL (no se enumera) - {'codigo': 'codigo_invalido', 'detalle': 'El código no es válido, ya se usó o venció.'}
+2026-11-08 14:33:17,065 WARNING django.request Bad Request: /auth/restablecer/
+PASA  una contraseña débil se rechaza diciendo por qué - 400
+PASA  y el código NO se gasta (se puede corregir y reintentar)
+PASA  con el código vigente y una contraseña válida se restablece (acepta mayúsculas, espacios y guiones) - 200
+PASA  la contraseña nueva funciona y la vieja ya no
+PASA  se revocan todas sus sesiones y se levanta el bloqueo
+PASA  el segundo factor sigue activo: restablecer la contraseña no lo desactiva
+2026-11-08 14:33:17,683 WARNING django.request Bad Request: /auth/restablecer/
+PASA  un código ya usado no sirve otra vez
+2026-11-08 14:33:17,866 WARNING django.request Bad Request: /auth/restablecer/
+PASA  un código vencido (16 minutos) se rechaza igual que uno inválido
+PASA  emitir un código nuevo invalida el anterior (solo uno vigente)
+2026-11-08 14:33:17,928 WARNING django.request Conflict: /plataforma/personas/371/restablecer-mfa/
+PASA  quien emitió el código no puede además restablecer el segundo factor de la misma cuenta (409) - 409
+PASA  otro operador sí lo restablece - 200
+PASA  y sus sesiones se revocan
+2026-11-08 14:33:17,991 WARNING django.request Conflict: /plataforma/personas/371/restablecer-mfa/
+PASA  no se restablece lo que no está activo (409) - 409
+2026-11-08 14:33:18,016 WARNING django.request Conflict: /plataforma/personas/371/restablecer-contrasena/
+PASA  quien restableció el segundo factor no puede emitir el código de esa cuenta (409) - 409
+PASA  identidades propone el alta de una coordinadora - 201
+2026-11-08 14:33:18,091 WARNING django.request Bad Request: /plataforma/aprobaciones/
+PASA  no se repite una propuesta pendiente igual (400) - 400
+2026-11-08 14:33:18,120 WARNING django.request Bad Request: /plataforma/aprobaciones/
+PASA  no se propone el alta de alguien que no existe (400) - 400
+2026-11-08 14:33:18,151 WARNING django.request Bad Request: /plataforma/aprobaciones/
+PASA  una cuenta de plataforma no puede ser coordinadora (400): lo impone la separación de poderes - 400
+2026-11-08 14:33:18,176 WARNING django.request Forbidden: /plataforma/aprobaciones/28/resolver/
+PASA  QUIEN PROPONE NO APRUEBA: el motor de decisiones lo niega (403) - 403
+2026-11-08 14:33:18,206 WARNING django.request Forbidden: /plataforma/aprobaciones/28/resolver/
+PASA  el operador de catálogo tampoco aprueba altas de coordinadores (403)
+PASA  aunque se saltara el backend, la base rechaza que el mismo operador apruebe lo que propuso
+PASA  sin aprobar todavía no existe la membresía
+PASA  otra persona de identidades aprueba y el alta se aplica - 200
+PASA  la aprobación queda con quién propuso y quién aprobó
+2026-11-08 14:33:18,298 WARNING django.request Conflict: /plataforma/aprobaciones/28/resolver/
+PASA  una propuesta ya resuelta no se resuelve otra vez (409)
+PASA  rechazar una propuesta no aplica nada
+2026-11-08 14:33:18,431 WARNING django.request Bad Request: /plataforma/aprobaciones/30/resolver/
+PASA  la decisión debe ser «aprobar» o «rechazar» (400)
+PASA  catálogo propone una institución nueva - 201
+2026-11-08 14:33:18,481 WARNING django.request Forbidden: /plataforma/aprobaciones/31/resolver/
+PASA  quien propone no la aprueba (403)
+2026-11-08 14:33:18,504 WARNING django.request Forbidden: /plataforma/aprobaciones/31/resolver/
+PASA  identidades no aprueba altas de instituciones (403)
+PASA  no existe hasta que se aprueba
+PASA  otra persona de catálogo aprueba y la institución se crea - 200
+2026-11-08 14:33:18,573 WARNING django.request Bad Request: /plataforma/aprobaciones/
+PASA  no se propone una institución que ya existe, sin distinguir mayúsculas (400) - 400
+PASA  el listado muestra solo las altas de su tipo
+2026-11-08 14:33:18,621 WARNING django.request Bad Request: /plataforma/personas/372/bloquear/
+PASA  bloquear exige un motivo (400)
+PASA  seguridad bloquea una cuenta - 200
+PASA  y su sesión deja de servir de inmediato
+2026-11-08 14:33:18,935 WARNING django.request Unauthorized: /auth/login/
+PASA  una cuenta bloqueada no puede iniciar sesión
+2026-11-08 14:33:18,963 WARNING django.request Conflict: /plataforma/personas/368/bloquear/
+PASA  nadie bloquea su propia cuenta (409)
+2026-11-08 14:33:18,988 WARNING django.request Forbidden: /plataforma/personas/371/bloquear/
+PASA  identidades no bloquea cuentas (403)
+PASA  seguridad desbloquea
+2026-11-08 14:33:19,040 WARNING django.request Conflict: /plataforma/personas/372/desbloquear/
+PASA  no desbloquea lo que no está bloqueado (409)
+2026-11-08 14:33:19,064 WARNING django.request Conflict: /plataforma/personas/372/desbloquear/
+PASA  una cuenta suspendida no la reactiva este rol (409)
+PASA  seguridad revoca las sesiones de alguien - {'codigo': 'sesiones_revocadas', 'cuantas': 2}
+PASA  seguridad ve los eventos recientes
+PASA  el custodio ve el estado de sus 8 secretos
+PASA  registra una rotación (solo metadatos) - 201
+PASA  tras registrarla, ese secreto queda al día
+2026-11-08 14:33:19,239 WARNING django.request Bad Request: /plataforma/secretos/
+PASA  un secreto desconocido se rechaza (400)
+2026-11-08 14:33:19,257 WARNING django.request Bad Request: /plataforma/secretos/
+PASA  la nota no puede pasar de 300 caracteres (400)
+2026-11-08 14:33:19,278 WARNING django.request Forbidden: /plataforma/secretos/
+PASA  identidades no ve los secretos (403)
+PASA  ninguna respuesta contiene valores de secretos
+PASA  el registro de rotaciones es de solo inserción en la base
+PASA  infraestructura ve la salud de la base - 200
+PASA  la conexión a la base va cifrada con TLS 1.3 - TLSv1.3
+PASA  muestra el vencimiento del certificado
+2026-11-08 14:33:19,355 WARNING django.request Forbidden: /plataforma/infraestructura/
+PASA  seguridad no ve la infraestructura (403)
+PASA  ni el auditor ni pgadmin_lectura leen los códigos de restablecimiento
+PASA  el auditor sí ve las rotaciones (son metadatos)
+PASA  la aplicación no puede borrar códigos ni editar rotaciones
+PASA  todo quedó en los eventos de seguridad
+PASA  también el restablecimiento de la contraseña y los intentos rechazados
+PASA  ningún evento contiene el código ni la contraseña
+PASA  las denegaciones pasaron por el motor de decisiones y quedaron registradas - 20
+PASA  todo se ejecutó como app_role, sin superusuario - app_role
+
+79 de 79 pasos correctos; no quedó ningún dato (transacción revertida).
+# código de salida: 0

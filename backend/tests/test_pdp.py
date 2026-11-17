@@ -279,3 +279,33 @@ class TestDenegarPorDefecto:
     def test_una_denegacion_anula_un_permiso(self):
         # funcionario con permiso sobre su institucion, pero cuenta suspendida
         assert not permite(funcionario(estado_cuenta="suspendida"), Accion.VER_TRAMITE, tramite())
+
+
+# --------------------------------------------------------------------------- iniciar trámites entre instituciones
+
+class TestIniciarTramites:
+    def test_el_personal_no_inicia_en_su_propia_institucion(self):
+        for rol in (funcionario, supervisor, coordinador):
+            s = rol(MOP, id=5)
+            d = decidir(s, Accion.CREAR_TRAMITE, tramite(MOP, solicitante_id=5, audiencia="institucion"), entorno())
+            assert not d.permitido and d.politica == "personal_no_inicia_en_su_institucion"
+
+    def test_el_personal_inicia_una_solicitud_interinstitucional_en_otra_institucion(self):
+        assert permite(funcionario(MOP, id=5), Accion.CREAR_TRAMITE, tramite(MINSA, solicitante_id=5, audiencia="institucion"))
+        assert permite(supervisor(MOP, id=5), Accion.CREAR_TRAMITE, tramite(MINSA, solicitante_id=5, audiencia="ambas"))
+
+    def test_el_personal_no_inicia_tramites_de_la_ciudadania_en_otra_institucion(self):
+        d = decidir(funcionario(MOP, id=5), Accion.CREAR_TRAMITE, tramite(MINSA, solicitante_id=5, audiencia="ciudadania"), entorno())
+        assert not d.permitido and d.politica == "audiencia_no_corresponde"
+
+    def test_la_ciudadania_no_inicia_solicitudes_interinstitucionales(self):
+        d = decidir(persona(id=5), Accion.CREAR_TRAMITE, tramite(MINSA, solicitante_id=5, audiencia="institucion"), entorno())
+        assert not d.permitido and d.politica == "audiencia_no_corresponde"
+        assert permite(persona(id=5), Accion.CREAR_TRAMITE, tramite(MINSA, solicitante_id=5, audiencia="ciudadania"))
+        assert permite(persona(id=5), Accion.CREAR_TRAMITE, tramite(MINSA, solicitante_id=5, audiencia="ambas"))
+
+    def test_el_personal_sigue_sin_poder_iniciar_a_nombre_de_otra_persona(self):
+        assert not permite(funcionario(MOP, id=5), Accion.CREAR_TRAMITE, tramite(MINSA, solicitante_id=6, audiencia="institucion"))
+
+    def test_ser_personal_de_otra_institucion_no_da_acceso_al_tramite_iniciado(self):
+        assert not permite(funcionario(MOP, id=5), Accion.VER_TRAMITE, tramite(MINSA, solicitante_id=6))

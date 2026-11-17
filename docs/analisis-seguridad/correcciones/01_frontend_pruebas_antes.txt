@@ -1,0 +1,396 @@
+# Pruebas del frontend antes de actualizar dependencias
+# 2026-11-08 13:45:47  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5\frontend
+$ npm test -- --run
+
+> siget-frontend@0.1.0 test
+> vitest run --run
+
+
+ RUN  v2.1.8 C:/Users/jeiva/Desktop/Proyecto-Ciber5/frontend
+
+ ✓ src/pruebas/api.prueba.js (11 tests) 54ms
+ ✓ src/pruebas/comun.prueba.jsx (13 tests) 28ms
+ ✓ src/pruebas/seguridad.prueba.js (8 tests) 35ms
+ ✓ src/pruebas/seguimiento.prueba.jsx (13 tests) 667ms
+ ✓ src/pruebas/ui.prueba.jsx (10 tests) 917ms
+   ✓ avisos, confirmaciones y tema > confirmar() devuelve true al aceptar y false al cancelar o con Escape 354ms
+ ✓ src/pruebas/sesion.prueba.jsx (6 tests) 1087ms
+   ✓ cierre de sesión por inactividad > no avisa mientras hay tiempo, avisa un minuto antes y cierra la sesión al agotarse 368ms
+   ✓ recargar la página > saca de un trámite abierto y devuelve al Inicio 352ms
+ ✓ src/pruebas/equipo.prueba.jsx (9 tests) 4149ms
+   ✓ quién puede gestionar > la coordinadora ve el formulario y los botones de cada persona del personal, pero no de las coordinaciones ni de sí misma 491ms
+   ✓ asignar, cambiar de rol y quitar > agrega a una persona como funcionaria y aparece en el equipo 525ms
+   ✓ asignar, cambiar de rol y quitar > una persona que no existe, o que ya es del equipo, se rechaza explicando por qué 737ms
+   ✓ asignar, cambiar de rol y quitar > una cuenta de plataforma no puede ser personal de una institución 853ms
+   ✓ asignar, cambiar de rol y quitar > quita a alguien sin trámites abiertos 597ms
+   ✓ asignar, cambiar de rol y quitar > es accesible (axe) 321ms
+ ❯ src/pruebas/simulador.prueba.jsx (15 tests | 1 failed) 8186ms
+   ✓ el simulador en pantalla > arranca con una situación normal y el motor responde «Permitido» 773ms
+   ✓ el simulador en pantalla > ofrece los 12 escenarios y marca el que está activo 604ms
+   ✓ el simulador en pantalla > el conflicto de interés se niega y la traza se detiene en la regla que anula 496ms
+   ✓ el simulador en pantalla > el segundo factor vencido se niega y «qué lo cambiaría» permite probar el cambio 1090ms
+   ✓ el simulador en pantalla > si está permitido, las alternativas muestran lo que lo rompería 414ms
+   ✓ el simulador en pantalla > un rol de plataforma que quiere ver un trámite recibe la política que lo prohíbe, explicada 494ms
+   × el simulador en pantalla > el control dual se explica y una cuenta bloqueada no puede nada 1645ms
+     → Unable to find an element with the text: cuenta_no_activa. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<section
+  aria-busy="false"
+  aria-live="polite"
+  class="veredicto negado"
+>
+  <div
+    class="veredicto-cabecera"
+  >
+    <span
+      class="sello sello-rechazado"
+    >
+      Negado
+    </span>
+    <p>
+      <strong>
+        Ciudadanía
+      </strong>
+       intenta 
+      <strong>
+        iniciar un trámite
+      </strong>
+      .
+    </p>
+  </div>
+  <dl
+    class="datos"
+  >
+    <dt>
+      Política que decidió
+    </dt>
+    <dd>
+      <code>
+        sin_regla_que_permita
+      </code>
+    </dd>
+    <dt>
+      Por qué
+    </dt>
+    <dd
+      class="normal"
+    >
+      Si ninguna política lo permite explícitamente, se niega (denegar por defecto).
+    </dd>
+  </dl>
+  <div
+    class="alerta alerta-info"
+    role="status"
+  >
+    <svg
+      aria-hidden="true"
+      class="icono "
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M12 3a9 9 0 100 18 9 9 0 000-18"
+      />
+      <path
+        d="M12 11v5"
+      />
+      <path
+        d="M12 8v.01"
+      />
+    </svg>
+    <div>
+      Modo de ejemplo: solo responde a los escenarios predefinidos. En la plataforma real responde a cualquier combinación.
+    </div>
+  </div>
+</section>
+
+Ignored nodes: comments, script, style
+<section
+  aria-busy="false"
+  aria-live="polite"
+  class="veredicto negado"
+>
+  <div
+    class="veredicto-cabecera"
+  >
+    <span
+      class="sello sello-rechazado"
+    >
+      Negado
+    </span>
+    <p>
+      <strong>
+        Ciudadanía
+      </strong>
+       intenta 
+      <strong>
+        iniciar un trámite
+      </strong>
+      .
+    </p>
+  </div>
+  <dl
+    class="datos"
+  >
+    <dt>
+      Política que decidió
+    </dt>
+    <dd>
+      <code>
+        sin_regla_que_permita
+      </code>
+    </dd>
+    <dt>
+      Por qué
+    </dt>
+    <dd
+      class="normal"
+    >
+      Si ninguna política lo permite explícitamente, se niega (denegar por defecto).
+    </dd>
+  </dl>
+  <div
+    class="alerta alerta-info"
+    role="status"
+  >
+    <svg
+      aria-hidden="true"
+      class="icono "
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M12 3a9 9 0 100 18 9 9 0 000-18"
+      />
+      <path
+        d="M12 11v5"
+      />
+      <path
+        d="M12 8v.01"
+      />
+    </svg>
+    <div>
+      Modo de ejemplo: solo responde a los escenarios predefinidos. En la plataforma real responde a cualquier combinación.
+    </div>
+  </div>
+</section>
+   ✓ el simulador en pantalla > el formulario solo muestra las variables que importan para la acción elegida 393ms
+   ✓ el simulador en pantalla > cambiar de rol conserva las circunstancias que siguen valiendo 340ms
+   ✓ el simulador en pantalla > el auditor parte de nivel 3 y la ciudadanía de «el trámite es suyo» 475ms
+   ✓ el simulador en pantalla > en modo de ejemplo avisa cuando se sale de los escenarios capturados 476ms
+   ✓ el simulador en pantalla > es accesible (axe) 970ms
+ ✓ src/pruebas/plataforma.prueba.jsx (23 tests) 10388ms
+   ✓ cada rol de plataforma tiene su consola > ines.infra abre «Infraestructura» y ya no es «pronto» 467ms
+   ✓ identidades > lista personas sin datos personales y emite un código que se muestra una sola vez 451ms
+   ✓ identidades > restablecer el segundo factor pide confirmar y explica las consecuencias 897ms
+   ✓ identidades > proponer un alta de coordinadora la deja pendiente 508ms
+   ✓ identidades > una propuesta inválida muestra lo que dijo el servidor 572ms
+   ✓ identidades > es accesible (axe) 645ms
+   ✓ catálogo > proponer una institución nueva exige nombre válido 500ms
+   ✓ seguridad > bloquear pide un motivo, deja la cuenta bloqueada y se puede desbloquear 1281ms
+   ✓ seguridad > cerrar sesiones pide confirmar 406ms
+   ✓ secretos e infraestructura > los 8 secretos empiezan sin registro y al registrar una rotación quedan al día, sin mostrar valores 663ms
+   ✓ recuperar la contraseña > con un código válido fija la contraseña nueva y vuelve a ingresar 1085ms
+   ✓ recuperar la contraseña > un código inválido, ya usado o vencido se explica sin revelar la causa 1021ms
+ ✓ src/pruebas/permisos.prueba.jsx (30 tests) 12255ms
+   ✓ roles y módulos > muestra los 10 roles, el aviso de que no hay superusuario y marca «tu rol» 469ms
+   ✓ módulos por rol > la tabla cruza los 15 módulos con los 10 roles y cuadra con la vista por rol 631ms
+   ✓ matriz de permisos > la ciudadanía no puede cambiar el estado y un rol de plataforma no ve trámites 653ms
+   ✓ matriz de permisos > al elegir una celda explica qué política decidió y por qué 1185ms
+   ✓ matriz de permisos > «Fuera de su ámbito» muestra que el funcionario no ve trámites de otra institución 741ms
+   ✓ matriz de permisos > el control dual: nadie aprueba un alta que él mismo propuso 806ms
+   ✓ matriz de permisos > es accesible (axe) 3151ms
+   ✓ permisos de la base de datos > app_role solo inserta decisiones y no borra nada; el registro es de solo inserción 374ms
+   ✓ permisos de la base de datos > auditor_role solo lee: ninguna fila le permite insertar, modificar ni borrar 484ms
+   ✓ permisos de la base de datos > es accesible (axe) 424ms
+   ✓ lo técnico no es para la ciudadanía > el personal sí las ve 339ms
+   ✓ segundo factor (MFA) > un código válido renueva la ventana y luego se demuestra que no se puede reutilizar 432ms
+   ✓ segundo factor (MFA) > un código incorrecto se explica y no ofrece la prueba de reuso 376ms
+   ✓ segundo factor (MFA) > es accesible (axe) 308ms
+ ✓ src/pruebas/pantallas.prueba.jsx (53 tests) 16442ms
+   ✓ el menú cambia según el rol > ana.ciudadana: ve Mis trámites, Iniciar un trámite, Mi seguridad, Segundo factor, Roles y permisos 375ms
+   ✓ qué datos ve cada persona > el supervisor ve al equipo con nombres en la supervisión 575ms
+   ✓ acciones sobre un trámite > cambiar el estado pide un código reciente del segundo factor y luego se aplica 551ms
+   ✓ acciones sobre un trámite > un código rechazado se explica y deja reintentar 458ms
+   ✓ acciones sobre un trámite > cancelar la reautenticación no cambia nada 323ms
+   ✓ acciones sobre un trámite > los estados finales piden confirmación explícita antes de aplicarse 330ms
+   ✓ acciones sobre un trámite > aprobar muestra el sello, avisa y deja el trámite sin más acciones 609ms
+   ✓ acciones sobre un trámite > lo que el personal inicia en otra institución lo sigue como solicitante: no puede gestionarlo 395ms
+   ✓ acciones sobre un trámite > solo el supervisor ve el selector para reasignar 683ms
+   ✓ auditoría > pide reautenticación y luego muestra el resumen de decisiones 331ms
+   ✓ acceso y sesión > un usuario inexistente recibe un mensaje genérico (no revela si existe ni si tiene segundo factor) 301ms
+   ✓ acceso y sesión > solo después de que el servidor acepta la contraseña aparece el segundo paso, con el código 420ms
+   ✓ acceso y sesión > con el código correcto en el segundo paso entra a la plataforma 635ms
+   ✓ acceso y sesión > «Volver» regresa al primer paso y olvida la contraseña 484ms
+   ✓ acceso y sesión > el código solo admite dígitos y máximo seis 653ms
+   ✓ acceso y sesión > crear una cuenta no pide código y lleva directo a activar el segundo factor 2314ms
+   ✓ accesibilidad (axe) > bandeja en lista y en tablero 511ms
+   ✓ accesibilidad (axe) > detalle de un trámite 314ms
+   ✓ las tres puertas de entrada > el personal elige su institución y entra por ella 736ms
+   ✓ las tres puertas de entrada > entrar por la puerta equivocada explica cuál es la correcta y no abre sesión 682ms
+   ✓ las tres puertas de entrada > el personal de otra institución tampoco entra por esta 623ms
+
+ Test Files  1 failed | 10 passed (11)
+      Tests  1 failed | 190 passed (191)
+   Start at  13:45:50
+   Duration  28.50s (transform 3.84s, setup 37.66s, collect 13.95s, tests 54.21s, environment 56.76s, prepare 10.55s)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/pruebas/simulador.prueba.jsx > el simulador en pantalla > el control dual se explica y una cuenta bloqueada no puede nada
+TestingLibraryElementError: Unable to find an element with the text: cuenta_no_activa. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<section
+  aria-busy="false"
+  aria-live="polite"
+  class="veredicto negado"
+>
+  <div
+    class="veredicto-cabecera"
+  >
+    <span
+      class="sello sello-rechazado"
+    >
+      Negado
+    </span>
+    <p>
+      <strong>
+        Ciudadanía
+      </strong>
+       intenta 
+      <strong>
+        iniciar un trámite
+      </strong>
+      .
+    </p>
+  </div>
+  <dl
+    class="datos"
+  >
+    <dt>
+      Política que decidió
+    </dt>
+    <dd>
+      <code>
+        sin_regla_que_permita
+      </code>
+    </dd>
+    <dt>
+      Por qué
+    </dt>
+    <dd
+      class="normal"
+    >
+      Si ninguna política lo permite explícitamente, se niega (denegar por defecto).
+    </dd>
+  </dl>
+  <div
+    class="alerta alerta-info"
+    role="status"
+  >
+    <svg
+      aria-hidden="true"
+      class="icono "
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M12 3a9 9 0 100 18 9 9 0 000-18"
+      />
+      <path
+        d="M12 11v5"
+      />
+      <path
+        d="M12 8v.01"
+      />
+    </svg>
+    <div>
+      Modo de ejemplo: solo responde a los escenarios predefinidos. En la plataforma real responde a cualquier combinación.
+    </div>
+  </div>
+</section>
+
+Ignored nodes: comments, script, style
+<section
+  aria-busy="false"
+  aria-live="polite"
+  class="veredicto negado"
+>
+  <div
+    class="veredicto-cabecera"
+  >
+    <span
+      class="sello sello-rechazado"
+    >
+      Negado
+    </span>
+    <p>
+      <strong>
+        Ciudadanía
+      </strong>
+       intenta 
+      <strong>
+        iniciar un trámite
+      </strong>
+      .
+    </p>
+  </div>
+  <dl
+    class="datos"
+  >
+    <dt>
+      Política que decidió
+    </dt>
+    <dd>
+      <code>
+        sin_regla_que_permita
+      </code>
+    </dd>
+    <dt>
+      Por qué
+    </dt>
+    <dd
+      class="normal"
+    >
+      Si ninguna política lo permite explícitamente, se niega (denegar por defecto).
+    </dd>
+  </dl>
+  <div
+    class="alerta alerta-info"
+    role="status"
+  >
+    <svg
+      aria-hidden="true"
+      class="icono "
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M12 3a9 9 0 100 18 9 9 0 000-18"
+      />
+      <path
+        d="M12 11v5"
+      />
+      <path
+        d="M12 8v.01"
+      />
+    </svg>
+    <div>
+      Modo de ejemplo: solo responde a los escenarios predefinidos. En la plataforma real responde a cualquier combinación.
+    </div>
+  </div>
+</section>
+ ❯ waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/pruebas/simulador.prueba.jsx:119:38
+    117|     expect(await within(veredicto()).findByText('control_dual')).toBeI…
+    118|     await user.click(escenario('Una cuenta bloqueada intenta iniciar u…
+    119|     expect(await within(veredicto()).findByText('cuenta_no_activa')).t…
+       |                                      ^
+    120|   })
+    121| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+# código de salida: 1

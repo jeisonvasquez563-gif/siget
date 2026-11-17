@@ -43,7 +43,7 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 2. **La ciudadana inicia un trámite** (Iniciar un trámite → MOP) y ve su estado e historial con las esclusas. No ve qué funcionario lo atiende.
 3. ★ **`fabio.mop` (funcionario).** Cerrar sesión y entrar. Bandeja: solo trámites del MOP. Abrir el trámite nuevo y pasarlo a «En tramitación»; aparece en el historial **con quién lo hizo**. Probar el tablero. Aprobarlo (pide confirmación: es un estado final) y mostrar el sello.
    - **Ojo con la reautenticación escalonada:** el código con el que se inicia sesión ya cuenta como segundo factor reciente (dura 15 minutos), así que **el cuadro «Confirma que eres tú» NO aparece al cambiar el estado justo después de entrar**. Para mostrarlo en vivo, ver «Cómo mostrar la reautenticación escalonada» abajo.
-4. ★ **Conflicto de interés.** Con `fabio.mop`, iniciar un trámite propio y abrirlo: no puede gestionarlo.
+4. ★ **Quién inicia qué.** Con `fabio.mop`, «Iniciar un trámite»: el MOP no aparece (el personal no inicia trámites en su propia institución) y en las demás solo ve la «Solicitud interinstitucional de información». La ciudadanía, al revés: no ve esas solicitudes. Si fabio inicia una en el MINSA, la sigue como solicitante pero no puede gestionarla.
 5. **`saul.mop` (supervisor).** Supervisión → reasignar un trámite a `flor.mop`. Mostrar «Equipo».
 6. **`felix.minsa`.** Su bandeja solo tiene trámites del MINSA: lo del MOP **no existe** para él (404, no «prohibido»).
 7. **`carla.mop` (coordinadora).** Ve el equipo y los roles de su institución, pero la lista de trámites está vacía: gestionar personas no da acceso a los datos de la ciudadanía.

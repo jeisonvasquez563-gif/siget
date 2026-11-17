@@ -93,6 +93,32 @@ describe('qué datos ve cada persona', () => {
     await user.click(await screen.findByRole('button', { name: 'Todos' }))
     expect(await screen.findAllByText('flor.mop')).not.toHaveLength(0)
   })
+
+  it('la supervisión filtra los trámites escalados por plazo vencido', async () => {
+    const { user } = await abrirComo('saul.mop')
+    await irA(user, 'Supervisión')
+    await user.click(await screen.findByRole('button', { name: 'Escalados' }))
+    const filas = await screen.findAllByRole('row', { name: /^Trámite \d+:/ })
+    expect(filas).toHaveLength(1)
+    expect(filas[0].getAttribute('aria-label')).toMatch(/^Trámite 41:/)
+    expect(within(filas[0]).getByText('Escalado a supervisión')).toBeInTheDocument()
+  })
+
+  it('el funcionario no tiene el filtro de escalados (lo atiende la supervisión)', async () => {
+    const { user } = await abrirComo('fabio.mop')
+    await irA(user, 'Bandeja de la institución')
+    await screen.findByRole('button', { name: 'Vencidos' })
+    expect(screen.queryByRole('button', { name: 'Escalados' })).not.toBeInTheDocument()
+  })
+
+  it('el detalle de un trámite escalado lo marca y el historial explica el escalamiento', async () => {
+    const { user } = await abrirComo('saul.mop')
+    await irA(user, 'Bandeja de la institución')
+    await user.click(await screen.findByRole('button', { name: 'Todos' }))
+    await user.click(await screen.findByRole('row', { name: /^Trámite 41:/ }))
+    expect(await screen.findAllByText('Escalado a supervisión')).toHaveLength(2)   // la marca del plazo y el evento
+    expect(screen.getByText(/Superó el plazo: el sistema lo pasó a la supervisión/)).toBeInTheDocument()
+  })
 })
 
 describe('acciones sobre un trámite', () => {
@@ -160,13 +186,33 @@ describe('acciones sobre un trámite', () => {
     expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
   })
 
-  it('un trámite que el propio funcionario inició no se puede gestionar (conflicto de interés)', async () => {
+  it('el personal no puede iniciar un trámite en su propia institución: no se le ofrece', async () => {
     const { user } = await abrirComo('fabio.mop')
     await irA(user, 'Iniciar un trámite')
+    expect(await screen.findByRole('radio', { name: /^MINSA/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /^MOP/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/No puedes iniciar trámites en la tuya/)).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: /^MINSA/ }))
+    // solo las solicitudes entre instituciones, no los trámites de la ciudadanía
+    expect(await screen.findByRole('radio', { name: /Solicitud interinstitucional/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Certificado de salud ocupacional/ })).not.toBeInTheDocument()
+  })
+
+  it('la ciudadanía ve todas las instituciones, pero no las solicitudes entre instituciones', async () => {
+    const { user } = await abrirComo('ana.ciudadana')
+    await irA(user, 'Iniciar un trámite')
     await user.click(await screen.findByRole('radio', { name: /^MOP/ }))
-    await user.click(await screen.findByRole('radio', { name: /Permiso de uso de vía pública/ }))
+    expect(await screen.findByRole('radio', { name: /Permiso de uso de vía pública/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Solicitud interinstitucional/ })).not.toBeInTheDocument()
+  })
+
+  it('lo que el personal inicia en otra institución lo sigue como solicitante: no puede gestionarlo', async () => {
+    const { user } = await abrirComo('fabio.mop')
+    await irA(user, 'Iniciar un trámite')
+    await user.click(await screen.findByRole('radio', { name: /^MINSA/ }))
+    await user.click(await screen.findByRole('radio', { name: /Solicitud interinstitucional/ }))
     await user.click(screen.getByRole('button', { name: 'Iniciar trámite' }))
-    expect(await screen.findByText(/por conflicto de interés no puedes gestionarlo/)).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: 'Recorrido del trámite: Recepción' })).toBeInTheDocument()
     // Un trámite «Pendiente» solo tiene la acción «Pasar a tramitación»: debe faltar (no vale mirar «Aprobar», que no aparece en ese estado)
     expect(screen.queryByRole('button', { name: 'Pasar a tramitación' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Acciones' })).not.toBeInTheDocument()

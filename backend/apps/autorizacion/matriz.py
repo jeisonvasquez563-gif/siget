@@ -30,7 +30,7 @@ ROLES = [
 ACCIONES = [
     # accion, etiqueta, grupo, (etiqueta del caso favorable, etiqueta del caso desfavorable)
     (Accion.VER_TRAMITE, "Ver un trámite", "Trámites", ("De su institución o propio", "De otra institución o de otra persona")),
-    (Accion.CREAR_TRAMITE, "Iniciar un trámite", "Trámites", ("A su nombre", "A nombre de otra persona")),
+    (Accion.CREAR_TRAMITE, "Iniciar un trámite", "Trámites", ("A su nombre, en un trámite que le corresponde", "En su propia institución o a nombre de otra persona")),
     (Accion.CAMBIAR_ESTADO, "Cambiar el estado de un trámite", "Trámites", ("De su institución", "De otra institución")),
     (Accion.REASIGNAR_TRAMITE, "Reasignar un trámite", "Trámites", ("De su institución", "De otra institución")),
     (Accion.ESCALAR_TRAMITE, "Atender un trámite escalado", "Trámites", ("De su institución", "De otra institución")),
@@ -42,6 +42,7 @@ ACCIONES = [
     (Accion.APROBAR_ALTA, "Aprobar un alta", "Control dual", ("Propuesta por otra persona", "Propuesta por la misma persona")),
     (Accion.ADMINISTRAR_INFRAESTRUCTURA, "Administrar la infraestructura", "Plataforma", None),
     (Accion.RESTABLECER_MFA, "Restablecer el segundo factor de alguien", "Plataforma", None),
+    (Accion.EMITIR_INVITACION, "Emitir una invitación para crear cuenta", "Plataforma", None),
     (Accion.BLOQUEAR_CUENTA, "Bloquear una cuenta", "Plataforma", None),
     (Accion.REVOCAR_SESION, "Revocar una sesión", "Plataforma", None),
     (Accion.ROTAR_SECRETOS, "Rotar secretos y certificados", "Plataforma", None),
@@ -54,6 +55,8 @@ REGLAS_DE_DENEGACION = [
     ("plataforma_sin_acceso_a_tramites", "Ningún rol de plataforma ve trámites ni documentos de la ciudadanía."),
     ("conflicto_de_interes", "Nadie gestiona un trámite que él mismo pidió."),
     ("control_dual", "Quien propone un alta no puede aprobarla."),
+    ("personal_no_inicia_en_su_institucion", "El personal de una institución no inicia trámites en su propia institución."),
+    ("audiencia_no_corresponde", "Cada trámite es para la ciudadanía o para otras instituciones: no se mezclan."),
     ("sin_regla_que_permita", "Si ninguna política lo permite explícitamente, se niega (denegar por defecto)."),
 ]
 
@@ -77,8 +80,13 @@ def _recursos(accion, rol, sujeto):
         tipo = "tramite" if accion in _TRAMITE else "documento"
         comunes = dict(tipo=tipo, estado="En Tramitacion", estado_destino="Aprobado" if accion == Accion.CAMBIAR_ESTADO else None)
         if accion == Accion.CREAR_TRAMITE:
-            return (Recurso(**{**comunes, "estado": None}, institucion_id=PROPIA, solicitante_id=sujeto.id),
-                    Recurso(**{**comunes, "estado": None}, institucion_id=PROPIA, solicitante_id=OTRA_PERSONA))
+            # El personal inicia en OTRA institución un trámite interinstitucional; la ciudadanía, uno suyo para la ciudadanía
+            comunes = {**comunes, "estado": None}
+            if es_personal:
+                return (Recurso(**comunes, institucion_id=AJENA, solicitante_id=sujeto.id, audiencia="institucion"),
+                        Recurso(**comunes, institucion_id=PROPIA, solicitante_id=sujeto.id, audiencia="institucion"))
+            return (Recurso(**comunes, institucion_id=PROPIA, solicitante_id=sujeto.id),
+                    Recurso(**comunes, institucion_id=PROPIA, solicitante_id=OTRA_PERSONA))
         return (Recurso(**comunes, institucion_id=PROPIA, solicitante_id=solicitante),
                 Recurso(**comunes, institucion_id=AJENA, solicitante_id=OTRA_PERSONA))
     if accion == Accion.GESTIONAR_USUARIOS_INSTITUCION:
