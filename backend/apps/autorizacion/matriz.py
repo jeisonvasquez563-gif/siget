@@ -20,7 +20,7 @@ ROLES = [
     ("supervisor", "Supervisor", "institucion", "Todo lo del funcionario y además reasigna y atiende escalados."),
     ("coordinador_institucional", "Coordinación", "institucion", "Gestiona al equipo de su institución. No ve trámites."),
     ("operador_infraestructura", "Operador de infraestructura", "plataforma", "Opera servidores y contenedores. No ve trámites."),
-    ("operador_identidades", "Operador de identidades", "plataforma", "Altas de coordinadores y restablece el segundo factor (control dual)."),
+    ("operador_identidades", "Operador de identidades", "plataforma", "Altas de coordinadores, restablece el segundo factor (control dual) y responde las solicitudes sobre datos personales."),
     ("operador_catalogo", "Operador de catálogo", "plataforma", "Altas de instituciones y de trámites (control dual)."),
     ("operador_seguridad", "Operador de seguridad", "plataforma", "Bloquea cuentas y revoca sesiones ante un incidente."),
     ("custodio_secretos", "Custodio de secretos", "plataforma", "Rota claves y certificados. No ve datos."),
@@ -45,6 +45,9 @@ ACCIONES = [
     (Accion.BLOQUEAR_CUENTA, "Bloquear una cuenta", "Plataforma", None),
     (Accion.REVOCAR_SESION, "Revocar una sesión", "Plataforma", None),
     (Accion.ROTAR_SECRETOS, "Rotar secretos y certificados", "Plataforma", None),
+    (Accion.CONSULTAR_SOLICITUDES_DATOS, "Ver las solicitudes sobre datos personales", "Datos personales", None),
+    (Accion.RESPONDER_SOLICITUD_DATOS, "Responder una solicitud sobre datos personales", "Datos personales", None),
+    (Accion.CORREGIR_MIS_DATOS, "Corregir los propios datos de contacto", "Datos personales", ("Su propio perfil", "El perfil de otra persona")),
     (Accion.CONSULTAR_AUDITORIA, "Consultar la auditoría", "Auditoría", None),
     (Accion.CONSULTAR_DECISIONES, "Consultar las decisiones de acceso", "Auditoría", None),
 ]
@@ -98,6 +101,8 @@ def _recursos(accion, rol, sujeto):
         if accion == Accion.PROPONER_ALTA:
             return Recurso(tipo=tipo, propuesto_por=sujeto.id), Recurso(tipo=otro, propuesto_por=sujeto.id)
         return Recurso(tipo=tipo, propuesto_por=OTRA_PERSONA), Recurso(tipo=tipo, propuesto_por=sujeto.id)
+    if accion == Accion.CORREGIR_MIS_DATOS:
+        return Recurso(tipo="perfil", solicitante_id=sujeto.id), Recurso(tipo="perfil", solicitante_id=OTRA_PERSONA)
     recurso = Recurso(tipo="plataforma")
     return recurso, recurso
 

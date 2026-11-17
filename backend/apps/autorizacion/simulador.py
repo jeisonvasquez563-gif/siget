@@ -25,12 +25,14 @@ VALORES = {
     "tipo_alta": ("alta_coordinador", "alta_institucion"),
     "alta_propuesta_por": ("otra_persona", "yo"),
     "nivel": (1, 2, 3),
+    "perfil_de": ("yo", "otra_persona"),
 }
 
 ETIQUETAS_VARIABLE = {
     "segundo_factor": "Segundo factor", "cuenta": "Estado de la cuenta", "institucion": "Institución del recurso", "audiencia": "Trámite para",
     "solicitante": "Quién pidió el trámite", "estado": "Estado actual del trámite", "estado_destino": "Estado al que se quiere pasar",
     "asignado": "Quién lo atiende", "tipo_alta": "Tipo de alta", "alta_propuesta_por": "Quién propuso el alta", "nivel": "Nivel de aseguramiento",
+    "perfil_de": "De quién es el perfil",
 }
 
 ETIQUETAS_VALOR = {
@@ -43,6 +45,7 @@ ETIQUETAS_VALOR = {
     "tipo_alta": {"alta_coordinador": "Alta de un coordinador", "alta_institucion": "Alta de una institución"},
     "alta_propuesta_por": {"otra_persona": "Otra persona", "yo": "La misma persona que actúa"},
     "nivel": {1: "Nivel 1", 2: "Nivel 2", 3: "Nivel 3"},
+    "perfil_de": {"yo": "De la misma persona que actúa", "otra_persona": "De otra persona"},
     "estado": {"Pendiente": "Pendiente", "En Tramitacion": "En tramitación", "En Subsanacion": "En subsanación", "Aprobado": "Aprobado", "Rechazado": "Rechazado"},
     "estado_destino": {"Pendiente": "Pendiente", "En Tramitacion": "En tramitación", "En Subsanacion": "En subsanación", "Aprobado": "Aprobado", "Rechazado": "Rechazado"},
 }
@@ -50,7 +53,7 @@ ETIQUETAS_VALOR = {
 DEFECTOS = {
     "segundo_factor": "reciente", "cuenta": "activa", "institucion": "propia", "audiencia": "ciudadania", "solicitante": "otra_persona",
     "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "nadie", "tipo_alta": "alta_institucion",
-    "alta_propuesta_por": "otra_persona", "nivel": 2,
+    "alta_propuesta_por": "otra_persona", "nivel": 2, "perfil_de": "yo",
 }
 
 _COMUN = ("segundo_factor", "cuenta")
@@ -74,6 +77,9 @@ VARIABLES_POR_ACCION = {
     Accion.ROTAR_SECRETOS: _COMUN,
     Accion.CONSULTAR_AUDITORIA: (*_COMUN, "nivel"),
     Accion.CONSULTAR_DECISIONES: (*_COMUN, "nivel"),
+    Accion.CONSULTAR_SOLICITUDES_DATOS: _COMUN,
+    Accion.RESPONDER_SOLICITUD_DATOS: _COMUN,
+    Accion.CORREGIR_MIS_DATOS: ("perfil_de", *_COMUN),
 }
 
 REGLAS = {
@@ -84,6 +90,7 @@ REGLAS = {
     "_ciudadano": "Reglas de la ciudadanía",
     "_personal_de_tramites": "Reglas del personal de trámites (funcionario y supervisor)",
     "_coordinador": "Reglas de la coordinación de la institución",
+    "_titular_de_sus_datos": "Reglas de quien corrige sus propios datos de contacto",
     "_operadores": "Reglas de los operadores de plataforma",
     "_auditor": "Reglas del auditor",
 }
@@ -160,6 +167,8 @@ def _recurso(entrada, accion, sujeto):
         return Recurso(tipo="tramite" if accion in matriz._TRAMITE else "documento", institucion_id=institucion, solicitante_id=solicitante,
                        funcionario_asignado_id=asignado, estado=None if accion == Accion.CREAR_TRAMITE else entrada.get("estado", "En Tramitacion"),
                        estado_destino=entrada.get("estado_destino") if cambia else None, audiencia=entrada.get("audiencia", "ciudadania"))
+    if accion == Accion.CORREGIR_MIS_DATOS:
+        return Recurso(tipo="perfil", solicitante_id=PERSONA if entrada.get("perfil_de", "yo") == "yo" else OTRA)
     if accion == Accion.GESTIONAR_USUARIOS_INSTITUCION:
         return Recurso(tipo="usuario", institucion_id=institucion)
     if accion == Accion.GESTIONAR_CATALOGO_INSTITUCION:

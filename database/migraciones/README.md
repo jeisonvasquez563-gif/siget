@@ -12,13 +12,15 @@ Cambios incrementales sobre el esquema `siget` que ya está aplicado. Se ejecuta
 | 007 | `007-auditor-login.sql` | `auditor_role` puede conectarse (solo lectura) y ve solo `id`, `username` y rol de plataforma de las personas | 21-oct-2026 |
 | 008 | `008-perfil-ciudadano.sql` | Tabla `perfil` con los datos personales del registro (cédula cifrada); solo `app_role` la lee e inserta | 22-oct-2026 |
 | 009 | `009-pgadmin-minimo-privilegio.sql` | `pgadmin_lectura` deja de leer todo (`pg_read_all_data`): solo lo no sensible | 22-oct-2026 |
+| 016 | `016-derechos-datos.sql` | Derechos sobre los datos personales (Ley 81): la persona corrige solo correo, provincia y ciudad (`UPDATE` por columna en `perfil`), constancia del aviso de privacidad y tabla `solicitud_derecho` (rectificación, cancelación y oposición, respuesta en 10 días hábiles) | Pendiente |
 
 ## Para una base nueva
 
-`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 009**.
+`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 009** (y las posteriores que ya estén en `main`, como la 016 cuando se libere).
 
 ## Reglas
 
 - La contraseña de `app_role` **nunca** va en una migración: se fija aparte y vive como `podman secret`.
 - Una migración debe ser segura de leer: sin datos personales ni secretos.
 - Al quitar un permiso a `PUBLIC`, conceder primero a los roles que lo usan y **verificar con un login real** (la migración 003 dejó el login del checkpoint sin base unos minutos por no hacerlo).
+- Los números 013 a 015 existen en otras ramas: no se reutilizan. Si dos ramas toman el mismo número, la que se integra después se renumera.

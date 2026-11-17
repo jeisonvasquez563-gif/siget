@@ -7,6 +7,7 @@ Reglas comunes (las impone el PDP en cada petición, y la base por debajo):
 - Todo queda en los eventos de seguridad (inalterables) y en las decisiones del PDP.
 """
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -16,7 +17,7 @@ from apps.autenticacion.autenticacion import exige_scope
 from apps.autenticacion.tokens import SCOPE_COMPLETO
 from apps.autorizacion.pdp import Accion, Recurso
 from apps.autorizacion.permisos import autorizar
-from apps.identidad.models import Aprobacion, Usuario
+from apps.identidad.models import Aprobacion, SolicitudDerecho, Usuario
 
 from . import servicio
 
@@ -27,7 +28,7 @@ MENSAJES = {
     "no_a_si_mismo": "No puedes hacer esto sobre tu propia cuenta.",
     "conflicto_de_funciones": "Ya hiciste la otra mitad del restablecimiento de esta cuenta en las últimas 24 horas: lo debe hacer otra persona.",
     "no_corresponde": "La cuenta no está en un estado en el que se pueda hacer esto.",
-    "ya_resuelta": "Esta propuesta ya fue resuelta.",
+    "ya_resuelta": "Esta propuesta o solicitud ya fue resuelta.",
     "sin_segundo_factor": "Esa cuenta no tiene segundo factor activo.",
     "cuenta_suspendida": "La cuenta está suspendida.",
 }
@@ -110,6 +111,32 @@ class EventosSeguridad(_Plataforma):
     def get(self, request):
         autorizar(request, Accion.BLOQUEAR_CUENTA, Recurso(tipo="usuario"))
         return Response({"eventos": servicio.eventos_recientes(request.query_params.get("evento", "")[:60])})
+
+
+# --------------------------------------------------------------------------- solicitudes sobre datos personales (Ley 81)
+
+class SolicitudesDatos(_Plataforma):
+    """Las solicitudes de rectificación, cancelación y oposición de las personas. Solo el operador de identidades, con segundo factor reciente.
+    Devuelve identificador y usuario de quien pide y su solicitud: nunca nombre, cédula, correo ni trámites."""
+
+    def get(self, request):
+        autorizar(request, Accion.CONSULTAR_SOLICITUDES_DATOS, Recurso(tipo="solicitud_derecho"))
+        estado = request.query_params.get("estado", "")[:20]
+        ahora = timezone.now()
+        lista = servicio.solicitudes_de_datos(estado, ahora)
+        if lista is None:
+            return Response({"codigo": "datos_invalidos", "errores": ["el estado debe ser «recibida», «atendida» o «rechazada»"]}, status=status.HTTP_400_BAD_REQUEST)
+        respuesta = Response({"solicitudes": lista, "resumen": servicio.resumen_solicitudes_de_datos(ahora)})
+        respuesta["Cache-Control"] = "no-store"  # lleva el detalle de lo que pide cada persona
+        return respuesta
+
+
+class SolicitudDatosResponder(_Plataforma):
+    def post(self, request, pk):
+        autorizar(request, Accion.RESPONDER_SOLICITUD_DATOS, Recurso(tipo="solicitud_derecho"))  # primero el PDP: quien no puede, no se entera de si existe
+        solicitud = get_object_or_404(SolicitudDerecho.objects.select_related("usuario"), pk=pk)
+        estado, respuesta = _campo(request, "estado"), _campo(request, "respuesta")
+        return _responder(servicio.responder_solicitud_de_datos(self.yo(request), solicitud, estado, respuesta, _ip(request)))
 
 
 # --------------------------------------------------------------------------- aprobaciones (control dual)

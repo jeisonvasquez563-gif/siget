@@ -18,7 +18,7 @@ from django.utils import timezone
 from apps.catalogo.models import Institucion
 from apps.identidad.models import Membresia, Perfil, Usuario
 
-from . import bloqueo, canales, contrasenas, mfa, perfil, politica_sesion, restablecimiento, tokens
+from . import bloqueo, canales, contrasenas, derechos, mfa, perfil, politica_sesion, restablecimiento, tokens
 from .models import EventoSeguridad, Restablecimiento, Sesion
 
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,31}$")
@@ -93,8 +93,10 @@ def _registrar_fallo(usuario, ip, ahora, motivo) -> Resultado:
 
 # --------------------------------------------------------------------------- registro e inicio de sesión
 
-def registrar_usuario(username, password, ip, datos_personales=None, hoy=None) -> Resultado:
-    """Crea la cuenta y su perfil en una sola transacción: o quedan las dos cosas o ninguna."""
+def registrar_usuario(username, password, ip, datos_personales=None, hoy=None, acepta_aviso=None) -> Resultado:
+    """Crea la cuenta y su perfil en una sola transacción: o quedan las dos cosas o ninguna.
+
+    `acepta_aviso` debe ser exactamente `True`: la persona leyó el aviso de privacidad (Ley 81). Se guarda la versión y la hora."""
     username = (username or "").strip().lower() if isinstance(username, str) else ""
     errores = []
     if not USERNAME_RE.match(username):
@@ -102,9 +104,12 @@ def registrar_usuario(username, password, ip, datos_personales=None, hoy=None) -
     errores += contrasenas.errores_de_contrasena(password, username)
     perfil_datos, errores_perfil = perfil.validar(datos_personales if isinstance(datos_personales, dict) else {}, hoy or timezone.localdate())
     errores += errores_perfil
+    if acepta_aviso is not True:  # ni «true» como texto ni 1: tiene que ser el booleano
+        errores.append(derechos.MENSAJE_ACEPTA_AVISO)
     if errores:
         return Resultado(False, "datos_invalidos", detalle={"errores": errores})
     clave = settings.SIGET_MFA_KEY
+    ahora = timezone.now()
     try:
         with transaction.atomic():
             usuario = Usuario.objects.create(username=username, password_hash=contrasenas.hashear(password))
@@ -112,7 +117,7 @@ def registrar_usuario(username, password, ip, datos_personales=None, hoy=None) -
                 usuario=usuario, nombre=perfil_datos["nombre"], apellidos=perfil_datos["apellidos"],
                 cedula_cifrada=perfil.cifrar_cedula(clave, perfil_datos["cedula"]), cedula_huella=perfil.huella_cedula(clave, perfil_datos["cedula"]),
                 fecha_nacimiento=perfil_datos["fecha_nacimiento"], provincia=perfil_datos["provincia"], ciudad=perfil_datos["ciudad"],
-                correo=perfil_datos["correo"],
+                correo=perfil_datos["correo"], aviso_version=derechos.AVISO_VERSION, aviso_leido_en=ahora,
             )
     except IntegrityError:
         # Usuario, cédula o correo ya registrados: se responde igual para no revelar quién está registrado

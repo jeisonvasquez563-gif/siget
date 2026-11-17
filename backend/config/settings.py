@@ -116,7 +116,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "EXCEPTION_HANDLER": "apps.nucleo.errores.manejador",
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "registro": "10/hour", "restablecer": "10/hour", "login": "10/min", "refresh": "60/min", "mfa": "10/min", "api": "120/min"},
+    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "registro": "10/hour", "restablecer": "10/hour", "login": "10/min", "refresh": "60/min", "mfa": "10/min", "api": "120/min", "exportar": "20/hour"},
     "UNAUTHENTICATED_USER": None,
 }
 

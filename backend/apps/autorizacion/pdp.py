@@ -38,6 +38,9 @@ class Accion(str, Enum):
     ROTAR_SECRETOS = "rotar_secretos"
     CONSULTAR_AUDITORIA = "consultar_auditoria"
     CONSULTAR_DECISIONES = "consultar_decisiones"
+    CORREGIR_MIS_DATOS = "corregir_mis_datos"
+    CONSULTAR_SOLICITUDES_DATOS = "consultar_solicitudes_datos"
+    RESPONDER_SOLICITUD_DATOS = "responder_solicitud_datos"
 
 
 # Transiciones válidas de un trámite (espejo de siget.transicion en la base, que es la autoridad).
@@ -199,9 +202,17 @@ def _coordinador(s, a, r, e):
         return Decision(True, "coordinador_gestiona_su_institucion")
 
 
+def _titular_de_sus_datos(s, a, r, e):
+    """Corregir el correo, la provincia o la ciudad del propio perfil (Ley 81): solo quien tiene perfil de persona (sin rol de
+    plataforma), solo el suyo y con segundo factor reciente. Nombre, apellidos, cédula y nacimiento van por solicitud."""
+    if a == Accion.CORREGIR_MIS_DATOS and r.tipo == "perfil" and r.solicitante_id == s.id and s.rol_plataforma == "ninguno" and _mfa_reciente(s, e):
+        return Decision(True, "titular_corrige_sus_datos")
+
+
 _ACCIONES_POR_ROL_PLATAFORMA = {
     "operador_infraestructura": {Accion.ADMINISTRAR_INFRAESTRUCTURA},
-    "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA},
+    "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA,
+                             Accion.CONSULTAR_SOLICITUDES_DATOS, Accion.RESPONDER_SOLICITUD_DATOS},
     "operador_catalogo": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA},
     "operador_seguridad": {Accion.BLOQUEAR_CUENTA, Accion.REVOCAR_SESION},
     "custodio_secretos": {Accion.ROTAR_SECRETOS},
@@ -224,7 +235,7 @@ def _auditor(s, a, r, e):
         return Decision(True, "auditor_consulta")
 
 
-PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _operadores, _auditor]
+PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _titular_de_sus_datos, _operadores, _auditor]
 
 
 # ----------------------------------------------------------------------------- decisión

@@ -33,7 +33,7 @@ Las contraseñas **no están en el repositorio**; se las pides al responsable (J
 | **Transparencia** | Matriz de roles y permisos **calculada por el propio motor de decisiones**, permisos reales de PostgreSQL y un **simulador de «qué pasaría si…»** |
 | **Segundo factor** | TOTP obligatorio, anti-repetición, bloqueo por intentos, reautenticación escalonada y actividad de seguridad propia |
 
-**No existe un superusuario:** ninguno de los 10 roles puede las 18 acciones del sistema (el que más puede, el supervisor, hace 6).
+**No existe un superusuario:** ninguno de los 10 roles puede las 21 acciones del sistema (el que más puede, el supervisor, hace 7).
 
 ## Arquitectura
 

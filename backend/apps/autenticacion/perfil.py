@@ -43,6 +43,64 @@ def _edad(nacimiento: date, hoy: date) -> int:
     return hoy.year - nacimiento.year - ((hoy.month, hoy.day) < (nacimiento.month, nacimiento.day))
 
 
+# --------------------------------------------------------------------------- campos de contacto (registro y corrección)
+# Los mismos validadores sirven al registro y a la corrección de «Mis datos» (PT-15): no pueden diferir.
+
+def validar_provincia(valor):
+    """Devuelve (provincia_normalizada, error|None)."""
+    provincia = _texto(valor)
+    if not provincia:
+        return provincia, "falta la provincia"
+    if provincia not in PROVINCIAS:
+        return provincia, "la provincia no es una de las de Panamá"
+    return provincia, None
+
+
+def validar_ciudad(valor):
+    """Devuelve (ciudad_normalizada, error|None)."""
+    ciudad = _texto(valor)
+    if not ciudad:
+        return ciudad, "falta la ciudad"
+    if len(ciudad) > 60 or not re.match(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 .'\-]+$", ciudad):
+        return ciudad, "la ciudad solo admite letras, números, espacios y signos simples (hasta 60 caracteres)"
+    return ciudad, None
+
+
+def validar_correo(valor):
+    """Devuelve (correo_en_minúsculas, error|None)."""
+    correo = _texto(valor).lower()
+    if not correo:
+        return correo, "falta el correo"
+    if len(correo) > 254 or not _CORREO_RE.match(correo):
+        return correo, "el correo no tiene un formato válido"
+    return correo, None
+
+
+CAMPOS_CORREGIBLES = ("correo", "provincia", "ciudad")
+_VALIDADORES_CONTACTO = {"correo": validar_correo, "provincia": validar_provincia, "ciudad": validar_ciudad}
+
+
+def validar_correccion(datos):
+    """Corrección de «Mis datos»: solo correo, provincia y ciudad (los demás datos van por una solicitud de rectificación).
+
+    Devuelve (campos_normalizados, errores). Exige al menos un campo; un campo ajeno a esos tres es un error, no se ignora."""
+    if not isinstance(datos, dict) or not datos:
+        return None, ["indica al menos un dato a corregir: correo, provincia o ciudad"]
+    errores = []
+    ajenos = sorted(str(k) for k in datos if k not in CAMPOS_CORREGIBLES)
+    if ajenos:
+        errores.append("estos datos no se corrigen aquí (pide una rectificación): " + ", ".join(ajenos))
+    campos = {}
+    for nombre in CAMPOS_CORREGIBLES:
+        if nombre in datos:
+            valor, error = _VALIDADORES_CONTACTO[nombre](datos[nombre])
+            if error:
+                errores.append(error)
+            else:
+                campos[nombre] = valor
+    return (None, errores) if errores else (campos, [])
+
+
 def validar(datos: dict, hoy: date):
     """Devuelve (perfil_normalizado, errores). `errores` es una lista de frases; si no está vacía, no se crea la cuenta."""
     errores = []
@@ -76,23 +134,10 @@ def validar(datos: dict, hoy: date):
         elif _edad(nacimiento, hoy) > EDAD_MAXIMA:
             errores.append("la fecha de nacimiento no es creíble")
 
-    provincia = _texto(datos.get("provincia"))
-    if not provincia:
-        errores.append("falta la provincia")
-    elif provincia not in PROVINCIAS:
-        errores.append("la provincia no es una de las de Panamá")
-
-    ciudad = _texto(datos.get("ciudad"))
-    if not ciudad:
-        errores.append("falta la ciudad")
-    elif len(ciudad) > 60 or not re.match(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 .'\-]+$", ciudad):
-        errores.append("la ciudad solo admite letras, números, espacios y signos simples (hasta 60 caracteres)")
-
-    correo = _texto(datos.get("correo")).lower()
-    if not correo:
-        errores.append("falta el correo")
-    elif len(correo) > 254 or not _CORREO_RE.match(correo):
-        errores.append("el correo no tiene un formato válido")
+    provincia, error_provincia = validar_provincia(datos.get("provincia"))
+    ciudad, error_ciudad = validar_ciudad(datos.get("ciudad"))
+    correo, error_correo = validar_correo(datos.get("correo"))
+    errores += [e for e in (error_provincia, error_ciudad, error_correo) if e]
 
     if errores:
         return None, errores

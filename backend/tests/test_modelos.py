@@ -7,7 +7,7 @@ from apps.auditoria.models import DecisionPdp, EventoAuditoria
 from apps.autenticacion.models import EventoSeguridad, Restablecimiento, Sesion
 from apps.plataforma.models import RotacionSecreto
 from apps.catalogo.models import Institucion, TipoTramite
-from apps.identidad.models import Aprobacion, Membresia, Perfil, Usuario
+from apps.identidad.models import Aprobacion, Membresia, Perfil, SolicitudDerecho, Usuario
 from apps.identidad.sujeto import construir_sujeto
 from apps.nucleo.esquema import columnas_del_modelo, diferencias, modelos_de_dominio
 from apps.tramites.models import Tramite, Transicion
@@ -17,7 +17,7 @@ TABLAS = {
     Aprobacion: "aprobacion", Tramite: "tramite", Transicion: "transicion",
     EventoAuditoria: "evento_auditoria", DecisionPdp: "decision_pdp",
     Sesion: "sesion", EventoSeguridad: "evento_seguridad", Perfil: "perfil",
-    Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto",
+    Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto", SolicitudDerecho: "solicitud_derecho",
 }
 
 
@@ -27,7 +27,7 @@ def test_ningun_modelo_crea_ni_migra_tablas(modelo, tabla):
     assert modelo._meta.db_table == tabla
 
 
-def test_estan_los_catorce_modelos_del_esquema():
+def test_estan_los_quince_modelos_del_esquema():
     assert {m._meta.db_table for m in modelos_de_dominio()} == set(TABLAS.values())
 
 

@@ -10,12 +10,12 @@ def ids(rol_plataforma="ninguno", roles=()):
 
 
 def test_el_ciudadano_ve_sus_tramites_y_nada_de_personal():
-    assert ids() == ["mis_tramites", "nuevo_tramite", "seguridad", "mfa", "roles_permisos"]
-    assert ids(roles=["ciudadano"]) == ["mis_tramites", "nuevo_tramite", "seguridad", "mfa", "roles_permisos"]
+    assert ids() == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa", "roles_permisos"]
+    assert ids(roles=["ciudadano"]) == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa", "roles_permisos"]
 
 
 def test_el_funcionario_suma_la_bandeja():
-    assert ids(roles=["funcionario"]) == ["mis_tramites", "nuevo_tramite", "bandeja", "seguridad", "mfa", "roles_permisos"]
+    assert ids(roles=["funcionario"]) == ["mis_tramites", "nuevo_tramite", "mis_datos", "bandeja", "seguridad", "mfa", "roles_permisos"]
 
 
 def test_el_supervisor_suma_supervision_y_equipo():
@@ -31,7 +31,7 @@ def test_el_coordinador_ve_el_equipo_pero_no_los_tramites_de_la_institucion():
 @pytest.mark.parametrize("rol", sorted(ROLES_PLATAFORMA))
 def test_un_rol_de_plataforma_no_ve_ningun_modulo_de_tramites(rol):
     r = ids(rol, ["funcionario"])  # aunque llegara con una membresía (la base lo impide), no cuenta
-    assert not {"mis_tramites", "nuevo_tramite", "bandeja", "supervision", "equipo"} & set(r)
+    assert not {"mis_tramites", "nuevo_tramite", "mis_datos", "bandeja", "supervision", "equipo"} & set(r)
     assert {"prueba_acceso", "seguridad", "mfa", "roles_permisos"} <= set(r) and len(r) == 5
 
 
