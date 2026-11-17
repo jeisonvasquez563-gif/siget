@@ -2,7 +2,7 @@
 
 Implementación en SIGET de las **ocho etapas** del SDLC seguro de Red Hat (*Seguridad en el ciclo de vida de desarrollo del software*, actualizado el 27-ago-2026). La organización del equipo, con lo que hace cada persona y el calendario, está en [`../SIGET_Organizacion_SDLC_Seguro.docx`](../SIGET_Organizacion_SDLC_Seguro.docx). Las mismas plantillas, listas para imprimir o repartir, están en [`../SIGET_Plantillas_SDLC_Seguro.docx`](../SIGET_Plantillas_SDLC_Seguro.docx).
 
-**Estado (16-nov-2026): las 8 etapas están completas** con datos reales de SIGET y evidencia en [`evidencia/`](./evidencia/). Para preparar la presentación, cada integrante tiene su sección en la **guía de defensa** ([`../SIGET_Guia_de_Defensa_SDLC_Seguro.docx`](../SIGET_Guia_de_Defensa_SDLC_Seguro.docx)), con preguntas probables del profesor y sus respuestas.
+**Estado (16-nov-2026): las 8 etapas están completas** con datos reales de SIGET y evidencia en [`evidencia/`](./evidencia/). El resumen de todo lo hecho, con quién hizo y quién revisó cada parte, está en el **informe final** ([`../SIGET_Informe_Final_Trabajo_Realizado.docx`](../SIGET_Informe_Final_Trabajo_Realizado.docx)), que se genera con `generadores/generar-informe-final.js`. Para preparar la presentación, cada integrante tiene su sección en la **guía de defensa** ([`../SIGET_Guia_de_Defensa_SDLC_Seguro.docx`](../SIGET_Guia_de_Defensa_SDLC_Seguro.docx)), con preguntas probables del profesor y sus respuestas.
 
 | Etapa | Entregable | Responsable | Revisa |
 |---|---|---|---|

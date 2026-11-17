@@ -17,7 +17,11 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 - **Después del reinicio** todo arrancó solo: servicios de SIGET, temporizador de escalamiento, Apache y PHP con su endurecimiento, PostgreSQL y respaldo diario. `verificar_tramites` 77/77, `verificar_plataforma` 91/91, `verificar_autenticacion` 84/84 y ensayo 101/101.
 - **VM2:** se quitó la regla del cortafuegos que permitía el puerto 5432 (PostgreSQL nativo sin uso); queda solo la del 5433.
 - **Hallazgo nuevo en VM1, corregido el 17-nov:** los repositorios externos de PostgreSQL (`pgdg-common` y `pgdg14` a `pgdg18`), que quedaron de pgAdmin, fallaban la verificación de firma GPG. Se respaldó su archivo y se deshabilitaron los seis; `dnf` actualiza sin errores y siguen 0 avisos pendientes (`docs/sdlc/evidencia/11_vm1_repos_pgdg`).
-- Evidencia: `docs/sdlc/evidencia/09_*` y `10_*`.
+- **Instantáneas borradas (17-nov):** confirmado que todo seguía bien, se borraron las instantáneas `antes-de-rocky-9.8-2026-11-16` de las dos VMs. VMware dejó los discos marcados para consolidar porque la consola los tenía abiertos; se completa con «Clean Up Disks» con las VMs apagadas (`docs/sdlc/evidencia/12_instantaneas_borradas`).
+- Evidencia: `docs/sdlc/evidencia/09_*`, `10_*`, `11_*` y `12_*`.
+
+### Documentación (informe final del trabajo realizado, 17-nov)
+- **[`docs/SIGET_Informe_Final_Trabajo_Realizado.docx`](./docs/SIGET_Informe_Final_Trabajo_Realizado.docx)**: reúne el análisis estático y dinámico, las correcciones en producción, PT-3, PT-2 y PT-8, las 8 etapas del SDLC seguro y el mantenimiento de las VMs, con quién hizo y quién revisó cada parte según la organización del 12-nov, 19 figuras de evidencia, pendientes, conclusiones por integrante y bibliografía. Se genera con `docs/sdlc/generadores/generar-informe-final.js`.
 
 ### Documentación (SDLC seguro implementado, 16-nov)
 - **Las 8 etapas del SDLC seguro de Red Hat están completas en [`docs/sdlc/`](./docs/sdlc/README.md)**, con datos reales de SIGET:

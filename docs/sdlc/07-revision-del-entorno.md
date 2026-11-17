@@ -92,7 +92,7 @@ Resumen: de 5 hallazgos, **3 corregidos** (2, 3 y 4) y **2 abiertos** (1 y 5).
 6. **VM1: reiniciar y comprobar.** Arrancaron solos los servicios de SIGET, Apache y PHP con su endurecimiento; la plataforma respondió 200 y SELinux siguió en Enforcing. Aquí apareció el hallazgo 5 (repositorios pgdg con firma inválida). ![VM1 tras reiniciar](evidencia/09_vm1_tras_reinicio.png)
 7. **Verificaciones.** Revisión del entorno repetida (ver «Después de la corrección»), `verificar_tramites` 77/77, `verificar_plataforma` 91/91 y `verificar_autenticacion` 84/84 contra la base real. ![VM1 después](evidencia/10_vm1_revision_despues.png) ![VM2 después](evidencia/10_vm2_revision_despues.png) ![Parches después](evidencia/10_parches_despues.png)
 8. **Ensayo.** Ensayo completo contra producción: 101/101.
-9. **Registro.** Este documento, la bitácora de parches (`08-bitacora-parches.md`) y el registro de riesgos. Las instantáneas se conservan: si algo hubiera fallado, se volvía a ellas.
+9. **Registro.** Este documento, la bitácora de parches (`08-bitacora-parches.md`) y el registro de riesgos. Las instantáneas se conservaron hasta confirmar que todo seguía bien y se borraron el 17-nov-2026 (`evidencia/12_instantaneas_borradas`). VMware dejó los discos marcados para consolidar, porque la consola tenía los archivos abiertos; se completa con «Manage > Clean Up Disks» con las VMs apagadas, y mientras tanto las VMs funcionan igual.
 
 | Dato | Valor |
 |---|---|
