@@ -33,9 +33,9 @@ Abrir SIGET a internet cambia el modelo de amenazas. Estos puntos son específic
 |---|---|---|
 | 1 | Decidir las preguntas de la sección 4 | Jeison |
 | 2 | Respaldo de la base (runbook 32.2) y, si se decide, actualizar y reiniciar las VMs | Operador de las VMs |
-| 3 | nginx: leer la IP real del cliente desde el proxy; límites de tasa por esa IP | Backend / infraestructura |
-| 4 | Variable `SIGET_REGISTRO` (cerrado / con invitación / abierto) y pruebas del registro | Backend |
-| 5 | Nuevo nombre en `SIGET_ALLOWED_HOSTS` y aviso de «demostración académica» en la interfaz | Backend y frontend |
+| 3 | nginx: leer la IP real del cliente desde el proxy; límites de tasa por esa IP. **Preparado** (bloque comentado en `nginx.conf`): falta confirmar la IP y la cabecera del proxy elegido | Backend / infraestructura |
+| 4 | Variable `SIGET_REGISTRO` (cerrado / con invitación / abierto) y pruebas del registro. **Hecho** (PT-2, migración 014) | Backend |
+| 5 | Nuevo nombre en `SIGET_ALLOWED_HOSTS` (y en el `map` de nombres permitidos de `nginx.conf`) y aviso de «demostración académica» en la interfaz. **El aviso está hecho** (`SIGET_AVISO_DEMOSTRACION=true`) | Backend y frontend |
 | 6 | Rotar o suspender las cuentas de demostración y crear las del público | Operador de las VMs |
 | 7 | Habilitar MagicDNS, HTTPS y Funnel en la consola de Tailscale (requiere sesión de la persona dueña de la tailnet) | Jeison |
 | 8 | En VM1, publicar con Funnel hacia nginx (`https+insecure://127.0.0.1:8443`, por el certificado de la CA interna) y **confirmar la sintaxis con la documentación vigente** | Operador de las VMs |

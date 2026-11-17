@@ -4,7 +4,10 @@ Zero Trust desde el arranque: nada de secretos en el código (se leen de variabl
 archivos montados por `podman secret`), todo se deniega por defecto y la conexión a la base de datos
 va por TLS verificando el certificado del servidor.
 """
+import base64
+import binascii
 import os
+import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -100,14 +103,51 @@ DATABASES["auditoria"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
                           "USER": os.environ.get("SIGET_DB_AUDITOR_USER", "auditor_role"),
                           "PASSWORD": _leer("SIGET_DB_AUDITOR_PASSWORD", "")}
 
+# El escalamiento automático de trámites vencidos corre con SU PROPIO rol (escalador_role, migración 013): solo puede
+# EXECUTE sobre siget.escalar_vencidos(); no lee ni escribe ninguna tabla directamente. Lo usa un temporizador de systemd.
+DATABASES["escalador"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
+                          "USER": os.environ.get("SIGET_DB_ESCALADOR_USER", "escalador_role"),
+                          "PASSWORD": _leer("SIGET_DB_ESCALADOR_PASSWORD", "")}
+# --- Documentos adjuntos (PT-8) ---
+# Clave AES-256 (32 bytes en base64) que cifra cada archivo; llega como podman secret. Sin ella, la carga de documentos
+# responde 503 en lugar de guardar archivos en claro. Los archivos viven en un volumen propio, nunca en la imagen.
+_clave_documentos = _leer("SIGET_DOCS_KEY", "")
+try:
+    SIGET_DOCS_KEY = base64.b64decode(_clave_documentos, validate=True) if _clave_documentos else b""
+except binascii.Error as error:
+    raise ImproperlyConfigured("SIGET_DOCS_KEY debe estar en base64.") from error
+if SIGET_DOCS_KEY and len(SIGET_DOCS_KEY) != 32:
+    raise ImproperlyConfigured("SIGET_DOCS_KEY debe tener 32 bytes (AES-256).")
+SIGET_DOCS_DIR = os.environ.get("SIGET_DOCS_DIR", "/datos/documentos")
+SIGET_DOCS_POR_TRAMITE = 20
+# Un archivo de hasta 5 MB se procesa en memoria: nunca toca el disco en claro (ni siquiera como temporal)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
+
 # --- Contraseñas: Argon2 primero ---
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.Argon2PasswordHasher"]
 
 # --- API: se deniega todo salvo lo que una política permita explícitamente ---
 # Los límites de tasa (throttling) se cuentan aquí. Con la memoria local cada proceso de gunicorn llevaba su propia cuenta
 # (límite real = N veces el nominal); una caché en archivos la comparten los procesos del contenedor (/tmp es tmpfs).
+
+def _directorio_privado(ruta: Path) -> str:
+    """Crea (o valida) el directorio de la caché solo para este usuario: evita que otro usuario lo cree antes o lo
+    reemplace por un enlace en un /tmp compartido (CWE-377, hallazgo B108 de Bandit)."""
+    ruta.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if ruta.is_symlink():
+        raise ImproperlyConfigured(f"El directorio de caché {ruta} no puede ser un enlace simbólico")
+    if hasattr(os, "getuid"):
+        if ruta.stat().st_uid != os.getuid():
+            raise ImproperlyConfigured(f"El directorio de caché {ruta} debe pertenecer al usuario que corre SIGET")
+        ruta.chmod(0o700)
+    return str(ruta)
+
+
+# Nombre propio por usuario (uid en Linux) en lugar de una ruta fija y predecible como /tmp/siget-cache
+_CACHE_POR_DEFECTO = Path(tempfile.gettempdir()) / f"siget-cache-{os.getuid() if hasattr(os, 'getuid') else 'local'}"
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-                      "LOCATION": os.environ.get("SIGET_CACHE_DIR", "/tmp/siget-cache")}}
+                      "LOCATION": _directorio_privado(Path(os.environ.get("SIGET_CACHE_DIR") or _CACHE_POR_DEFECTO))}}
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["apps.autenticacion.autenticacion.AutenticacionJWT"],
@@ -123,6 +163,17 @@ REST_FRAMEWORK = {
 # --- Parámetros de la política de acceso (ver docs/superpowers/specs/2026-10-20-motor-abac-design.md) ---
 SIGET_MFA_RECIENTE_MINUTOS = int(os.environ.get("SIGET_MFA_RECIENTE_MINUTOS", "15"))
 SIGET_MFA_CIUDADANO_OBLIGATORIO = _bool("SIGET_MFA_CIUDADANO_OBLIGATORIO", True)
+
+# Registro de cuentas: «abierto» (cualquiera crea su cuenta, como hasta ahora), «invitacion» (hace falta un código de un solo
+# uso que emite el operador de identidades) o «cerrado» (nadie crea cuentas desde la web). Un valor inválido no deja arrancar.
+SIGET_REGISTRO = os.environ.get("SIGET_REGISTRO", "abierto").strip().lower()
+if SIGET_REGISTRO not in {"abierto", "invitacion", "cerrado"}:
+    raise ImproperlyConfigured("SIGET_REGISTRO debe ser abierto, invitacion o cerrado.")
+SIGET_INVITACION_DIAS = int(os.environ.get("SIGET_INVITACION_DIAS", "7"))
+if not 1 <= SIGET_INVITACION_DIAS <= 30:
+    raise ImproperlyConfigured("SIGET_INVITACION_DIAS debe estar entre 1 y 30.")
+# Aviso visible de «demostración académica» en la interfaz (recomendado si la plataforma se abre a internet)
+SIGET_AVISO_DEMOSTRACION = _bool("SIGET_AVISO_DEMOSTRACION", False)
 
 # --- Cabeceras y cookies seguras (en producción detrás de nginx con TLS) ---
 if not DEBUG:

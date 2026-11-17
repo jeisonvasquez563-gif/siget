@@ -6,12 +6,14 @@ Reglas comunes (las impone el PDP en cada petición, y la base por debajo):
 - Quien propone un alta no la aprueba (control dual); nadie actúa sobre su propia cuenta.
 - Todo queda en los eventos de seguridad (inalterables) y en las decisiones del PDP.
 """
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.autenticacion import servicio as auth
 from apps.autenticacion.autenticacion import exige_scope
 from apps.autenticacion.tokens import SCOPE_COMPLETO
 from apps.autorizacion.pdp import Accion, Recurso
@@ -77,6 +79,22 @@ class PersonaRestablecerContrasena(_Plataforma):
     def post(self, request, pk):
         autorizar(request, Accion.RESTABLECER_MFA, Recurso(tipo="usuario"))
         r = servicio.emitir_codigo(self.yo(request), _persona(pk), _ip(request))
+        respuesta = _responder(r, creado=True)
+        respuesta["Cache-Control"] = "no-store"  # lleva el código en claro: que nada lo guarde
+        return respuesta
+
+
+class Invitaciones(_Plataforma):
+    """Invitaciones para crear cuenta (registro por invitación). Solo el operador de identidades, con segundo factor reciente."""
+
+    def get(self, request):
+        autorizar(request, Accion.EMITIR_INVITACION, Recurso(tipo="usuario"))
+        return Response({"modo_registro": settings.SIGET_REGISTRO, "invitaciones": auth.invitaciones()})
+
+    def post(self, request):
+        autorizar(request, Accion.EMITIR_INVITACION, Recurso(tipo="usuario"))
+        datos = request.data if isinstance(request.data, dict) else {}
+        r = auth.emitir_invitacion(self.yo(request), datos.get("nota", ""), _ip(request))
         respuesta = _responder(r, creado=True)
         respuesta["Cache-Control"] = "no-store"  # lleva el código en claro: que nada lo guarde
         return respuesta

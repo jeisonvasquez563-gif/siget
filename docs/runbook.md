@@ -1623,9 +1623,81 @@ Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/ps
 - El límite de inicios de sesión (10 por minuto por IP) corta un ensayo con muchas cuentas: el script espera un minuto antes de la sección 10.
 - Una corrida interrumpida del ensayo deja una propuesta pendiente; el script la rechaza al empezar.
 
+## 35. Plazos en días hábiles y escalamiento automático (PT-3)
+
+**Qué cambia.** Los trámites nuevos vencen en días hábiles de Panamá (sin fines de semana ni los feriados de `siget.feriado`, ver [`feriados-panama.md`](./feriados-panama.md)). Cada hora, un temporizador de systemd en VM1 ejecuta `manage.py escalar_vencidos`. Ese comando marca `escalado_en` en los trámites abiertos que superaron su fecha límite y escribe un evento `escalamiento` en la auditoría. La supervisión los ve con el filtro «Escalados».
+
+**Mínimo privilegio.** El temporizador se conecta como `escalador_role`, que solo puede `EXECUTE` sobre `siget.escalar_vencidos()`: no lee ni escribe ninguna tabla, no es superusuario y no salta la seguridad por filas. Su contenedor recibe solo dos secretos (`siget-db-escalador-password` y `siget-ca`) y usa `config.settings_escalador`, que se niega a arrancar si le llegan las claves reales de Django, JWT o el segundo factor. `app_role` no puede ejecutar el escalamiento ni escribir `escalado_en`.
+
+### 35.1 Aplicar (Jeison)
+
+1. **Respaldo** de la base (sección 32.2) y migración 012 aplicada.
+2. VM2: `database/psql-contenedor.sh < database/migraciones/013-plazos-y-escalamiento.sql`.
+3. VM2: fijar la contraseña de `escalador_role` sin mostrarla (`\password escalador_role` en psql) y agregar a `pg_hba.conf` la línea de `escalador_role` desde VM1 con `hostssl` y `scram-sha-256`, igual que `auditor_role`. Después, `SELECT pg_reload_conf();`.
+4. VM2: correr las pruebas, que terminan en `ROLLBACK`: `database/psql-contenedor.sh < database/pruebas-escalamiento.sql`. Todas deben decir `PASA`.
+5. VM1, como `siget`: crear el secreto `siget-db-escalador-password` con la misma contraseña (`podman secret create … -`, leyendo de la entrada estándar).
+6. VM1: reconstruir la imagen del backend, copiar `siget-escalar.service` y `siget-escalar.timer` a `~/.config/systemd/user/` y luego `systemctl --user daemon-reload && systemctl --user enable --now siget-escalar.timer`.
+7. Comprobar: `systemctl --user start siget-escalar.service && journalctl --user -u siget-escalar -n 5` muestra `escalar_vencidos: N trámite(s) escalado(s)`. Después correr `verificar_tramites` y el ensayo.
+
+### 35.2 Volver atrás
+
+`systemctl --user disable --now siget-escalar.timer` detiene el escalamiento sin tocar datos. La columna y la tabla pueden quedarse; los eventos `escalamiento` ya escritos son inalterables, como toda la auditoría.
+
+### 35.3 Registro de la aplicación (12 de noviembre de 2026)
+
+1. VM2: respaldo con `systemctl start siget-respaldo.service`, restauración verificada (`tramites_demo-20261112-165343.dump`). Las migraciones 011 y 012 ya estaban aplicadas.
+2. VM2: ensayo de la migración 013 junto con sus pruebas, en una sola transacción terminada en `ROLLBACK` (10 de 10, sin dejar nada). Después se aplicó de verdad y se repitieron las pruebas: 10 de 10.
+3. VM2: línea de `escalador_role` en `/home/siget/config/pg_hba.conf` (respaldo: `pg_hba.conf.respaldo-2026-11-12`). **Ojo:** el archivo está montado en el contenedor por inodo. Si se reemplaza el archivo, por ejemplo con `install`, el contenedor sigue viendo el viejo y `pg_reload_conf()` no alcanza: hay que reiniciar `siget-postgres.service`, que reaplica la etiqueta `:Z`. El archivo debe quedar en `644` para que lo lea el usuario `postgres` del contenedor.
+4. Contraseña de `escalador_role`: se generó en VM2 (`openssl rand`), se fijó con `ALTER ROLE` por la entrada estándar de psql (con `log_statement = none`) y se pasó por una tubería SSH a `podman secret create siget-db-escalador-password -` en VM1. Nunca se mostró ni se guardó en un archivo.
+5. VM1: imagen del backend reconstruida con las correcciones del análisis (PR #7) y PT-3 combinadas (respaldo: `siget-backend:respaldo-2026-11-12`). Antes de construir se normalizaron los finales de línea a LF. Se crearon `~/.config/systemd/user/siget-escalar.{service,timer}` y se activó el temporizador. La primera corrida escaló 41 trámites vencidos.
+6. `verificar_tramites` 63 de 63 y `verificar_autenticacion` 84 de 84 contra la base real.
+7. VM1: interfaz desplegada (compilada con el PR #7 y PT-3 combinados, 194 de 194 pruebas). Se respaldó `/home/siget/frontend` en `frontend.respaldo-2026-11-12` y se reemplazó **solo el contenido** (`find -mindepth 1 -delete` y copiar). El directorio conserva su inodo, así que nginx no necesita reiniciarse, y `chcon -R --reference=/home/siget/frontend` aplica a los archivos nuevos la etiqueta `container_file_t` del contenedor. Se comprobó que el bundle servido contiene la marca y el filtro «Escalados».
+
+## 36. Registro configurable e invitaciones (PT-2)
+
+**Qué cambia.** `SIGET_REGISTRO` (en `siget-backend.container`) decide cómo se crean las cuentas: `abierto` (por defecto), `invitacion` o `cerrado`. Con invitación, el operador de identidades emite códigos desde su consola («Invitaciones para crear cuenta») y los entrega por un canal externo. `SIGET_AVISO_DEMOSTRACION=true` muestra el aviso de «demostración académica» en todas las pantallas. `SIGET_INVITACION_DIAS` (1 a 30, 7 por defecto) fija la vigencia de cada invitación.
+
+### 36.1 Aplicar
+
+1. VM2: respaldo (sección 32.2) y migración 014 (`database/psql-contenedor.sh < database/migraciones/014-invitaciones.sql`).
+2. VM1: reconstruir la imagen del backend y la interfaz y desplegarlas. Si se cambia el modo, agregar `Environment=SIGET_REGISTRO=invitacion` (y, si corresponde, `Environment=SIGET_AVISO_DEMOSTRACION=true`) a `siget-backend.container`, `systemctl --user daemon-reload` y reiniciar el backend.
+3. Comprobar: `curl https://…:8443/auth/configuracion/` devuelve el modo, y `verificar_plataforma` pasa con los pasos de invitaciones.
+
+**Volver atrás:** quitar la variable (vuelve a `abierto`) y reiniciar el backend. La tabla `invitacion` puede quedarse.
+
+### 36.2 Registro de la aplicación (12 de noviembre de 2026)
+
+1. VM2: respaldo verificado (`tramites_demo-20261112-171700.dump`, 15 tablas), ensayo de la migración 014 con 4 comprobaciones en una transacción que terminó en `ROLLBACK`, y después la migración real.
+2. VM1: backend e interfaz construidos con el PR #7, PT-3 y PT-2 combinados (respaldos `siget-backend:respaldo-2026-11-12b` y `frontend.respaldo-2026-11-12b`). Modo `abierto`: `GET /auth/configuracion/` devuelve `{"registro":"abierto","aviso_demostracion":false}`.
+3. Verificación contra la base real: `verificar_plataforma` 91 de 91 (incluye los 12 pasos de invitaciones), `verificar_tramites` 63 de 63 y `verificar_autenticacion` 84 de 84.
+4. **Para usar `ejecutar-comando.sh` desde Windows:** el paquete del código debe llevar finales de línea LF (`.py`, `Containerfile`, `requirements*.txt`); conviene armarlo con `git archive` o normalizándolo antes de subirlo. Si no, la imagen se construye con CRLF.
+
+## 37. Documentos adjuntos (PT-8)
+
+**Qué cambia.** Las personas adjuntan PDF, PNG o JPEG a sus trámites. Los archivos se guardan **cifrados con AES-256-GCM** en el volumen `siget-documentos` de VM1, montado en `/datos` dentro del backend; el resto del contenedor sigue siendo de solo lectura. La base solo tiene los metadatos (migración 015).
+
+### 37.1 Aplicar
+
+1. VM2: respaldo y migración 015 (`database/psql-contenedor.sh < database/migraciones/015-documentos.sql`).
+2. VM1, como `siget`: crear la clave de documentos **sin mostrarla**: `head -c 32 /dev/urandom | base64 | podman secret create siget-docs-key -`.
+3. VM1: copiar `siget-documentos.volume` y `siget-backend.container` a `~/.config/containers/systemd/`, reconstruir la imagen del backend y la interfaz, `systemctl --user daemon-reload` y reiniciar el backend.
+4. Comprobar con `verificar_tramites` (sección de documentos) y adjuntar un PDF desde la interfaz.
+
+**Importante:** sin `siget-docs-key` los archivos no se pueden descifrar. La clave se respalda **aparte** de los archivos (nunca en el mismo lugar) y su rotación se registra en la consola de secretos. El respaldo de VM1 debe incluir el volumen `siget-documentos`.
+
+**Volver atrás:** volver al `siget-backend.container` anterior y reiniciar. La carga responde `503` mientras no haya clave. La tabla y el volumen pueden quedarse.
+
+### 37.2 Registro de la aplicación (12 de noviembre de 2026)
+
+1. VM2: respaldo verificado (`tramites_demo-20261112-174700.dump`, 16 tablas), ensayo de la migración 015 con 4 comprobaciones terminado en `ROLLBACK`, y después la migración real.
+2. VM1: la clave `siget-docs-key` se generó con `head -c 32 /dev/urandom | base64 -w0 | podman secret create siget-docs-key -` (nunca se mostró). **Pendiente: respaldarla fuera de VM1**, separada de los archivos.
+3. **La unidad del backend en producción tenía `Environment=SIGET_INACTIVIDAD_MINUTOS=2`, que no está en el repositorio** (ajuste de la demo, rama `chore/inactividad-demo`). La unidad nueva se armó sobre la de producción agregando solo las líneas de PT-8; la anterior quedó en `/home/siget/siget-backend.container.respaldo-2026-11-12c`. Antes de copiar cualquier unidad del repositorio, compararla con la de producción.
+4. Backend e interfaz con el PR #7, PT-3, PT-2 y PT-8 combinados (respaldos `siget-backend:respaldo-2026-11-12c` y `frontend.respaldo-2026-11-12c`). Dentro del contenedor: el volumen `/datos` pertenece al usuario 1001 (opción `U`) y se puede escribir; el resto sigue de solo lectura; la clave está montada. Se probó un cifrado y descifrado real con la clave y el volumen de producción, sin dejar rastro.
+5. `verificar_tramites` 77 de 77, `verificar_plataforma` 91 de 91, `verificar_autenticacion` 84 de 84 y ensayo 101 de 101.
+
 ## 38. Retiro del checkpoint PHP, pgAdmin web y puerto 80 (PT-13, 17 de noviembre de 2026)
 
-> Numeración: las secciones 35 a 37 (PT-3, PT-2 y PT-8) están en sus ramas; al fusionar, revisar que no se repita el número.
+
 
 El checkpoint PHP (`/gestion/`) y pgAdmin 4 web (`/pgadmin4/`, primer intento de checkpoint) los servía Apache en el puerto 80 de VM1, **por HTTP sin cifrar** y abiertos a toda la red. SIGET no usa ninguno de los dos (nginx en 8443 y 8080) y el registro de accesos de Apache estaba vacío desde el 16-nov. Aprobado por Jeison.
 

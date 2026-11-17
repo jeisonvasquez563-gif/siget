@@ -42,6 +42,7 @@ ACCIONES = [
     (Accion.APROBAR_ALTA, "Aprobar un alta", "Control dual", ("Propuesta por otra persona", "Propuesta por la misma persona")),
     (Accion.ADMINISTRAR_INFRAESTRUCTURA, "Administrar la infraestructura", "Plataforma", None),
     (Accion.RESTABLECER_MFA, "Restablecer el segundo factor de alguien", "Plataforma", None),
+    (Accion.EMITIR_INVITACION, "Emitir una invitación para crear cuenta", "Plataforma", None),
     (Accion.BLOQUEAR_CUENTA, "Bloquear una cuenta", "Plataforma", None),
     (Accion.REVOCAR_SESION, "Revocar una sesión", "Plataforma", None),
     (Accion.ROTAR_SECRETOS, "Rotar secretos y certificados", "Plataforma", None),

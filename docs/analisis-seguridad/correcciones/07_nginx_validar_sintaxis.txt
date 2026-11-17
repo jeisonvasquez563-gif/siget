@@ -1,0 +1,6 @@
+# VM1 — validar el nginx.conf corregido (nginx -t) en un contenedor desechable
+# 2026-11-08 14:07:11  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "sudo install -o siget -g siget -m 644 /tmp/nginx.conf.nuevo /home/siget/config/nginx.conf.nuevo && sudo -H -u siget bash -lc \"cd /tmp && export XDG_RUNTIME_DIR=/run/user/\$(id -u) && podman run --rm --secret siget-nginx-crt --secret siget-nginx-key -v /home/siget/config/nginx.conf.nuevo:/etc/nginx/nginx.conf:ro,Z registry.access.redhat.com/ubi9/nginx-126:1-1777855212 nginx -t\""
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+# código de salida: 0

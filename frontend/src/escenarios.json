@@ -45,7 +45,7 @@
     "id": "cuenta-bloqueada",
     "titulo": "Una cuenta bloqueada intenta iniciar un trámite",
     "leccion": "Una cuenta que no está activa no puede nada, sea cual sea su rol.",
-    "entrada": { "rol": "ciudadano", "accion": "crear_tramite", "institucion": "propia", "solicitante": "yo", "segundo_factor": "reciente", "cuenta": "bloqueada" }
+    "entrada": { "rol": "ciudadano", "accion": "crear_tramite", "institucion": "propia", "solicitante": "yo", "audiencia": "ciudadania", "segundo_factor": "reciente", "cuenta": "bloqueada" }
   },
   {
     "id": "control-dual",
