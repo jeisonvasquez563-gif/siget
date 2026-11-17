@@ -6,6 +6,11 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Integración (rama que reproduce producción, 17-nov)
+- **`integracion/produccion` junta en una sola rama lo que corre en producción**: el análisis estático y dinámico (#7), el CI de seguridad (#16), PT-3 (#8 y #9), PT-2 (#10 y #11) y PT-8 (#12 y #13), fusionados en ese orden sobre `develop`. Hasta ahora producción era una combinación hecha a mano que no existía como rama.
+- **Conflictos resueltos:** los de documentación (CHANGELOG, runbook y README de migraciones) uniendo las dos entradas; los de código (`settings.py`, `tramites/vistas.py`, `verificar_tramites.py`, `test_modelos.py`, `componentes.css`, `Tramites.jsx` y `comun.jsx`) a mano, conservando lo de las dos ramas. Las secciones 35 a 37 del runbook y la tabla de migraciones quedaron en orden.
+- **Verificado contra producción:** los 85 archivos del backend (`apps`, `config`, `manage.py`, `requirements.txt`) son idénticos, por SHA-256, a los del contenedor `siget-backend` en ejecución en VM1. Pruebas: 555 del backend y 206 del frontend, las mismas que al desplegar.
+
 ### Añadido (documentos adjuntos, PT-8, 12-nov)
 - **Documentos adjuntos a los trámites**: la persona que pidió el trámite adjunta PDF, PNG o JPEG de hasta 5 MB, mientras no haya resolución final y hasta 20 por trámite. El personal de la institución los ve y los descarga; la plataforma no los ve nunca. Ya lo decidía el PDP (`adjuntar_documento`, `ver_documento`).
 - **Validación por contenido** (`apps/tramites/documentos.py`, 50 pruebas de archivos hostiles): se detectan los bytes mágicos, la extensión tiene que coincidir con lo detectado, y se rechazan ejecutables disfrazados, doble extensión, HTML y SVG. El nombre se sanea (sin ruta, sin caracteres de control ni de dirección) y la ubicación en disco la genera el servidor.
