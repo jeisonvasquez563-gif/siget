@@ -174,7 +174,7 @@ class Command(BaseCommand):
             mala = self._publica("/auth/registro/", {**datos_nuevo, "invitacion": "AAAA-BBBB-CCCC"})
             self._paso("con registro por invitación, sin código o con uno falso no se crea la cuenta (misma respuesta)",
                        sin.status_code == mala.status_code == 400 and sin.json() == mala.json() and not Usuario.objects.filter(username="vp_invitada").exists())
-            r = self._publica("/auth/registro/", {**datos_nuevo, "password": "corta", "invitacion": invitacion})
+            r = self._publica("/auth/registro/", {**datos_nuevo, "password": "corta", "invitacion": invitacion})  # nosec B105: inválida a propósito
             self._paso("un error en los datos NO gasta la invitación", r.status_code == 400 and Invitacion.objects.get(pk=fila_inv.pk).usada_en is None)
             r = self._publica("/auth/registro/", {**datos_nuevo, "invitacion": invitacion})
             nueva = Usuario.objects.filter(username="vp_invitada").first()
