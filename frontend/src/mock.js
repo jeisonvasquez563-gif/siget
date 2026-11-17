@@ -95,8 +95,11 @@ const T = (id, tipo, estado, solicitante, asignado, creadoDias, sla, extra = {})
   const t = TIPOS[tipo - 1]
   const creado = Date.now() - creadoDias * DIA
   const limite = creado + sla * DIA
+  const vencido = !['Aprobado', 'Rechazado'].includes(estado) && limite < Date.now()
+  // Como en la plataforma real, el temporizador escala los vencidos (a la hora siguiente de vencer)
+  const escalado_en = vencido ? new Date(limite + 3600000).toISOString() : null
   return { id, tipo_tramite: { id: t.id, nombre: t.nombre }, institucion: t.institucion, estado, fecha_limite: new Date(limite).toISOString(),
-    vencido: !['Aprobado', 'Rechazado'].includes(estado) && limite < Date.now(), creado_en: new Date(creado).toISOString(),
+    vencido, escalado: Boolean(escalado_en), escalado_en, creado_en: new Date(creado).toISOString(),
     solicitante_id: solicitante, funcionario_asignado_id: asignado, sensibilidad: 2, ...extra }
 }
 const TRAMITES_BASE = [
@@ -111,6 +114,7 @@ TRAMITES_BASE.forEach((t, i) => {
   if (t.estado !== 'Pendiente') lista.push(ev(i * 10 + 2, t.id, 'cambio_estado', 'Pendiente', 'En Tramitacion', t.funcionario_asignado_id || 201, (i + 3) * 3600000 * 4))
   if (t.estado === 'En Subsanacion') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', 'En Subsanacion', 202, 3600000 * 9))
   if (t.estado === 'Aprobado' || t.estado === 'Rechazado') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', t.estado, 203, 3600000 * 6))
+  if (t.escalado) lista.push({ ...ev(i * 10 + 4, t.id, 'escalamiento', t.estado, t.estado, null, 0), creado_en: t.escalado_en, atributos: { regla: 'plazo_vencido' } })
   EVENTOS_BASE[t.id] = lista
 })
 

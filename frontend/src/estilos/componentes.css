@@ -97,6 +97,10 @@
 .plazo-texto { display: block; font-size: var(--t-xs); color: var(--tinta-suave); margin-top: 0.3rem; }
 .plazo-texto.atencion { color: var(--boya-texto); font-weight: 650; }
 .plazo-texto.vencido { color: var(--sello-rojo); font-weight: 650; }
+.etiqueta-escalado {
+  display: inline-block; margin-top: 0.35rem; padding: 0.1rem 0.5rem; border: 1px solid var(--sello-rojo);
+  border-radius: 999px; color: var(--sello-rojo); font-size: var(--t-xs); font-weight: 650;
+}
 
 /* ---------- estados vacíos, carga, alertas ---------- */
 .vacio { text-align: center; padding: 3rem 1.5rem; background: var(--superficie); border: 1px dashed var(--borde-fuerte); border-radius: var(--radio-l); }
