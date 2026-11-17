@@ -17,7 +17,7 @@
 |---|---|---|---|---|---|
 | Línea base: 16-nov-2026 (antes de actualizar) | 2 / 2 | 112 / 103 | — | — | Plan de actualización, con respaldo e instantáneas previas |
 | 16-nov-2026 (después de actualizar) | 0 / 0 | 0 / 0 | — | — | `dnf update` en VM2 y luego en VM1, reinicio y verificaciones; las dos VMs quedaron en Rocky Linux 9.9 |
-| 17-nov-2026 | 0 / 0 | 0 / 0 | — | — | Se deshabilitaron los repositorios pgdg con firma inválida en VM1 y se borraron las instantáneas «antes-de-rocky-9.8-2026-11-16» de las dos VMs (`evidencia/11_vm1_repos_pgdg`, `evidencia/12_instantaneas_borradas`) |
+| 17-nov-2026 | 0 / 0 | 0 / 0 | — | — | Se deshabilitaron los repositorios pgdg con firma inválida en VM1 y se borraron las instantáneas «antes-de-rocky-9.8-2026-11-16» de las dos VMs (`evidencia/11_vm1_repos_pgdg`, `evidencia/12_instantaneas_borradas`). Se retiraron Apache, PHP y pgAdmin web (paquetes apagados: ya no hay que vigilar sus avisos mientras sigan así) |
 | 23-nov-2026 | A completar en la próxima revisión |  |  |  |  |
 
 Totales de la línea base: VM1 tiene 203 avisos de seguridad (2 críticos, 112 importantes, 83 moderados y 6 bajos) y VM2 tiene 192 (2 críticos, 103 importantes, 82 moderados y 5 bajos). Hay además 5 avisos de errores corregidos en cada una. Los dos críticos son los mismos en ambas (RLSA-2026:25049 y RLSA-2026:88459). Ese día seguían sin aplicarse, así que se incumplía la regla de 7 días. Se resolvieron la misma noche con la actualización completa del sistema (`dnf update`).

@@ -1,0 +1,18 @@
+# Puerto 80 en VM1 antes del retiro (17-nov-2026)
+# 2026-11-17 14:07:17  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-sdlc
+$ bash C:\Users\jeiva\AppData\Local\Temp/pt13/antes.sh
+== Puertos en escucha (80, 8080, 8443)
+*:8080 users:(("pasta.avx2",pid=1672,fd=153))
+*:8443 users:(("pasta.avx2",pid=1672,fd=154))
+*:80 users:(("httpd",pid=2691,fd=4),("httpd",pid=1923,fd=4),("httpd",pid=1921,fd=4),("httpd",pid=1918,fd=4),("httpd",pid=1019,fd=4))
+== Servicios
+httpd: active / enabled
+php-fpm: active / enabled
+== Cortafuegos
+dhcpv6-client http ssh
+8080/tcp 8443/tcp
+== Desde el anfitrion
+http://192.168.159.137/gestion/login.php      200
+http://192.168.159.137/pgadmin4/              302
+https://192.168.159.137:8443/salud/           200
+# código de salida: 0

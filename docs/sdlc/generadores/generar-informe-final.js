@@ -194,12 +194,12 @@ const sdlc = [
   p("Se tomó como marco la guía de Red Hat *Seguridad en el ciclo de vida de desarrollo del software*: aplicar la seguridad desde el inicio y en cada etapa (*shift left*) con responsabilidad compartida entre desarrollo, operaciones y seguridad (*DevSecOps*). Cada etapa tiene su entregable en `docs/sdlc/` y su responsable."),
   ...tabla("Resultado de cada etapa", ["Etapa", "Responsable", "Resultado"], [
     ["1. Planificación", "Simna De Gracia", "24 riesgos evaluados; 12 con algo pendiente, priorizados"],
-    ["2. Requisitos", "Gabriel González", "26 requisitos (20 cumplen, 2 parciales, 4 no cumplen) y 11 artículos de leyes panameñas"],
-    ["3. Diseño", "Joel Medina", "41 amenazas STRIDE: 24 mitigadas, 14 parciales, 3 abiertas"],
+    ["2. Requisitos", "Gabriel González", "26 requisitos (21 cumplen, 1 parcial, 4 no cumplen) y 11 artículos de leyes panameñas"],
+    ["3. Diseño", "Joel Medina", "41 amenazas STRIDE: 25 mitigadas, 15 parciales, 1 abierta"],
     ["4. Desarrollo", "Andy Martínez", "14 reglas de codificación segura; CI de seguridad con 5 controles en verde y Dependabot"],
     ["5. Documentación", "Jorge Medina", "43 controles inventariados y `SECURITY.md` completa"],
     ["6. Pruebas", "Bradley Morales", "Plan de pruebas; lista de revisión de 10 puntos aplicada a los PR #10 y #12"],
-    ["7. Implementación", "Jeison Vásquez", "Revisión de VM1 y VM2: 5 hallazgos, 4 corregidos y 1 abierto (puerto 80 del checkpoint PHP)"],
+    ["7. Implementación", "Jeison Vásquez", "Revisión de VM1 y VM2: 5 hallazgos, los 5 corregidos (el último, el puerto 80 del checkpoint PHP, el 17-nov)"],
     ["8. Mantenimiento", "Anyurie Sánchez y Walter Sanjur", "Supervisión semanal y bitácora de parches: de 2 avisos críticos por VM a 0 críticos y 0 pendientes"],
   ], [2000, 2100, 5260]),
   ...etapa("5.1 Etapa 1 — Planificación", "Simna De Gracia", "Jeison Vásquez", [
@@ -221,7 +221,7 @@ const sdlc = [
     "Se escribió el **plan de pruebas de seguridad** (`06-plan-de-pruebas.md`), que junta las pruebas automáticas (555 del backend y 206 del frontend), las verificaciones contra la base real, el ensayo de 101 comprobaciones contra producción y el análisis dinámico. Se armó una **lista de revisión de código de 10 puntos** y se aplicó a los PR #10 y #12.",
   ]),
   ...etapa("5.7 Etapa 7 — Implementación", "Jeison Vásquez", "Andy Martínez", [
-    "Se revisó el **entorno de despliegue** de VM1 y VM2 solo con comandos de lectura (`07-revision-del-entorno.md`): SELinux en Enforcing, SSH solo con clave, cortafuegos, TLS 1.3 con calificación A, cabeceras de seguridad y contenedores sin root. Salieron 5 hallazgos y 4 se corrigieron: una regla sobrante del puerto 5432 en VM2, los avisos críticos sin aplicar, la versión de Rocky sin soporte y los repositorios con firma inválida. Queda abierto el puerto 80 del checkpoint PHP.",
+    "Se revisó el **entorno de despliegue** de VM1 y VM2 solo con comandos de lectura (`07-revision-del-entorno.md`): SELinux en Enforcing, SSH solo con clave, cortafuegos, TLS 1.3 con calificación A, cabeceras de seguridad y contenedores sin root. Salieron 5 hallazgos y se corrigieron los 5: una regla sobrante del puerto 5432 en VM2, los avisos críticos sin aplicar, la versión de Rocky sin soporte, los repositorios con firma inválida y el puerto 80 del checkpoint PHP (sección 6.4).",
   ], [...figS("07_vm1_revision.png", "Revisión del entorno de VM1 (solo lectura)"), ...figS("07_tls_cabeceras.png", "TLS 1.3 y cabeceras de seguridad de la plataforma")]),
   ...etapa("5.8 Etapa 8 — Mantenimiento: supervisión", "Anyurie Sánchez", "Walter Sanjur", [
     "Se abrió la **bitácora semanal de supervisión** (`08-bitacora-supervision.md`): eventos de seguridad, cuentas bloqueadas, accesos denegados, estado de los temporizadores y del respaldo diario. Se escribió además el **procedimiento ante una intrusión**: a quién avisar, cómo contener (bloquear la cuenta, cerrar sesiones) y qué evidencia guardar.",
@@ -235,7 +235,7 @@ const sdlc = [
 // ---------------------------------------------------------------- 6. mantenimiento de las VMs
 const vms = [
   h1("6. Mantenimiento de las máquinas virtuales"),
-  autoria("Jeison Vásquez y Walter Sanjur", "Andy Martínez"),
+  autoria("Jeison Vásquez y Walter Sanjur (6.1 a 6.3); Jeison Vásquez (6.4 y 6.5)", "Andy Martínez"),
   h2("6.1 Actualización a Rocky Linux 9.9 (16 de noviembre)"),
   p("Las dos VMs pasaron de Rocky 9.7, sin soporte desde mayo, a **9.9**, con todos los avisos de seguridad aplicados. Se hizo con cinco cuidados: respaldo verificado de la base, una instantánea de VMware de cada VM, una máquina por vez (primero VM2 y, verificada, VM1), reinicio para cargar el kernel nuevo y verificaciones completas contra la base real (77/77, 91/91, 84/84 y ensayo 101/101). En VM2 se quitó además la regla del cortafuegos del puerto 5432, que no se usaba."),
   ...figS("09_vm1_actualizacion.png", "Actualización de VM1 a Rocky Linux 9.9"),
@@ -245,6 +245,12 @@ const vms = [
   h2("6.3 Retiro de las instantáneas (17 de noviembre)"),
   p("Confirmado que todo seguía funcionando, se borraron las instantáneas «antes-de-rocky-9.8-2026-11-16» de las dos VMs. Una instantánea vieja ocupa disco y hace más lento el acceso a los discos virtuales. VMware dejó los discos marcados para consolidar porque la consola los tenía abiertos; se completa con «Manage > Clean Up Disks» con las VMs apagadas, y mientras tanto las VMs funcionan igual."),
   ...figS("12_instantaneas_borradas.png", "Las dos VMs sin instantáneas"),
+  h2("6.4 Retiro del checkpoint PHP y cierre del puerto 80 (17 de noviembre)"),
+  p("El checkpoint PHP fue una entrega intermedia del semestre y seguía sirviendo su inicio de sesión por HTTP, sin cifrar, en el puerto 80 de VM1. Al revisarlo apareció que ese mismo Apache servía también **pgAdmin web**, un primer intento de checkpoint que quedó instalado, abierto a toda la red y también sin cifrar. SIGET no usa ninguno de los dos y el registro de accesos estaba vacío desde el 16 de noviembre."),
+  p("Con respaldo previo (código del checkpoint, configuración de Apache, PHP y pgAdmin, y la regla del cortafuegos, en una carpeta solo de root) se detuvieron y deshabilitaron Apache y php-fpm, se quitó el servicio `http` del cortafuegos y el rol `checkpoint_app` de la base quedó sin inicio de sesión, así que la contraseña que guardaba su configuración ya no sirve. Después: el puerto 80 no responde, la plataforma sí, `verificar_tramites` 77/77, `verificar_plataforma` 91/91, `verificar_autenticacion` 84/84 y ensayo 101/101. Con esto el requisito RS-13 (todo el tráfico por TLS 1.3) pasa a cumplirse."),
+  ...figS("13_puerto80_despues.png", "Puerto 80 cerrado y plataforma verificada"),
+  h2("6.5 Copia de la clave de los documentos fuera de VM1 (17 de noviembre)"),
+  p("La clave que cifra los documentos adjuntos existía solo en VM1: si la máquina se dañaba, los archivos quedaban ilegibles para siempre (riesgo R6, la amenaza abierta más grave). Se copió directamente de VM1 a una carpeta del equipo anfitrión con permisos solo para el administrador, sin que el valor apareciera en pantalla ni en ningún documento, y se comprobó que la copia es idéntica comparando su huella SHA-256. Queda llevar una segunda copia fuera del PC anfitrión, porque las dos VMs corren en ese mismo equipo."),
   salto(),
 ];
 
@@ -252,8 +258,7 @@ const vms = [
 const pendientes = [
   h1("7. Lo que queda pendiente"),
   ...tabla("Trabajo pendiente", ["Pendiente", "Por qué importa", "Responsable"], [
-    ["Retirar el checkpoint PHP y cerrar el puerto 80 (PT-13)", "Mientras sirva en HTTP, su cookie no puede llevar `Secure`", "Jeison Vásquez"],
-    ["Copia de la clave de documentos fuera de VM1", "Si VM1 se pierde, los documentos cifrados no se pueden recuperar", "Jeison Vásquez"],
+    ["Segunda copia de la clave de documentos fuera del PC anfitrión (USB o gestor de contraseñas)", "La copia del 17-nov está fuera de VM1 pero en el mismo PC que aloja las VMs", "Jeison Vásquez"],
     ["Consolidar los discos de las VMs", "Terminar la limpieza de las instantáneas", "Jeison Vásquez"],
     ["Derechos sobre los datos personales y aviso de privacidad (Ley 81 de 2019)", "Son los requisitos que no se cumplen", "Gabriel González y Andy Martínez"],
     ["Plan para Python 3.12", "Pierde soporte en abril de 2027", "Walter Sanjur"],

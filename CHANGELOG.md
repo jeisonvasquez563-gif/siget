@@ -6,6 +6,13 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Seguridad (checkpoint PHP y pgAdmin web retirados, puerto 80 cerrado, PT-13, 17-nov)
+- **Retirados el checkpoint PHP (`/gestion/`) y pgAdmin 4 web (`/pgadmin4/`)**, que Apache servía por HTTP sin cifrar en el puerto 80 de VM1. pgAdmin apareció al revisar Apache: era el primer intento de checkpoint y seguía abierto a toda la red. SIGET no usa ninguno de los dos.
+- Con respaldo previo en `/root/respaldo-pt13-2026-11-17/` se detuvieron y deshabilitaron `httpd` y `php-fpm`, se quitó `http` del cortafuegos y el rol `checkpoint_app` quedó sin inicio de sesión (`NOLOGIN`), así que la contraseña que guardaba su configuración ya no sirve. Los paquetes siguen instalados pero apagados; volver atrás está en el runbook §38.2.
+- Después: el 80 no responde, la plataforma sí; `verificar_tramites` 77/77, `verificar_plataforma` 91/91, `verificar_autenticacion` 84/84 y ensayo 101/101 (`docs/sdlc/evidencia/13_*`).
+- **Copia de `siget-docs-key` fuera de VM1**, en el equipo anfitrión, verificada por huella SHA-256 sin mostrar el valor. Falta una segunda copia fuera de ese PC.
+- Efecto en el SDLC: R8 mitigado y R6 parcial; RS-13 pasa a «Cumple» (21 cumplen); amenazas A3 mitigada y A2 parcial (25 mitigadas, 15 parciales, 1 abierta); los 5 hallazgos de la revisión del entorno quedan corregidos.
+
 ### Mantenimiento (VMs actualizadas a Rocky Linux 9.9, 16-nov)
 - **Primera actualización completa del sistema desde la instalación.** Las dos VMs pasaron de Rocky 9.7 (sin soporte desde el 28-may-2026) a **9.9**, la última versión menor, con kernel 5.14.0-741.22.1 y Podman 5.8.5.
 - **Avisos pendientes:** se aplicaron todos los avisos de seguridad pendientes (203 en VM1 y 192 en VM2, más 5 correcciones de errores en cada una, según la línea base del mismo día), entre ellos los 2 críticos (`ca-certificates` RLSA-2026:88459 y Samba RLSA-2026:25049). Quedan **0 críticos y 0 actualizaciones pendientes**.

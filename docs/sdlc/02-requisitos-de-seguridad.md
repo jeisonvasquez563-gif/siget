@@ -28,7 +28,7 @@
 | RS-10 | Auditoría | Las actuaciones sobre trámites, las decisiones de acceso y los eventos de seguridad quedan en registros que nadie puede modificar ni borrar | Triggers `auditoria_inmutable`, `auditoria_sin_truncate` y `decision_inmutable` (`database/diseno-roles-permisos.sql`) y `evento_seguridad_inmutable` (`database/migraciones/004-autenticacion.sql`) | Cumple |
 | RS-11 | Auditoría | También se registran los accesos **negados**, no solo los permitidos | `GET /auditoria/decisiones/?resultado=negadas` y el resumen con `negadas_24h` (`docs/api.md`, «Auditoría»); `docs/zero-trust-cobertura.md`, principio 7 (`decision_pdp`, «también las negadas») | Cumple |
 | RS-12 | Auditoría | El auditor solo puede leer, con su propio usuario de base de datos, y sus propias consultas quedan registradas («quién audita al auditor») | `database/migraciones/007-auditor-login.sql`; `docs/runbook.md` §28; pruebas en `backend/tests/test_auditoria_api.py`; exige rol `auditor`, nivel 3 y segundo factor reciente (`docs/api.md`) | Cumple |
-| RS-13 | Cifrado | Todo el tráfico del navegador viaja cifrado con TLS 1.3 y el navegador no puede volver a HTTP | `ssl_protocols TLSv1.3` y `Strict-Transport-Security` en `infra/podman/vm1-app-backend/nginx.conf`. Falta: el checkpoint PHP antiguo todavía sirve su login por HTTP en el puerto 80 (`docs/zero-trust-cobertura.md`, sección 5, tarea ZT-9) | Parcial |
+| RS-13 | Cifrado | Todo el tráfico del navegador viaja cifrado con TLS 1.3 y el navegador no puede volver a HTTP | `ssl_protocols TLSv1.3` y `Strict-Transport-Security` en `infra/podman/vm1-app-backend/nginx.conf`. El checkpoint PHP, que servía su login por HTTP en el puerto 80, se retiró el 17-nov-2026 y el puerto 80 quedó cerrado (`docs/sdlc/evidencia/13_puerto80_despues`) | Cumple |
 | RS-14 | Cifrado | La conexión entre la aplicación y la base de datos va cifrada, se verifica el certificado del servidor y la base rechaza conexiones sin cifrar | `docs/runbook.md` §18 (TLS 1.3, `hostssl`, verificación del certificado) y tarea ZT-2 en `docs/zero-trust-cobertura.md` | Cumple |
 | RS-15 | Cifrado | Los documentos que adjunta la ciudadanía se guardan cifrados, con una clave aparte, y se detecta si alguien los altera | Rama `feature/backend-documentos`: AES-256-GCM y huella SHA-256 comprobada al descargar (`backend/apps/tramites/documentos.py`), clave `siget-docs-key` como `podman secret`, migración `015-documentos.sql`, pruebas en `backend/tests/test_documentos.py` (CHANGELOG, «documentos adjuntos, PT-8») | Cumple |
 | RS-16 | Disponibilidad | Una ráfaga de peticiones no tumba el servicio: se limita y se responde «demasiadas peticiones» (429) | `limit_req_zone` y `limit_req_status 429` en `infra/podman/vm1-app-backend/nginx.conf`; límite de 10 por hora en la recuperación de contraseña (`docs/api.md`) | Cumple |
@@ -63,7 +63,7 @@
 
 ## Resumen
 
-- **26 requisitos** (3 de ejemplo y 23 nuevos): 20 cumplen, 2 son parciales (RS-13 y RS-17) y **4 no cumplen** (RS-09, RS-22, RS-24 y RS-26).
+- **26 requisitos** (3 de ejemplo y 23 nuevos): 21 cumplen, 1 es parcial (RS-17; RS-13 pasó a «Cumple» el 17-nov-2026 al retirar el checkpoint PHP) y **4 no cumplen** (RS-09, RS-22, RS-24 y RS-26).
 - **11 filas normativas**: 4 cumplen, 3 son parciales y 4 no cumplen.
 - Lo más urgente: los **derechos del titular** sobre sus datos personales (ver, corregir, eliminar) y el **aviso de privacidad** en el registro. Ambos los exige la Ley 81 de 2019 y hoy SIGET no los tiene.
 

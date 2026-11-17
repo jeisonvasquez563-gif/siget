@@ -31,7 +31,7 @@ flowchart LR
 
   subgraph VM1["Límite 2: VM1 app-backend (firewalld, SELinux enforcing)"]
     ADM1["sshd y sudo<br/>administración"]
-    AP["Apache + PHP<br/>checkpoint antiguo, puerto 80"]
+    AP["Apache + PHP<br/>checkpoint antiguo, retirado el 17-nov"]
     TMR["Temporizador de escalamiento<br/>systemd + contenedor desechable"]
     SEC[["podman secret<br/>claves y contraseñas"]]
     VOL[("Volumen siget-documentos<br/>archivos cifrados AES-256-GCM")]
@@ -145,8 +145,8 @@ Incluye las **abiertas** y las **parciales**, ordenadas de la más grave a la me
 
 | # | Pieza | STRIDE | Amenaza | Estado | Qué falta | Riesgo |
 |---|---|---|---|---|---|---|
-| A2 | Documentos | D | Pérdida de la clave o del volumen de documentos | Abierta | Respaldar `siget-docs-key` fuera de VM1 y separada de los archivos; respaldo del volumen | R6 |
-| A3 | nginx (VM1) | I | El checkpoint PHP envía la contraseña sin cifrar por el puerto 80 | Abierta | Retirar el checkpoint, cerrar el puerto 80 y rotar su contraseña de base | R8 |
+| A2 | Documentos | D | Pérdida de la clave o del volumen de documentos | Parcial | Hecho el 17-nov-2026: copia de `siget-docs-key` fuera de VM1, verificada por huella. Resta: una copia fuera del equipo anfitrión y el respaldo del volumen | R6 |
+| A3 | nginx (VM1) | I | El checkpoint PHP envía la contraseña sin cifrar por el puerto 80 | **Mitigada** (17-nov-2026) | Hecho: checkpoint y pgAdmin web retirados, puerto 80 cerrado y `checkpoint_app` sin inicio de sesión (`docs/sdlc/evidencia/13_*`) | R8 |
 | A4 | Base de datos | D | Una sola persona con sudo completo | Abierta | Decidir quién más puede operar VM2, al menos para restaurar | R9 |
 | P1 | Documentos | E | PDF malicioso sin antivirus | Parcial | Análisis con ClamAV en un contenedor aparte | R4 |
 | P2 | Documentos | I | Clave y archivos en la misma VM, legibles por quien opera como `siget` | Parcial | Guardar la clave fuera de VM1 (o en un custodio aparte) | R6 |
@@ -168,12 +168,12 @@ Incluye las **abiertas** y las **parciales**, ordenadas de la más grave a la me
 
 | Estado | Ejemplo del backend | Piezas completadas | Total |
 |---|---|---|---|
-| Mitigada | 6 | 18 | 24 |
-| Parcial | 0 | 14 | 14 |
-| Abierta | 0 | 3 | 3 |
+| Mitigada | 6 | 19 | 25 |
+| Parcial | 0 | 15 | 15 |
+| Abierta | 0 | 1 | 1 |
 | **Total** | **6** | **35** | **41** |
 
-**La amenaza abierta más grave** es ahora A2, la pérdida de la clave o del volumen de documentos: el daño no se puede revertir. La que lo era, A1 (los parches), se mitigó el 16-nov-2026: afectaba a las dos máquinas a la vez y una vulnerabilidad del sistema operativo podía saltarse todas las barreras de la aplicación.
+**La amenaza abierta** que queda es A4 (una sola persona con sudo en VM2). A2, la pérdida de la clave de documentos, pasó a Parcial el 17-nov-2026 con la copia fuera de VM1, y A3 (checkpoint PHP en HTTP) quedó mitigada ese mismo día. La que lo era, A1 (los parches), se mitigó el 16-nov-2026: afectaba a las dos máquinas a la vez y una vulnerabilidad del sistema operativo podía saltarse todas las barreras de la aplicación.
 
 ## Preguntas que puede hacer el profesor
 
@@ -190,7 +190,7 @@ Es la frontera entre dos zonas en las que confiamos distinto, por ejemplo entre 
 Porque partimos de la idea de que una barrera puede fallar. El PDP decide en el backend con todas las reglas (segundo factor reciente, conflicto de interés); la RLS se aplica dentro de la base y solo deja ver las filas de las instituciones autorizadas. Si un error de programación se salta el PDP, la base igual niega. De hecho, la RLS nos ayudó a descubrir un permiso demasiado amplio que corregimos (runbook 27).
 
 **5. ¿Cuál es la amenaza abierta más grave?**
-La pérdida de la clave de los documentos: si se pierde, los archivos cifrados quedan ilegibles para siempre, y hoy la clave existe solo en VM1. La que era la más grave, las máquinas virtuales sin parches (170 y 177 avisos, dos críticos en cada una), la mitigamos el 16-nov-2026: actualizamos las dos a Rocky 9.9 y quedaron en cero críticos y cero pendientes. Importaba mucho porque está por debajo de todo lo que construimos: si alguien toma el sistema operativo, nuestras reglas de aplicación ya no lo detienen.
+Hoy queda una sola abierta: que una sola persona tenga sudo en VM2 (A4), porque si no está nadie puede restaurar ni parchar. Hasta el 17 de noviembre la más grave era la pérdida de la clave de los documentos, porque existía solo en VM1 y sin ella los archivos cifrados quedan ilegibles para siempre; ese día sacamos una copia fuera de VM1, verificada por su huella sin mostrar el valor, y pasó a Parcial (falta una copia fuera del PC anfitrión). Antes, la más grave eran las máquinas virtuales sin parches (203 y 192 avisos de seguridad, dos críticos en cada una), que la mitigamos el 16-nov-2026: actualizamos las dos a Rocky 9.9 y quedaron en cero críticos y cero pendientes. Importaba mucho porque está por debajo de todo lo que construimos: si alguien toma el sistema operativo, nuestras reglas de aplicación ya no lo detienen.
 
 **6. ¿Cómo se protege un documento que sube un ciudadano?**
 Primero revisamos el contenido real del archivo, no solo su nombre: solo aceptamos PDF, PNG y JPEG de hasta 5 MB. Después lo ciframos con AES-256-GCM atado a su trámite, así que si alguien lo copia o lo cambia, deja de abrirse. Guardamos su huella SHA-256 y la comparamos en cada descarga, que siempre sale como archivo adjunto y nunca se abre dentro de la página. Lo que nos falta es un antivirus y respaldar la clave fuera de VM1.
@@ -202,7 +202,7 @@ El token de acceso dura solo 10 minutos y vive en la memoria de la página, no g
 Por mínimo privilegio: el temporizador solo necesita marcar los trámites vencidos. Su rol no puede leer ninguna tabla, solo ejecutar una función, y el contenedor no recibe las claves de la aplicación. Si alguien robara esa contraseña, lo único que podría hacer es escalar trámites que ya vencieron, y eso queda en la auditoría.
 
 **9. ¿Por qué marcaron amenazas como «parcial» o «abierta» en vez de decir que todo está cubierto?**
-Porque un modelo de amenazas que solo dice «mitigada» no sirve para decidir nada. Preferimos ser honestos: 24 mitigadas, 14 parciales y 3 abiertas, cada una con lo que falta y su riesgo en el registro de la etapa 1. Así el equipo sabe exactamente qué arreglar primero.
+Porque un modelo de amenazas que solo dice «mitigada» no sirve para decidir nada. Preferimos ser honestos: hoy son 25 mitigadas, 15 parciales y 1 abierta, cada una con lo que falta y su riesgo en el registro de la etapa 1. Así el equipo sabe exactamente qué arreglar primero.
 
 **10. ¿Cómo saben que los controles que nombran existen de verdad?**
 Cada control de las tablas está en un archivo concreto del repositorio que nombramos, y muchos tienen pruebas automáticas o evidencia: por ejemplo, la prueba de que la auditoría no se puede borrar, el escaneo de ZAP y Nmap después de corregir, y la prueba de cabecera `Host` falsa que responde 421.
