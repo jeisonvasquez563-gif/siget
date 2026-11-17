@@ -10,7 +10,7 @@ from apps.catalogo.models import Feriado, Institucion, TipoTramite
 from apps.identidad.models import Aprobacion, Membresia, Perfil, Usuario
 from apps.identidad.sujeto import construir_sujeto
 from apps.nucleo.esquema import columnas_del_modelo, diferencias, modelos_de_dominio
-from apps.tramites.models import Tramite, Transicion
+from apps.tramites.models import Documento, Tramite, Transicion
 
 TABLAS = {
     Institucion: "institucion", TipoTramite: "tipo_tramite", Usuario: "usuario", Membresia: "membresia",
@@ -19,6 +19,7 @@ TABLAS = {
     Sesion: "sesion", EventoSeguridad: "evento_seguridad", Perfil: "perfil",
     Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto", Feriado: "feriado",
     Invitacion: "invitacion",
+    Documento: "documento",
 }
 
 
