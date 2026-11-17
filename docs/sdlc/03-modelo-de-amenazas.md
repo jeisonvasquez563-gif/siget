@@ -101,7 +101,7 @@ flowchart LR
 | I | El servidor revela versiones, rutas internas o archivos que no debería servir | `server_tokens off`, `proxy_hide_header X-Powered-By`, solo los prefijos de la API llegan al backend y todo lo demás responde 404 (`nginx.conf`); Apache con `ServerTokens Prod` y `TraceEnable Off` (`docs/analisis-seguridad/README.md`, «Aplicado en producción»); OWASP ZAP sin alertas de riesgo después de corregir (`docs/analisis-seguridad/despues/11_zap_escaneo.txt`) | Mitigada |
 | I | Alguien en la misma red lee usuario y contraseña del checkpoint PHP antiguo, que se sirve por HTTP en el puerto 80 de VM1 | La plataforma nueva no tiene este problema (todo por TLS 1.3 y el puerto 8080 solo redirige con 301). El checkpoint tiene la cookie `HttpOnly` y `SameSite=Strict` (`docs/analisis-seguridad/README.md`), pero sin TLS su contraseña viaja en claro y la cookie no puede llevar `Secure`. Nmap lo confirma (`despues/10_nmap_puertos_tls.txt`). Plan: retirarlo y cerrar el puerto 80 (ZT-9 / PT-13; R8) | Abierta |
 | D | Una ráfaga de peticiones desde una dirección satura el servicio | `limit_req` de 20 peticiones por segundo por dirección con respuesta 429, cuerpo máximo de 10 MB y tiempos de espera de 15 segundos (`nginx.conf`); además, límites por tipo de petición en Django con caché compartida entre procesos (`config/settings.py`, hallazgo H-4 corregido). Si se abre a internet detrás de un proxy, primero hay que leer la IP real (R19) | Mitigada |
-| E | Una falla de nginx permite ejecutar código y saltar desde el contenedor al resto de VM1 | Contenedor rootless con `NoNewPrivileges`, `DropCapability=ALL`, sistema de archivos de solo lectura y configuración montada `:ro` (`siget-nginx.container`); SELinux en enforcing (runbook 12.5). **Queda:** la imagen de nginx no se reconstruye desde hace meses (UBI 9.7) y VM1 tiene avisos de seguridad sin aplicar (R5, R23) | Parcial |
+| E | Una falla de nginx permite ejecutar código y saltar desde el contenedor al resto de VM1 | Contenedor rootless con `NoNewPrivileges`, `DropCapability=ALL`, sistema de archivos de solo lectura y configuración montada `:ro` (`siget-nginx.container`); SELinux en enforcing (runbook 12.5). **Queda:** la imagen de nginx no se reconstruye desde hace meses (UBI 9.7) y las VMs ya no tienen avisos pendientes desde el 16-nov-2026 (R5), pero la imagen sigue sin reconstruirse (R23) | Parcial |
 
 ## Base de datos PostgreSQL
 
@@ -114,7 +114,7 @@ flowchart LR
 | D | Se pierde la base (falla del disco, error humano) o se agotan sus conexiones | Límite de conexiones por rol (`app_role` 20, `auditor_role` 5, `escalador_role` 2; migraciones 003, 007 y 013); respaldo diario con **prueba de restauración** en cada corrida (`infra/podman/vm2-db-server/respaldo/siget-respaldo.sh`). **Queda:** los respaldos están en la misma VM2 y no hay segunda base (R7, R17) | Parcial |
 | D | La única persona con sudo completo en las VMs no está disponible y nadie puede restaurar, parchar ni migrar | Procedimientos escritos paso a paso (runbook 33 a 37) y sudo acotado de Andy en VM1 (runbook 20). No hay una segunda persona capaz de operar VM2 (R9, decisión abierta) | Abierta |
 | E | Quien controla `app_role` intenta volverse superusuario, crear roles o saltarse la RLS | Ningún rol del proyecto es superusuario ni tiene `BYPASSRLS` ni `CREATEROLE` (`diseno-roles-permisos.sql`); `REVOKE ALL ... FROM PUBLIC`; las funciones `SECURITY DEFINER` tienen `search_path` fijo (`siget, pg_temp`) | Mitigada |
-| E | Un atacante aprovecha una vulnerabilidad conocida y sin parchar del sistema operativo de VM1 o VM2 para tomar la máquina | Solo hay barreras alrededor (SSH solo con clave, firewall, SELinux, contenedores rootless). El parche en sí no se aplica: 170 avisos en VM1 y 177 en VM2, 2 críticos en cada una, y Rocky 9.7 ya sin soporte (informe de mantenimiento, rama `docs/analisis-mantenimiento`; R5, R10). El contenedor de PostgreSQL usa una imagen de docker.io y no quita capacidades (`siget-postgres.container`) | Abierta |
+| E | Un atacante aprovecha una vulnerabilidad conocida y sin parchar del sistema operativo de VM1 o VM2 para tomar la máquina | Solo hay barreras alrededor (SSH solo con clave, firewall, SELinux, contenedores rootless). El 16-nov-2026 se aplicaron los parches con respaldo e instantáneas previas: 0 avisos críticos y 0 actualizaciones pendientes en las dos VMs, y Rocky Linux 9.9 (antes 9.7 sin soporte) (`docs/sdlc/evidencia/10_parches_despues.txt`, `09_vm1_actualizacion.txt`, `09_vm2_actualizacion.txt`; R5, R10). Además se quitó la regla sobrante del puerto 5432 en VM2. **Queda:** el contenedor de PostgreSQL usa una imagen de docker.io y no quita capacidades (`siget-postgres.container`), y VM1 tiene dos repositorios externos con firma inválida que dnf rechaza (R24) | Mitigada |
 
 ## Temporizador de escalamiento
 
@@ -141,11 +141,10 @@ flowchart LR
 
 ## Amenazas abiertas
 
-Incluye las **abiertas** y las **parciales**, ordenadas de la más grave a la menos grave. Las abiertas van primero.
+Incluye las **abiertas** y las **parciales**, ordenadas de la más grave a la menos grave. Las abiertas van primero. La antigua A1 (VMs sin parches) pasó a **Mitigada** el 16-nov-2026 y queda al final como registro.
 
 | # | Pieza | STRIDE | Amenaza | Estado | Qué falta | Riesgo |
 |---|---|---|---|---|---|---|
-| A1 | VM1 y VM2 (fila en la tabla de la base) | E | Vulnerabilidades sin parchar en el sistema operativo | Abierta | Aplicar los parches con respaldo previo y pasar a Rocky 9.8 | R5, R10 |
 | A2 | Documentos | D | Pérdida de la clave o del volumen de documentos | Abierta | Respaldar `siget-docs-key` fuera de VM1 y separada de los archivos; respaldo del volumen | R6 |
 | A3 | nginx (VM1) | I | El checkpoint PHP envía la contraseña sin cifrar por el puerto 80 | Abierta | Retirar el checkpoint, cerrar el puerto 80 y rotar su contraseña de base | R8 |
 | A4 | Base de datos | D | Una sola persona con sudo completo | Abierta | Decidir quién más puede operar VM2, al menos para restaurar | R9 |
@@ -163,17 +162,18 @@ Incluye las **abiertas** y las **parciales**, ordenadas de la más grave a la me
 | P12 | Navegador | I | Un XSS podría usar el token en memoria | Parcial | Mantener la CSP estricta y la prueba de seguridad del frontend | — |
 | P13 | Documentos | R | La descarga no registra qué documento se bajó | Parcial | Registrar el número de documento en la decisión o en la auditoría | — |
 | P14 | Documentos | D | Sin cuota total del volumen | Parcial | Cuota o aviso de disco lleno | — |
+| A1 | VM1 y VM2 (fila en la tabla de la base) | E | Vulnerabilidades sin parchar en el sistema operativo | **Mitigada** (16-nov-2026) | Hecho: actualización a Rocky 9.9, 0 críticos y 0 pendientes (`docs/sdlc/evidencia/10_parches_despues.txt`). Resta mantener la bitácora semanal y resolver los repositorios con firma inválida | R5, R10, R24 |
 
 ### Resumen por estado
 
 | Estado | Ejemplo del backend | Piezas completadas | Total |
 |---|---|---|---|
-| Mitigada | 6 | 17 | 23 |
+| Mitigada | 6 | 18 | 24 |
 | Parcial | 0 | 14 | 14 |
-| Abierta | 0 | 4 | 4 |
+| Abierta | 0 | 3 | 3 |
 | **Total** | **6** | **35** | **41** |
 
-**La amenaza abierta más grave** es A1, los parches: afecta a las dos máquinas a la vez y una vulnerabilidad del sistema operativo podría saltarse todas las barreras de la aplicación.
+**La amenaza abierta más grave** es ahora A2, la pérdida de la clave o del volumen de documentos: el daño no se puede revertir. La que lo era, A1 (los parches), se mitigó el 16-nov-2026: afectaba a las dos máquinas a la vez y una vulnerabilidad del sistema operativo podía saltarse todas las barreras de la aplicación.
 
 ## Preguntas que puede hacer el profesor
 
@@ -190,7 +190,7 @@ Es la frontera entre dos zonas en las que confiamos distinto, por ejemplo entre 
 Porque partimos de la idea de que una barrera puede fallar. El PDP decide en el backend con todas las reglas (segundo factor reciente, conflicto de interés); la RLS se aplica dentro de la base y solo deja ver las filas de las instituciones autorizadas. Si un error de programación se salta el PDP, la base igual niega. De hecho, la RLS nos ayudó a descubrir un permiso demasiado amplio que corregimos (runbook 27).
 
 **5. ¿Cuál es la amenaza abierta más grave?**
-Las máquinas virtuales sin parches: 170 avisos de seguridad en VM1 y 177 en VM2, dos críticos en cada una. Es la más grave porque está por debajo de todo lo que construimos: si alguien toma el sistema operativo, nuestras reglas de aplicación ya no lo detienen. Lo dejamos escrito como pendiente, con plan, en vez de esconderlo.
+La pérdida de la clave de los documentos: si se pierde, los archivos cifrados quedan ilegibles para siempre, y hoy la clave existe solo en VM1. La que era la más grave, las máquinas virtuales sin parches (170 y 177 avisos, dos críticos en cada una), la mitigamos el 16-nov-2026: actualizamos las dos a Rocky 9.9 y quedaron en cero críticos y cero pendientes. Importaba mucho porque está por debajo de todo lo que construimos: si alguien toma el sistema operativo, nuestras reglas de aplicación ya no lo detienen.
 
 **6. ¿Cómo se protege un documento que sube un ciudadano?**
 Primero revisamos el contenido real del archivo, no solo su nombre: solo aceptamos PDF, PNG y JPEG de hasta 5 MB. Después lo ciframos con AES-256-GCM atado a su trámite, así que si alguien lo copia o lo cambia, deja de abrirse. Guardamos su huella SHA-256 y la comparamos en cada descarga, que siempre sale como archivo adjunto y nunca se abre dentro de la página. Lo que nos falta es un antivirus y respaldar la clave fuera de VM1.
@@ -202,7 +202,7 @@ El token de acceso dura solo 10 minutos y vive en la memoria de la página, no g
 Por mínimo privilegio: el temporizador solo necesita marcar los trámites vencidos. Su rol no puede leer ninguna tabla, solo ejecutar una función, y el contenedor no recibe las claves de la aplicación. Si alguien robara esa contraseña, lo único que podría hacer es escalar trámites que ya vencieron, y eso queda en la auditoría.
 
 **9. ¿Por qué marcaron amenazas como «parcial» o «abierta» en vez de decir que todo está cubierto?**
-Porque un modelo de amenazas que solo dice «mitigada» no sirve para decidir nada. Preferimos ser honestos: 23 mitigadas, 14 parciales y 4 abiertas, cada una con lo que falta y su riesgo en el registro de la etapa 1. Así el equipo sabe exactamente qué arreglar primero.
+Porque un modelo de amenazas que solo dice «mitigada» no sirve para decidir nada. Preferimos ser honestos: 24 mitigadas, 14 parciales y 3 abiertas, cada una con lo que falta y su riesgo en el registro de la etapa 1. Así el equipo sabe exactamente qué arreglar primero.
 
 **10. ¿Cómo saben que los controles que nombran existen de verdad?**
 Cada control de las tablas está en un archivo concreto del repositorio que nombramos, y muchos tienen pruebas automáticas o evidencia: por ejemplo, la prueba de que la auditoría no se puede borrar, el escaneo de ZAP y Nmap después de corregir, y la prueba de cabecera `Host` falsa que responde 421.

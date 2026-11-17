@@ -20,14 +20,14 @@ Implementación en SIGET de las **ocho etapas** del SDLC seguro de Red Hat (*Seg
 
 | Etapa | Resultado |
 |---|---|
-| 1. Planificación | 23 riesgos evaluados; 13 con algo pendiente, ordenados para Jeison |
+| 1. Planificación | 24 riesgos evaluados; 13 con algo pendiente, ordenados para Jeison (R5 de parches mitigado el 16-nov; R24 nuevo) |
 | 2. Requisitos | 26 requisitos (20 cumplen, 2 parciales, 4 no cumplen) y 11 artículos de las leyes 81 de 2019, 83 de 2012 y 6 de 2002 |
-| 3. Diseño | 41 amenazas STRIDE en 6 componentes, con diagrama de flujo de datos: 23 mitigadas, 14 parciales, 4 abiertas |
+| 3. Diseño | 41 amenazas STRIDE en 6 componentes, con diagrama de flujo de datos: 24 mitigadas, 14 parciales, 3 abiertas (la de VMs sin parches quedó mitigada el 16-nov) |
 | 4. Desarrollo | 14 reglas de codificación segura; CI de seguridad automático (PR #16, 5 controles en verde) y Dependabot |
 | 5. Documentación | 43 controles inventariados y `SECURITY.md` completa |
 | 6. Pruebas | Pruebas corridas (backend y frontend), lista de revisión de 10 ítems aplicada a los PR #10 y #12 |
-| 7. Implementación | Revisión del entorno de VM1 y VM2: SELinux, SSH, cortafuegos, TLS 1.3 (A), contenedor sin root; 4 hallazgos |
-| 8. Mantenimiento | Primera semana de supervisión, procedimiento ante intrusiones y línea base de parches (2 críticos por VM) |
+| 7. Implementación | Revisión del entorno de VM1 y VM2: SELinux, SSH, cortafuegos, TLS 1.3 (A), contenedor sin root; 5 hallazgos: 3 corregidos el 16-nov (regla del 5432, avisos críticos, Rocky 9.9) y 2 abiertos (puerto 80 del checkpoint PHP y repositorios pgdg con firma inválida) |
+| 8. Mantenimiento | Primera semana de supervisión, procedimiento ante intrusiones y bitácora de parches: de 2 críticos por VM (línea base) a 0 críticos y 0 pendientes tras actualizar a Rocky 9.9 el 16-nov |
 
 ## Cómo se trabaja
 

@@ -6,6 +6,19 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Mantenimiento (VMs actualizadas a Rocky Linux 9.9, 16-nov)
+- **Primera actualización completa del sistema desde la instalación.** Las dos VMs pasaron de Rocky 9.7 (sin soporte desde el 28-may-2026) a **9.9**, la última versión menor, con kernel 5.14.0-741.22.1 y Podman 5.8.5.
+- **Avisos pendientes:** se aplicaron todos los avisos de seguridad pendientes (203 en VM1 y 192 en VM2, más 5 correcciones de errores en cada una, según la línea base del mismo día), entre ellos los 2 críticos (`ca-certificates` RLSA-2026:88459 y Samba RLSA-2026:25049). Quedan **0 críticos y 0 actualizaciones pendientes**.
+- **Cómo se hizo:**
+  - respaldo verificado de la base (`tramites_demo-20261116-222436.dump`);
+  - instantáneas de VMware de las dos VMs (`antes-de-rocky-9.8-2026-11-16`);
+  - VM2 primero y, verificada, VM1;
+  - reinicio de cada una para cargar el kernel nuevo.
+- **Después del reinicio** todo arrancó solo: servicios de SIGET, temporizador de escalamiento, Apache y PHP con su endurecimiento, PostgreSQL y respaldo diario. `verificar_tramites` 77/77, `verificar_plataforma` 91/91, `verificar_autenticacion` 84/84 y ensayo 101/101.
+- **VM2:** se quitó la regla del cortafuegos que permitía el puerto 5432 (PostgreSQL nativo sin uso); queda solo la del 5433.
+- **Hallazgo nuevo en VM1:** los repositorios externos `pgdg-common` y `pgdg14`, que quedaron de pgAdmin, fallan la verificación de firma GPG y dnf los rechaza. Pendiente deshabilitarlos.
+- Evidencia: `docs/sdlc/evidencia/09_*` y `10_*`.
+
 ### Documentación (SDLC seguro implementado, 16-nov)
 - **Las 8 etapas del SDLC seguro de Red Hat están completas en [`docs/sdlc/`](./docs/sdlc/README.md)**, con datos reales de SIGET:
   - 23 riesgos;

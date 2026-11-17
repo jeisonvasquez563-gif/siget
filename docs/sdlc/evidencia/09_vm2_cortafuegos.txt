@@ -1,0 +1,8 @@
+# Corrección — VM2: quitar la regla del puerto 5432 (PostgreSQL nativo sin uso)
+# 2026-11-16 22:35:05  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.100.20 "sudo firewall-cmd --permanent --remove-rich-rule=\"rule family=\\\"ipv4\\\" source address=\\\"192.168.100.10/32\\\" port port=\\\"5432\\\" protocol=\\\"tcp\\\" accept\" && sudo firewall-cmd --reload && echo \"Reglas que quedan:\" && sudo firewall-cmd --list-rich-rules"
+success
+success
+Reglas que quedan:
+rule family="ipv4" source address="192.168.100.10/32" port port="5433" protocol="tcp" accept
+# código de salida: 0

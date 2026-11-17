@@ -110,8 +110,8 @@ const comun = [
     ["¿Por qué eligieron las ocho etapas de Red Hat?", "Porque cubren todo el ciclo, desde planificar hasta mantener, y para cada etapa dicen qué medida de seguridad aplicar. Nos permitió revisar SIGET de punta a punta y repartir el trabajo: cada integrante es responsable de una etapa."],
     ["¿Qué etapa les costó más y por qué?", "El mantenimiento: al revisar encontramos que las máquinas nunca se habían actualizado y que la versión de Rocky Linux ya no tenía soporte. Lo documentamos y hay un plan con fechas para corregirlo."],
     ["¿Cómo saben que lo que dicen es verdad?", "Todo tiene evidencia en el repositorio: capturas y salidas completas de cada comando en `docs/sdlc/evidencia/`, pruebas automáticas que cualquiera puede correr y el historial de cambios en GitHub con quién hizo y quién revisó cada cosa."],
-    ["¿Qué es lo más importante que falta?", "Aplicar los parches pendientes de las máquinas (hay 2 avisos críticos por máquina) y respaldar la clave que cifra los documentos fuera de la máquina. Ambos están en el registro de riesgos y en el plan de mantenimiento."],
-    ["¿Qué harían distinto?", "Haber empezado la supervisión y los parches desde el primer día. El SDLC seguro dice justamente eso: la seguridad no es una etapa final, va en todas."],
+    ["¿Qué es lo más importante que falta?", "Respaldar la clave que cifra los documentos fuera de la máquina, retirar el checkpoint PHP que sigue en HTTP y darle a la persona la forma de ver, corregir y eliminar sus datos personales (Ley 81 de 2019). Los parches ya se aplicaron: el 16 de noviembre las dos máquinas pasaron a Rocky 9.9 sin avisos críticos pendientes."],
+    ["¿Qué harían distinto?", "Haber empezado la supervisión y los parches desde el primer día: las máquinas estuvieron meses sin actualizarse hasta que la revisión de mantenimiento lo descubrió. El SDLC seguro dice justamente eso: la seguridad no es una etapa final, va en todas."],
   ].flatMap(([q, a]) => [new Paragraph({ children: runs("**" + q + "**"), spacing: { before: 160, after: 60 }, keepNext: true }), p(a)]),
   h2("1.5 Glosario rápido"),
   ...tabla(["Término", "En simple"], [
