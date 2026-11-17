@@ -65,4 +65,4 @@ Detalle de lo corregido: [`endurecimiento-vms.md`](../endurecimiento-vms.md).
 | Puertos 80/443 en VM1 | Decisión de Jeison | Apache los ocupa; tocar la app PHP requiere aprobación |
 | Podman en VM2 | Andy, con sudo en VM2 si Jeison lo autoriza | Hoy Andy no tiene sudo allí |
 | Especificación y plan propios del motor ABAC | Equipo | Siguiente entrega de diseño |
-| Verificar los DOI de NIST | Cualquiera | Antes de entregar al profesor |
+| ~~Verificar los DOI de NIST~~ | Hecho el 15-oct | Ambos DOI resuelven a NIST; títulos, autores y años coinciden con las referencias |

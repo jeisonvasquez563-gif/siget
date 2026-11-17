@@ -1,0 +1,328 @@
+"""Recorrido de la API de trámites por HTTP contra la base real, en una transacción que se revierte.
+
+Se mintean tokens directamente (la autenticación ya la cubre `verificar_autenticacion`) para armar personas con
+distintos roles. Atraviesa todo: autenticación, límites, contexto RLS, PDP, base de datos y auditoría.
+Las decisiones del PDP se capturan en memoria SOLO en esta prueba (escribirlas dejaría filas permanentes: la tabla
+es de solo inserción); en producción van por una conexión aparte que no se revierte.
+"""
+import os
+import pathlib
+import tempfile
+from datetime import datetime, timedelta
+from unittest import mock
+
+from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management.base import BaseCommand, CommandError
+from django.db import DatabaseError, connection, connections, transaction
+from django.test import override_settings
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+from apps.auditoria.models import EventoAuditoria
+from apps.autenticacion import contrasenas, tokens
+from apps.autenticacion.models import Sesion
+from apps.autorizacion import permisos
+from apps.catalogo.models import Institucion, TipoTramite, feriados_entre
+from apps.identidad.models import Membresia, Usuario
+from apps.tramites.models import Documento, Tramite
+from apps.tramites.serializacion import sumar_dias_habiles
+
+HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.9"}
+
+
+class _Revertir(Exception):
+    pass
+
+
+DECISIONES = []
+
+
+def _capturar_decision(actor_id, accion, recurso, decision):
+    """En producción las decisiones van por una conexión aparte (`decisiones`), que no se revierte aunque la petición
+    sí. Aquí se capturan en memoria: escribirlas de verdad dejaría filas permanentes (la tabla es de solo inserción)."""
+    DECISIONES.append((actor_id, accion.value, decision.permitido, decision.politica))
+
+
+class Command(BaseCommand):
+    help = "Prueba de integración de la API de trámites contra la base real (se revierte al final)."
+
+    def _paso(self, nombre, ok, detalle=""):
+        self.resultados.append(ok)
+        marca = self.style.SUCCESS("PASA ") if ok else self.style.ERROR("FALLA")
+        self.stdout.write(f"{marca} {nombre}{(' - ' + str(detalle)) if detalle else ''}")
+
+    def _http(self, metodo, ruta, token=None, datos=None):
+        cabeceras = dict(HOST)
+        if token:
+            cabeceras["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+        if metodo == "get":
+            r = self.cliente.get(ruta, secure=True, **cabeceras)
+        else:
+            r = self.cliente.post(ruta, datos, format="json", secure=True, **cabeceras)
+        cache.clear()
+        transaction.set_rollback(False)  # DRF marca la transacción al rechazar; en producción cada petición tiene la suya
+        return r
+
+    def _persona(self, nombre, rol_plataforma="ninguno", mfa_hace_min=1):
+        ahora = timezone.now()
+        return Usuario.objects.create(username=f"int_t_{nombre}", password_hash=contrasenas.inutilizable(), rol_plataforma=rol_plataforma, mfa_activo=True,
+                                      mfa_verificado_en=ahora - timedelta(minutes=mfa_hace_min))
+
+    def _token(self, usuario, scope=tokens.SCOPE_COMPLETO):
+        ahora = timezone.now()
+        s = Sesion.objects.create(usuario=usuario, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=ahora + timedelta(hours=1))
+        from django.conf import settings
+        return tokens.emitir_access(settings.SIGET_JWT_KEY, usuario.pk, s.pk, scope, ahora, 600, settings.SIGET_EMISOR)
+
+    def handle(self, *args, **opciones):
+        self.resultados = []
+        self.cliente = APIClient()
+        try:
+            with transaction.atomic(), mock.patch.object(permisos, "_registrar_decision", _capturar_decision):
+                self._recorrer()
+                raise _Revertir()
+        except _Revertir:
+            pass
+        residuo = Usuario.objects.filter(username__startswith="int_t_").count()
+        self._paso("la transacción se revirtió: no quedó ninguna persona de la prueba", residuo == 0, f"{residuo} filas")
+        total, fallas = len(self.resultados), self.resultados.count(False)
+        self.stdout.write(f"\n{total - fallas} de {total} pasos correctos; no quedó ningún dato (transacción revertida).")
+        if fallas:
+            raise CommandError(f"{fallas} paso(s) fallaron")
+
+    def _recorrer(self):
+        mop = Institucion.objects.get(nombre="MOP")
+        minsa = Institucion.objects.get(nombre="MINSA")
+        tipo_mop = TipoTramite.objects.get(institucion=mop, audiencia="ciudadania")
+        tipo_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="ciudadania")
+        inter_mop = TipoTramite.objects.get(institucion=mop, audiencia="institucion")
+        inter_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="institucion")
+
+        coord = self._persona("coord")
+        ana, beto = self._persona("ana"), self._persona("beto")
+        func_mop, func2_mop, super_mop, func_minsa = (self._persona(n) for n in ("func_mop", "func2_mop", "super_mop", "func_minsa"))
+        operador = self._persona("operador", rol_plataforma="operador_infraestructura")
+        for u, inst, rol in ((func_mop, mop, "funcionario"), (func2_mop, mop, "funcionario"), (super_mop, mop, "supervisor"), (func_minsa, minsa, "funcionario")):
+            Membresia.objects.create(usuario=u, institucion=inst, rol=rol, asignado_por=coord)
+        t = {u.username: self._token(u) for u in (ana, beto, func_mop, func2_mop, super_mop, func_minsa, operador)}
+        tok = lambda u: t[u.username]  # noqa: E731
+
+        def cuantos(persona):
+            r = self._http("get", "/tramites/?limite=100", tok(persona))
+            return len(r.json()["resultados"]) if r.status_code == 200 else f"HTTP {r.status_code}"
+
+        # La base puede tener trámites de la demostración: se mide la línea base antes de crear los propios
+        base_mop, base_minsa = cuantos(func_mop), cuantos(func_minsa)
+
+        # ---------------------------------------------------------------- acceso y catálogo
+        self._paso("sin token se responde 401", self._http("get", "/tramites/").status_code == 401)
+        enrolar = self._token(ana, tokens.SCOPE_ENROLAR_MFA)
+        self._paso("un token de enrolamiento no sirve para la API de trámites", self._http("get", "/tramites/", enrolar).status_code == 403)
+        DECISIONES.clear()
+        r = self._http("get", "/tramites/", tok(operador))
+        self._paso("un operador de plataforma no accede a trámites (el PDP lo niega)", r.status_code == 403, r.status_code)
+        self._paso("y esa denegación quedó registrada, con la política que la motivó",
+                   [(d[2], d[3]) for d in DECISIONES] == [(False, "plataforma_sin_acceso_a_tramites")], DECISIONES)
+
+        r = self._http("get", "/catalogo/instituciones/", tok(ana))
+        self._paso("el catálogo lista las 6 instituciones", r.status_code == 200 and len(r.json()) >= 6, len(r.json()) if r.status_code == 200 else r.status_code)
+        r = self._http("get", f"/catalogo/tipos-tramite/?institucion={mop.pk}", tok(ana))
+        self._paso("el catálogo se filtra por institución", r.status_code == 200 and len(r.json()) == 2 and {t["audiencia"] for t in r.json()} == {"ciudadania", "institucion"})
+        self._paso("un filtro inválido se rechaza", self._http("get", "/catalogo/tipos-tramite/?institucion=abc", tok(ana)).status_code == 400)
+
+        # ---------------------------------------------------------------- crear
+        r = self._http("post", "/tramites/", tok(ana), {"tipo_tramite": tipo_mop.pk})
+        cuerpo = r.json()
+        self._paso("la ciudadana crea un trámite", r.status_code == 201 and cuerpo["estado"] == "Pendiente", r.status_code)
+        tramite_ana = cuerpo["id"]
+        self._paso("el plazo se calcula con el SLA del catálogo (10 días)", cuerpo["fecha_limite"] is not None and cuerpo["vencido"] is False)
+        creado = datetime.fromisoformat(cuerpo["creado_en"])
+        esperado = sumar_dias_habiles(creado, tipo_mop.sla_dias, feriados_entre(creado.date(), creado.date() + timedelta(days=90)))
+        self._paso("el plazo cuenta días hábiles: sin fines de semana ni feriados de la tabla feriado",
+                   abs(datetime.fromisoformat(cuerpo["fecha_limite"]) - esperado) < timedelta(seconds=5), cuerpo["fecha_limite"])
+        self._paso("un trámite nuevo no está escalado", cuerpo["escalado"] is False)
+        try:
+            with transaction.atomic():
+                with connection.cursor() as c:
+                    c.execute("SELECT siget.escalar_vencidos()")
+            self._paso("la aplicación (app_role) NO puede ejecutar el escalamiento", False)
+        except DatabaseError:
+            self._paso("la aplicación (app_role) NO puede ejecutar el escalamiento", True)
+        try:
+            with transaction.atomic():
+                Tramite.objects.filter(pk=tramite_ana).update(escalado_en=timezone.now())
+            self._paso("la aplicación (app_role) NO puede marcar un trámite como escalado", False)
+        except DatabaseError:
+            self._paso("la aplicación (app_role) NO puede marcar un trámite como escalado", True)
+        self._paso("la ciudadana no ve datos de otras personas en su propio trámite", "solicitante_id" not in cuerpo and "funcionario_asignado_id" not in cuerpo and cuerpo["asignado"] is False)
+        r = self._http("post", "/tramites/", tok(ana), {"tipo_tramite": tipo_mop.pk, "solicitante": beto.pk, "solicitante_id": beto.pk,
+                                                        "estado": "Aprobado", "funcionario_asignado_id": func_mop.pk})
+        self._paso("los campos que no le corresponden se ignoran (no puede fijar solicitante, estado ni asignado)",
+                   r.status_code == 201 and r.json()["estado"] == "Pendiente" and r.json()["asignado"] is False)
+        self._paso("un trámite inexistente en el catálogo da 404", self._http("post", "/tramites/", tok(ana), {"tipo_tramite": 999999}).status_code == 404)
+        for malo in ("1", True, 1.5, None, [1], -3, 10**30):
+            if self._http("post", "/tramites/", tok(ana), {"tipo_tramite": malo}).status_code != 400:
+                self._paso(f"un tipo de trámite inválido ({malo!r}) se rechaza", False)
+                break
+        else:
+            self._paso("un tipo de trámite inválido (texto, booleano, decimal, nulo, lista, negativo, enorme) se rechaza con 400", True)
+        self._paso("un cuerpo que no es un objeto se rechaza", self._http("post", "/tramites/", tok(ana), [1, 2]).status_code == 400)
+        r = self._http("post", "/tramites/", tok(beto), {"tipo_tramite": tipo_minsa.pk})
+        tramite_beto_minsa = r.json()["id"]
+
+        # ---------------------------------------------------------------- quién ve qué (RLS)
+        self._paso("la ciudadana ve solo sus 2 trámites", cuantos(ana) == 2, cuantos(ana))
+        self._paso("el funcionario del MOP ve 2 más (los de su institución), no el del MINSA", cuantos(func_mop) == base_mop + 2, f"{base_mop} + 2 esperado, hay {cuantos(func_mop)}")
+        self._paso("el funcionario del MINSA ve 1 más (el del MINSA), no los del MOP", cuantos(func_minsa) == base_minsa + 1, f"{base_minsa} + 1 esperado, hay {cuantos(func_minsa)}")
+        self._paso("la segunda ciudadana ve solo el suyo", cuantos(beto) == 1, cuantos(beto))
+        # Gestionar personas no da acceso a los datos de los trámites (la RLS solo abre las instituciones donde se atiende)
+        coordinador = self._persona("coordinador_mop")
+        Membresia.objects.create(usuario=coordinador, institucion=mop, rol="coordinador_institucional", asignado_por=super_mop)
+        t[coordinador.username] = self._token(coordinador)
+        self._paso("el coordinador de la institución NO ve ningún trámite de ella (gestiona personas, no datos)", cuantos(coordinador) == 0, cuantos(coordinador))
+        self._paso("ni siquiera uno concreto: para él no existe (404)", self._http("get", f"/tramites/{tramite_ana}/", tok(coordinador)).status_code == 404)
+        self._paso("pero sí ve el equipo de su institución", self._http("get", "/equipo/", tok(coordinador)).status_code == 200)
+        self._paso("y el personal sin rol de supervisión o coordinación no ve el equipo (403)", self._http("get", "/equipo/", tok(func_mop)).status_code == 403)
+        r = self._http("get", "/tramites/", tok(func_mop))
+        self._paso("el personal ve los datos internos; la ciudadana no", "solicitante_id" in r.json()["resultados"][0])
+
+        self._paso("el solicitante ve el detalle de su trámite", self._http("get", f"/tramites/{tramite_ana}/", tok(ana)).status_code == 200)
+        self._paso("otra ciudadana recibe 404 (no se revela que existe)", self._http("get", f"/tramites/{tramite_ana}/", tok(beto)).status_code == 404)
+        self._paso("el personal de otra institución recibe 404", self._http("get", f"/tramites/{tramite_ana}/", tok(func_minsa)).status_code == 404)
+        self._paso("el personal de la institución lo ve", self._http("get", f"/tramites/{tramite_ana}/", tok(func_mop)).status_code == 200)
+        self._paso("un id enorme no rompe nada (404)", self._http("get", f"/tramites/{10**30}/", tok(ana)).status_code == 404)
+        self._paso("una paginación inválida se rechaza", self._http("get", "/tramites/?limite=0", tok(ana)).status_code == 400 and self._http("get", "/tramites/?limite=1", tok(ana)).json()["limite"] == 1)
+        r = self._http("get", "/tramites/?escalados=1&limite=100", tok(ana))
+        self._paso("el filtro de escalados solo devuelve trámites escalados", r.status_code == 200 and all(t["escalado"] for t in r.json()["resultados"]))
+        self._paso("un valor inválido del filtro de escalados se rechaza", self._http("get", "/tramites/?escalados=si", tok(ana)).status_code == 400)
+
+        # ---------------------------------------------------------------- documentos adjuntos (PT-8)
+        pdf = b"%PDF-1.7\n%verificacion SIGET\n%%EOF\n"
+        with tempfile.TemporaryDirectory() as carpeta, override_settings(SIGET_DOCS_KEY=os.urandom(32), SIGET_DOCS_DIR=carpeta):
+            def subir(token, nombre, contenido, tramite=tramite_ana):
+                cab = dict(HOST, HTTP_AUTHORIZATION=f"Bearer {token}")
+                r = self.cliente.post(f"/tramites/{tramite}/documentos/", {"archivo": SimpleUploadedFile(nombre, contenido)},
+                                      format="multipart", secure=True, **cab)
+                cache.clear()
+                transaction.set_rollback(False)
+                return r
+            r = subir(tok(ana), "../../requisito.pdf", pdf)
+            doc = r.json() if r.status_code == 201 else {}
+            self._paso("la ciudadana adjunta un PDF a su trámite (el nombre se sanea)", r.status_code == 201 and doc.get("nombre") == "requisito.pdf", r.status_code)
+            fila = Documento.objects.filter(pk=doc.get("id")).first()
+            en_disco = (pathlib.Path(carpeta) / fila.ubicacion[:2] / fila.ubicacion).read_bytes() if fila else b""
+            self._paso("en disco el archivo está cifrado (no aparece el contenido) y la ruta la generó el servidor",
+                       fila is not None and pdf not in en_disco and en_disco.startswith(b"SGD1") and "requisito" not in fila.ubicacion)
+            r = self._http("get", f"/tramites/{tramite_ana}/documentos/{doc.get('id')}/", tok(ana))
+            self._paso("al descargarlo vuelve idéntico, como adjunto y sin que el navegador lo interprete",
+                       r.status_code == 200 and r.content == pdf and r["Content-Disposition"].startswith("attachment")
+                       and r["X-Content-Type-Options"] == "nosniff" and r["Cache-Control"] == "no-store", r.status_code)
+            self._paso("un ejecutable con extensión .pdf se rechaza (415)", subir(tok(ana), "factura.pdf", b"MZ\x90\x00binario").status_code == 415)
+            self._paso("un HTML o un SVG se rechazan (415)", subir(tok(ana), "x.html", b"<script>").status_code == subir(tok(ana), "x.svg", b"<svg>").status_code == 415)
+            self._paso("otro ciudadano no ve ni adjunta en un trámite ajeno (404: para él no existe)",
+                       self._http("get", f"/tramites/{tramite_ana}/documentos/", tok(beto)).status_code == 404 and subir(tok(beto), "a.pdf", pdf).status_code == 404)
+            r = self._http("get", f"/tramites/{tramite_ana}/documentos/", tok(func_mop))
+            self._paso("el personal de la institución ve los documentos (con la huella SHA-256)", r.status_code == 200 and len(r.json()["documentos"]) == 1 and "sha256" in r.json()["documentos"][0])
+            self._paso("el personal no adjunta documentos en nombre de la persona (403)", subir(tok(func_mop), "a.pdf", pdf).status_code == 403)
+            self._paso("el personal de otra institución no los ve (404)", self._http("get", f"/tramites/{tramite_ana}/documentos/{doc.get('id')}/", tok(func_minsa)).status_code == 404)
+            # La seguridad por filas oculta el trámite antes de llegar al PDP: para el operador no existe (404, no 403)
+            self._paso("un rol de plataforma no ve documentos (para él el trámite no existe: 404)",
+                       self._http("get", f"/tramites/{tramite_ana}/documentos/", tok(operador)).status_code == 404)
+            pathlib.Path(carpeta, fila.ubicacion[:2], fila.ubicacion).write_bytes(en_disco[:-1] + bytes([en_disco[-1] ^ 1]))
+            r = self._http("get", f"/tramites/{tramite_ana}/documentos/{doc.get('id')}/", tok(ana))
+            self._paso("un archivo alterado en disco no se entrega (falla la verificación de integridad)", r.status_code == 500 and r.json()["codigo"] == "documento_no_disponible")
+            for operacion, accion in (("modificar", lambda: Documento.objects.filter(pk=fila.pk).update(nombre="otro.pdf")),
+                                      ("borrar", lambda: Documento.objects.filter(pk=fila.pk).delete())):
+                try:
+                    with transaction.atomic():
+                        accion()
+                    self._paso(f"la aplicación no puede {operacion} un documento", False)
+                except DatabaseError:
+                    self._paso(f"la aplicación no puede {operacion} un documento", True)
+            self._paso("el documento queda en el historial del trámite",
+                       EventoAuditoria.objects.filter(tramite_id=tramite_ana, accion="documento_adjuntado").count() == 1)
+
+        # ---------------------------------------------------------------- cambio de estado
+        r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(ana), {"estado": "En Tramitacion"})
+        self._paso("la ciudadana no puede cambiar el estado", r.status_code == 403)
+        Usuario.objects.filter(pk=func_mop.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=20))
+        r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), {"estado": "En Tramitacion"})
+        self._paso("con el segundo factor vencido (20 min) se niega y se sugiere reautenticar (con un booleano de verdad)", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.json())
+        Usuario.objects.filter(pk=func_mop.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=2))
+        r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), {"estado": "Aprobado"})
+        self._paso("saltarse un paso (Pendiente a Aprobado) se niega", r.status_code == 403)
+        for malo in ({"estado": "Inventado"}, {}, {"estado": 5}, {"estado": None}):
+            if self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), malo).status_code != 400:
+                self._paso(f"un estado inválido ({malo}) se rechaza", False)
+                break
+        else:
+            self._paso("un estado inexistente, ausente o que no es texto se rechaza con 400", True)
+        r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_minsa), {"estado": "En Tramitacion"})
+        self._paso("el personal de otra institución recibe 404 al intentar cambiarlo", r.status_code == 404)
+        r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), {"estado": "En Tramitacion"})
+        self._paso("el funcionario con el segundo factor reciente lo pasa a En Tramitación", r.status_code == 200 and r.json()["estado"] == "En Tramitacion", r.status_code)
+
+        # quién inicia qué: el personal solo hacia otras instituciones y solo trámites interinstitucionales
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": tipo_mop.pk})
+        self._paso("el personal del MOP no inicia un trámite en el MOP", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": inter_mop.pk})
+        self._paso("ni siquiera la solicitud interinstitucional de su propia institución", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": tipo_minsa.pk})
+        self._paso("el personal no inicia en otra institución un trámite pensado para la ciudadanía", r.status_code == 403)
+        r = self._http("post", "/tramites/", tok(func_mop), {"tipo_tramite": inter_minsa.pk})
+        self._paso("el personal del MOP inicia una solicitud interinstitucional en el MINSA", r.status_code == 201, r.status_code)
+        propio = r.json()["id"] if r.status_code == 201 else None
+        self._paso("quien la inició la ve (es suya) y el personal del MINSA también",
+                   self._http("get", f"/tramites/{propio}/", tok(func_mop)).status_code == 200 and self._http("get", f"/tramites/{propio}/", tok(func_minsa)).status_code == 200)
+        r = self._http("post", f"/tramites/{propio}/estado/", tok(func_mop), {"estado": "En Tramitacion"})
+        self._paso("quien la inició no la gestiona: pertenece a otra institución", r.status_code in (403, 404), r.status_code)
+        r = self._http("post", "/tramites/", tok(ana), {"tipo_tramite": inter_minsa.pk})
+        self._paso("la ciudadanía no inicia solicitudes interinstitucionales", r.status_code == 403)
+
+        # ---------------------------------------------------------------- reasignación
+        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(func_mop), {"funcionario_id": func2_mop.pk})
+        self._paso("un funcionario no puede reasignar (solo el supervisor)", r.status_code == 403)
+        for malo in ({"funcionario_id": func_minsa.pk}, {"funcionario_id": ana.pk}, {"funcionario_id": "x"}, {}):
+            if self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(super_mop), malo).status_code != 400:
+                self._paso(f"una reasignación inválida ({malo}) se rechaza", False)
+                break
+        else:
+            self._paso("reasignar a otra institución, al solicitante o con datos inválidos se rechaza con 400", True)
+        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(super_mop), {"funcionario_id": func2_mop.pk})
+        self._paso("el supervisor reasigna a personal de su institución", r.status_code == 200 and r.json()["funcionario_asignado_id"] == func2_mop.pk, r.status_code)
+        r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), {"estado": "Aprobado"})
+        self._paso("un funcionario no mueve un trámite asignado a otro", r.status_code == 403)
+        Usuario.objects.filter(pk=super_mop.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=1))
+        r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(super_mop), {"estado": "Aprobado"})
+        self._paso("el supervisor sí, aunque esté asignado a otro", r.status_code == 200 and r.json()["estado"] == "Aprobado", r.status_code)
+        r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(super_mop), {"estado": "Rechazado"})
+        self._paso("un estado final no admite más cambios", r.status_code == 403)
+
+        # ---------------------------------------------------------------- historial
+        r = self._http("get", f"/tramites/{tramite_ana}/historial/", tok(ana))
+        eventos = r.json()["eventos"]
+        acciones = [e["accion"] for e in eventos]
+        self._paso("el solicitante ve el historial completo de su trámite, en orden",
+                   r.status_code == 200 and acciones == ["creacion", "documento_adjuntado", "cambio_estado", "reasignacion", "cambio_estado"], acciones)
+        self._paso("pero sin saber quién actuó ni el detalle interno", all("actor_id" not in e and "atributos" not in e for e in eventos))
+        r = self._http("get", f"/tramites/{tramite_ana}/historial/", tok(func_mop))
+        self._paso("el personal ve quién actuó en cada paso", all("actor_id" in e for e in r.json()["eventos"])
+                   and next(e for e in r.json()["eventos"] if e["accion"] == "cambio_estado")["actor_id"] == func_mop.pk)
+        self._paso("otra ciudadana recibe 404 al pedir el historial", self._http("get", f"/tramites/{tramite_ana}/historial/", tok(beto)).status_code == 404)
+
+        # ---------------------------------------------------------------- decisiones registradas
+        negadas = [d for d in DECISIONES if d[2] is False]
+        permitidas = [d for d in DECISIONES if d[2] is True]
+        self._paso("cada decisión del PDP, permitida o negada, quedó registrada", len(negadas) >= 6 and len(permitidas) >= 8, f"{len(permitidas)} permitidas y {len(negadas)} negadas")
+        politicas = {d[3] for d in DECISIONES}
+        self._paso("con la política que la motivó",
+                   {"conflicto_de_interes", "sin_regla_que_permita", "funcionario_cambia_estado"} <= politicas, sorted(politicas))
+        # La propiedad que importa en producción: las decisiones NO van por la conexión de la petición
+        principal, aparte = connections["default"], connections["decisiones"]
+        self._paso("las decisiones usan una conexión distinta, en autocommit y fuera de toda transacción",
+                   principal is not aparte and aparte.get_autocommit() and not aparte.in_atomic_block)
+        with connection.cursor() as c:
+            c.execute("select current_user, (select rolsuper from pg_roles where rolname = current_user)")
+            usuario_bd, es_super = c.fetchone()
+        self._paso("todo se ejecutó como app_role, sin superusuario", usuario_bd == "app_role" and not es_super)

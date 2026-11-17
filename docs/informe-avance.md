@@ -106,3 +106,44 @@ Según el [plan de trabajo](./architecture/plan.md), lo que sigue después de es
 - **Sin TLS entre app y BD todavía**: el tráfico PostgreSQL viaja sin cifrar por la red interna. No es explotable desde fuera del laboratorio (red host-only, sin salida), pero debe corregirse antes de cualquier despliegue con datos reales.
 - **Triple stack web temporal en VM1**: conviven, sin conflicto de rutas, pgAdmin4 (`/pgadmin4/`), la aplicación PHP de login y usuarios (`/gestion/`) y, a futuro, el nginx en contenedor que exige el diseño final — hay que definir qué se conserva y qué se retira al avanzar a Podman.
 - **Malentendido inicial de requerimiento**: la primera entrega (pgAdmin) no coincidía con lo pedido por el profesor; se corrigió a tiempo tras una aclaración directa. Vale la lección para futuras entregas: confirmar el alcance exacto antes de invertir tiempo de implementación.
+
+## 7. Actualización al 21 de octubre de 2026
+
+Todo lo descrito arriba corresponde al primer avance (24 de septiembre). Desde entonces el proyecto pasó de un checkpoint a una **plataforma funcionando de punta a punta**. El detalle cronológico está en [`historial-del-proyecto.md`](./historial-del-proyecto.md) y el paso a paso técnico en el [runbook](./runbook.md) (secciones 12 a 32).
+
+### 7.1 Estado actual verificado
+
+| Componente | Estado |
+|---|---|
+| Podman rootless + Quadlet en las dos VMs, usuario de servicio `siget` | Completo y verificado |
+| PostgreSQL 16 en contenedor rootless, TLS 1.3, sin superusuario; la base nativa se apagó | Completo y verificado |
+| Roles de base sin superusuario, RLS, disparadores, auditoría de solo inserción (7 migraciones) | Completo y verificado contra la base real |
+| Rol de plataforma dividido en cinco roles con control dual; 10 roles en total | Completo |
+| nginx con TLS 1.3 como única entrada, cabeceras de seguridad y límite de tasa | Completo y verificado |
+| Backend Django + DRF: autenticación (Argon2, JWT corto, TOTP, reautenticación escalonada, bloqueo) | Completo: 47 pasos contra la base real |
+| Decisor de acceso (ABAC) que niega por defecto y ante fallos | Completo: 84 pruebas y 6 mutaciones detectadas |
+| API de trámites y catálogo con auditoría en la misma transacción | Completo: 51 pasos contra la base real |
+| Consola de auditoría con rol de base de datos propio de solo lectura | Completo: 34 pasos contra la base real |
+| Transparencia: matriz de permisos calculada por el PDP, permisos reales de la base y simulador de «qué pasaría si…» | Completo: 39 pasos contra la base real |
+| Interfaz React: 10 módulos por rol, sistema de diseño propio, accesible, claro/oscuro | Completo |
+| Pruebas automáticas y CI | 354 (backend) + 130 (frontend); CI en GitHub en verde |
+| Ensayo de la demostración con las 13 cuentas | 55 de 55 comprobaciones correctas |
+| Documentación | Runbook de 32 secciones, contrato de la API, guía para abrir la plataforma y guion de la demo |
+| Plazos con escalamiento automático, documentos, notificaciones, consolas de los operadores | Pendiente |
+| Respaldos automáticos de la base | Pendiente (hay respaldos manuales verificados) |
+| Retiro del checkpoint PHP | Pendiente (semana 6) |
+
+### 7.2 Decisiones que se agregan a las de arriba
+
+- **Sin superusuario y con control dual:** ningún rol puede las 18 acciones del sistema (lo comprueba una prueba automática).
+- **Dos barreras de aislamiento** (decisor en Django y seguridad por filas en PostgreSQL).
+- **La consola de auditoría lee con un rol de base propio de solo lectura**, y cada consulta queda registrada.
+- **Sin estilos ni scripts en línea** (CSP estricta): la interfaz usa CSS propio.
+- **La documentación en pantalla se calcula del motor real** (matriz y simulador), para que no pueda desactualizarse.
+
+### 7.3 Riesgos vigentes
+
+- **Respaldos:** no hay copias automáticas de la base viva; se hizo un respaldo manual verificado el 21-oct. Perderla obligaría a resembrar las cuentas de demostración con credenciales nuevas.
+- **Checkpoint PHP:** sigue sirviendo por HTTP en el puerto 80 hasta su retiro (semana 6); el sistema nuevo no tiene ese desvío.
+- **Actualizaciones pendientes** de las VMs: se aplican y se reinicia después de la presentación.
+

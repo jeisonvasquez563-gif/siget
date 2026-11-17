@@ -1,0 +1,17 @@
+# Retiro del checkpoint PHP y pgAdmin, cierre del puerto 80 (17-nov-2026)
+# 2026-11-17 14:07:48  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-sdlc
+$ bash C:\Users\jeiva\AppData\Local\Temp/pt13/retiro.sh
+== 1. Respaldo (solo root)
+78af6703f3bc1af0321129c7b6b06d9b9bd27b64cfe34a8b801330463730cdef  checkpoint-apache-php-pgadmin.tar.gz
+archivos en el respaldo: 80
+== 2. Detener y deshabilitar Apache (checkpoint y pgAdmin) y php-fpm
+  Removed "/etc/systemd/system/multi-user.target.wants/httpd.service".
+  Removed "/etc/systemd/system/multi-user.target.wants/php-fpm.service".
+httpd: inactive / disabled
+php-fpm: inactive / disabled
+== 3. Cerrar el puerto 80 en el cortafuegos
+success
+success
+servicios: dhcpv6-client ssh
+puertos: 8080/tcp 8443/tcp
+# código de salida: 0

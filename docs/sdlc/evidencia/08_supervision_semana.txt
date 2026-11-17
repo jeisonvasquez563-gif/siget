@@ -1,0 +1,27 @@
+# Etapa 8 — Supervisión: eventos de seguridad de los últimos 7 días (solo totales)
+# 2026-11-16 22:12:09  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.100.20 "bash /tmp/psql-contenedor.sh -d tramites_demo -P pager=off -c \"select evento, count(*) as cantidad, count(distinct ip) as ips_distintas from siget.evento_seguridad where creado_en > now() - interval '7 days' group by 1 order by 2 desc\" -c \"select accion, count(*) as cantidad from siget.evento_auditoria where creado_en > now() - interval '7 days' and accion in ('escalamiento','documento_adjuntado') group by 1\" -c \"select permitido, count(*) as decisiones from siget.decision_pdp where creado_en > now() - interval '7 days' group by 1\""
+           evento           | cantidad | ips_distintas 
+----------------------------+----------+---------------
+ login_ok                   |       42 |             1
+ login_fallido              |       33 |             1
+ restablecimiento_rechazado |       12 |             1
+ mfa_verificacion_fallida   |        3 |             1
+ mfa_verificado             |        3 |             1
+ restablecimiento_emitido   |        3 |             1
+ logout                     |        3 |             1
+ alta_rechazada             |        3 |             1
+ alta_propuesta             |        3 |             1
+(9 rows)
+
+    accion    | cantidad 
+--------------+----------
+ escalamiento |       41
+(1 row)
+
+ permitido | decisiones 
+-----------+------------
+ f         |         60
+ t         |         99
+(2 rows)
+# código de salida: 0

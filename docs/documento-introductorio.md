@@ -24,7 +24,7 @@ Diseñar e implementar una aplicación que permita dar seguimiento trazable, ver
 - Registrar cada cambio de estado de un trámite como un evento de auditoría que no pueda modificarse ni eliminarse.
 - Validar las transiciones de estado contra una tabla de transiciones permitidas.
 - Calcular la fecha límite de atención por tipo de trámite y escalar automáticamente los trámites vencidos.
-- Proteger el sistema con controles por capas: aislamiento de red, SELinux, contenedores sin privilegios de administrador, autenticación multifactor y control de acceso por roles.
+- Proteger el sistema con controles por capas: aislamiento de red, SELinux, contenedores sin privilegios de root, autenticación multifactor y control de acceso por roles.
 
 ### 1.3 Metodología y estructura del documento
 
@@ -218,7 +218,7 @@ La solución se despliega en dos servidores Linux (Rocky Linux 9) con SELinux en
 
 | Capa | Componente | Ubicación | Función |
 |---|---|---|---|
-| 1. Cliente | Navegador web (SPA en React) | Equipo del usuario | Interfaz para ciudadano, funcionario, supervisor y administrador. |
+| 1. Cliente | Navegador web (SPA en React) | Equipo del usuario | Interfaz para ciudadano, funcionario, supervisor, coordinador institucional, los cinco roles de operación de plataforma y auditor. |
 | 2. Entrada | nginx con TLS | Servidor de aplicación (VM1) | Terminación TLS y cabeceras de seguridad (HSTS, CSP, X-Frame-Options). |
 | 3. Aplicación | Django + Django REST Framework | Servidor de aplicación (VM1), mismo pod que nginx | API: autenticación, RBAC, máquina de estados, escalamiento. |
 | 4. Datos | PostgreSQL 16 | Servidor de datos (VM2) | Almacenamiento y auditoría de solo inserción; acceso solo desde VM1. |
@@ -235,7 +235,7 @@ Fuente: diseño del proyecto.
 | Backend | Django + DRF (API-first) | Validación de transiciones de estado en el servidor, nunca en el cliente. |
 | Contraseñas | Argon2 | Hash resistente a ataques de fuerza bruta. |
 | Sesión de API | JWT de corta duración + refresh token | El token de acceso vive en memoria; el de refresco en cookie httpOnly, Secure y SameSite=Strict. |
-| MFA | django-otp (TOTP) | Obligatorio para funcionario, supervisor y administrador. |
+| MFA | django-otp (TOTP) | Obligatorio para funcionario, supervisor, coordinador institucional, los cinco roles de operación de plataforma y auditor. |
 | Base de datos | PostgreSQL 16 con TLS | Escucha solo en la IP interna; rol de aplicación con permisos mínimos. |
 | Frontend | React + Vite + Tailwind CSS + shadcn/ui | CORS con lista exacta de orígenes, nunca comodín. |
 | Contenedores | Podman rootless, gestionado con Quadlet | Sin demonio privilegiado ni docker-compose. |
@@ -268,7 +268,13 @@ Fuente: diseño del proyecto.
 | Ciudadano | Crea trámites y consulta el estado de los propios. | No |
 | Funcionario | Tramita y cambia el estado de los trámites de su institución. | Obligatorio |
 | Supervisor | Recibe los trámites escalados por vencimiento y supervisa a los funcionarios. | Obligatorio |
-| Administrador | Gestiona usuarios, instituciones y el catálogo de trámites. | Obligatorio |
+| Coordinador institucional | Gestiona los usuarios, las membresías y el catálogo de trámites de su institución. | Obligatorio |
+| Operador de infraestructura | Gestiona servidores, contenedores, despliegues y parches, sin acceso a trámites. | Obligatorio |
+| Operador de identidades | Da de alta a los coordinadores y restablece el segundo factor (con control dual). | Obligatorio |
+| Operador de catálogo | Da de alta instituciones y tipos de trámite base (con control dual). | Obligatorio |
+| Operador de seguridad | Bloquea cuentas y revoca sesiones ante incidentes. | Obligatorio |
+| Custodio de secretos | Rota contraseñas, claves y certificados. | Obligatorio |
+| Auditor | Lee la auditoría de todas las instituciones, sin tocar trámites. | Obligatorio |
 
 Fuente: diseño del proyecto. El detalle de permisos por rol se afinará en el diseño detallado.
 

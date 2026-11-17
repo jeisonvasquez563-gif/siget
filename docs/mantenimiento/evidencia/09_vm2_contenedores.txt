@@ -1,0 +1,12 @@
+# VM2: imagen de PostgreSQL y el servidor nativo que quedó instalado
+# 2026-11-12 18:55:50  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-plazos
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.100.20 "sudo -H -u siget bash -lc \"cd /tmp && export XDG_RUNTIME_DIR=/run/user/\$(id -u) && podman images --format \\\"table {{.Repository}}:{{.Tag}} {{.CreatedSince}}\\\"\"; bash /tmp/psql-contenedor.sh -d tramites_demo -At -c \"select version()\"; echo; echo \"PostgreSQL nativo (dnf):\"; rpm -q postgresql-server; echo \"servicio: $(systemctl is-active postgresql)\""
+REPOSITORY:TAG                    <no value>
+docker.io/library/postgres:16.15  5 weeks ago
+quay.io/podman/hello:latest       2 years ago
+PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+
+PostgreSQL nativo (dnf):
+postgresql-server-16.15-1.module+el9.8.0+40320+f6f9ed3c.x86_64
+servicio: inactive
+# código de salida: 0

@@ -1,0 +1,475 @@
+{
+ "roles": [
+  {
+   "nombre": "app_role",
+   "descripcion": "El backend (Django): solo lo que la aplicación necesita para trabajar",
+   "existe": true,
+   "superusuario": false,
+   "omite_rls": false,
+   "puede_conectar": true,
+   "limite_conexiones": 20,
+   "crea_roles": false,
+   "crea_bases": false
+  },
+  {
+   "nombre": "auditor_role",
+   "descripcion": "La consola de auditoría: solo lectura del registro",
+   "existe": true,
+   "superusuario": false,
+   "omite_rls": false,
+   "puede_conectar": true,
+   "limite_conexiones": 5,
+   "crea_roles": false,
+   "crea_bases": false
+  },
+  {
+   "nombre": "siget_owner",
+   "descripcion": "Dueño de las tablas: nadie se conecta con él (no tiene inicio de sesión)",
+   "existe": true,
+   "superusuario": false,
+   "omite_rls": false,
+   "puede_conectar": false,
+   "limite_conexiones": -1,
+   "crea_roles": false,
+   "crea_bases": false
+  },
+  {
+   "nombre": "checkpoint_app",
+   "descripcion": "Checkpoint PHP intermedio (se retira en la semana 6)",
+   "existe": true,
+   "superusuario": false,
+   "omite_rls": false,
+   "puede_conectar": true,
+   "limite_conexiones": -1,
+   "crea_roles": false,
+   "crea_bases": false
+  },
+  {
+   "nombre": "pgadmin_lectura",
+   "descripcion": "Consulta de solo lectura para administrar la base",
+   "existe": true,
+   "superusuario": false,
+   "omite_rls": false,
+   "puede_conectar": true,
+   "limite_conexiones": -1,
+   "crea_roles": false,
+   "crea_bases": false
+  }
+ ],
+ "tablas": [
+  {
+   "nombre": "aprobacion",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 0
+  },
+  {
+   "nombre": "decision_pdp",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 1
+  },
+  {
+   "nombre": "evento_auditoria",
+   "rls": true,
+   "politicas": 4,
+   "triggers": 2
+  },
+  {
+   "nombre": "evento_seguridad",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 2
+  },
+  {
+   "nombre": "institucion",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 0
+  },
+  {
+   "nombre": "membresia",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 1
+  },
+  {
+   "nombre": "sesion",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 0
+  },
+  {
+   "nombre": "tipo_tramite",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 0
+  },
+  {
+   "nombre": "tramite",
+   "rls": true,
+   "politicas": 3,
+   "triggers": 2
+  },
+  {
+   "nombre": "transicion",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 0
+  },
+  {
+   "nombre": "usuario",
+   "rls": false,
+   "politicas": 0,
+   "triggers": 1
+  }
+ ],
+ "privilegios": {
+  "app_role": {
+   "aprobacion": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "columnas",
+    "DELETE": "no"
+   },
+   "decision_pdp": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "evento_auditoria": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "evento_seguridad": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "institucion": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "membresia": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "sesion": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "columnas",
+    "DELETE": "no"
+   },
+   "tipo_tramite": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "tramite": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "columnas",
+    "DELETE": "no"
+   },
+   "transicion": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "usuario": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "columnas",
+    "DELETE": "no"
+   }
+  },
+  "auditor_role": {
+   "aprobacion": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "decision_pdp": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "evento_auditoria": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "evento_seguridad": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "institucion": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "membresia": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "sesion": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "tipo_tramite": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "tramite": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "transicion": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "usuario": {
+    "SELECT": "columnas",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   }
+  },
+  "siget_owner": {
+   "aprobacion": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "decision_pdp": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "evento_auditoria": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "evento_seguridad": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "institucion": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "membresia": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "sesion": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "tipo_tramite": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "tramite": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "transicion": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   },
+   "usuario": {
+    "SELECT": "total",
+    "INSERT": "total",
+    "UPDATE": "total",
+    "DELETE": "total"
+   }
+  },
+  "checkpoint_app": {
+   "aprobacion": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "decision_pdp": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "evento_auditoria": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "evento_seguridad": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "institucion": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "membresia": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "sesion": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "tipo_tramite": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "tramite": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "transicion": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "usuario": {
+    "SELECT": "no",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   }
+  },
+  "pgadmin_lectura": {
+   "aprobacion": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "decision_pdp": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "evento_auditoria": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "evento_seguridad": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "institucion": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "membresia": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "sesion": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "tipo_tramite": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "tramite": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "transicion": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   },
+   "usuario": {
+    "SELECT": "total",
+    "INSERT": "no",
+    "UPDATE": "no",
+    "DELETE": "no"
+   }
+  }
+ },
+ "administrador_del_motor": {
+  "nombre": "postgres",
+  "superusuario": true,
+  "nota": "Existe, pero no tiene contraseña y se rechaza por red: solo entra por el socket local del contenedor."
+ },
+ "ningun_rol_de_aplicacion_es_superusuario": true
+}

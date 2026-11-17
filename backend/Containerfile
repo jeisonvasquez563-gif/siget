@@ -1,0 +1,19 @@
+# Imagen del backend de SIGET. Base oficial de Red Hat (UBI 9) con Python 3.12.
+# Corre como usuario sin privilegios (uid 1001, el de la imagen base). No contiene secretos:
+# la clave de Django, la contraseña de la base y la CA se montan con `podman secret`.
+FROM registry.access.redhat.com/ubi9/python-312:latest
+
+WORKDIR /opt/app-root/src
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY config ./config
+COPY apps ./apps
+COPY manage.py pytest.ini ./
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=config.settings
+
+EXPOSE 8000
+# Por defecto sirve la API; para comandos de gestión se sobrescribe: `... python manage.py <comando>`
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-"]

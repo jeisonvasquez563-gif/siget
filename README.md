@@ -1,74 +1,128 @@
 # SIGET — Sistema de Gestión y Trazabilidad
 
-Proyecto de gobierno digital (Ciberseguridad 5, UTP). Referencia funcional inicial: Panamá Conecta.
+[![backend-ci](https://github.com/jeisonvasquez563-gif/siget/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/jeisonvasquez563-gif/siget/actions/workflows/backend-ci.yml)
+[![frontend-ci](https://github.com/jeisonvasquez563-gif/siget/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/jeisonvasquez563-gif/siget/actions/workflows/frontend-ci.yml)
+
+Seguimiento **trazable y seguro** de los trámites ante el Estado panameño. Proyecto de gobierno digital de Ciberseguridad 5 (UTP). Referencia funcional inicial: Panamá Conecta.
 
 **Autor:** Jeison Vásquez — Grupo Ciber5
 
 ## Problemática
 
-Falta de trazabilidad y transparencia en el seguimiento de trámites ante el Estado — expedientes que quedan indefinidamente "en revisión", sin plazos exigibles ni rendición de cuentas. La seguridad (SELinux, aislamiento de red, RBAC, auditoría) es el mecanismo que garantiza que esa trazabilidad sea confiable, no el tema del proyecto en sí.
+Falta de trazabilidad y transparencia en el seguimiento de trámites ante el Estado: expedientes que quedan indefinidamente «en revisión», sin plazos exigibles ni rendición de cuentas. **La seguridad es el método, no el tema:** Zero Trust, sin superusuario y con auditoría inalterable garantizan que esa trazabilidad sea confiable.
 
-## Estado actual
+## ▶ Abrir la plataforma
 
-Infraestructura base (Fase 1) completa y checkpoint de aplicación funcionando:
+> **Guía completa: [`docs/como-abrir-la-plataforma.md`](./docs/como-abrir-la-plataforma.md)** · Presentación al profesor: [`docs/demo-guion.md`](./docs/demo-guion.md)
 
-- Dos VMs Rocky Linux 9 (`app-backend` / `db-server`), red interna dedicada `192.168.100.0/24`, SELinux enforcing, firewall restrictivo.
-- Checkpoint de entrega: aplicación PHP con login y gestión de usuarios (crear/eliminar), corriendo sobre Apache en VM1, contra PostgreSQL en VM2.
+1. Enciende las dos VMs (`app-backend` y `db-server`) en VMware.
+2. Instala la CA del proyecto una sola vez (Windows: `certutil -addstore -user Root infra\pki\siget-ca.crt`; otros sistemas en la guía).
+3. Abre **https://192.168.159.137:8443** (o `https://100.104.206.118:8443` por Tailscale) e inicia sesión con una cuenta de demostración, su contraseña y el código de 6 dígitos del segundo factor.
 
-La arquitectura final del proyecto (Podman rootless, Django + DRF, React, JWT/MFA, modelo de datos completo con trazabilidad a nivel de BD) está definida pero pendiente de implementar — ver `docs/`.
+Las contraseñas **no están en el repositorio**; se las pides al responsable (Jeison). ¿Solo quieres ver las pantallas, sin servidores? `cd frontend && npm install && npm run dev` y abre `http://localhost:5173/?mock=saul.mop` (datos de ejemplo, sin credenciales).
+
+## Qué hace hoy
+
+| | |
+|---|---|
+| **Ciudadanía** | Inicia trámites del catálogo y sigue su estado, plazo e historial (el «recorrido por esclusas») |
+| **Personal** | Atiende la bandeja de su institución (lista y tablero), cambia estados con segundo factor reciente y confirma las resoluciones finales; el supervisor reasigna y atiende escalados |
+| **Coordinación** | Ve al equipo y los roles de su institución, **sin** acceso a los datos de los trámites |
+| **Plataforma** | Cinco roles (infraestructura, identidades, catálogo, seguridad, secretos) con **control dual** y sin acceso a trámites |
+| **Auditoría** | Lee el registro inalterable con un rol de base de datos de solo lectura; cada consulta queda registrada |
+| **Transparencia** | Matriz de roles y permisos **calculada por el propio motor de decisiones**, permisos reales de PostgreSQL y un **simulador de «qué pasaría si…»** |
+| **Segundo factor** | TOTP obligatorio, anti-repetición, bloqueo por intentos, reautenticación escalonada y actividad de seguridad propia |
+
+**No existe un superusuario:** ninguno de los 10 roles puede las 18 acciones del sistema (el que más puede, el supervisor, hace 6).
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+  N["Navegador<br/>React"] -- "HTTPS · TLS 1.3" --> X
+  subgraph VM1["VM1 · app-backend (Podman rootless, pod siget)"]
+    X["nginx :8443<br/>única entrada"] --> D["Django + DRF<br/>autenticación · PDP (ABAC)"]
+  end
+  D -- "TLS 1.3 · verify-full<br/>app_role · auditor_role" --> P
+  subgraph VM2["VM2 · db-server"]
+    P[("PostgreSQL 16<br/>RLS · disparadores<br/>auditoría de solo inserción")]
+  end
+```
+
+**Cada petición atraviesa cinco capas y ninguna confía en la anterior:** nginx/TLS → autenticación (token de 10 minutos, sesión, cuenta, segundo factor) → decisor de acceso (ABAC, niega por defecto) → seguridad por filas de PostgreSQL → disparadores y registro inalterable. Más en [`docs/estructura-plataforma.md`](./docs/estructura-plataforma.md).
+
+## Stack
+
+| Capa | Tecnología |
+|---|---|
+| Interfaz | React 18 + Vite, CSS propio (sin estilos en línea por la CSP), fuentes autohospedadas |
+| API | Django 5.2 LTS + Django REST Framework, Argon2, PyJWT, pyotp, Fernet |
+| Base de datos | PostgreSQL 16 en contenedor rootless, esquema `siget`, RLS |
+| Plataforma | Rocky Linux 9.7, Podman rootless + Quadlet (systemd), nginx, SELinux enforcing, firewalld |
+| Acceso del equipo | SSH solo por clave sobre Tailscale (WireGuard) |
+| Calidad | pytest (354), Vitest + Testing Library + axe (130), ESLint, verificaciones contra la base real, GitHub Actions |
 
 ## Estructura del repositorio (monorepo)
 
 ```
 .
-├── backend/                      # Django + DRF — API del proyecto (Fase 2, pendiente)
-├── frontend/                     # React + Vite + Tailwind + shadcn/ui (Fase 2, pendiente)
+├── backend/              # Django + DRF: apps autenticacion, autorizacion (PDP), tramites, catalogo,
+│                         #   identidad, auditoria, nucleo; comandos verificar_* y sembrar_demo
+├── frontend/             # React + Vite: pantallas por rol, sistema de diseño, pruebas, simulador de desarrollo
+├── database/             # Esquema, diseño de roles, migraciones 002–007, pruebas SQL
 ├── infra/
-│   ├── vm1-app-backend/          # Notas de configuración de VM1
-│   ├── vm2-db-server/            # Notas de configuración de VM2
-│   └── podman/                   # Unidades Quadlet (systemd) — Fase 2, pendiente
-├── database/
-│   └── schema.sql                # Esquema de la base de datos (sin credenciales)
-├── checkpoints/
-│   └── siget-gestion-usuarios/   # Entrega de checkpoint: login + CRUD en PHP (separada de la arquitectura final)
-├── docs/
-│   ├── Runbook_SIGET.docx        # Paso a paso técnico completo
-│   ├── Informe_Avance_SIGET.docx # Resumen ejecutivo, decisiones, pendientes
-│   └── Comandos_Demo_SIGET.txt   # Guion de comandos para demos
-├── .github/workflows/            # CI/CD (planeado, ver README ahí)
-├── .editorconfig
-└── CONTRIBUTING.md               # Convención de ramas y commits
+│   ├── podman/           # Unidades Quadlet y nginx.conf de VM1 y VM2
+│   └── pki/              # CA pública del proyecto
+├── demo/                 # Ensayo automático de la demo, generador de códigos TOTP, capturas
+├── docs/                 # Toda la documentación (ver índice en docs/README.md)
+├── checkpoints/          # El PHP intermedio (se retira en la semana 6), separado a propósito
+├── .github/workflows/    # backend-ci y frontend-ci
+├── CHANGELOG.md          # Cada cambio, con su motivo
+└── CONTRIBUTING.md       # Ramas, commits, documentación y seguridad
 ```
 
-`backend/` y `frontend/` son el desarrollo real del proyecto en Django y React. `checkpoints/` guarda las entregas puntuales de avance (como la app PHP de login/usuarios) que se construyeron rápido para cumplir un pedido específico del profesor, separadas a propósito de la arquitectura final — no se van a ir mezclando con el código definitivo.
+`demo-local/` (credenciales de demostración) y los respaldos `*.dump` **nunca se suben**: están en `.gitignore`.
+
+## Documentación
+
+Todo está en [`docs/`](./docs/README.md). Lo esencial:
+
+| Documento | Para qué |
+|---|---|
+| [`como-abrir-la-plataforma.md`](./docs/como-abrir-la-plataforma.md) | **Abrir, probar y operar la plataforma** |
+| [`historial-del-proyecto.md`](./docs/historial-del-proyecto.md) | **Todo lo que se hizo**, en orden, con decisiones, incidentes y lo que falta |
+| [`demo-guion.md`](./docs/demo-guion.md) | Guion de la presentación, lista de verificación del día y plan B |
+| [`abrir-a-internet.md`](./docs/abrir-a-internet.md) | **Pendiente:** publicar la plataforma a todo internet (opciones, riesgos y plan) |
+| [`runbook.md`](./docs/runbook.md) | Paso a paso técnico de todo lo ejecutado (32 secciones) |
+| [`api.md`](./docs/api.md) | Contrato de la API (frontera entre backend y frontend) |
+| [`zero-trust-cobertura.md`](./docs/zero-trust-cobertura.md) | Cobertura de los 7 principios de Zero Trust (NIST SP 800-207) |
+| [`organizacion-backend-frontend.md`](./docs/organizacion-backend-frontend.md) | Los dos frentes, hojas de ruta y definición de «terminado» |
 
 ## Flujo de trabajo (GitFlow)
 
-- **`main`** — versión estable, lista para mostrar/entregar. Solo recibe merges desde `develop` o `hotfix/*`.
-- **`develop`** — rama de integración, donde conviven los avances antes de consolidarse.
-- **`feature/<nombre>`** — una rama por bloque de trabajo (ej. `feature/podman-quadlet`, `feature/django-modelo-datos`), sale de `develop` y vuelve a `develop` por PR.
-- **`release/<version>`** — cuando se prepara una entrega formal, sale de `develop`, se estabiliza ahí, y se mergea a `main` y de vuelta a `develop`.
-- **`hotfix/<nombre>`** — arreglos urgentes sobre `main`, se mergean a `main` y a `develop`.
+- **`main`** — versión estable para entregar; solo recibe merges desde `develop` o `hotfix/*`.
+- **`develop`** — integración.
+- **`feature/backend-<tema>`** y **`feature/frontend-<tema>`** — un bloque de trabajo por rama y **un PR por frente**, con revisión cruzada.
+- Mensajes con [Conventional Commits]; todo cambio actualiza el `CHANGELOG.md` y, si toca infraestructura, el runbook. Detalle en [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-Convención de mensajes de commit y reglas de seguridad para cada PR: ver [`CONTRIBUTING.md`](./CONTRIBUTING.md).
-
-Ejemplo para arrancar un bloque nuevo de trabajo:
+Verificación local antes de un PR:
 
 ```bash
-git checkout develop
-git pull
-git checkout -b feature/podman-quadlet
-# ... trabajo ...
-git push -u origin feature/podman-quadlet
-# Pull Request feature/podman-quadlet -> develop
+cd backend  && python -m pytest -q          # 354 pruebas, sin base de datos
+cd frontend && npm run verificar            # lint + 130 pruebas + build
 ```
 
-## Regla de oro del proyecto
+Las pruebas contra la base real (`verificar_*`) corren en VM1 dentro de una transacción que se revierte; ver el runbook.
 
-Nunca se elimina ni se sobreescribe nada en las VMs sin aprobación explícita, caso por caso. Todo cambio se documenta antes de ejecutarse.
+## Regla de oro
+
+Nunca se elimina ni se sobrescribe nada en las VMs sin aprobación explícita, caso por caso. Todo cambio se documenta antes de ejecutarse y se respalda la base antes de migrarla.
 
 ## Seguridad
 
-- `checkpoints/*/config.php` **nunca se sube a git** (está en `.gitignore`) — contiene credenciales reales. Usar `config.example.php` como plantilla.
-- SELinux se mantiene en modo `enforcing` en ambas VMs en todo momento.
-- El acceso a PostgreSQL está restringido por firewall a la IP interna exacta de la VM de aplicación.
+- **Cero credenciales en git:** contraseñas, claves y secretos viven como `podman secret` en las VMs; las cuentas de demostración, solo en un archivo local ignorado.
+- SELinux en `enforcing` en ambas VMs; SSH solo por clave; el superusuario de PostgreSQL no tiene contraseña y se rechaza por red.
+- El acceso a PostgreSQL exige TLS 1.3 verificando el certificado y está restringido a la IP interna de la aplicación.
+- Las cuentas de demostración son solo del laboratorio y se suspenden tras la presentación.
+
+[Conventional Commits]: https://www.conventionalcommits.org/

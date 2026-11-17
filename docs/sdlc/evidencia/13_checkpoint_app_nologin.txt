@@ -1,0 +1,14 @@
+# Rol checkpoint_app sin inicio de sesion (17-nov-2026)
+# 2026-11-17 14:11:42  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-sdlc
+$ bash C:\Users\jeiva\AppData\Local\Temp/pt13/rol.sh
+== Antes
+rolname|rolcanlogin|sesiones
+checkpoint_app|t|0
+(1 row)
+== Quitar el inicio de sesion al rol del checkpoint retirado
+ALTER ROLE
+== Despues
+rolname|rolcanlogin
+checkpoint_app|f
+(1 row)
+# código de salida: 0
