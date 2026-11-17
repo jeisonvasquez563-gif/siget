@@ -1,0 +1,17 @@
+# SDLC seguro, etapa 6 (pruebas: revisión de código). Lo que toca la seguridad de la plataforma pide la revisión de quien
+# responde por la infraestructura. Pendiente: agregar las cuentas de GitHub de cada frente (backend y frontend) cuando se
+# confirme quién es quién; mientras tanto, el resto de los cambios sigue la revisión cruzada de CONTRIBUTING.md.
+
+# Infraestructura, base de datos (roles, RLS, migraciones) y el propio CI
+/infra/                         @jeisonvasquez563-gif
+/database/                      @jeisonvasquez563-gif
+/.github/                       @jeisonvasquez563-gif
+
+# Núcleo de seguridad del backend: autenticación, autorización (PDP) y configuración
+/backend/apps/autenticacion/    @jeisonvasquez563-gif
+/backend/apps/autorizacion/     @jeisonvasquez563-gif
+/backend/config/                @jeisonvasquez563-gif
+
+# Política de seguridad y excepciones de las herramientas
+/SECURITY.md                    @jeisonvasquez563-gif
+/.gitleaksignore                @jeisonvasquez563-gif

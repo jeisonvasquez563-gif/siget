@@ -1,0 +1,6 @@
+# Backend en producción: la caché usa un directorio propio con permisos 700 (corrección B108)
+# 2026-11-08 14:31:44  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "sudo -H -u siget bash -lc \"cd /tmp && export XDG_RUNTIME_DIR=/run/user/\$(id -u) && podman exec siget-backend sh -c \\\"id; ls -ld /tmp/siget-cache* \\\"\""
+uid=1001(default) gid=0(root) groups=0(root)
+drwx------. 2 default root 60 Nov  8 19:31 /tmp/siget-cache-1001
+# código de salida: 0

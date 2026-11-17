@@ -51,6 +51,11 @@ def hashear(contrasena: str) -> str:
     return make_password(contrasena)  # Argon2 (único hasher configurado)
 
 
+def inutilizable() -> str:
+    """Hash que ninguna contraseña verifica (cuentas de prueba o sin contraseña); evita guardar valores fijos como "x"."""
+    return make_password(None)
+
+
 def verificar(contrasena: str, hash_guardado: str) -> bool:
     return check_password(contrasena, hash_guardado)
 

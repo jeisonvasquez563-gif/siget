@@ -4,6 +4,8 @@ Usa el cliente de pruebas de DRF (las peticiones pasan por nginx-less pero por t
 autenticación, permisos, límites de tasa, servicios y base de datos). El reloj se controla para probar
 vencimientos, bloqueos y la ventana del segundo factor. No deja ningún dato.
 """
+# Las contraseñas marcadas con «nosec B105» son inválidas a propósito: se envían para comprobar que la API las
+# rechaza (pruebas negativas). Bandit las señala como contraseñas escritas en el código; es un falso positivo revisado.
 from datetime import timedelta
 from unittest import mock
 
@@ -85,9 +87,9 @@ class Command(BaseCommand):
         ahora = timezone.now()
 
         # ---------------------------------------------------------------- registro
-        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": "corta"})
+        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": "corta"})  # nosec B105
         self._paso("rechaza una contraseña débil", r.status_code == 400, r.status_code)
-        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": "passwordpassword"})
+        r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": "passwordpassword"})  # nosec B105
         self._paso("rechaza una contraseña común aunque sea larga", r.status_code == 400)
         r = self._http("post", "/auth/registro/", {"username": "int_ana", "password": CLAVE_BUENA, **personales(1)})
         self._paso("registra una cuenta", r.status_code == 201, r.status_code)
@@ -114,13 +116,13 @@ class Command(BaseCommand):
         self._paso("la contraseña quedó con hash Argon2 (nunca en claro)", ana.password_hash.startswith("argon2$") and CLAVE_BUENA not in ana.password_hash)
 
         # ---------------------------------------------------------------- login sin enumerar usuarios
-        mala = self._http("post", "/auth/login/", {"username": "int_ana", "password": "incorrecta-incorrecta"})
-        inexistente = self._http("post", "/auth/login/", {"username": "no_existe_nadie", "password": "incorrecta-incorrecta"})
+        mala = self._http("post", "/auth/login/", {"username": "int_ana", "password": "incorrecta-incorrecta"})  # nosec B105
+        inexistente = self._http("post", "/auth/login/", {"username": "no_existe_nadie", "password": "incorrecta-incorrecta"})  # nosec B105
         self._paso("usuario inexistente y contraseña mala dan la MISMA respuesta (no se enumera)",
                    (mala.status_code, mala.json()) == (inexistente.status_code, inexistente.json()) and mala.status_code == 401)
         r = self._http("post", "/auth/login/", {"username": "int_ana"})
         self._paso("un login sin contraseña no rompe nada", r.status_code == 401)
-        r = self._http("post", "/auth/login/", {"username": ["int_ana"], "password": 12345})
+        r = self._http("post", "/auth/login/", {"username": ["int_ana"], "password": 12345})  # nosec B105
         self._paso("tipos de datos inesperados no provocan un error 500", r.status_code == 401, r.status_code)
 
         # ---------------------------------------------------------------- login y enrolamiento del segundo factor
@@ -226,7 +228,7 @@ class Command(BaseCommand):
         # ---------------------------------------------------------------- bloqueo por intentos
         self._http("post", "/auth/registro/", {"username": "int_beto", "password": CLAVE_BUENA, **personales(2)})
         for _ in range(3):
-            self._http("post", "/auth/login/", {"username": "int_beto", "password": "mala-mala-mala-1"})
+            self._http("post", "/auth/login/", {"username": "int_beto", "password": "mala-mala-mala-1"})  # nosec B105
         r = self._http("post", "/auth/login/", {"username": "int_beto", "password": CLAVE_BUENA})
         self._paso("tras 3 fallos, ni la contraseña correcta entra (bloqueo de 5 minutos)", r.status_code == 401, r.status_code)
         self._paso("el bloqueo no se distingue de una contraseña mala (misma respuesta)", r.json() == mala.json())
@@ -239,7 +241,7 @@ class Command(BaseCommand):
         # ---------------------------------------------------------------- bloqueo progresivo: 5 -> 15 -> 60 minutos
         self._http("post", "/auth/registro/", {"username": "int_dani", "password": CLAVE_BUENA, **personales(4)})
         dani = Usuario.objects.get(username="int_dani")
-        mala_dani = {"username": "int_dani", "password": "mala-mala-mala-1"}
+        mala_dani = {"username": "int_dani", "password": "mala-mala-mala-1"}  # nosec B105
         buena_dani = {"username": "int_dani", "password": CLAVE_BUENA}
 
         def tres_fallos(instante):
@@ -320,7 +322,7 @@ class Command(BaseCommand):
 
         # ---------------------------------------------------------------- límite de tasa
         self._limpiar()
-        codigos = [self.cliente.post("/auth/login/", {"username": "nadie", "password": "x"}, format="json", secure=True, **HOST).status_code for _ in range(12)]
+        codigos = [self.cliente.post("/auth/login/", {"username": "nadie", "password": "x"}, format="json", secure=True, **HOST).status_code for _ in range(12)]  # nosec B105
         self._limpiar()
         self._paso("el límite de tasa corta una ráfaga de logins (429)", 429 in codigos and codigos[:10].count(429) == 0, f"{codigos.count(401)}x401, {codigos.count(429)}x429")
 

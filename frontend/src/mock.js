@@ -9,6 +9,7 @@
 import matrizEjemplo from './mock-datos/matriz.json'
 import { equipoMock } from './mock-equipo.js'
 import { plataformaMock } from './mock-plataforma.js'
+import { olvidarConfiguracion } from './api.js'
 import bdEjemplo from './mock-datos/base-de-datos.json'
 import simuladorEjemplo from './mock-datos/simulador.json'
 
@@ -95,8 +96,11 @@ const T = (id, tipo, estado, solicitante, asignado, creadoDias, sla, extra = {})
   const t = TIPOS[tipo - 1]
   const creado = Date.now() - creadoDias * DIA
   const limite = creado + sla * DIA
+  const vencido = !['Aprobado', 'Rechazado'].includes(estado) && limite < Date.now()
+  // Como en la plataforma real, el temporizador escala los vencidos (a la hora siguiente de vencer)
+  const escalado_en = vencido ? new Date(limite + 3600000).toISOString() : null
   return { id, tipo_tramite: { id: t.id, nombre: t.nombre }, institucion: t.institucion, estado, fecha_limite: new Date(limite).toISOString(),
-    vencido: !['Aprobado', 'Rechazado'].includes(estado) && limite < Date.now(), creado_en: new Date(creado).toISOString(),
+    vencido, escalado: Boolean(escalado_en), escalado_en, creado_en: new Date(creado).toISOString(),
     solicitante_id: solicitante, funcionario_asignado_id: asignado, sensibilidad: 2, ...extra }
 }
 const TRAMITES_BASE = [
@@ -111,6 +115,7 @@ TRAMITES_BASE.forEach((t, i) => {
   if (t.estado !== 'Pendiente') lista.push(ev(i * 10 + 2, t.id, 'cambio_estado', 'Pendiente', 'En Tramitacion', t.funcionario_asignado_id || 201, (i + 3) * 3600000 * 4))
   if (t.estado === 'En Subsanacion') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', 'En Subsanacion', 202, 3600000 * 9))
   if (t.estado === 'Aprobado' || t.estado === 'Rechazado') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', t.estado, 203, 3600000 * 6))
+  if (t.escalado) lista.push({ ...ev(i * 10 + 4, t.id, 'escalamiento', t.estado, t.estado, null, 0), creado_en: t.escalado_en, atributos: { regla: 'plazo_vencido' } })
   EVENTOS_BASE[t.id] = lista
 })
 
@@ -148,9 +153,12 @@ function paginar(lista, p) {
 }
 
 export function instalarMock(inicial, opciones = {}) {
+  const ajustes = opciones // dentro de fetch, «opciones» es la de cada petición
+  olvidarConfiguracion()
   // Cada instalación parte del mismo estado: lo que se cambie en una sesión de ejemplo no contamina la siguiente
   const TRAMITES = structuredClone(TRAMITES_BASE)
   const EVENTOS = structuredClone(EVENTOS_BASE)
+  const DOCUMENTOS = { 36: [{ id: 1, nombre: 'plano-del-local.pdf', tipo: 'application/pdf', tamano: 482133, creado_en: hace(3600000 * 30) }] }
   let actual = USUARIOS[inicial] ? inicial : null
   let enrolando = inicial === 'enrolar'
   let mfaFresco = false
@@ -178,7 +186,7 @@ export function instalarMock(inicial, opciones = {}) {
     const url = new URL(typeof ruta === 'string' ? ruta : ruta.url, location.origin)
     const p = url.searchParams
     const metodo = (opciones.method || 'GET').toUpperCase()
-    const cuerpo = opciones.body ? JSON.parse(opciones.body) : {}
+    const cuerpo = typeof opciones.body === 'string' ? JSON.parse(opciones.body) : {} // FormData (documentos) se lee aparte
     const camino = url.pathname
     await demora()
     if (camino === '/auth/refresh/') return actual || enrolando ? resp(200, { access_token: 'mock', scope: enrolando ? 'enrolar_mfa' : 'completo' }) : resp(401, { codigo: 'sesion_invalida' })
@@ -200,7 +208,12 @@ export function instalarMock(inicial, opciones = {}) {
       return resp(200, { access_token: 'mock', scope: 'completo' })
     }
     if (camino === '/auth/instituciones/') return resp(200, INSTITUCIONES.map(({ id, nombre }) => ({ id, nombre })))
-    if (camino === '/auth/registro/') return resp(201, { detalle: 'Cuenta creada.' })
+    if (camino === '/auth/configuracion/') return resp(200, { registro: ajustes.registro || 'abierto', aviso_demostracion: Boolean(ajustes.aviso) })
+    if (camino === '/auth/registro/') {
+      if (ajustes.registro === 'cerrado') return resp(403, { codigo: 'registro_cerrado', detalle: 'La creación de cuentas está cerrada en este momento.' })
+      if (ajustes.registro === 'invitacion' && cuerpo.invitacion !== 'K7MQ-2XWD-9PRT') return resp(400, { codigo: 'invitacion_invalida', detalle: 'La invitación no es válida, ya se usó o venció.' })
+      return resp(201, { detalle: 'Cuenta creada.' })
+    }
     if (camino === '/auth/restablecer/') {
       const bueno = (cuerpo.codigo || '').replace(/[\s-]/g, '').toUpperCase() === 'K7MQ2XWD9PRT' && USUARIOS[(cuerpo.username || '').trim().toLowerCase()]
       if (!bueno) return resp(400, { codigo: 'codigo_invalido', detalle: 'El código no es válido, ya se usó o venció.' })
@@ -249,6 +262,25 @@ export function instalarMock(inicial, opciones = {}) {
       TRAMITES.push(t)
       EVENTOS[t.id] = [ev(Date.now(), t.id, 'creacion', null, 'Pendiente', u.id, 1000)]
       return resp(201, dto(u, t))
+    }
+    const d = camino.match(/^\/tramites\/(\d+)\/documentos\/(?:(\d+)\/)?$/)
+    if (d) {
+      const t = TRAMITES.find((x) => x.id === Number(d[1]))
+      if (!t || !visibles(u, t)) return resp(404, { detalle: 'No encontrado.' })
+      const lista = (DOCUMENTOS[t.id] ||= [])
+      if (d[2]) {
+        const doc = lista.find((x) => x.id === Number(d[2]))
+        if (!doc) return resp(404, { detalle: 'No encontrado.' })
+        return new Response(new Blob(['%PDF-1.7 ejemplo'], { type: doc.tipo }), { status: 200, headers: { 'Content-Type': doc.tipo } })
+      }
+      if (metodo === 'GET') return resp(200, { tramite: t.id, documentos: lista })
+      if (esPersonal(u, t)) return negado()
+      const archivo = opciones.body?.get?.('archivo')
+      if (!archivo || !/\.(pdf|png|jpe?g)$/i.test(archivo.name)) return resp(415, { codigo: 'extension_no_permitida', detalle: 'Solo se aceptan PDF, PNG o JPEG.' })
+      const nuevo = { id: Date.now(), nombre: archivo.name, tipo: /\.pdf$/i.test(archivo.name) ? 'application/pdf' : /\.png$/i.test(archivo.name) ? 'image/png' : 'image/jpeg', tamano: archivo.size, creado_en: new Date().toISOString() }
+      lista.push(nuevo)
+      EVENTOS[t.id].push({ ...ev(Date.now(), t.id, 'documento_adjuntado', t.estado, t.estado, u.id, 0), atributos: { documento: nuevo.id } })
+      return resp(201, nuevo)
     }
     const m = camino.match(/^\/tramites\/(\d+)\/(estado\/|reasignar\/|historial\/)?$/)
     if (m) {

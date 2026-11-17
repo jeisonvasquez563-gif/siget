@@ -1,0 +1,39 @@
+# SDLC seguro, etapas 4 y 8: Dependabot propone, por PR, las actualizaciones de las dependencias (y avisa de las que tienen
+# vulnerabilidades). Cada PR pasa por el CI de pruebas y de seguridad y por la revisión obligatoria antes de fusionarse.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    target-branch: develop
+    labels: [dependencias, backend]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    target-branch: develop
+    labels: [dependencias, frontend]
+    open-pull-requests-limit: 5
+    groups:
+      herramientas-de-desarrollo:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: develop
+    labels: [dependencias, ci]
+
+  # Imágenes base de los contenedores (UBI 9): avisa cuando hay una etiqueta nueva
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+    target-branch: develop
+    labels: [dependencias, contenedores]
