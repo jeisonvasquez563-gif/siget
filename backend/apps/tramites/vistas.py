@@ -10,6 +10,8 @@ Cómo se protege cada petición (Zero Trust, "nunca confiar, siempre verificar")
 
 Lo que la persona no puede ver, para ella no existe (404): no se distingue "no existe" de "no es tuyo".
 """
+from datetime import timedelta
+
 from django.db import DatabaseError, transaction
 from django.utils import timezone
 from rest_framework import status
@@ -23,7 +25,7 @@ from apps.autenticacion.autenticacion import exige_scope
 from apps.autenticacion.tokens import SCOPE_COMPLETO
 from apps.autorizacion.pdp import Accion, Recurso
 from apps.autorizacion.permisos import _membresias, autorizar
-from apps.catalogo.models import TipoTramite
+from apps.catalogo.models import TipoTramite, feriados_entre
 from apps.identidad.models import Membresia
 from apps.nucleo.contexto import fijar_contexto
 from apps.tramites.models import Tramite
@@ -86,8 +88,13 @@ class TramitesColeccion(_Base):
         if pagina is None:
             return _error("paginacion_invalida", "limite (1 a 100) y desplazamiento deben ser enteros válidos.", status.HTTP_400_BAD_REQUEST)
         limite, desplazamiento = pagina
+        escalados = request.query_params.get("escalados")
+        if escalados not in (None, "1"):
+            return _error("filtro_invalido", "`escalados` solo admite el valor 1.", status.HTTP_400_BAD_REQUEST)
         ahora = timezone.now()
         consulta = Tramite.objects.select_related("tipo_tramite", "institucion").order_by("-creado_en", "-id")
+        if escalados:
+            consulta = consulta.filter(escalado_en__isnull=False)
         filas = list(consulta[desplazamiento:desplazamiento + limite])
         return Response({"resultados": [tramite_a_dict(t, self._es_personal(t), ahora) for t in filas],
                          "limite": limite, "desplazamiento": desplazamiento})
@@ -104,10 +111,13 @@ class TramitesColeccion(_Base):
         autorizar(request, Accion.CREAR_TRAMITE, Recurso(tipo="tramite", institucion_id=tipo.institucion_id, solicitante_id=usuario.pk,
                                                                      audiencia=tipo.audiencia))
         ahora = timezone.now()
+        # Holgura amplia: un plazo de N días hábiles nunca ocupa más de N*3 + 30 días calendario
+        feriados = feriados_entre(ahora.date(), ahora.date() + timedelta(days=tipo.sla_dias * 3 + 30))
         tramite = Tramite.objects.create(tipo_tramite=tipo, institucion=tipo.institucion, solicitante=usuario,
-                                         fecha_limite=calcular_fecha_limite(ahora, tipo.sla_dias))
+                                         fecha_limite=calcular_fecha_limite(ahora, tipo.sla_dias, feriados))
         EventoAuditoria.objects.create(tramite=tramite, institucion_id=tipo.institucion_id, actor_id=usuario.pk, accion="creacion",
-                                       estado_nuevo=tramite.estado, atributos={"tipo_tramite": tipo.pk, "sla_dias": tipo.sla_dias})
+                                       estado_nuevo=tramite.estado, atributos={"tipo_tramite": tipo.pk, "sla_dias": tipo.sla_dias,
+                                                                                         "plazo": "dias_habiles"})
         return self._respuesta(tramite.pk, status.HTTP_201_CREATED)
 
 

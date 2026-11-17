@@ -25,6 +25,8 @@ class Tramite(ModeloDeEsquema):
     estado = models.TextField(choices=ESTADOS, default="Pendiente")
     sensibilidad = models.SmallIntegerField(default=1)
     fecha_limite = models.DateTimeField(null=True, blank=True)
+    # Lo marca solo la función siget.escalar_vencidos() de la base (la aplicación no puede escribir esta columna)
+    escalado_en = models.DateTimeField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta(ModeloDeEsquema.Meta):

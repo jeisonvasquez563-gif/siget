@@ -55,7 +55,7 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 
 | Método y ruta | Cuerpo / parámetros | Respuesta |
 |---|---|---|
-| `GET /tramites/` | `?limite=1..100&desplazamiento=` | `{resultados: [Tramite], limite, desplazamiento}` — solo los que la persona puede ver |
+| `GET /tramites/` | `?limite=1..100&desplazamiento=&escalados=1` | `{resultados: [Tramite], limite, desplazamiento}` — solo los que la persona puede ver; `escalados=1` deja solo los escalados (otro valor: `400 filtro_invalido`) |
 | `POST /tramites/` | `{tipo_tramite: <id>}` | `201 Tramite`. El solicitante siempre es quien llama |
 | `GET /tramites/<id>/` | — | `Tramite` |
 | `POST /tramites/<id>/estado/` | `{estado}` | `200 Tramite`; `403`/`409` |
@@ -68,13 +68,15 @@ Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) �
 
 ```json
 { "id": 30, "tipo_tramite": {"id": 2, "nombre": "…"}, "institucion": {"id": 3, "nombre": "MOP"}, "estado": "Pendiente",
-  "fecha_limite": "…", "vencido": false, "creado_en": "…",
+  "fecha_limite": "…", "vencido": false, "escalado": false, "creado_en": "…",
   "asignado": false }                                              // ciudadanía
   // personal de la institución, en lugar de `asignado`:
-  // "solicitante_id": 5, "funcionario_asignado_id": 9, "sensibilidad": 2
+  // "solicitante_id": 5, "funcionario_asignado_id": 9, "sensibilidad": 2, "escalado_en": "…" | null
 ```
 
-**Evento** — `{id, accion, estado_anterior, estado_nuevo, institucion_id, creado_en}`; el personal ve además `actor_id` y `atributos`.
+**Plazos (migración 013):** `fecha_limite` se calcula en **días hábiles de Panamá** (lunes a viernes, sin los feriados de la tabla `siget.feriado`), a la misma hora del inicio. Los trámites anteriores conservan su plazo en días calendario. `escalado` es `true` cuando el temporizador de escalamiento detectó el plazo vencido sin resolución; desde ahí lo atiende la supervisión. Ver [`feriados-panama.md`](./feriados-panama.md).
+
+**Evento** — `{id, accion, estado_anterior, estado_nuevo, institucion_id, creado_en}`; el personal ve además `actor_id` y `atributos`. Acciones: `creacion`, `cambio_estado`, `reasignacion` y `escalamiento` (lo escribe el sistema: `actor_id` nulo, `atributos: {regla: "plazo_vencido", fecha_limite}`).
 
 ## Catálogo y equipo
 
