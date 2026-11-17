@@ -1623,6 +1623,25 @@ Respaldo previo y `cat database/migraciones/011-equipo-institucion.sql | /tmp/ps
 - El límite de inicios de sesión (10 por minuto por IP) corta un ensayo con muchas cuentas: el script espera un minuto antes de la sección 10.
 - Una corrida interrumpida del ensayo deja una propuesta pendiente; el script la rechaza al empezar.
 
+## 36. Registro configurable e invitaciones (PT-2)
+
+**Qué cambia.** `SIGET_REGISTRO` (en `siget-backend.container`) decide cómo se crean las cuentas: `abierto` (por defecto), `invitacion` o `cerrado`. Con invitación, el operador de identidades emite códigos desde su consola («Invitaciones para crear cuenta») y los entrega por un canal externo. `SIGET_AVISO_DEMOSTRACION=true` muestra el aviso de «demostración académica» en todas las pantallas. `SIGET_INVITACION_DIAS` (1 a 30, 7 por defecto) fija la vigencia de cada invitación.
+
+### 36.1 Aplicar
+
+1. VM2: respaldo (sección 32.2) y migración 014 (`database/psql-contenedor.sh < database/migraciones/014-invitaciones.sql`).
+2. VM1: reconstruir la imagen del backend y la interfaz y desplegarlas. Si se cambia el modo, agregar `Environment=SIGET_REGISTRO=invitacion` (y, si corresponde, `Environment=SIGET_AVISO_DEMOSTRACION=true`) a `siget-backend.container`, `systemctl --user daemon-reload` y reiniciar el backend.
+3. Comprobar: `curl https://…:8443/auth/configuracion/` devuelve el modo, y `verificar_plataforma` pasa con los pasos de invitaciones.
+
+**Volver atrás:** quitar la variable (vuelve a `abierto`) y reiniciar el backend. La tabla `invitacion` puede quedarse.
+
+### 36.2 Registro de la aplicación (12 de noviembre de 2026)
+
+1. VM2: respaldo verificado (`tramites_demo-20261112-171700.dump`, 15 tablas), ensayo de la migración 014 con 4 comprobaciones en una transacción que terminó en `ROLLBACK`, y después la migración real.
+2. VM1: backend e interfaz construidos con el PR #7, PT-3 y PT-2 combinados (respaldos `siget-backend:respaldo-2026-11-12b` y `frontend.respaldo-2026-11-12b`). Modo `abierto`: `GET /auth/configuracion/` devuelve `{"registro":"abierto","aviso_demostracion":false}`.
+3. Verificación contra la base real: `verificar_plataforma` 91 de 91 (incluye los 12 pasos de invitaciones), `verificar_tramites` 63 de 63 y `verificar_autenticacion` 84 de 84.
+4. **Para usar `ejecutar-comando.sh` desde Windows:** el paquete del código debe llevar finales de línea LF (`.py`, `Containerfile`, `requirements*.txt`); conviene armarlo con `git archive` o normalizándolo antes de subirlo. Si no, la imagen se construye con CRLF.
+
 ## 35. Plazos en días hábiles y escalamiento automático (PT-3)
 
 **Qué cambia.** Los trámites nuevos vencen en días hábiles de Panamá (sin fines de semana ni los feriados de `siget.feriado`, ver [`feriados-panama.md`](./feriados-panama.md)). Cada hora, un temporizador de systemd en VM1 ejecuta `manage.py escalar_vencidos`. Ese comando marca `escalado_en` en los trámites abiertos que superaron su fecha límite y escribe un evento `escalamiento` en la auditoría. La supervisión los ve con el filtro «Escalados».

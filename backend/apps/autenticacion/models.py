@@ -47,3 +47,18 @@ class Restablecimiento(ModeloDeEsquema):
 
     class Meta(ModeloDeEsquema.Meta):
         db_table = "restablecimiento"
+
+
+class Invitacion(ModeloDeEsquema):
+    """Código de un solo uso para crear una cuenta cuando el registro es por invitación (migración 014). Solo se guarda su SHA-256."""
+
+    codigo_hash = models.TextField(unique=True)
+    emitida_por = models.ForeignKey(Usuario, on_delete=models.DO_NOTHING, db_column="emitida_por", related_name="+")
+    nota = models.TextField(default="")
+    creado_en = models.DateTimeField(auto_now_add=True)
+    vence_en = models.DateTimeField()
+    usada_en = models.DateTimeField(null=True, blank=True)
+    usada_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.DO_NOTHING, db_column="usada_por", related_name="+")
+
+    class Meta(ModeloDeEsquema.Meta):
+        db_table = "invitacion"

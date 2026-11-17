@@ -33,6 +33,7 @@ class Accion(str, Enum):
     APROBAR_ALTA = "aprobar_alta"
     ADMINISTRAR_INFRAESTRUCTURA = "administrar_infraestructura"
     RESTABLECER_MFA = "restablecer_mfa"
+    EMITIR_INVITACION = "emitir_invitacion"
     BLOQUEAR_CUENTA = "bloquear_cuenta"
     REVOCAR_SESION = "revocar_sesion"
     ROTAR_SECRETOS = "rotar_secretos"
@@ -201,7 +202,7 @@ def _coordinador(s, a, r, e):
 
 _ACCIONES_POR_ROL_PLATAFORMA = {
     "operador_infraestructura": {Accion.ADMINISTRAR_INFRAESTRUCTURA},
-    "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA},
+    "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA, Accion.EMITIR_INVITACION},
     "operador_catalogo": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA},
     "operador_seguridad": {Accion.BLOQUEAR_CUENTA, Accion.REVOCAR_SESION},
     "custodio_secretos": {Accion.ROTAR_SECRETOS},

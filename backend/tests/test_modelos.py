@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import pytest
 
 from apps.auditoria.models import DecisionPdp, EventoAuditoria
-from apps.autenticacion.models import EventoSeguridad, Restablecimiento, Sesion
+from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 from apps.plataforma.models import RotacionSecreto
 from apps.catalogo.models import Feriado, Institucion, TipoTramite
 from apps.identidad.models import Aprobacion, Membresia, Perfil, Usuario
@@ -18,6 +18,7 @@ TABLAS = {
     EventoAuditoria: "evento_auditoria", DecisionPdp: "decision_pdp",
     Sesion: "sesion", EventoSeguridad: "evento_seguridad", Perfil: "perfil",
     Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto", Feriado: "feriado",
+    Invitacion: "invitacion",
 }
 
 

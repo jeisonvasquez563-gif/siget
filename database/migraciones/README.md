@@ -12,6 +12,8 @@ Cambios incrementales sobre el esquema `siget` que ya está aplicado. Se ejecuta
 | 007 | `007-auditor-login.sql` | `auditor_role` puede conectarse (solo lectura) y ve solo `id`, `username` y rol de plataforma de las personas | 21-oct-2026 |
 | 008 | `008-perfil-ciudadano.sql` | Tabla `perfil` con los datos personales del registro (cédula cifrada); solo `app_role` la lee e inserta | 22-oct-2026 |
 | 009 | `009-pgadmin-minimo-privilegio.sql` | `pgadmin_lectura` deja de leer todo (`pg_read_all_data`): solo lo no sensible | 22-oct-2026 |
+| 014 | `014-invitaciones.sql` | Tabla `invitacion` (registro por invitación): solo el hash del código, vencimiento, un solo uso (trigger) y `app_role` solo marca el uso | 12-nov-2026 |
+
 | 010 | `010-plataforma-y-restablecimiento.sql` | Consolas de plataforma, control dual, códigos de restablecimiento y registro de rotaciones | aplicada (comprobado 12-nov-2026) |
 | 011 | `011-equipo-institucion.sql` | Revocación de membresías y `siget.tramites_abiertos_de()` | aplicada (comprobado 12-nov-2026) |
 | 012 | `012-tramites-entre-instituciones.sql` | `tipo_tramite.audiencia` y el trigger `tramite_valida_inicio` | aplicada (comprobado 12-nov-2026) |
