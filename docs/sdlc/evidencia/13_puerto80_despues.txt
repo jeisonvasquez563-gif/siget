@@ -1,0 +1,23 @@
+# Puerto 80 cerrado y plataforma verificada (17-nov-2026)
+# 2026-11-17 14:08:36  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-sdlc
+$ bash C:\Users\jeiva\AppData\Local\Temp/pt13/despues.sh
+== Puertos en escucha (80, 8080, 8443)
+*:8080 users:(("pasta.avx2",pid=1672,fd=153))
+*:8443 users:(("pasta.avx2",pid=1672,fd=154))
+== Servicios
+httpd: inactive / disabled
+php-fpm: inactive / disabled
+== Cortafuegos
+dhcpv6-client ssh
+8080/tcp 8443/tcp
+== Desde el anfitrion
+http://192.168.159.137/gestion/login.php      000
+http://192.168.159.137/pgadmin4/              000
+https://192.168.159.137:8443/salud/           200
+== Verificaciones contra la base real
+verificar_tramites: 77 de 77 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_plataforma: 91 de 91 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_autenticacion: 84 de 84 pasos correctos; no quedó ningún dato (transacción revertida).
+== Ensayo completo contra produccion
+ENSAYO: 101 de 101 comprobaciones correctas
+# código de salida: 0
