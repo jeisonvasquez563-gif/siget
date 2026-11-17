@@ -1,0 +1,86 @@
+name: security-scan
+
+# SDLC seguro, etapas 4 (desarrollo) y 6 (pruebas): las mismas herramientas del análisis estático de noviembre corren solas
+# en cada PR y en cada push a develop/main, y una vez por semana (aparecen vulnerabilidades nuevas en dependencias que no
+# cambiaron). Cualquier hallazgo hace fallar el flujo: un falso positivo se justifica en el código (nosec / nosemgrep) o en
+# .gitleaksignore, nunca se oculta sin explicación. Ver docs/sdlc/.
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+  schedule:
+    - cron: "17 6 * * 1"   # lunes 06:17 UTC (01:17 en Panamá)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sast-python:
+    name: Bandit (SAST del backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "bandit==1.9.4"
+      - run: bandit -r backend/apps backend/config backend/manage.py -x backend/tests
+
+  sast-semgrep:
+    name: Semgrep (SAST de todo el código)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "semgrep==1.184.0"
+      - run: >
+          semgrep scan --metrics=off --error
+          --config p/owasp-top-ten --config p/django --config p/python --config p/javascript --config p/react --config p/secrets
+          --exclude node_modules --exclude dist --exclude "*.min.js"
+          backend frontend/src infra demo database
+
+  sca-python:
+    name: pip-audit (dependencias del backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pip-audit==2.10.1"
+      - run: pip-audit -r backend/requirements.txt -r backend/requirements-dev.txt --desc on
+
+  sca-npm:
+    name: npm audit (dependencias del frontend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Sin instalar nada: audita el árbol exacto de package-lock.json
+      - run: npm audit --audit-level=low
+
+  secretos:
+    name: Gitleaks (secretos en todo el historial)
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # todo el historial, no solo el último commit
+      - name: Descargar Gitleaks y verificar su suma SHA-256 oficial
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          archivo="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "$base/$archivo"
+          curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" | grep " $archivo\$" | sha256sum -c -
+          tar xzf "$archivo" gitleaks
+      - run: ./gitleaks git . --redact --no-banner -v
