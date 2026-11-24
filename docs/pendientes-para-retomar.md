@@ -27,7 +27,7 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 |---|---|---|
 | ~~El trámite no tiene contenido~~ **HECHO el 24-nov** (PR #22 y #23, runbook 40.9): formulario por tipo, motivo obligatorio en la base y respuesta de la ciudadanía a la subsanación; ensayo 112/112 | — | — |
 | Notificaciones dentro de la plataforma (PT-9) | Medio | 2–3 días |
-| Perfil y cambio de contraseña desde la sesión | Medio | 2–3 días |
+| ~~Cambio de contraseña desde la sesión~~ **HECHO el 24-nov** (PR #25 y #26, runbook 41.6) | — | — |
 | Gestión de los tipos de trámite por institución: la acción del PDP existe, la ruta no | Medio | 2–3 días |
 | Catálogo de demostración más rico (hoy 6 instituciones y 6 trámites) | Medio | 1 día |
 
@@ -47,8 +47,8 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 
 ### Frontend (profesional)
 - Pruebas de punta a punta con Playwright y contraste AA medido (PT-12).
-- Paginación: hoy la bandeja corta en 100 (`Tramites.jsx`).
-- Pantalla de error global (`ErrorBoundary`).
+- ~~Paginación~~ hecha el 24-nov (de a 20; en el navegador: límite conocido, runbook 41.5).
+- ~~Pantalla de error global~~ hecha el 24-nov.
 - Panel de indicadores para supervisión y coordinación.
 - Revisar el comportamiento en celular.
 
@@ -81,9 +81,9 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 **Semana 1**
 1. ~~Terminar PT-15~~ (hecho el 24-nov).
 2. ~~Contenido del trámite~~ (hecho el 24-nov).
-3. Cambio de contraseña.
-4. Pantalla de error global y paginación.
-5. Corregir la documentación desactualizada.
+3. ~~Cambio de contraseña~~ (hecho el 24-nov).
+4. ~~Pantalla de error global y paginación~~ (hecho el 24-nov).
+5. ~~Corregir la documentación desactualizada~~ (hecho el 24-nov, PR #24).
 
 **Semana 2**
 1. Notificaciones y gestión del catálogo.
