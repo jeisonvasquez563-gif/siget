@@ -103,8 +103,8 @@ class Command(BaseCommand):
                    all(self._llamar(o, "get", "/tramites/").status_code == 403 for o in (ida, ca, seg, sec, inf)))
         sin_factor = self._persona("vp_sin_factor", "operador_identidades")
         Usuario.objects.filter(pk=sin_factor.pk).update(mfa_verificado_en=ahora - timedelta(hours=2))
-        sesion = Sesion.objects.create(usuario=sin_factor, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=ahora + timedelta(minutes=10))
-        token = tokens.emitir_access(settings.SIGET_JWT_KEY, sin_factor.pk, sesion.pk, tokens.SCOPE_COMPLETO, ahora, 300, settings.SIGET_EMISOR)
+        sesion = Sesion.objects.create(usuario=sin_factor, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=timezone.now() + timedelta(minutes=10))
+        token = tokens.emitir_access(settings.SIGET_JWT_KEY, sin_factor.pk, sesion.pk, tokens.SCOPE_COMPLETO, timezone.now(), 300, settings.SIGET_EMISOR)
         r = APIClient().get("/plataforma/personas/", secure=True, **dict(HOST, HTTP_AUTHORIZATION=f"Bearer {token}"))
         cache.clear(); transaction.set_rollback(False)
         self._paso("sin segundo factor reciente se niega y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
@@ -337,8 +337,8 @@ class Command(BaseCommand):
                    all(self._llamar(o, "get", "/plataforma/solicitudes-datos/").status_code == 403 for o in (ca, seg, sec, inf, ana)))
         self._paso("tampoco las responden (403)", all(self._llamar(o, "post", f"/plataforma/solicitudes-datos/{sol_ana}/responder/", {"estado": "atendida", "respuesta": "No me corresponde esto."}).status_code == 403 for o in (ca, seg, sec, inf, ana)))
         Usuario.objects.filter(pk=sin_factor.pk).update(mfa_verificado_en=ahora - timedelta(hours=2))
-        sesion = Sesion.objects.create(usuario=sin_factor, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=ahora + timedelta(minutes=10))
-        token = tokens.emitir_access(settings.SIGET_JWT_KEY, sin_factor.pk, sesion.pk, tokens.SCOPE_COMPLETO, ahora, 300, settings.SIGET_EMISOR)
+        sesion = Sesion.objects.create(usuario=sin_factor, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=timezone.now() + timedelta(minutes=10))
+        token = tokens.emitir_access(settings.SIGET_JWT_KEY, sin_factor.pk, sesion.pk, tokens.SCOPE_COMPLETO, timezone.now(), 300, settings.SIGET_EMISOR)
         r = APIClient().get("/plataforma/solicitudes-datos/", secure=True, **dict(HOST, HTTP_AUTHORIZATION=f"Bearer {token}"))
         cache.clear(); transaction.set_rollback(False)
         self._paso("sin segundo factor reciente se niega y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
@@ -360,6 +360,32 @@ class Command(BaseCommand):
         self._paso("una solicitud ya respondida no se responde otra vez, ni por otro operador (409)", r.status_code == 409 and r.json()["codigo"] == "ya_resuelta" and SolicitudDerecho.objects.get(pk=sol_ana).respuesta == respuesta_texto, r.status_code)
         r = self._llamar(idb, "post", f"/plataforma/solicitudes-datos/{sol_fer.pk}/responder/", {"estado": "atendida", "respuesta": "Ya corregimos tu apellido; puedes verlo en Mis datos."})
         self._paso("otra persona de identidades atiende otra solicitud", r.status_code == 200 and SolicitudDerecho.objects.get(pk=sol_fer.pk).estado == "atendida", r.status_code)
+        def rechazada_por_la_base(sql, parametros=()):
+            try:
+                with transaction.atomic(), connection.cursor() as c:
+                    c.execute(sql, parametros)
+                return False
+            except DatabaseError:
+                return True
+
+        # D2: solo un operador de identidades responde (la base lo exige aunque la aplicación fallara)
+        sol_d2 = SolicitudDerecho.objects.create(usuario=fer, tipo="rectificacion", detalle="Solicitud para probar quién puede responder.", vence_en=timezone.now() + timedelta(days=14))
+        responder = "update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba larga.' where id = %s"
+        self._paso("la base rechaza una respuesta de quien no es operador de identidades (ciudadanía u otro operador de plataforma)",
+                   rechazada_por_la_base(responder, [ana.pk, sol_d2.pk]) and rechazada_por_la_base(responder, [seg.pk, sol_d2.pk]) and rechazada_por_la_base(responder, [ca.pk, sol_d2.pk])
+                   and SolicitudDerecho.objects.get(pk=sol_d2.pk).estado == "recibida")
+        self._paso("y acepta la de un operador de identidades", not rechazada_por_la_base(responder, [ida.pk, sol_d2.pk]) and SolicitudDerecho.objects.get(pk=sol_d2.pk).estado == "atendida")
+        # D1: una solicitud nace siempre «recibida» y sin respuesta, aunque se intente otra cosa
+        with transaction.atomic():
+            falsa = SolicitudDerecho.objects.create(usuario=fer, tipo="oposicion", detalle="Solicitud que intenta nacer atendida.", estado="atendida", respondida_por=ida,
+                                                    respondida_en=ahora - timedelta(days=400), respuesta="Respuesta que nadie dio.", vence_en=timezone.now() + timedelta(days=14))
+        falsa = SolicitudDerecho.objects.get(pk=falsa.pk)
+        self._paso("una solicitud no puede nacer «atendida» ni con respuesta: la base la deja «recibida», sin respuesta y con la creación fechada por ella",
+                   falsa.estado == "recibida" and falsa.respondida_en is None and falsa.respondida_por_id is None and falsa.respuesta is None
+                   and abs((falsa.creada_en - timezone.now()).total_seconds()) < 600)
+        self._paso("tampoco nace con un plazo a 10 años, ya vencido o de 5 días (debe vencer entre 10 y 30 días)",
+                   all(rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con un plazo fuera de rango.', " + plazo + ")", [fer.pk])
+                       for plazo in ("now() + interval '3650 days'", "now() - interval '1 day'", "now() + interval '5 days'")))
         r = self._llamar(ida, "get", "/plataforma/solicitudes-datos/?estado=rechazada")
         self._paso("en el filtro de cerradas aparece quién respondió", r.status_code == 200 and any(x["id"] == sol_ana and x["respondida_por"]["usuario"] == "vp_ident_a" for x in r.json()["solicitudes"]))
         r = self._llamar(ana, "get", "/auth/mis-datos/solicitudes/")
@@ -381,11 +407,15 @@ class Command(BaseCommand):
                          from pg_roles r where r.rolname in ('app_role','auditor_role','pgadmin_lectura','checkpoint_app')""")
             permisos_bd = {f[0]: f[1:] for f in c.fetchall()}
         with connection.cursor() as c:
-            c.execute("""select r.rolname, has_table_privilege(r.rolname,'siget.solicitud_derecho','SELECT'), has_table_privilege(r.rolname,'siget.solicitud_derecho','DELETE')
-                         from pg_roles r where r.rolname in ('app_role','auditor_role','pgadmin_lectura','checkpoint_app')""")
+            c.execute("""select r.rolname, has_table_privilege(r.rolname,'siget.solicitud_derecho','SELECT'), has_table_privilege(r.rolname,'siget.solicitud_derecho','DELETE'),
+                         has_table_privilege(r.rolname,'siget.solicitud_derecho','INSERT'), has_table_privilege(r.rolname,'siget.solicitud_derecho','UPDATE'),
+                         has_any_column_privilege(r.rolname,'siget.solicitud_derecho','SELECT'), has_any_column_privilege(r.rolname,'siget.solicitud_derecho','INSERT'),
+                         has_any_column_privilege(r.rolname,'siget.solicitud_derecho','UPDATE')
+                         from pg_roles r where r.rolname in ('app_role','auditor_role','pgadmin_lectura','checkpoint_app','escalador_role')""")
             sobre_solicitudes = {f[0]: f[1:] for f in c.fetchall()}
-        self._paso("ni el auditor ni pgadmin_lectura ni el checkpoint leen las solicitudes sobre datos personales", not any(sobre_solicitudes[rol][0] for rol in ("auditor_role", "pgadmin_lectura", "checkpoint_app")))
-        self._paso("la aplicación lee las solicitudes pero no las borra", sobre_solicitudes["app_role"] == (True, False))
+        self._paso("ni el auditor, ni pgadmin_lectura, ni el checkpoint, ni el escalador tienen nada sobre las solicitudes sobre datos personales (ni por tabla ni por columna)",
+                   not any(any(sobre_solicitudes[rol]) for rol in ("auditor_role", "pgadmin_lectura", "checkpoint_app", "escalador_role")))
+        self._paso("la aplicación lee, inserta y actualiza (por columnas) las solicitudes pero no las borra", sobre_solicitudes["app_role"] == (True, False, True, False, True, True, True))
         self._paso("ni el auditor ni pgadmin_lectura leen los códigos de restablecimiento", not permisos_bd["auditor_role"][0] and not permisos_bd["pgadmin_lectura"][0] and not permisos_bd["checkpoint_app"][0])
         self._paso("el auditor sí ve las rotaciones (son metadatos)", permisos_bd["auditor_role"][1] is True)
         self._paso("la aplicación no puede borrar códigos ni editar rotaciones", not permisos_bd["app_role"][2] and not permisos_bd["app_role"][3])

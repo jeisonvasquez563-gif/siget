@@ -422,7 +422,7 @@ class Command(BaseCommand):
         token_luz = self._entrar(luz)  # `_entrar` volvió a fijar la verificación
         r = self._http("get", "/auth/mis-datos/", token=token_luz)
         cuerpo = r.json() if r.status_code == 200 else {}
-        self._paso("la persona ve su perfil completo y descifrado (es su propio dato)", r.status_code == 200 and cuerpo["perfil"]["cedula"] == "8-900-1020"
+        self._paso("la persona ve su perfil con la cédula ENMASCARADA (solo los últimos 3 caracteres)", r.status_code == 200 and cuerpo["perfil"]["cedula"] == "*-***-*020"
                    and cuerpo["perfil"]["correo"] == "prueba20@ejemplo.com" and cuerpo["perfil"]["nombre"] == "Prueba", r.status_code)
         self._paso("con los datos de la cuenta, el aviso vigente, la constancia de lectura y sus solicitudes",
                    cuerpo.get("cuenta", {}).get("usuario") == "int_luz" and cuerpo.get("aviso_vigente", {}).get("version") == derechos.AVISO_VERSION
@@ -430,13 +430,16 @@ class Command(BaseCommand):
         self._paso("las respuestas con datos personales no se guardan en cachés", r.headers.get("Cache-Control") == "no-store")
         crudo = r.content.decode()
         self._paso("no devuelve credenciales ni la cédula cifrada o su huella", all(x not in crudo for x in ("password", "argon2", "mfa_secreto", "cedula_cifrada", "cedula_huella", secreto_luz)))
-        self._paso("cada persona ve solo lo suyo", self._http("get", "/auth/mis-datos/", token=token_mario).json()["perfil"]["cedula"] == "8-900-1021")
+        self._paso("cada persona ve solo lo suyo", self._http("get", "/auth/mis-datos/", token=token_mario).json()["perfil"]["cedula"] == "*-***-*021")
 
         # ---------------------------------------------------------------- corregir correo, provincia y ciudad
         token_viejo = self._entrar(luz, minutos_mfa=60)
         r = self._http("patch", "/auth/mis-datos/", {"ciudad": "David"}, token=token_viejo)
         self._paso("corregir exige segundo factor reciente: se niega y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
         self._paso("y no cambió nada", Perfil.objects.get(usuario=luz).ciudad == "Ciudad de Panamá")
+        r = self._http("get", "/auth/mis-datos/exportar/", token=token_viejo)
+        self._paso("exportar (lleva la cédula completa) también exige segundo factor reciente: se niega y se sugiere reautenticar",
+                   r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True and "8-900-1020" not in r.content.decode(), r.status_code)
         r = self._http("post", "/auth/mfa/verificar/", {"codigo": pyotp.TOTP(secreto_luz).at(timezone.now().timestamp())}, token=token_viejo)
         self._paso("reautenticarse con el código del segundo factor", r.status_code == 200, r.status_code)
         r = self._http("patch", "/auth/mis-datos/", {"correo": " Luz.Nueva@Ejemplo.COM ", "ciudad": "David", "provincia": "Chiriquí"}, token=token_viejo)
@@ -528,18 +531,36 @@ class Command(BaseCommand):
         self._paso("una respuesta necesita quien responde y el texto (la base lo exige)",
                    rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida' where id = %s", [abierta.pk])
                    and rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s where id = %s", [operador.pk, abierta.pk]))
-        self._paso("nadie responde su propia solicitud (la base lo exige)",
-                   rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba.' where id = %s", [luz.pk, abierta.pk]))
+        self._paso("solo un operador de identidades responde: una persona cualquiera no puede (la base lo exige)",
+                   rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba.' where id = %s", [luz.pk, abierta.pk])
+                   and rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba.' where id = %s", [mario.pk, abierta.pk]))
+        propia = SolicitudDerecho.objects.create(usuario=operador, tipo="oposicion", detalle="Solicitud de prueba del propio operador.", vence_en=timezone.now() + timedelta(days=14))
+        self._paso("nadie responde su propia solicitud, ni siquiera un operador de identidades (la base lo exige)",
+                   rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba.' where id = %s", [operador.pk, propia.pk]))
+        self._paso("ni se puede fijar la hora de la respuesta (no hay UPDATE sobre `respondida_en`: la fija el trigger)",
+                   rechazada_por_la_base("update siget.solicitud_derecho set respondida_en = now() where id = %s", [propia.pk]))
+        # Al nacer, la solicitud la normaliza la base: lo que mande la aplicación sobre el estado, la respuesta o la fecha no cuenta
+        with transaction.atomic():
+            falsa = SolicitudDerecho.objects.create(usuario=operador, tipo="oposicion", detalle="Solicitud que intenta nacer atendida.", estado="atendida", respondida_por=luz,
+                                                    respondida_en=ahora - timedelta(days=400), respuesta="Respuesta que nadie dio.", vence_en=timezone.now() + timedelta(days=14))
+        falsa = SolicitudDerecho.objects.get(pk=falsa.pk)
+        self._paso("una solicitud no puede nacer «atendida» ni con respuesta: la base la deja «recibida» y sin respuesta, y fecha ella la creación",
+                   falsa.estado == "recibida" and falsa.respondida_en is None and falsa.respondida_por_id is None and falsa.respuesta is None
+                   and abs((falsa.creada_en - timezone.now()).total_seconds()) < 600)
+        self._paso("ni nacer con un plazo a 10 años, ya vencido o de solo 5 días (debe vencer entre 10 y 30 días)",
+                   rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con el plazo a 10 años.', now() + interval '3650 days')", [operador.pk])
+                   and rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con el plazo ya vencido.', now() - interval '1 day')", [operador.pk])
+                   and rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con el plazo de 5 dias.', now() + interval '5 days')", [operador.pk]))
         try:
             with transaction.atomic():
-                filas = SolicitudDerecho.objects.filter(pk=abierta.pk).update(estado="atendida", respondida_por=operador, respuesta="Respuesta de prueba para la verificación.", respondida_en=ahora)
+                filas = SolicitudDerecho.objects.filter(pk=abierta.pk).update(estado="atendida", respondida_por=operador, respuesta="Respuesta de prueba para la verificación.")
             self._paso("una respuesta completa sí se guarda", filas == 1)
         except DatabaseError as error:
             self._paso("una respuesta completa sí se guarda", False, error)
         self._paso("pero una solicitud ya respondida no se vuelve a tocar (ni para cambiar la respuesta)",
                    rechazada_por_la_base("update siget.solicitud_derecho set respuesta = 'Otra respuesta distinta.' where id = %s", [abierta.pk])
                    and rechazada_por_la_base("update siget.solicitud_derecho set estado = 'rechazada' where id = %s", [abierta.pk]))
-        self._paso("y la base fijó la hora de la respuesta", SolicitudDerecho.objects.get(pk=abierta.pk).respondida_en is not None)
+        self._paso("y la base fijó la hora de la respuesta", abs((SolicitudDerecho.objects.get(pk=abierta.pk).respondida_en - timezone.now()).total_seconds()) < 600)
         self._paso("la persona ve la respuesta a su solicitud", any(x["respuesta"] == "Respuesta de prueba para la verificación." and x["estado"] == "atendida"
                                                                     for x in self._http("get", "/auth/mis-datos/solicitudes/", token=token_luz).json()["solicitudes"]))
         with connection.cursor() as c:
@@ -547,12 +568,15 @@ class Command(BaseCommand):
                          has_table_privilege(r.rolname, 'siget.solicitud_derecho', 'DELETE'), has_table_privilege(r.rolname, 'siget.perfil', 'DELETE'),
                          has_column_privilege(r.rolname, 'siget.perfil', 'correo', 'UPDATE'), has_column_privilege(r.rolname, 'siget.perfil', 'provincia', 'UPDATE'),
                          has_column_privilege(r.rolname, 'siget.perfil', 'ciudad', 'UPDATE'), has_column_privilege(r.rolname, 'siget.perfil', 'nombre', 'UPDATE'),
-                         has_column_privilege(r.rolname, 'siget.perfil', 'cedula_cifrada', 'UPDATE'), has_column_privilege(r.rolname, 'siget.perfil', 'actualizado_en', 'UPDATE')
-                         from pg_roles r where r.rolname in ('app_role', 'auditor_role', 'pgadmin_lectura', 'checkpoint_app')""")
+                         has_column_privilege(r.rolname, 'siget.perfil', 'cedula_cifrada', 'UPDATE'), has_column_privilege(r.rolname, 'siget.perfil', 'actualizado_en', 'UPDATE'),
+                         has_any_column_privilege(r.rolname, 'siget.solicitud_derecho', 'SELECT'), has_any_column_privilege(r.rolname, 'siget.solicitud_derecho', 'INSERT'),
+                         has_any_column_privilege(r.rolname, 'siget.solicitud_derecho', 'UPDATE'), has_column_privilege(r.rolname, 'siget.solicitud_derecho', 'respondida_en', 'UPDATE')
+                         from pg_roles r where r.rolname in ('app_role', 'auditor_role', 'pgadmin_lectura', 'checkpoint_app', 'escalador_role')""")
             privilegios = {f[0]: f[1:] for f in c.fetchall()}
-        self._paso("ni el auditor, ni pgadmin_lectura ni el checkpoint leen las solicitudes (el detalle puede tener datos personales)",
-                   not any(privilegios[rol][0] for rol in ("auditor_role", "pgadmin_lectura", "checkpoint_app")))
+        self._paso("ni el auditor, ni pgadmin_lectura, ni el checkpoint, ni el escalador tienen nada sobre las solicitudes, ni por tabla ni por columna (el detalle puede tener datos personales)",
+                   not any(any(privilegios[rol][i] for i in (0, 1, 2, 10, 11, 12, 13)) for rol in ("auditor_role", "pgadmin_lectura", "checkpoint_app", "escalador_role")))
         self._paso("la aplicación lee e inserta solicitudes pero no las borra, ni borra perfiles",
                    privilegios["app_role"][0] and privilegios["app_role"][1] and not privilegios["app_role"][2] and not privilegios["app_role"][3])
         self._paso("de las columnas del perfil solo se pueden actualizar correo, provincia y ciudad",
                    privilegios["app_role"][4:7] == (True, True, True) and privilegios["app_role"][7:] == (False, False, False))
+        self._paso("la aplicación no tiene UPDATE sobre `respondida_en` (la hora de la respuesta la fija la base)", privilegios["app_role"][13] is False)
