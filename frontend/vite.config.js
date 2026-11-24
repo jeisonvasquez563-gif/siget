@@ -16,5 +16,8 @@ export default defineConfig({
     setupFiles: ['./src/pruebas/preparar.js'],
     include: ['src/pruebas/**/*.prueba.{js,jsx}'],
     css: false,
+    // Los chequeos de accesibilidad (axe) recorren tablas grandes, como la matriz de 25 acciones por 10 roles: con el límite
+    // de 5 s fallaban a veces por tiempo, nunca por una afirmación
+    testTimeout: 20000,
   },
 })

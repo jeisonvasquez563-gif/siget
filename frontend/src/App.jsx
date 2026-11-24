@@ -9,6 +9,8 @@ import { etiquetaDeRol } from './comun.jsx'
 import { agrupar, iconoDe } from './modulos.js'
 import { Equipo } from './Equipo.jsx'
 import { Inicio, Proximamente, PruebaAcceso, Seguridad } from './Otras.jsx'
+import { MisDatos } from './MisDatos.jsx'
+import { Privacidad } from './Privacidad.jsx'
 import { ConsolaCatalogo, ConsolaIdentidades, ConsolaInfraestructura, ConsolaSecretos, ConsolaSeguridad } from './Plataforma.jsx'
 import { Bandeja, Detalle, MisTramites, NuevoTramite } from './Tramites.jsx'
 import { Avatar, Icono, Logo, useUI } from './ui.jsx'
@@ -21,6 +23,13 @@ export default function App() {
   const { tema, alternarTema, avisar } = useUI()
 
   const [motivo, setMotivo] = useState('')
+  // El aviso de privacidad es público: vive en la dirección (#/privacidad) y se puede leer antes de registrarse o con la sesión abierta
+  const [enPrivacidad, setEnPrivacidad] = useState(window.location.hash === '#/privacidad')
+  useEffect(() => {
+    const f = () => setEnPrivacidad(window.location.hash === '#/privacidad')
+    window.addEventListener('hashchange', f)
+    return () => window.removeEventListener('hashchange', f)
+  }, [])
 
   const cargarYo = useCallback(async () => {
     const datos = await api('/auth/yo/')
@@ -56,6 +65,7 @@ export default function App() {
   })
   const seguirConectado = () => { seguir(); api('/auth/yo/').catch(() => {}) }
 
+  if (enPrivacidad) return <><Privacidad />{restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}</>
   if (fase === 'cargando') {
     return <main className="acceso"><section className="acceso-formulario" role="status" aria-label="Verificando tu sesión"><Logo className="marca-logo" /></section></main>
   }
@@ -76,6 +86,7 @@ export default function App() {
     case 'bandeja': contenido = <Bandeja yo={yo} abrir={abrir} modo="bandeja" />; break
     case 'supervision': contenido = <Bandeja yo={yo} abrir={abrir} modo="supervision" />; break
     case 'equipo': contenido = <Equipo />; break
+    case 'mis_datos': contenido = <MisDatos yo={yo} />; break
     case 'seguridad': contenido = <Seguridad yo={yo} />; break
     case 'auditoria': contenido = <Auditoria />; break
     case 'mfa': contenido = <SegundoFactor yo={yo} refrescar={refrescarYo} />; break

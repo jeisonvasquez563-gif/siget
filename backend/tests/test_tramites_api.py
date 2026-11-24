@@ -170,7 +170,8 @@ def test_el_historial_muestra_el_actor_al_personal():
 # --------------------------------------------------------------------------- auditoría de rutas
 
 # Únicas vistas que pueden ser públicas: se declaran aquí a propósito. Cualquier otra ruta pública es un error.
-PUBLICAS = {"salud", "registro", "login", "refresh", "restablecer", "instituciones-publicas", "configuracion"}
+PUBLICAS = {"salud", "registro", "login", "refresh", "restablecer", "instituciones-publicas", "configuracion",
+            "aviso-privacidad"}
 
 
 def todas_las_rutas():

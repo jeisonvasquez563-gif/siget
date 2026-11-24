@@ -17,10 +17,10 @@ from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.autenticacion import contrasenas, perfil
+from apps.autenticacion import contrasenas, derechos, mfa, perfil, tokens
 from apps.autenticacion.models import EventoSeguridad, Sesion
-from apps.catalogo.models import Institucion
-from apps.identidad.models import Membresia, Perfil, Usuario
+from apps.catalogo.models import Institucion, TipoTramite
+from apps.identidad.models import Membresia, Perfil, SolicitudDerecho, Usuario
 
 CLAVE_BUENA = "una-frase-larga-y-poco-comun-7391"
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.7"}
@@ -29,7 +29,7 @@ HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.7"}
 def personales(n, **cambios):
     """Datos personales válidos y únicos por número (la cédula y el correo no pueden repetirse)."""
     base = {"nombre": "Prueba", "apellidos": "Integración", "cedula": f"8-900-{1000 + n}", "fecha_nacimiento": "1990-05-20",
-            "provincia": "Panamá", "ciudad": "Ciudad de Panamá", "correo": f"prueba{n}@ejemplo.com"}
+            "provincia": "Panamá", "ciudad": "Ciudad de Panamá", "correo": f"prueba{n}@ejemplo.com", "acepta_aviso": True}
     base.update(cambios)
     return base
 
@@ -52,7 +52,7 @@ class Command(BaseCommand):
         cabeceras = dict(HOST, **extra)
         if token:
             cabeceras["HTTP_AUTHORIZATION"] = f"Bearer {token}"
-        r = getattr(cliente, metodo)(ruta, datos, format="json", secure=True, **cabeceras) if metodo == "post" else \
+        r = getattr(cliente, metodo)(ruta, datos, format="json", secure=True, **cabeceras) if metodo in ("post", "patch") else \
             getattr(cliente, metodo)(ruta, secure=True, **cabeceras)
         self._limpiar()
         return r
@@ -109,6 +109,8 @@ class Command(BaseCommand):
         ana = Usuario.objects.get(username="int_ana")
         perfil_ana = Perfil.objects.get(usuario=ana)
         self._paso("el perfil quedó guardado con sus datos", perfil_ana.nombre == "Prueba" and perfil_ana.provincia == "Panamá" and perfil_ana.correo == "prueba1@ejemplo.com")
+        self._paso("el perfil guarda la constancia del aviso de privacidad (versión y hora) y aún no fue corregido",
+                   perfil_ana.aviso_version == derechos.AVISO_VERSION and perfil_ana.aviso_leido_en is not None and perfil_ana.actualizado_en is None)
         self._paso("la cédula NO está en claro: solo cifrada y como huella", "8-900-1001" not in (perfil_ana.cedula_cifrada + perfil_ana.cedula_huella)
                    and len(perfil_ana.cedula_huella) == 64)
         self._paso("la cédula cifrada se puede recuperar con la clave del servidor",
@@ -326,6 +328,8 @@ class Command(BaseCommand):
         self._limpiar()
         self._paso("el límite de tasa corta una ráfaga de logins (429)", 429 in codigos and codigos[:10].count(429) == 0, f"{codigos.count(401)}x401, {codigos.count(429)}x429")
 
+        self._derechos(ahora)
+
         # ---------------------------------------------------------------- registro de seguridad inalterable y datos
         n = EventoSeguridad.objects.count()
         self._paso("los eventos de seguridad quedaron registrados", n >= 20, f"{n} eventos")
@@ -342,13 +346,26 @@ class Command(BaseCommand):
             self._paso("la base no deja modificar el registro de seguridad", False)
         except DatabaseError:
             self._paso("la base no deja modificar el registro de seguridad", True)
-        for operacion, sql in (("modificar", "update siget.perfil set nombre = 'x'"), ("borrar", "delete from siget.perfil")):
+        for columna in ("nombre", "apellidos", "cedula_cifrada", "cedula_huella", "fecha_nacimiento", "creado_en", "aviso_version", "aviso_leido_en", "actualizado_en", "usuario_id"):
             try:
                 with transaction.atomic(), connection.cursor() as c:
-                    c.execute(sql)
-                self._paso(f"la base no deja {operacion} un perfil (ni a la propia aplicación)", False)
+                    c.execute(f"update siget.perfil set {columna} = {columna}")  # nosec B608 - nombres de columna fijos de la propia verificacion
+                self._paso(f"la base no deja modificar «{columna}» de un perfil (ni a la propia aplicación)", False)
             except DatabaseError:
-                self._paso(f"la base no deja {operacion} un perfil (ni a la propia aplicación)", True)
+                self._paso(f"la base no deja modificar «{columna}» de un perfil (ni a la propia aplicación)", True)
+        try:
+            with transaction.atomic(), connection.cursor() as c:
+                c.execute("delete from siget.perfil")
+            self._paso("la base no deja borrar un perfil (ni a la propia aplicación)", False)
+        except DatabaseError:
+            self._paso("la base no deja borrar un perfil (ni a la propia aplicación)", True)
+        for columna in ("correo", "provincia", "ciudad"):
+            try:
+                with transaction.atomic(), connection.cursor() as c:
+                    c.execute(f"update siget.perfil set {columna} = {columna} where usuario_id = %s", [ana.pk])  # nosec B608 - columnas fijas de la verificacion
+                    self._paso(f"en cambio sí deja modificar «{columna}» (la única corrección permitida)", c.rowcount == 1)
+            except DatabaseError as error:
+                self._paso(f"en cambio sí deja modificar «{columna}» (la única corrección permitida)", False, error)
         crudos = " ".join(str(v) for v in EventoSeguridad.objects.values_list("detalle", flat=True))
         self._paso("la bitácora de seguridad no lleva cédula, correo ni nombre", all(x not in crudos for x in ("8-900-", "@ejemplo.com", "Prueba")))
         self._paso("ningún evento contiene contraseñas, códigos ni tokens", CLAVE_BUENA not in crudos and secreto not in crudos)
@@ -358,3 +375,208 @@ class Command(BaseCommand):
             c.execute("select current_user, (select rolsuper from pg_roles where rolname = current_user)")
             usuario_bd, es_super = c.fetchone()
         self._paso("todo se ejecutó como app_role, sin superusuario", usuario_bd == "app_role" and not es_super)
+
+    # ------------------------------------------------------------------ derechos sobre los datos personales (PT-15, Ley 81)
+    def _entrar(self, usuario, minutos_mfa=1, scope=tokens.SCOPE_COMPLETO):
+        """Un token de acceso con una sesión real y el segundo factor verificado hace `minutos_mfa` (None = nunca)."""
+        ahora = timezone.now()
+        sesion = Sesion.objects.create(usuario=usuario, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=ahora + timedelta(minutes=10))
+        Usuario.objects.filter(pk=usuario.pk).update(mfa_verificado_en=None if minutos_mfa is None else ahora - timedelta(minutes=minutos_mfa))
+        return tokens.emitir_access(settings.SIGET_JWT_KEY, usuario.pk, sesion.pk, scope, ahora, 600, settings.SIGET_EMISOR)
+
+    def _ciudadana(self, n, username):
+        """Se registra por la API (con aviso) y se le deja el segundo factor activo con un secreto conocido para reautenticar."""
+        r = self._http("post", "/auth/registro/", {"username": username, "password": CLAVE_BUENA, **personales(n)})
+        usuario = Usuario.objects.get(username=username)
+        secreto = mfa.nuevo_secreto()
+        Usuario.objects.filter(pk=usuario.pk).update(mfa_activo=True, mfa_secreto=mfa.cifrar(settings.SIGET_MFA_KEY, secreto))
+        usuario.refresh_from_db()
+        return usuario, secreto, r
+
+    def _derechos(self, ahora):
+        # ---------------------------------------------------------------- el aviso de privacidad y el registro
+        r = self._http("get", "/auth/aviso-privacidad/")
+        aviso = r.json() if r.status_code == 200 else {}
+        self._paso("el aviso de privacidad se lee sin iniciar sesión y trae versión, finalidad de cada dato y el plazo de 10 días hábiles",
+                   r.status_code == 200 and aviso.get("version") == derechos.AVISO_VERSION and aviso.get("plazo_respuesta_dias_habiles") == 10
+                   and len(aviso.get("datos", [])) >= 6 and "10 días hábiles" in aviso.get("texto", ""), r.status_code)
+        self._paso("el aviso no lleva datos de nadie", "@" not in aviso.get("texto", "") and "8-900-" not in aviso.get("texto", ""))
+        sin_aviso = personales(30)
+        sin_aviso.pop("acepta_aviso")
+        r = self._http("post", "/auth/registro/", {"username": "int_sinaviso", "password": CLAVE_BUENA, **sin_aviso})
+        self._paso("registrarse sin confirmar el aviso se rechaza con un mensaje claro", r.status_code == 400 and derechos.MENSAJE_ACEPTA_AVISO in r.json().get("errores", []), r.status_code)
+        for valor in (False, "true", 1):
+            r = self._http("post", "/auth/registro/", {"username": "int_sinaviso", "password": CLAVE_BUENA, **personales(30, acepta_aviso=valor)})
+            self._paso(f"confirmar el aviso con {valor!r} (no es el booleano true) tampoco sirve", r.status_code == 400, r.status_code)
+        self._paso("sin el aviso no se creó ni la cuenta ni el perfil", not Usuario.objects.filter(username="int_sinaviso").exists() and not Perfil.objects.filter(correo="prueba30@ejemplo.com").exists())
+
+        luz, secreto_luz, r = self._ciudadana(20, "int_luz")
+        mario, _, _ = self._ciudadana(21, "int_mario")
+        self._paso("con el aviso confirmado el registro se completa y queda la constancia", r.status_code == 201 and Perfil.objects.get(usuario=luz).aviso_version == derechos.AVISO_VERSION)
+        token_luz, token_mario = self._entrar(luz), self._entrar(mario)
+
+        # ---------------------------------------------------------------- ver los propios datos
+        self._paso("«Mis datos» exige iniciar sesión (401)", self._http("get", "/auth/mis-datos/").status_code == 401)
+        enrolamiento = self._entrar(luz, scope=tokens.SCOPE_ENROLAR_MFA)
+        self._paso("un token de enrolamiento (sin segundo factor activado) no abre «Mis datos» (403)", self._http("get", "/auth/mis-datos/", token=enrolamiento).status_code == 403)
+        token_luz = self._entrar(luz)  # `_entrar` volvió a fijar la verificación
+        r = self._http("get", "/auth/mis-datos/", token=token_luz)
+        cuerpo = r.json() if r.status_code == 200 else {}
+        self._paso("la persona ve su perfil con la cédula ENMASCARADA (solo los últimos 3 caracteres)", r.status_code == 200 and cuerpo["perfil"]["cedula"] == "*-***-*020"
+                   and cuerpo["perfil"]["correo"] == "prueba20@ejemplo.com" and cuerpo["perfil"]["nombre"] == "Prueba", r.status_code)
+        self._paso("con los datos de la cuenta, el aviso vigente, la constancia de lectura y sus solicitudes",
+                   cuerpo.get("cuenta", {}).get("usuario") == "int_luz" and cuerpo.get("aviso_vigente", {}).get("version") == derechos.AVISO_VERSION
+                   and cuerpo.get("aviso_aceptado", {}).get("vigente") is True and cuerpo.get("solicitudes") == [] and cuerpo.get("tramites") == {"total": 0})
+        self._paso("las respuestas con datos personales no se guardan en cachés", r.headers.get("Cache-Control") == "no-store")
+        crudo = r.content.decode()
+        self._paso("no devuelve credenciales ni la cédula cifrada o su huella", all(x not in crudo for x in ("password", "argon2", "mfa_secreto", "cedula_cifrada", "cedula_huella", secreto_luz)))
+        self._paso("cada persona ve solo lo suyo", self._http("get", "/auth/mis-datos/", token=token_mario).json()["perfil"]["cedula"] == "*-***-*021")
+
+        # ---------------------------------------------------------------- corregir correo, provincia y ciudad
+        token_viejo = self._entrar(luz, minutos_mfa=60)
+        r = self._http("patch", "/auth/mis-datos/", {"ciudad": "David"}, token=token_viejo)
+        self._paso("corregir exige segundo factor reciente: se niega y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
+        self._paso("y no cambió nada", Perfil.objects.get(usuario=luz).ciudad == "Ciudad de Panamá")
+        r = self._http("get", "/auth/mis-datos/exportar/", token=token_viejo)
+        self._paso("exportar (lleva la cédula completa) también exige segundo factor reciente: se niega y se sugiere reautenticar",
+                   r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True and "8-900-1020" not in r.content.decode(), r.status_code)
+        r = self._http("post", "/auth/mfa/verificar/", {"codigo": pyotp.TOTP(secreto_luz).at(timezone.now().timestamp())}, token=token_viejo)
+        self._paso("reautenticarse con el código del segundo factor", r.status_code == 200, r.status_code)
+        r = self._http("patch", "/auth/mis-datos/", {"correo": " Luz.Nueva@Ejemplo.COM ", "ciudad": "David", "provincia": "Chiriquí"}, token=token_viejo)
+        fila = Perfil.objects.get(usuario=luz)
+        self._paso("tras reautenticarse corrige correo, provincia y ciudad (con los mismos validadores del registro)",
+                   r.status_code == 200 and sorted(r.json()["campos_cambiados"]) == ["ciudad", "correo", "provincia"]
+                   and (fila.correo, fila.provincia, fila.ciudad) == ("luz.nueva@ejemplo.com", "Chiriquí", "David"), r.status_code)
+        self._paso("la base sella `actualizado_en` (no depende de lo que mande la aplicación)", fila.actualizado_en is not None and abs((fila.actualizado_en - ahora).total_seconds()) < 600)
+        self._paso("nombre, apellidos, cédula y fecha de nacimiento no cambiaron", (fila.nombre, fila.apellidos, fila.fecha_nacimiento.isoformat()) == ("Prueba", "Integración", "1990-05-20")
+                   and perfil.descifrar_cedula(settings.SIGET_MFA_KEY, fila.cedula_cifrada) == "8-900-1020")
+        evento = EventoSeguridad.objects.filter(actor=luz, evento="datos_personales_corregidos").first()
+        self._paso("queda un evento de seguridad con los NOMBRES de los campos y nunca los valores",
+                   evento is not None and evento.detalle == {"campos": ["ciudad", "correo", "provincia"]} and "luz.nueva" not in str(evento.detalle) and "David" not in str(evento.detalle))
+        for cuerpo_malo, motivo in (({"nombre": "Otra Persona"}, "el nombre"), ({"cedula": "8-1-1"}, "la cédula"), ({"fecha_nacimiento": "1980-01-01"}, "la fecha de nacimiento"),
+                                    ({"usuario_id": mario.pk, "ciudad": "David"}, "un identificador ajeno"), ({}, "un cuerpo vacío"),
+                                    ({"correo": "malo"}, "un correo inválido"), ({"provincia": "Narnia"}, "una provincia inexistente"), ({"ciudad": "<script>"}, "una ciudad inválida")):
+            r = self._http("patch", "/auth/mis-datos/", cuerpo_malo, token=token_viejo)
+            self._paso(f"corregir {motivo} se rechaza (400)", r.status_code == 400 and r.json()["errores"], r.status_code)
+        self._paso("lo rechazado no cambió nada ni tocó a otra persona", Perfil.objects.get(usuario=luz).nombre == "Prueba" and Perfil.objects.get(usuario=mario).ciudad == "Ciudad de Panamá")
+        antes = EventoSeguridad.objects.filter(actor=luz, evento="datos_personales_corregidos").count()
+        r = self._http("patch", "/auth/mis-datos/", {"ciudad": "David"}, token=token_viejo)
+        self._paso("repetir el mismo valor no cambia nada ni deja un evento falso", r.status_code == 200 and r.json()["campos_cambiados"] == []
+                   and EventoSeguridad.objects.filter(actor=luz, evento="datos_personales_corregidos").count() == antes)
+        repetido = self._http("post", "/auth/registro/", {"username": "int_luz", "password": CLAVE_BUENA, **personales(40)})
+        r = self._http("patch", "/auth/mis-datos/", {"correo": "PRUEBA21@Ejemplo.com"}, token=token_viejo)
+        self._paso("un correo de otra cuenta responde igual que en el registro (409, mismo código, sin revelar de quién es)",
+                   r.status_code == 409 and r.json()["codigo"] == repetido.json()["codigo"] == "usuario_existente" and "prueba21" not in str(r.json()), r.status_code)
+        self._paso("y el perfil sigue como estaba", Perfil.objects.get(usuario=luz).correo == "luz.nueva@ejemplo.com")
+        self._paso("sin sesión no se corrige (401)", self._http("patch", "/auth/mis-datos/", {"ciudad": "David"}).status_code == 401)
+
+        # ---------------------------------------------------------------- portabilidad: exportar
+        tipo = TipoTramite.objects.filter(audiencia__in=("ciudadania", "ambas")).order_by("id").first()
+        r = self._http("post", "/tramites/", {"tipo_tramite": tipo.pk}, token=token_viejo)
+        self._paso("(preparación) la persona inicia un trámite", r.status_code == 201, r.status_code)
+        r = self._http("get", "/auth/mis-datos/exportar/", token=token_viejo)
+        texto = r.content.decode()
+        documento = r.json() if r.status_code == 200 else {}
+        self._paso("exportar entrega un archivo JSON descargable que no se guarda en cachés",
+                   r.status_code == 200 and r.headers.get("Content-Disposition", "").startswith("attachment;") and ".json" in r.headers.get("Content-Disposition", "")
+                   and r.headers.get("Cache-Control") == "no-store", r.status_code)
+        self._paso("trae el perfil, la cuenta, los trámites propios con su historial, las solicitudes y la actividad de seguridad",
+                   documento.get("perfil", {}).get("cedula") == "8-900-1020" and documento.get("cuenta", {}).get("usuario") == "int_luz"
+                   and len(documento.get("tramites", [])) == 1 and isinstance(documento["tramites"][0].get("historial"), list)
+                   and "solicitudes" in documento and any(a["evento"] == "datos_personales_corregidos" for a in documento.get("actividad_de_seguridad", [])))
+        self._paso("no trae datos de otra persona ni credenciales", all(x not in texto for x in ("8-900-1021", "prueba21@", "int_mario", "password", "argon2", "mfa_secreto", "cedula_huella", secreto_luz)))
+        otro = self._http("get", "/auth/mis-datos/exportar/", token=token_mario).json()
+        self._paso("los trámites de una persona no aparecen en la exportación de otra", otro["tramites"] == [] and otro["perfil"]["cedula"] == "8-900-1021")
+        self._paso("«Mis datos» cuenta sus trámites", self._http("get", "/auth/mis-datos/", token=token_viejo).json()["tramites"] == {"total": 1})
+        self._paso("exportar queda en los eventos de seguridad, sin contenido", EventoSeguridad.objects.filter(actor=luz, evento="datos_personales_exportados").exists()
+                   and "8-900" not in str(list(EventoSeguridad.objects.filter(actor=luz, evento="datos_personales_exportados").values_list("detalle", flat=True))))
+
+        # ---------------------------------------------------------------- solicitudes de rectificación, cancelación u oposición
+        for malo, motivo in (({"tipo": "acceso", "detalle": "x" * 20}, "un tipo inexistente"), ({"tipo": "cancelacion", "detalle": "corto"}, "un detalle muy corto"),
+                             ({"tipo": "cancelacion", "detalle": "x" * 1001}, "un detalle muy largo"), ({}, "un cuerpo vacío")):
+            self._paso(f"una solicitud con {motivo} se rechaza (400)", self._http("post", "/auth/mis-datos/solicitudes/", malo, token=token_luz).status_code == 400)
+        r = self._http("post", "/auth/mis-datos/solicitudes/", {"tipo": "rectificacion", "detalle": "Mi segundo apellido está mal escrito.", "usuario_id": mario.pk, "estado": "atendida"}, token=token_luz)
+        sol = r.json() if r.status_code == 201 else {}
+        fila_sol = SolicitudDerecho.objects.filter(usuario=luz).first()
+        self._paso("crea una solicitud: queda «recibida», a nombre de quien llama (no de lo que diga el cuerpo)",
+                   r.status_code == 201 and sol["estado"] == "recibida" and fila_sol is not None and fila_sol.estado == "recibida" and not SolicitudDerecho.objects.filter(usuario=mario).exists(), r.status_code)
+        vence, creada = fila_sol.vence_en, fila_sol.creada_en
+        self._paso("vence en 10 días hábiles (nunca en fin de semana)", vence.weekday() < 5 and 12 <= (vence - creada).days <= 14, f"{creada:%a %d-%m} -> {vence:%a %d-%m}")
+        self._paso("cada persona ve solo sus solicitudes", len(self._http("get", "/auth/mis-datos/solicitudes/", token=token_luz).json()["solicitudes"]) == 1
+                   and self._http("get", "/auth/mis-datos/solicitudes/", token=token_mario).json()["solicitudes"] == [])
+        self._paso("el evento de seguridad no lleva el detalle de la solicitud (podría tener datos personales)",
+                   EventoSeguridad.objects.filter(actor=luz, evento="solicitud_derecho_creada").exists()
+                   and "apellido" not in str(list(EventoSeguridad.objects.filter(actor=luz, evento="solicitud_derecho_creada").values_list("detalle", flat=True))))
+        for _ in range(2):
+            self._http("post", "/auth/mis-datos/solicitudes/", {"tipo": "oposicion", "detalle": "No quiero que usen mis datos para otra cosa."}, token=token_luz)
+        r = self._http("post", "/auth/mis-datos/solicitudes/", {"tipo": "cancelacion", "detalle": "Quiero cancelar mi cuenta, por favor."}, token=token_luz)
+        self._paso(f"hay un tope de {derechos.MAX_SOLICITUDES_ABIERTAS} solicitudes abiertas por persona (409)", r.status_code == 409 and r.json()["codigo"] == "demasiadas_abiertas"
+                   and SolicitudDerecho.objects.filter(usuario=luz).count() == derechos.MAX_SOLICITUDES_ABIERTAS, r.status_code)
+
+        # ---------------------------------------------------------------- la base protege las solicitudes y el perfil
+        operador = Usuario.objects.create(username="int_ident", password_hash=contrasenas.hashear(CLAVE_BUENA), rol_plataforma="operador_identidades", nivel_aseguramiento=2)
+        abierta = SolicitudDerecho.objects.filter(usuario=luz).order_by("id").first()
+
+        def rechazada_por_la_base(sql, parametros=()):
+            try:
+                with transaction.atomic(), connection.cursor() as c:
+                    c.execute(sql, parametros)
+                return False
+            except DatabaseError:
+                return True
+
+        self._paso("la aplicación no puede borrar solicitudes", rechazada_por_la_base("delete from siget.solicitud_derecho"))
+        for columna in ("detalle", "tipo", "usuario_id", "vence_en", "creada_en"):
+            self._paso(f"ni modificar «{columna}» de una solicitud", rechazada_por_la_base(f"update siget.solicitud_derecho set {columna} = {columna}"))  # nosec B608 - columnas fijas de la verificacion
+        self._paso("una respuesta necesita quien responde y el texto (la base lo exige)",
+                   rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida' where id = %s", [abierta.pk])
+                   and rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s where id = %s", [operador.pk, abierta.pk]))
+        self._paso("solo un operador de identidades responde: una persona cualquiera no puede (la base lo exige)",
+                   rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba.' where id = %s", [luz.pk, abierta.pk])
+                   and rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba.' where id = %s", [mario.pk, abierta.pk]))
+        propia = SolicitudDerecho.objects.create(usuario=operador, tipo="oposicion", detalle="Solicitud de prueba del propio operador.", vence_en=timezone.now() + timedelta(days=14))
+        self._paso("nadie responde su propia solicitud, ni siquiera un operador de identidades (la base lo exige)",
+                   rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba.' where id = %s", [operador.pk, propia.pk]))
+        self._paso("ni se puede fijar la hora de la respuesta (no hay UPDATE sobre `respondida_en`: la fija el trigger)",
+                   rechazada_por_la_base("update siget.solicitud_derecho set respondida_en = now() where id = %s", [propia.pk]))
+        # Al nacer, la solicitud la normaliza la base: lo que mande la aplicación sobre el estado, la respuesta o la fecha no cuenta
+        with transaction.atomic():
+            falsa = SolicitudDerecho.objects.create(usuario=operador, tipo="oposicion", detalle="Solicitud que intenta nacer atendida.", estado="atendida", respondida_por=luz,
+                                                    respondida_en=ahora - timedelta(days=400), respuesta="Respuesta que nadie dio.", vence_en=timezone.now() + timedelta(days=14))
+        falsa = SolicitudDerecho.objects.get(pk=falsa.pk)
+        self._paso("una solicitud no puede nacer «atendida» ni con respuesta: la base la deja «recibida» y sin respuesta, y fecha ella la creación",
+                   falsa.estado == "recibida" and falsa.respondida_en is None and falsa.respondida_por_id is None and falsa.respuesta is None
+                   and abs((falsa.creada_en - timezone.now()).total_seconds()) < 600)
+        self._paso("ni nacer con un plazo a 10 años, ya vencido o de solo 5 días (debe vencer entre 10 y 30 días)",
+                   rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con el plazo a 10 años.', now() + interval '3650 days')", [operador.pk])
+                   and rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con el plazo ya vencido.', now() - interval '1 day')", [operador.pk])
+                   and rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con el plazo de 5 dias.', now() + interval '5 days')", [operador.pk]))
+        try:
+            with transaction.atomic():
+                filas = SolicitudDerecho.objects.filter(pk=abierta.pk).update(estado="atendida", respondida_por=operador, respuesta="Respuesta de prueba para la verificación.")
+            self._paso("una respuesta completa sí se guarda", filas == 1)
+        except DatabaseError as error:
+            self._paso("una respuesta completa sí se guarda", False, error)
+        self._paso("pero una solicitud ya respondida no se vuelve a tocar (ni para cambiar la respuesta)",
+                   rechazada_por_la_base("update siget.solicitud_derecho set respuesta = 'Otra respuesta distinta.' where id = %s", [abierta.pk])
+                   and rechazada_por_la_base("update siget.solicitud_derecho set estado = 'rechazada' where id = %s", [abierta.pk]))
+        self._paso("y la base fijó la hora de la respuesta", abs((SolicitudDerecho.objects.get(pk=abierta.pk).respondida_en - timezone.now()).total_seconds()) < 600)
+        self._paso("la persona ve la respuesta a su solicitud", any(x["respuesta"] == "Respuesta de prueba para la verificación." and x["estado"] == "atendida"
+                                                                    for x in self._http("get", "/auth/mis-datos/solicitudes/", token=token_luz).json()["solicitudes"]))
+        with connection.cursor() as c:
+            c.execute("""select r.rolname, has_table_privilege(r.rolname, 'siget.solicitud_derecho', 'SELECT'), has_table_privilege(r.rolname, 'siget.solicitud_derecho', 'INSERT'),
+                         has_table_privilege(r.rolname, 'siget.solicitud_derecho', 'DELETE'), has_table_privilege(r.rolname, 'siget.perfil', 'DELETE'),
+                         has_column_privilege(r.rolname, 'siget.perfil', 'correo', 'UPDATE'), has_column_privilege(r.rolname, 'siget.perfil', 'provincia', 'UPDATE'),
+                         has_column_privilege(r.rolname, 'siget.perfil', 'ciudad', 'UPDATE'), has_column_privilege(r.rolname, 'siget.perfil', 'nombre', 'UPDATE'),
+                         has_column_privilege(r.rolname, 'siget.perfil', 'cedula_cifrada', 'UPDATE'), has_column_privilege(r.rolname, 'siget.perfil', 'actualizado_en', 'UPDATE'),
+                         has_any_column_privilege(r.rolname, 'siget.solicitud_derecho', 'SELECT'), has_any_column_privilege(r.rolname, 'siget.solicitud_derecho', 'INSERT'),
+                         has_any_column_privilege(r.rolname, 'siget.solicitud_derecho', 'UPDATE'), has_column_privilege(r.rolname, 'siget.solicitud_derecho', 'respondida_en', 'UPDATE')
+                         from pg_roles r where r.rolname in ('app_role', 'auditor_role', 'pgadmin_lectura', 'checkpoint_app', 'escalador_role')""")
+            privilegios = {f[0]: f[1:] for f in c.fetchall()}
+        self._paso("ni el auditor, ni pgadmin_lectura, ni el checkpoint, ni el escalador tienen nada sobre las solicitudes, ni por tabla ni por columna (el detalle puede tener datos personales)",
+                   not any(any(privilegios[rol][i] for i in (0, 1, 2, 10, 11, 12, 13)) for rol in ("auditor_role", "pgadmin_lectura", "checkpoint_app", "escalador_role")))
+        self._paso("la aplicación lee e inserta solicitudes pero no las borra, ni borra perfiles",
+                   privilegios["app_role"][0] and privilegios["app_role"][1] and not privilegios["app_role"][2] and not privilegios["app_role"][3])
+        self._paso("de las columnas del perfil solo se pueden actualizar correo, provincia y ciudad",
+                   privilegios["app_role"][4:7] == (True, True, True) and privilegios["app_role"][7:] == (False, False, False))
+        self._paso("la aplicación no tiene UPDATE sobre `respondida_en` (la hora de la respuesta la fija la base)", privilegios["app_role"][13] is False)

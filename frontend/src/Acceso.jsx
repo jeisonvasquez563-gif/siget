@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { api, ApiError, configuracion, confirmarMfa, iniciarSesion, instituciones, registrar, restablecerContrasena } from './api.js'
 import { Alerta, Icono, Logo } from './ui.jsx'
+import { PROVINCIAS } from './comun.jsx'
 import { MapaPanama } from './Mapa.jsx'
 
 function Faro({ titulo, lema, ilustracion = true }) {
@@ -26,11 +27,6 @@ function Faro({ titulo, lema, ilustracion = true }) {
   )
 }
 
-// Provincias y comarcas de Panamá. El servidor valida contra su propia lista: esta solo arma el selector.
-const PROVINCIAS = [
-  'Bocas del Toro', 'Chiriquí', 'Coclé', 'Colón', 'Darién', 'Herrera', 'Los Santos', 'Panamá', 'Panamá Oeste', 'Veraguas',
-  'Comarca Guna Yala', 'Comarca Emberá-Wounaan', 'Comarca Ngäbe-Buglé',
-]
 const PERSONALES_VACIOS = { nombre: '', apellidos: '', cedula: '', fecha_nacimiento: '', provincia: '', ciudad: '', correo: '' }
 
 // Fecha más reciente en la que alguien ya cumplió 18 años (el servidor lo vuelve a comprobar)
@@ -172,6 +168,7 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
   const [aviso, setAviso] = useState('')
   const [trabajando, setTrabajando] = useState(false)
   const [personales, setPersonales] = useState(PERSONALES_VACIOS)
+  const [leyoAviso, setLeyoAviso] = useState(false) // «Leí el aviso de privacidad» (Ley 81): el servidor exige `acepta_aviso: true`
   const [codigoReset, setCodigoReset] = useState('')
   const [equivocada, setEquivocada] = useState(null) // la cuenta es válida pero corresponde a otra puerta
   const [modoRegistro, setModoRegistro] = useState('abierto') // abierto | invitacion | cerrado (lo decide el servidor)
@@ -196,11 +193,12 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
         setAviso('Contraseña restablecida. Ingresa con tu nueva contraseña y el código de tu aplicación de autenticación.')
         setModo('entrar'); setClave(''); setCodigoReset('')
       } else if (modo === 'registro') {
-        await registrar(usuario, clave, { ...personales, cedula: personales.cedula.trim().toUpperCase() }, modoRegistro === 'invitacion' ? invitacion.trim() : '')
+        await registrar(usuario, clave, { ...personales, cedula: personales.cedula.trim().toUpperCase(), acepta_aviso: leyoAviso },
+          modoRegistro === 'invitacion' ? invitacion.trim() : '')
         try {
           // Cuenta nueva: se entra de inmediato y el servidor guía al alta del segundo factor (QR), sin volver a escribir nada
           await iniciarSesion(usuario, clave, '', puerta)
-          setClave(''); setPersonales(PERSONALES_VACIOS)
+          setClave(''); setPersonales(PERSONALES_VACIOS); setLeyoAviso(false)
           await alEntrar()
         } catch {
           setAviso('Tu cuenta está lista. Ingresa con tu usuario y contraseña: te guiaremos para activar el segundo factor.')
@@ -328,6 +326,15 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
                 {registro && <p id="ayuda-clave" className="suave ayuda-clave">Mínimo 12 caracteres; no uses tu nombre de usuario ni una contraseña común.</p>}
               </>
             )}
+            {registro && (
+              <div className="casilla-aviso">
+                <label className="casilla">
+                  <input type="checkbox" checked={leyoAviso} onChange={(e) => setLeyoAviso(e.target.checked)} required />
+                  <span>Leí el aviso de privacidad</span>
+                </label>
+                <small>Dice para qué usamos cada dato, quién lo ve, cuánto lo guardamos y cómo ejercer tus derechos (Ley 81 de 2019). <a href="#/privacidad" target="_blank" rel="noopener noreferrer">Leer el aviso de privacidad<span className="solo-lector"> (se abre en una pestaña nueva)</span></a></small>
+              </div>
+            )}
             {pideCodigo && (
               <label className="campo">
                 <span>Código del autenticador</span>
@@ -349,7 +356,7 @@ export function Login({ alEntrar, motivo = '', puerta = { canal: 'ciudadania' } 
           {!pideCodigo && !recuperar && esCiudadania && modoRegistro !== 'cerrado' && (
             <div className="alta-cuenta">
               <span>{registro ? '¿Ya tienes cuenta?' : '¿Primera vez en SIGET?'}</span>
-              <button type="button" className="btn btn-sec btn-ancho" onClick={() => { setModo(registro ? 'entrar' : 'registro'); setError(''); setAviso(''); setClave('') }}>
+              <button type="button" className="btn btn-sec btn-ancho" onClick={() => { setModo(registro ? 'entrar' : 'registro'); setError(''); setAviso(''); setClave(''); setLeyoAviso(false) }}>
                 {registro ? 'Ingresar con mi cuenta' : 'Crear una cuenta'}
               </button>
             </div>

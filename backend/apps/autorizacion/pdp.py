@@ -39,6 +39,12 @@ class Accion(str, Enum):
     ROTAR_SECRETOS = "rotar_secretos"
     CONSULTAR_AUDITORIA = "consultar_auditoria"
     CONSULTAR_DECISIONES = "consultar_decisiones"
+    VER_MIS_DATOS = "ver_mis_datos"
+    EXPORTAR_MIS_DATOS = "exportar_mis_datos"
+    CREAR_SOLICITUD_DATOS = "crear_solicitud_datos"
+    CORREGIR_MIS_DATOS = "corregir_mis_datos"
+    CONSULTAR_SOLICITUDES_DATOS = "consultar_solicitudes_datos"
+    RESPONDER_SOLICITUD_DATOS = "responder_solicitud_datos"
 
 
 # Transiciones válidas de un trámite (espejo de siget.transicion en la base, que es la autoridad).
@@ -200,9 +206,26 @@ def _coordinador(s, a, r, e):
         return Decision(True, "coordinador_gestiona_su_institucion")
 
 
+def _titular_de_sus_datos(s, a, r, e):
+    """Los derechos sobre los propios datos (Ley 81): solo quien tiene perfil de persona (sin rol de plataforma) y solo sobre el suyo.
+    Ver y pedir una solicitud no exigen segundo factor; exportar (lleva la cédula completa) y corregir, sí, reciente.
+    Nombre, apellidos, cédula y nacimiento no se corrigen: van por solicitud."""
+    if r.tipo != "perfil" or r.solicitante_id != s.id or s.rol_plataforma != "ninguno":
+        return None
+    if a == Accion.VER_MIS_DATOS:
+        return Decision(True, "titular_consulta_sus_datos")
+    if a == Accion.CREAR_SOLICITUD_DATOS:
+        return Decision(True, "titular_pide_sobre_sus_datos")
+    if a == Accion.EXPORTAR_MIS_DATOS and _mfa_reciente(s, e):
+        return Decision(True, "titular_exporta_sus_datos")
+    if a == Accion.CORREGIR_MIS_DATOS and _mfa_reciente(s, e):
+        return Decision(True, "titular_corrige_sus_datos")
+
+
 _ACCIONES_POR_ROL_PLATAFORMA = {
     "operador_infraestructura": {Accion.ADMINISTRAR_INFRAESTRUCTURA},
-    "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA, Accion.EMITIR_INVITACION},
+    "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA, Accion.EMITIR_INVITACION,
+                             Accion.CONSULTAR_SOLICITUDES_DATOS, Accion.RESPONDER_SOLICITUD_DATOS},
     "operador_catalogo": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA},
     "operador_seguridad": {Accion.BLOQUEAR_CUENTA, Accion.REVOCAR_SESION},
     "custodio_secretos": {Accion.ROTAR_SECRETOS},
@@ -225,7 +248,7 @@ def _auditor(s, a, r, e):
         return Decision(True, "auditor_consulta")
 
 
-PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _operadores, _auditor]
+PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _titular_de_sus_datos, _operadores, _auditor]
 
 
 # ----------------------------------------------------------------------------- decisión

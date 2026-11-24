@@ -10,15 +10,15 @@ from datetime import timedelta
 
 import django
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.utils import timezone
 
-from apps.autenticacion import servicio as auth
+from apps.autenticacion import derechos, servicio as auth
 from apps.autenticacion.models import EventoSeguridad, Sesion
 from apps.autenticacion.servicio import Resultado, registrar_evento
 from apps.catalogo.models import Institucion
-from apps.identidad.models import Aprobacion, Membresia, Usuario
+from apps.identidad.models import Aprobacion, Membresia, SolicitudDerecho, Usuario
 
 from apps.identidad import equipo
 
@@ -112,6 +112,61 @@ def restablecer_mfa(operador, objetivo, ip, ahora=None):
     auth._revocar_todas(objetivo.pk)
     registrar_evento(operador.pk, "mfa_restablecido", ip, {"objetivo": objetivo.pk})
     return Resultado(True, "mfa_restablecido")
+
+
+# --------------------------------------------------------------------------- solicitudes sobre datos personales (Ley 81)
+
+def solicitud_para_operador(s, ahora):
+    """Lo que ve el operador de identidades: quién pide (identificador y usuario, nunca nombre, cédula ni correo), qué pide y cómo va el plazo.
+
+    No hay datos de trámites aquí: la respuesta explica qué se puede borrar y qué no (los trámites son expediente público)."""
+    return {"id": s.pk, "tipo": s.tipo, "detalle": s.detalle, "estado": s.estado, "creada_en": s.creada_en, "vence_en": s.vence_en,
+            "vencida": derechos.esta_vencida(s.estado, s.vence_en, ahora), "respondida_en": s.respondida_en, "respuesta": s.respuesta,
+            "persona": {"id": s.usuario_id, "usuario": s.usuario.username},
+            "respondida_por": {"id": s.respondida_por_id, "usuario": s.respondida_por.username} if s.respondida_por_id else None}
+
+
+def solicitudes_de_datos(estado="", ahora=None, limite=100):
+    """Las solicitudes (todas o por estado); `None` si el estado no existe. Las abiertas primero y, entre ellas, las que vencen antes."""
+    ahora = ahora or timezone.now()
+    consulta = SolicitudDerecho.objects.select_related("usuario", "respondida_por")
+    if estado:
+        if estado not in derechos.ESTADOS_SOLICITUD:
+            return None
+        consulta = consulta.filter(estado=estado)
+    abiertas = list(consulta.filter(estado="recibida").order_by("vence_en", "id")[:limite])
+    cerradas = list(consulta.exclude(estado="recibida").order_by("-respondida_en", "-id")[:limite])
+    return [solicitud_para_operador(s, ahora) for s in (abiertas + cerradas)[:limite]]
+
+
+def resumen_solicitudes_de_datos(ahora=None):
+    ahora = ahora or timezone.now()
+    abiertas = SolicitudDerecho.objects.filter(estado="recibida")
+    return {"recibidas": abiertas.count(), "vencidas": abiertas.filter(vence_en__lt=ahora).count()}
+
+
+def responder_solicitud_de_datos(operador, solicitud, estado, respuesta, ip, ahora=None):
+    """Atiende o rechaza una solicitud, una sola vez. La base impone lo mismo: ni se toca una respondida ni se responde sin texto.
+
+    NO borra ni modifica datos de la persona: si corresponde corregir o suprimir algo se hace aparte, y la respuesta lo explica."""
+    ahora = ahora or timezone.now()
+    if solicitud.usuario_id == operador.pk:
+        return Resultado(False, "no_a_si_mismo")
+    if solicitud.estado != "recibida":
+        return Resultado(False, "ya_resuelta")
+    datos, errores = derechos.validar_resolucion({"estado": estado, "respuesta": respuesta})
+    if errores:
+        return Resultado(False, "datos_invalidos", detalle={"errores": errores})
+    with transaction.atomic():
+        # `estado="recibida"` en el filtro: si otro operador la respondió entre tanto, no se pisa su respuesta.
+        # La hora de la respuesta no se envía: la fija la base (trigger) y la aplicación no tiene UPDATE sobre esa columna
+        filas = SolicitudDerecho.objects.filter(pk=solicitud.pk, estado="recibida").update(
+            estado=datos[0], respuesta=datos[1], respondida_por=operador)
+        if filas != 1:
+            return Resultado(False, "ya_resuelta")
+        registrar_evento(operador.pk, "solicitud_derecho_respondida", ip,
+                         {"solicitud": solicitud.pk, "tipo": solicitud.tipo, "estado": datos[0], "objetivo": solicitud.usuario_id})
+    return Resultado(True, "solicitud_" + datos[0])
 
 
 # --------------------------------------------------------------------------- aprobaciones (control dual)

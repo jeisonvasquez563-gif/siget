@@ -7,7 +7,7 @@ from apps.auditoria.models import DecisionPdp, EventoAuditoria
 from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 from apps.plataforma.models import RotacionSecreto
 from apps.catalogo.models import Feriado, Institucion, TipoTramite
-from apps.identidad.models import Aprobacion, Membresia, Perfil, Usuario
+from apps.identidad.models import Aprobacion, Membresia, Perfil, SolicitudDerecho, Usuario
 from apps.identidad.sujeto import construir_sujeto
 from apps.nucleo.esquema import columnas_del_modelo, diferencias, modelos_de_dominio
 from apps.tramites.models import Documento, Tramite, Transicion
@@ -20,6 +20,7 @@ TABLAS = {
     Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto", Feriado: "feriado",
     Invitacion: "invitacion",
     Documento: "documento",
+    SolicitudDerecho: "solicitud_derecho",
 }
 
 

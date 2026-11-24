@@ -362,6 +362,7 @@ describe('acceso y sesión', () => {
     await user.type(screen.getByLabelText('Correo electrónico'), 'maria@correo.com')
     await user.type(screen.getByLabelText('Usuario'), 'nuevo.usuario')
     await user.type(screen.getByLabelText('Contraseña'), 'una-frase-larga-y-unica')
+    await user.click(screen.getByRole('checkbox', { name: 'Leí el aviso de privacidad' }))
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
     expect(await screen.findByRole('heading', { name: 'Activa el segundo factor' })).toBeInTheDocument()
   })

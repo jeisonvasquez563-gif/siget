@@ -19,6 +19,12 @@
                     "estado": "disponible"
                 },
                 {
+                    "id": "mis_datos",
+                    "nombre": "Mis datos",
+                    "descripcion": "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.",
+                    "estado": "disponible"
+                },
+                {
                     "id": "seguridad",
                     "nombre": "Mi seguridad",
                     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
@@ -37,8 +43,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 4,
-            "acciones_totales": 18
+            "acciones_permitidas": 8,
+            "acciones_totales": 25
         },
         {
             "id": "funcionario",
@@ -56,6 +62,12 @@
                     "id": "nuevo_tramite",
                     "nombre": "Iniciar un trámite",
                     "descripcion": "Elige una institución y un trámite del catálogo.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mis_datos",
+                    "nombre": "Mis datos",
+                    "descripcion": "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.",
                     "estado": "disponible"
                 },
                 {
@@ -83,8 +95,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 4,
-            "acciones_totales": 18
+            "acciones_permitidas": 8,
+            "acciones_totales": 25
         },
         {
             "id": "supervisor",
@@ -102,6 +114,12 @@
                     "id": "nuevo_tramite",
                     "nombre": "Iniciar un trámite",
                     "descripcion": "Elige una institución y un trámite del catálogo.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mis_datos",
+                    "nombre": "Mis datos",
+                    "descripcion": "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.",
                     "estado": "disponible"
                 },
                 {
@@ -141,8 +159,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 6,
-            "acciones_totales": 18
+            "acciones_permitidas": 10,
+            "acciones_totales": 25
         },
         {
             "id": "coordinador_institucional",
@@ -160,6 +178,12 @@
                     "id": "nuevo_tramite",
                     "nombre": "Iniciar un trámite",
                     "descripcion": "Elige una institución y un trámite del catálogo.",
+                    "estado": "disponible"
+                },
+                {
+                    "id": "mis_datos",
+                    "nombre": "Mis datos",
+                    "descripcion": "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.",
                     "estado": "disponible"
                 },
                 {
@@ -187,8 +211,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 3,
-            "acciones_totales": 18
+            "acciones_permitidas": 7,
+            "acciones_totales": 25
         },
         {
             "id": "operador_infraestructura",
@@ -228,13 +252,13 @@
                 }
             ],
             "acciones_permitidas": 1,
-            "acciones_totales": 18
+            "acciones_totales": 25
         },
         {
             "id": "operador_identidades",
             "nombre": "Operador de identidades",
             "ambito": "plataforma",
-            "descripcion": "Altas de coordinadores y restablece el segundo factor (control dual).",
+            "descripcion": "Altas de coordinadores, restablece el segundo factor (control dual) y responde las solicitudes sobre datos personales.",
             "modulos": [
                 {
                     "id": "consola_identidades",
@@ -267,8 +291,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 3,
-            "acciones_totales": 18
+            "acciones_permitidas": 6,
+            "acciones_totales": 25
         },
         {
             "id": "operador_catalogo",
@@ -308,7 +332,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 18
+            "acciones_totales": 25
         },
         {
             "id": "operador_seguridad",
@@ -348,7 +372,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 18
+            "acciones_totales": 25
         },
         {
             "id": "custodio_secretos",
@@ -388,7 +412,7 @@
                 }
             ],
             "acciones_permitidas": 1,
-            "acciones_totales": 18
+            "acciones_totales": 25
         },
         {
             "id": "auditor",
@@ -428,7 +452,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 18
+            "acciones_totales": 25
         }
     ],
     "acciones": [
@@ -446,8 +470,8 @@
             "nombre": "Iniciar un trámite",
             "grupo": "Trámites",
             "casos": [
-                "A su nombre",
-                "A nombre de otra persona"
+                "A su nombre, en un trámite que le corresponde",
+                "En su propia institución o a nombre de otra persona"
             ]
         },
         {
@@ -544,6 +568,12 @@
             "casos": null
         },
         {
+            "id": "emitir_invitacion",
+            "nombre": "Emitir una invitación para crear cuenta",
+            "grupo": "Plataforma",
+            "casos": null
+        },
+        {
             "id": "bloquear_cuenta",
             "nombre": "Bloquear una cuenta",
             "grupo": "Plataforma",
@@ -560,6 +590,54 @@
             "nombre": "Rotar secretos y certificados",
             "grupo": "Plataforma",
             "casos": null
+        },
+        {
+            "id": "consultar_solicitudes_datos",
+            "nombre": "Ver las solicitudes sobre datos personales",
+            "grupo": "Datos personales",
+            "casos": null
+        },
+        {
+            "id": "responder_solicitud_datos",
+            "nombre": "Responder una solicitud sobre datos personales",
+            "grupo": "Datos personales",
+            "casos": null
+        },
+        {
+            "id": "ver_mis_datos",
+            "nombre": "Ver los propios datos personales",
+            "grupo": "Datos personales",
+            "casos": [
+                "Su propio perfil",
+                "El perfil de otra persona"
+            ]
+        },
+        {
+            "id": "exportar_mis_datos",
+            "nombre": "Exportar los propios datos personales",
+            "grupo": "Datos personales",
+            "casos": [
+                "Su propio perfil",
+                "El perfil de otra persona"
+            ]
+        },
+        {
+            "id": "crear_solicitud_datos",
+            "nombre": "Pedir rectificación, cancelación u oposición",
+            "grupo": "Datos personales",
+            "casos": [
+                "Sobre su propio perfil",
+                "Sobre el perfil de otra persona"
+            ]
+        },
+        {
+            "id": "corregir_mis_datos",
+            "nombre": "Corregir los propios datos de contacto",
+            "grupo": "Datos personales",
+            "casos": [
+                "Su propio perfil",
+                "El perfil de otra persona"
+            ]
         },
         {
             "id": "consultar_auditoria",
@@ -719,6 +797,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -751,6 +840,72 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_consulta_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_exporta_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_pide_sobre_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_corrige_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -794,7 +949,7 @@
                 },
                 "desfavorable": {
                     "permitido": false,
-                    "politica": "sin_regla_que_permita"
+                    "politica": "personal_no_inicia_en_su_institucion"
                 },
                 "exige_segundo_factor": false
             },
@@ -919,6 +1074,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -951,6 +1117,72 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_consulta_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_exporta_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_pide_sobre_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_corrige_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -994,7 +1226,7 @@
                 },
                 "desfavorable": {
                     "permitido": false,
-                    "politica": "sin_regla_que_permita"
+                    "politica": "personal_no_inicia_en_su_institucion"
                 },
                 "exige_segundo_factor": false
             },
@@ -1119,6 +1351,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -1151,6 +1394,72 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_consulta_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_exporta_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_pide_sobre_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_corrige_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -1194,7 +1503,7 @@
                 },
                 "desfavorable": {
                     "permitido": false,
-                    "politica": "sin_regla_que_permita"
+                    "politica": "personal_no_inicia_en_su_institucion"
                 },
                 "exige_segundo_factor": false
             },
@@ -1319,6 +1628,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -1351,6 +1671,72 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_consulta_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_exporta_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_pide_sobre_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_corrige_sus_datos"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": true
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -1519,6 +1905,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -1542,6 +1939,72 @@
                 "exige_segundo_factor": false
             },
             "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -1719,6 +2182,17 @@
                 },
                 "exige_segundo_factor": true
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_emitir_invitacion"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_emitir_invitacion"
+                },
+                "exige_segundo_factor": true
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -1742,6 +2216,72 @@
                 "exige_segundo_factor": false
             },
             "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_consultar_solicitudes_datos"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_consultar_solicitudes_datos"
+                },
+                "exige_segundo_factor": true
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_responder_solicitud_datos"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_responder_solicitud_datos"
+                },
+                "exige_segundo_factor": true
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -1919,6 +2459,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -1942,6 +2493,72 @@
                 "exige_segundo_factor": false
             },
             "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -2119,6 +2736,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": true,
@@ -2142,6 +2770,72 @@
                 "exige_segundo_factor": true
             },
             "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -2319,6 +3013,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -2351,6 +3056,72 @@
                     "politica": "custodio_secretos_rotar_secretos"
                 },
                 "exige_segundo_factor": true
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -2519,6 +3290,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -2542,6 +3324,72 @@
                 "exige_segundo_factor": false
             },
             "rotar_secretos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "consultar_solicitudes_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "exportar_mis_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "crear_solicitud_datos": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "corregir_mis_datos": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -2576,30 +3424,6 @@
             }
         }
     },
-    "denegaciones": [
-        {
-            "politica": "cuenta_no_activa",
-            "descripcion": "Una cuenta bloqueada o suspendida no puede hacer nada."
-        },
-        {
-            "politica": "plataforma_sin_acceso_a_tramites",
-            "descripcion": "Ningún rol de plataforma ve trámites ni documentos de la ciudadanía."
-        },
-        {
-            "politica": "conflicto_de_interes",
-            "descripcion": "Nadie gestiona un trámite que él mismo pidió."
-        },
-        {
-            "politica": "control_dual",
-            "descripcion": "Quien propone un alta no puede aprobarla."
-        },
-        {
-            "politica": "sin_regla_que_permita",
-            "descripcion": "Si ninguna política lo permite explícitamente, se niega (denegar por defecto)."
-        }
-    ],
-    "ventana_minutos": 15,
-    "ningun_rol_puede_todo": true,
     "modulos": [
         {
             "id": "mis_tramites",
@@ -2650,6 +3474,18 @@
             "descripcion": "Personal y roles de tu institución.",
             "estado": "disponible",
             "roles": [
+                "supervisor",
+                "coordinador_institucional"
+            ]
+        },
+        {
+            "id": "mis_datos",
+            "nombre": "Mis datos",
+            "descripcion": "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.",
+            "estado": "disponible",
+            "roles": [
+                "ciudadano",
+                "funcionario",
                 "supervisor",
                 "coordinador_institucional"
             ]
@@ -2776,5 +3612,37 @@
                 "auditor"
             ]
         }
-    ]
+    ],
+    "denegaciones": [
+        {
+            "politica": "cuenta_no_activa",
+            "descripcion": "Una cuenta bloqueada o suspendida no puede hacer nada."
+        },
+        {
+            "politica": "plataforma_sin_acceso_a_tramites",
+            "descripcion": "Ningún rol de plataforma ve trámites ni documentos de la ciudadanía."
+        },
+        {
+            "politica": "conflicto_de_interes",
+            "descripcion": "Nadie gestiona un trámite que él mismo pidió."
+        },
+        {
+            "politica": "control_dual",
+            "descripcion": "Quien propone un alta no puede aprobarla."
+        },
+        {
+            "politica": "personal_no_inicia_en_su_institucion",
+            "descripcion": "El personal de una institución no inicia trámites en su propia institución."
+        },
+        {
+            "politica": "audiencia_no_corresponde",
+            "descripcion": "Cada trámite es para la ciudadanía o para otras instituciones: no se mezclan."
+        },
+        {
+            "politica": "sin_regla_que_permita",
+            "descripcion": "Si ninguna política lo permite explícitamente, se niega (denegar por defecto)."
+        }
+    ],
+    "ventana_minutos": 15,
+    "ningun_rol_puede_todo": true
 }

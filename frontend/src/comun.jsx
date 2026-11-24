@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from './api.js'
 import { Alerta, Icono, Insignia } from './ui.jsx'
 
 export { Alerta }
+
+// Provincias y comarcas de Panamá. El servidor valida contra su propia lista: esta solo arma los selectores (registro y «Mis datos»).
+export const PROVINCIAS = [
+  'Bocas del Toro', 'Chiriquí', 'Coclé', 'Colón', 'Darién', 'Herrera', 'Los Santos', 'Panamá', 'Panamá Oeste', 'Veraguas',
+  'Comarca Guna Yala', 'Comarca Emberá-Wounaan', 'Comarca Ngäbe-Buglé',
+]
 
 export const ROLES_PLATAFORMA = {
   ninguno: 'Sin rol de plataforma',
@@ -113,6 +119,29 @@ export function mensajeDe(error) {
   return 'No se pudo conectar con el servidor. Revisa tu conexión.'
 }
 
+// Modales: Escape cierra el de más arriba (si hay dos abiertos, solo ese) y al cerrarse el foco vuelve al botón que lo abrió.
+// El botón se anota al dibujar el modal por primera vez (el `autoFocus` del campo interno mueve el foco después).
+const MODALES_ABIERTOS = []
+
+export function useModal(alCerrar) {
+  const [abridor] = useState(() => (document.activeElement && document.activeElement !== document.body ? document.activeElement : null))
+  const cerrar = useRef(alCerrar)
+  useEffect(() => { cerrar.current = alCerrar })
+  useEffect(() => {
+    const yo = {}
+    MODALES_ABIERTOS.push(yo)
+    const tecla = (e) => {
+      if (e.key === 'Escape' && MODALES_ABIERTOS[MODALES_ABIERTOS.length - 1] === yo) cerrar.current()
+    }
+    document.addEventListener('keydown', tecla)
+    return () => {
+      document.removeEventListener('keydown', tecla)
+      MODALES_ABIERTOS.splice(MODALES_ABIERTOS.indexOf(yo), 1)
+      if (abridor?.isConnected && !abridor.disabled) abridor.focus()
+    }
+  }, [abridor])
+}
+
 // Reautenticación escalonada: las acciones sensibles piden un código reciente del segundo factor.
 export function useReautenticacion() {
   const [pendiente, setPendiente] = useState(null)
@@ -144,6 +173,7 @@ export function useReautenticacion() {
 }
 
 function ModalCodigo({ alCancelar, alVerificar }) {
+  useModal(alCancelar)
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(false)
@@ -156,7 +186,9 @@ function ModalCodigo({ alCancelar, alVerificar }) {
       await api('/auth/mfa/verificar/', { metodo: 'POST', cuerpo: { codigo } })
       await alVerificar()
     } catch (e) {
-      setError(e instanceof ApiError && e.estado === 400 ? 'Ese código no sirve: es incorrecto o ya se usó. Espera al siguiente e inténtalo otra vez.' : mensajeDe(e))
+      const incorrecto = e instanceof ApiError && e.estado === 400
+      setError(incorrecto ? 'Ese código no sirve: es incorrecto o ya se usó. Espera al siguiente e inténtalo otra vez.' : mensajeDe(e))
+      if (incorrecto) setCodigo('') // un código ya rechazado no se reintenta: se escribe el siguiente
       setTrabajando(false)
     }
   }

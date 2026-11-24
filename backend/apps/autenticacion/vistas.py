@@ -100,7 +100,7 @@ class Registro(_Publica):
         datos = request.data if isinstance(request.data, dict) else {}
         personales = {k: datos.get(k) for k in ("nombre", "apellidos", "cedula", "fecha_nacimiento", "provincia", "ciudad", "correo")}
         r = servicio.registrar_usuario(_campo(request, "username"), _campo(request, "password"), _ip(request), personales,
-                                       invitacion=_campo(request, "invitacion"))
+                                       invitacion=_campo(request, "invitacion"), acepta_aviso=datos.get("acepta_aviso"))
         if r.ok:
             return Response({"detalle": "Cuenta creada. Inicia sesión y activa el segundo factor."}, status=status.HTTP_201_CREATED)
         if r.codigo == "datos_invalidos":

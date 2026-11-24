@@ -18,7 +18,7 @@ from django.utils import timezone
 from apps.catalogo.models import Institucion
 from apps.identidad.models import Membresia, Perfil, Usuario
 
-from . import bloqueo, canales, contrasenas, mfa, perfil, politica_sesion, restablecimiento, tokens
+from . import bloqueo, canales, contrasenas, derechos, mfa, perfil, politica_sesion, restablecimiento, tokens
 from .models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,31}$")
@@ -93,12 +93,16 @@ def _registrar_fallo(usuario, ip, ahora, motivo) -> Resultado:
 
 # --------------------------------------------------------------------------- registro e inicio de sesión
 
-def registrar_usuario(username, password, ip, datos_personales=None, hoy=None, invitacion=None, modo=None, ahora=None) -> Resultado:
+def registrar_usuario(username, password, ip, datos_personales=None, hoy=None, invitacion=None, modo=None, ahora=None,
+                      acepta_aviso=None) -> Resultado:
     """Crea la cuenta y su perfil en una sola transacción: o quedan las dos cosas o ninguna.
 
     Según SIGET_REGISTRO: «cerrado» no crea cuentas; «invitacion» exige un código vigente, que se gasta en la MISMA transacción
     en que se crea la cuenta (si algo falla, el código sigue sirviendo). Los datos se validan ANTES que el código, así un error
-    de formulario no gasta la invitación. Cualquier problema con el código responde lo mismo («invitación inválida»)."""
+    de formulario no gasta la invitación. Cualquier problema con el código responde lo mismo («invitación inválida»).
+
+    `acepta_aviso` debe ser exactamente `True`: la persona leyó el aviso de privacidad (Ley 81). Se guarda la versión y la hora.
+    Se valida con el resto de los datos, antes que la invitación."""
     modo = modo or settings.SIGET_REGISTRO
     ahora = ahora or timezone.now()
     if modo == "cerrado":
@@ -111,6 +115,8 @@ def registrar_usuario(username, password, ip, datos_personales=None, hoy=None, i
     errores += contrasenas.errores_de_contrasena(password, username)
     perfil_datos, errores_perfil = perfil.validar(datos_personales if isinstance(datos_personales, dict) else {}, hoy or timezone.localdate())
     errores += errores_perfil
+    if acepta_aviso is not True:  # ni «true» como texto ni 1: tiene que ser el booleano
+        errores.append(derechos.MENSAJE_ACEPTA_AVISO)
     if errores:
         return Resultado(False, "datos_invalidos", detalle={"errores": errores})
     clave = settings.SIGET_MFA_KEY
@@ -131,7 +137,7 @@ def registrar_usuario(username, password, ip, datos_personales=None, hoy=None, i
                 usuario=usuario, nombre=perfil_datos["nombre"], apellidos=perfil_datos["apellidos"],
                 cedula_cifrada=perfil.cifrar_cedula(clave, perfil_datos["cedula"]), cedula_huella=perfil.huella_cedula(clave, perfil_datos["cedula"]),
                 fecha_nacimiento=perfil_datos["fecha_nacimiento"], provincia=perfil_datos["provincia"], ciudad=perfil_datos["ciudad"],
-                correo=perfil_datos["correo"],
+                correo=perfil_datos["correo"], aviso_version=derechos.AVISO_VERSION, aviso_leido_en=ahora,
             )
     except IntegrityError:
         # Usuario, cédula o correo ya registrados: se responde igual para no revelar quién está registrado
