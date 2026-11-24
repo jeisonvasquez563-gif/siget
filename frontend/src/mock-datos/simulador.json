@@ -78,6 +78,10 @@
     "segundo_factor",
     "cuenta"
    ],
+   "emitir_invitacion": [
+    "segundo_factor",
+    "cuenta"
+   ],
    "bloquear_cuenta": [
     "segundo_factor",
     "cuenta"
@@ -99,6 +103,34 @@
     "segundo_factor",
     "cuenta",
     "nivel"
+   ],
+   "consultar_solicitudes_datos": [
+    "segundo_factor",
+    "cuenta"
+   ],
+   "responder_solicitud_datos": [
+    "segundo_factor",
+    "cuenta"
+   ],
+   "ver_mis_datos": [
+    "perfil_de",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "exportar_mis_datos": [
+    "perfil_de",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "crear_solicitud_datos": [
+    "perfil_de",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "corregir_mis_datos": [
+    "perfil_de",
+    "segundo_factor",
+    "cuenta"
    ]
   },
   "etiquetas": {
@@ -112,7 +144,8 @@
    "asignado": "Quién lo atiende",
    "tipo_alta": "Tipo de alta",
    "alta_propuesta_por": "Quién propuso el alta",
-   "nivel": "Nivel de aseguramiento"
+   "nivel": "Nivel de aseguramiento",
+   "perfil_de": "De quién es el perfil"
   },
   "valores": {
    "segundo_factor": [
@@ -264,6 +297,16 @@
      "valor": 3,
      "etiqueta": "Nivel 3"
     }
+   ],
+   "perfil_de": [
+    {
+     "valor": "yo",
+     "etiqueta": "De la misma persona que actúa"
+    },
+    {
+     "valor": "otra_persona",
+     "etiqueta": "De otra persona"
+    }
    ]
   },
   "defectos": {
@@ -277,7 +320,8 @@
    "asignado": "nadie",
    "tipo_alta": "alta_institucion",
    "alta_propuesta_por": "otra_persona",
-   "nivel": 2
+   "nivel": 2,
+   "perfil_de": "yo"
   }
  },
  "casos": [
@@ -573,6 +617,13 @@
      },
      {
       "fase": "permiso",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
       "regla": "Reglas de los operadores de plataforma",
       "resultado": "no_aplica",
       "politica": null,
@@ -768,6 +819,13 @@
      },
      {
       "fase": "permiso",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
       "regla": "Reglas de los operadores de plataforma",
       "resultado": "no_aplica",
       "politica": null,
@@ -891,6 +949,13 @@
      {
       "fase": "permiso",
       "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1034,6 +1099,13 @@
      },
      {
       "fase": "permiso",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
       "regla": "Reglas de los operadores de plataforma",
       "resultado": "no_aplica",
       "politica": null,
@@ -1136,9 +1208,9 @@
      "accion": "crear_tramite",
      "institucion": "propia",
      "solicitante": "yo",
-     "audiencia": "ciudadania",
      "segundo_factor": "reciente",
-     "cuenta": "bloqueada"
+     "cuenta": "bloqueada",
+     "audiencia": "ciudadania"
     },
     "decision": {
      "permitido": false,
@@ -1324,6 +1396,13 @@
      },
      {
       "fase": "permiso",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
       "regla": "Reglas de los operadores de plataforma",
       "resultado": "no_aplica",
       "politica": null,
@@ -1439,6 +1518,13 @@
      {
       "fase": "permiso",
       "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1562,6 +1648,13 @@
      {
       "fase": "permiso",
       "regla": "Reglas de la coordinación de la institución",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null

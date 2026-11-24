@@ -27,6 +27,7 @@ async function llenarDatos(user) {
   await user.type(screen.getByLabelText('Correo electrónico'), 'maria@correo.com')
   await user.type(screen.getByLabelText('Usuario'), 'nuevo.usuario')
   await user.type(screen.getByLabelText('Contraseña'), 'una-frase-larga-y-unica')
+  await user.click(screen.getByLabelText('Leí el aviso de privacidad'))  // obligatorio desde PT-15 (Ley 81)
 }
 
 describe('registro configurable', () => {

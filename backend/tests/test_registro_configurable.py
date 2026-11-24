@@ -44,7 +44,8 @@ def test_con_invitacion_los_datos_se_validan_antes_que_el_codigo(eventos, monkey
 def test_una_invitacion_mal_formada_se_rechaza_sin_consultar_la_base(eventos, monkeypatch, codigo):
     monkeypatch.setattr(servicio.Invitacion.objects, "select_for_update", lambda: pytest.fail("no debe consultar"))
     monkeypatch.setattr(servicio.transaction, "atomic", lambda: _SinTransaccion())
-    r = servicio.registrar_usuario("ana.nueva", CLAVE, "10.0.0.1", DATOS, modo="invitacion", invitacion=codigo)
+    r = servicio.registrar_usuario("ana.nueva", CLAVE, "10.0.0.1", DATOS, modo="invitacion", invitacion=codigo,
+                                  acepta_aviso=True)
     assert (r.ok, r.codigo) == (False, "invitacion_invalida")
     assert eventos[-1][0] == "registro_rechazado" and eventos[-1][1]["motivo"] == "invitacion_invalida"
 

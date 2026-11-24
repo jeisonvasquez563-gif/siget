@@ -168,7 +168,7 @@ class Command(BaseCommand):
         r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "ver_tramite"}, t[ana.username], formato="multipart")
         self._paso("un cuerpo que no es JSON se rechaza (415)", r.status_code == 415, r.status_code)
         r = self._http("/politicas/simular/", t[ana.username])
-        self._paso("el formulario del simulador (GET) lista las variables de las 18 acciones", r.status_code == 200 and len(r.json()["variables"]) == 18)
+        self._paso("el formulario del simulador (GET) lista las variables de las 25 acciones", r.status_code == 200 and len(r.json()["variables"]) == 25)
         self._paso("el simulador no registró ninguna decisión: es hipotético y no ensucia la auditoría", self._decisiones_registradas() == antes, f"{antes} -> {self._decisiones_registradas()}")
 
         # ---------------------------------------------------------------- una sola fuente para la ventana del segundo factor

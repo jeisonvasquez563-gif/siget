@@ -7,6 +7,7 @@
 //           cata.catalogo sergio.seguridad silvia.secretos aldo.auditor
 
 import matrizEjemplo from './mock-datos/matriz.json'
+import { derechosMock, MENSAJE_ACEPTA_AVISO } from './mock-derechos.js'
 import { equipoMock } from './mock-equipo.js'
 import { plataformaMock } from './mock-plataforma.js'
 import { olvidarConfiguracion } from './api.js'
@@ -44,6 +45,7 @@ const MODULOS = {
   bandeja: ['Bandeja de la institución', 'Trámites de tu institución: revisarlos y cambiar su estado.', 'disponible'],
   supervision: ['Supervisión', 'Reasigna trámites y atiende los escalados de tu institución.', 'disponible'],
   equipo: ['Equipo de la institución', 'Personal y roles de tu institución.', 'disponible'],
+  mis_datos: ['Mis datos', 'Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.', 'disponible'],
   seguridad: ['Mi seguridad', 'Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.', 'disponible'],
   mfa: ['Segundo factor (MFA)', 'Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.', 'disponible'],
   roles_permisos: ['Roles y permisos', 'Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.', 'disponible'],
@@ -65,7 +67,7 @@ function modulosDe(u) {
   if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa', 'roles_permisos']
   else {
     const roles = u.membresias.map((m) => m.rol)
-    ids = ['mis_tramites', 'nuevo_tramite']
+    ids = ['mis_tramites', 'nuevo_tramite', 'mis_datos']
     if (roles.some((r) => r === 'funcionario' || r === 'supervisor')) ids.push('bandeja')
     if (roles.includes('supervisor')) ids.push('supervision')
     if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('equipo')
@@ -173,6 +175,11 @@ export function instalarMock(inicial, opciones = {}) {
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
     negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
   })
+  const derechos = derechosMock({
+    usuarios: USUARIOS, actual: () => actual, hace, mfaFresco: () => mfaFresco,
+    resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
+    tramitesDe: (u) => TRAMITES.filter((t) => t.solicitante_id === u.id).map(paraCiudadania),
+  })
   const demora = (ms = opciones.demora ?? 140) => new Promise((r) => setTimeout(r, ms))
   const resp = (estado, cuerpo) => new Response(cuerpo === null ? null : JSON.stringify(cuerpo), { status: estado, headers: { 'Content-Type': 'application/json' } })
   const yo = () => {
@@ -208,10 +215,13 @@ export function instalarMock(inicial, opciones = {}) {
       return resp(200, { access_token: 'mock', scope: 'completo' })
     }
     if (camino === '/auth/instituciones/') return resp(200, INSTITUCIONES.map(({ id, nombre }) => ({ id, nombre })))
+    if (camino === '/auth/aviso-privacidad/') return derechos.aviso()
     if (camino === '/auth/configuracion/') return resp(200, { registro: ajustes.registro || 'abierto', aviso_demostracion: Boolean(ajustes.aviso) })
     if (camino === '/auth/registro/') {
       if (ajustes.registro === 'cerrado') return resp(403, { codigo: 'registro_cerrado', detalle: 'La creación de cuentas está cerrada en este momento.' })
       if (ajustes.registro === 'invitacion' && cuerpo.invitacion !== 'K7MQ-2XWD-9PRT') return resp(400, { codigo: 'invitacion_invalida', detalle: 'La invitación no es válida, ya se usó o venció.' })
+      // Igual que el servidor: sin la confirmación del aviso (el booleano true) no se crea la cuenta
+      if (cuerpo.acepta_aviso !== true) return resp(400, { codigo: 'datos_invalidos', errores: [MENSAJE_ACEPTA_AVISO] })
       return resp(201, { detalle: 'Cuenta creada.' })
     }
     if (camino === '/auth/restablecer/') {
@@ -330,6 +340,8 @@ export function instalarMock(inicial, opciones = {}) {
       if (camino === '/auditoria/seguridad/') return resp(200, paginar(p.get('evento') ? SEGURIDAD.filter((e) => e.evento === p.get('evento')) : SEGURIDAD, p))
       if (camino === '/auditoria/tramites/') return resp(200, paginar(p.get('accion') ? ACTUACIONES.filter((e) => e.accion === p.get('accion')) : ACTUACIONES, p))
     }
+    const deDerechos = derechos.manejar(camino, metodo, cuerpo, p)
+    if (deDerechos) return deDerechos
     const deConsola = plataforma(camino, metodo, cuerpo, p)
     if (deConsola) return deConsola
     return resp(404, { detalle: 'No encontrado.' })

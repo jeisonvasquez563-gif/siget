@@ -1,0 +1,12 @@
+# PT-15: ensayo completo contra produccion (24-nov-2026)
+# 2026-11-24 11:37:48  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pt15/paso6.sh
+== 11. Ensayo completo contra produccion
+ENSAYO: 101 de 101 comprobaciones correctas
+== 12. Rutas nuevas desde el anfitrion
+/salud/                            200
+/auth/aviso-privacidad/            200
+/auth/mis-datos/                   401
+/plataforma/solicitudes-datos/     401
+(sin sesion: /auth/mis-datos/ y la consola deben responder 401)
+# código de salida: 0

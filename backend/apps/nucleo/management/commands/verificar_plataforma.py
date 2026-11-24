@@ -21,7 +21,7 @@ from apps.autenticacion import contrasenas, mfa, tokens
 from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 from apps.autorizacion import permisos
 from apps.catalogo.models import Institucion
-from apps.identidad.models import Aprobacion, Membresia, Usuario
+from apps.identidad.models import Aprobacion, Membresia, SolicitudDerecho, Usuario
 from apps.plataforma.models import RotacionSecreto
 
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.21"}
@@ -98,13 +98,13 @@ class Command(BaseCommand):
         self._paso("la lista nunca trae hashes, secretos ni datos personales", all(x not in crudo for x in ("password", "argon2", "mfa_secreto", "cedula", "correo", "nombre")))
         self._paso("seguridad también lista las personas (para bloquear)", self._llamar(seg, "get", "/plataforma/personas/").status_code == 200)
         self._paso("infraestructura NO ve las personas (403)", self._llamar(inf, "get", "/plataforma/personas/").status_code == 403)
-        self._paso("una persona de la ciudadanía NO entra a ninguna consola (403)", all(self._llamar(ana, "get", f"/plataforma/{x}/").status_code == 403 for x in ("personas", "aprobaciones", "secretos", "infraestructura", "eventos")))
+        self._paso("una persona de la ciudadanía NO entra a ninguna consola (403)", all(self._llamar(ana, "get", f"/plataforma/{x}/").status_code == 403 for x in ("personas", "aprobaciones", "secretos", "infraestructura", "eventos", "solicitudes-datos")))
         self._paso("ninguna consola devuelve trámites: /tramites/ le está vedado a los 5 operadores (403)",
                    all(self._llamar(o, "get", "/tramites/").status_code == 403 for o in (ida, ca, seg, sec, inf)))
         sin_factor = self._persona("vp_sin_factor", "operador_identidades")
         Usuario.objects.filter(pk=sin_factor.pk).update(mfa_verificado_en=ahora - timedelta(hours=2))
-        sesion = Sesion.objects.create(usuario=sin_factor, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=ahora + timedelta(minutes=10))
-        token = tokens.emitir_access(settings.SIGET_JWT_KEY, sin_factor.pk, sesion.pk, tokens.SCOPE_COMPLETO, ahora, 300, settings.SIGET_EMISOR)
+        sesion = Sesion.objects.create(usuario=sin_factor, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=timezone.now() + timedelta(minutes=10))
+        token = tokens.emitir_access(settings.SIGET_JWT_KEY, sin_factor.pk, sesion.pk, tokens.SCOPE_COMPLETO, timezone.now(), 300, settings.SIGET_EMISOR)
         r = APIClient().get("/plataforma/personas/", secure=True, **dict(HOST, HTTP_AUTHORIZATION=f"Bearer {token}"))
         cache.clear(); transaction.set_rollback(False)
         self._paso("sin segundo factor reciente se niega y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
@@ -165,7 +165,8 @@ class Command(BaseCommand):
                    r.status_code == 200 and invitacion not in json.dumps(r.json()) and any(i["estado"] == "vigente" for i in r.json()["invitaciones"]))
         self._paso("otro rol de plataforma no emite invitaciones (403)", self._llamar(seg, "post", "/plataforma/invitaciones/", {}).status_code == 403)
         datos_nuevo = {"username": "vp_invitada", "password": CLAVE, "nombre": "Invitada", "apellidos": "Prueba", "cedula": "8-901-2345",
-                       "fecha_nacimiento": "1991-03-04", "provincia": "Panamá", "ciudad": "Panamá", "correo": "vp_invitada@ejemplo.com"}
+                       "fecha_nacimiento": "1991-03-04", "provincia": "Panamá", "ciudad": "Panamá", "correo": "vp_invitada@ejemplo.com",
+                       "acepta_aviso": True}
         with override_settings(SIGET_REGISTRO="cerrado"):
             r = self._publica("/auth/registro/", datos_nuevo)
         self._paso("con el registro cerrado no se crea ninguna cuenta (403)", r.status_code == 403 and not Usuario.objects.filter(username="vp_invitada").exists(), r.status_code)
@@ -310,12 +311,111 @@ class Command(BaseCommand):
         self._paso("muestra el vencimiento del certificado", cuerpo.get("certificado", {}).get("dias_restantes", -1) > 0)
         self._paso("seguridad no ve la infraestructura (403)", self._llamar(seg, "get", "/plataforma/infraestructura/").status_code == 403)
 
+        # ------------------------------------------------------------ solicitudes sobre datos personales (PT-15, Ley 81)
+        r = self._llamar(ana, "post", "/auth/mis-datos/solicitudes/", {"tipo": "cancelacion", "detalle": "Quiero que borren mi cuenta y mis datos."})
+        sol_ana = r.json().get("id") if r.status_code == 201 else None
+        self._paso("(preparación) una persona de la ciudadanía envía una solicitud de cancelación", sol_ana is not None, r.status_code)
+        sol_fer = SolicitudDerecho.objects.create(usuario=fer, tipo="rectificacion", detalle="Mi apellido está mal escrito en mi perfil.", vence_en=ahora + timedelta(days=14))
+        sol_propia = SolicitudDerecho.objects.create(usuario=ida, tipo="oposicion", detalle="Solicitud propia del operador de identidades.", vence_en=ahora + timedelta(days=14))
+        r = self._llamar(ida, "get", "/plataforma/solicitudes-datos/")
+        cuerpo = r.json() if r.status_code == 200 else {}
+        self._paso("identidades lista las solicitudes sobre datos personales", r.status_code == 200 and {sol_ana, sol_fer.pk} <= {x["id"] for x in cuerpo.get("solicitudes", [])}, r.status_code)
+        claves = {"id", "tipo", "detalle", "estado", "creada_en", "vence_en", "vencida", "respondida_en", "respuesta", "persona", "respondida_por"}
+        self._paso("cada una trae quién pide solo por identificador y usuario, nunca nombre, cédula, correo ni datos de trámites",
+                   all(set(x) == claves and set(x["persona"]) == {"id", "usuario"} for x in cuerpo.get("solicitudes", [])) and cuerpo.get("solicitudes"))
+        self._paso("la respuesta que lleva el detalle no se guarda en cachés", r.headers.get("Cache-Control") == "no-store")
+        self._paso("el resumen cuenta las abiertas", cuerpo.get("resumen", {}).get("recibidas", 0) >= 3, cuerpo.get("resumen"))
+        with mock.patch("django.utils.timezone.now", return_value=ahora + timedelta(days=20)):
+            r = self._llamar(ida, "get", "/plataforma/solicitudes-datos/?estado=recibida")
+        propias_abiertas = [x for x in r.json().get("solicitudes", []) if x["id"] in {sol_ana, sol_fer.pk, sol_propia.pk}] if r.status_code == 200 else []
+        self._paso("pasado el plazo (20 días después) las abiertas se marcan como vencidas y el resumen las cuenta",
+                   len(propias_abiertas) == 3 and all(x["vencida"] for x in propias_abiertas) and r.json()["resumen"]["vencidas"] >= 3)
+        r = self._llamar(ida, "get", "/plataforma/solicitudes-datos/?estado=recibida")
+        self._paso("se puede filtrar por estado", r.status_code == 200 and all(x["estado"] == "recibida" for x in r.json()["solicitudes"]))
+        self._paso("un estado que no existe se rechaza (400)", self._llamar(ida, "get", "/plataforma/solicitudes-datos/?estado=cualquiera").status_code == 400)
+        self._paso("solo identidades las ve: el resto de operadores y la ciudadanía reciben 403",
+                   all(self._llamar(o, "get", "/plataforma/solicitudes-datos/").status_code == 403 for o in (ca, seg, sec, inf, ana)))
+        self._paso("tampoco las responden (403)", all(self._llamar(o, "post", f"/plataforma/solicitudes-datos/{sol_ana}/responder/", {"estado": "atendida", "respuesta": "No me corresponde esto."}).status_code == 403 for o in (ca, seg, sec, inf, ana)))
+        Usuario.objects.filter(pk=sin_factor.pk).update(mfa_verificado_en=ahora - timedelta(hours=2))
+        sesion = Sesion.objects.create(usuario=sin_factor, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=timezone.now() + timedelta(minutes=10))
+        token = tokens.emitir_access(settings.SIGET_JWT_KEY, sin_factor.pk, sesion.pk, tokens.SCOPE_COMPLETO, timezone.now(), 300, settings.SIGET_EMISOR)
+        r = APIClient().get("/plataforma/solicitudes-datos/", secure=True, **dict(HOST, HTTP_AUTHORIZATION=f"Bearer {token}"))
+        cache.clear(); transaction.set_rollback(False)
+        self._paso("sin segundo factor reciente se niega y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
+        ruta = f"/plataforma/solicitudes-datos/{sol_ana}/responder/"
+        for malo, motivo in (({"estado": "recibida", "respuesta": "Respuesta de prueba larga."}, "un estado que no es una resolución"), ({"estado": "borrar", "respuesta": "Respuesta de prueba larga."}, "un estado inventado"),
+                             ({"estado": "atendida", "respuesta": "ok"}, "una respuesta demasiado corta"), ({"estado": "atendida"}, "sin respuesta"), ({}, "un cuerpo vacío")):
+            self._paso(f"responder con {motivo} se rechaza (400)", self._llamar(ida, "post", ruta, malo).status_code == 400)
+        self._paso("lo rechazado no cambió la solicitud", SolicitudDerecho.objects.get(pk=sol_ana).estado == "recibida")
+        self._paso("una solicitud que no existe da 404", self._llamar(ida, "post", "/plataforma/solicitudes-datos/999999999/responder/", {"estado": "atendida", "respuesta": "Respuesta de prueba larga."}).status_code == 404)
+        r = self._llamar(ida, "post", f"/plataforma/solicitudes-datos/{sol_propia.pk}/responder/", {"estado": "atendida", "respuesta": "Me respondo a mí mismo, que no corresponde."})
+        self._paso("nadie responde su propia solicitud (409; la base también lo impide)", r.status_code == 409 and r.json()["codigo"] == "no_a_si_mismo" and SolicitudDerecho.objects.get(pk=sol_propia.pk).estado == "recibida", r.status_code)
+        respuesta_texto = "Corregimos lo que corresponde. Los trámites son expediente público con conservación obligatoria y no se pueden borrar."
+        r = self._llamar(ida, "post", ruta, {"estado": "rechazada", "respuesta": respuesta_texto})
+        fila_ana = SolicitudDerecho.objects.get(pk=sol_ana)
+        self._paso("identidades responde: queda con el estado, quién respondió, cuándo y la respuesta",
+                   r.status_code == 200 and fila_ana.estado == "rechazada" and fila_ana.respondida_por_id == ida.pk and fila_ana.respondida_en is not None and fila_ana.respuesta == respuesta_texto, r.status_code)
+        self._paso("responder no borra ni modifica nada de la persona (solo la solicitud)", Usuario.objects.filter(pk=ana.pk).exists() and Usuario.objects.get(pk=ana.pk).estado_cuenta == "activa")
+        r = self._llamar(idb, "post", ruta, {"estado": "atendida", "respuesta": "Intento responder otra vez la misma solicitud."})
+        self._paso("una solicitud ya respondida no se responde otra vez, ni por otro operador (409)", r.status_code == 409 and r.json()["codigo"] == "ya_resuelta" and SolicitudDerecho.objects.get(pk=sol_ana).respuesta == respuesta_texto, r.status_code)
+        r = self._llamar(idb, "post", f"/plataforma/solicitudes-datos/{sol_fer.pk}/responder/", {"estado": "atendida", "respuesta": "Ya corregimos tu apellido; puedes verlo en Mis datos."})
+        self._paso("otra persona de identidades atiende otra solicitud", r.status_code == 200 and SolicitudDerecho.objects.get(pk=sol_fer.pk).estado == "atendida", r.status_code)
+        def rechazada_por_la_base(sql, parametros=()):
+            try:
+                with transaction.atomic(), connection.cursor() as c:
+                    c.execute(sql, parametros)
+                return False
+            except DatabaseError:
+                return True
+
+        # D2: solo un operador de identidades responde (la base lo exige aunque la aplicación fallara)
+        sol_d2 = SolicitudDerecho.objects.create(usuario=fer, tipo="rectificacion", detalle="Solicitud para probar quién puede responder.", vence_en=timezone.now() + timedelta(days=14))
+        responder = "update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s, respuesta = 'Respuesta de prueba larga.' where id = %s"
+        self._paso("la base rechaza una respuesta de quien no es operador de identidades (ciudadanía u otro operador de plataforma)",
+                   rechazada_por_la_base(responder, [ana.pk, sol_d2.pk]) and rechazada_por_la_base(responder, [seg.pk, sol_d2.pk]) and rechazada_por_la_base(responder, [ca.pk, sol_d2.pk])
+                   and SolicitudDerecho.objects.get(pk=sol_d2.pk).estado == "recibida")
+        self._paso("y acepta la de un operador de identidades", not rechazada_por_la_base(responder, [ida.pk, sol_d2.pk]) and SolicitudDerecho.objects.get(pk=sol_d2.pk).estado == "atendida")
+        # D1: una solicitud nace siempre «recibida» y sin respuesta, aunque se intente otra cosa
+        with transaction.atomic():
+            falsa = SolicitudDerecho.objects.create(usuario=fer, tipo="oposicion", detalle="Solicitud que intenta nacer atendida.", estado="atendida", respondida_por=ida,
+                                                    respondida_en=ahora - timedelta(days=400), respuesta="Respuesta que nadie dio.", vence_en=timezone.now() + timedelta(days=14))
+        falsa = SolicitudDerecho.objects.get(pk=falsa.pk)
+        self._paso("una solicitud no puede nacer «atendida» ni con respuesta: la base la deja «recibida», sin respuesta y con la creación fechada por ella",
+                   falsa.estado == "recibida" and falsa.respondida_en is None and falsa.respondida_por_id is None and falsa.respuesta is None
+                   and abs((falsa.creada_en - timezone.now()).total_seconds()) < 600)
+        self._paso("tampoco nace con un plazo a 10 años, ya vencido o de 5 días (debe vencer entre 10 y 30 días)",
+                   all(rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con un plazo fuera de rango.', " + plazo + ")", [fer.pk])  # nosec B608 - plazos fijos de la verificacion
+                       for plazo in ("now() + interval '3650 days'", "now() - interval '1 day'", "now() + interval '5 days'")))
+        r = self._llamar(ida, "get", "/plataforma/solicitudes-datos/?estado=rechazada")
+        self._paso("en el filtro de cerradas aparece quién respondió", r.status_code == 200 and any(x["id"] == sol_ana and x["respondida_por"]["usuario"] == "vp_ident_a" for x in r.json()["solicitudes"]))
+        r = self._llamar(ana, "get", "/auth/mis-datos/solicitudes/")
+        propias = r.json().get("solicitudes", []) if r.status_code == 200 else []
+        self._paso("la persona ve la respuesta a su solicitud, sin el nombre de quien la respondió", any(x["id"] == sol_ana and x["respuesta"] == respuesta_texto and x["estado"] == "rechazada" for x in propias)
+                   and "respondida_por" not in json.dumps(propias))
+        self._paso("las consolas de plataforma siguen sin ver trámites (403 en /tramites/ también para identidades)", self._llamar(ida, "get", "/tramites/").status_code == 403)
+        eventos_solicitud = list(EventoSeguridad.objects.filter(evento="solicitud_derecho_respondida", actor__in=[ida, idb]).values_list("detalle", flat=True))
+        self._paso("cada respuesta queda en los eventos de seguridad con quién, a quién y el resultado, sin el texto de la respuesta ni el detalle",
+                   len(eventos_solicitud) == 2 and all(set(d) == {"solicitud", "tipo", "estado", "objetivo"} for d in eventos_solicitud) and "expediente" not in json.dumps(eventos_solicitud))
+        self._paso("las decisiones del PDP sobre las solicitudes quedaron registradas, también las negadas",
+                   any(d[1] == "responder_solicitud_datos" and d[2] is True for d in self.decisiones) and any(d[1] == "responder_solicitud_datos" and d[2] is False for d in self.decisiones)
+                   and any(d[1] == "consultar_solicitudes_datos" and d[2] is False for d in self.decisiones))
+
         # ------------------------------------------------------------ privilegios en la base y registro
         with connection.cursor() as c:
             c.execute("""select r.rolname, has_table_privilege(r.rolname,'siget.restablecimiento','SELECT'), has_table_privilege(r.rolname,'siget.rotacion_secreto','SELECT'),
                          has_table_privilege(r.rolname,'siget.restablecimiento','DELETE'), has_table_privilege(r.rolname,'siget.rotacion_secreto','UPDATE')
                          from pg_roles r where r.rolname in ('app_role','auditor_role','pgadmin_lectura','checkpoint_app')""")
             permisos_bd = {f[0]: f[1:] for f in c.fetchall()}
+        with connection.cursor() as c:
+            c.execute("""select r.rolname, has_table_privilege(r.rolname,'siget.solicitud_derecho','SELECT'), has_table_privilege(r.rolname,'siget.solicitud_derecho','DELETE'),
+                         has_table_privilege(r.rolname,'siget.solicitud_derecho','INSERT'), has_table_privilege(r.rolname,'siget.solicitud_derecho','UPDATE'),
+                         has_any_column_privilege(r.rolname,'siget.solicitud_derecho','SELECT'), has_any_column_privilege(r.rolname,'siget.solicitud_derecho','INSERT'),
+                         has_any_column_privilege(r.rolname,'siget.solicitud_derecho','UPDATE')
+                         from pg_roles r where r.rolname in ('app_role','auditor_role','pgadmin_lectura','checkpoint_app','escalador_role')""")
+            sobre_solicitudes = {f[0]: f[1:] for f in c.fetchall()}
+        self._paso("ni el auditor, ni pgadmin_lectura, ni el checkpoint, ni el escalador tienen nada sobre las solicitudes sobre datos personales (ni por tabla ni por columna)",
+                   not any(any(sobre_solicitudes[rol]) for rol in ("auditor_role", "pgadmin_lectura", "checkpoint_app", "escalador_role")))
+        self._paso("la aplicación lee, inserta y actualiza (por columnas) las solicitudes pero no las borra", sobre_solicitudes["app_role"] == (True, False, True, False, True, True, True))
         self._paso("ni el auditor ni pgadmin_lectura leen los códigos de restablecimiento", not permisos_bd["auditor_role"][0] and not permisos_bd["pgadmin_lectura"][0] and not permisos_bd["checkpoint_app"][0])
         self._paso("el auditor sí ve las rotaciones (son metadatos)", permisos_bd["auditor_role"][1] is True)
         self._paso("la aplicación no puede borrar códigos ni editar rotaciones", not permisos_bd["app_role"][2] and not permisos_bd["app_role"][3])

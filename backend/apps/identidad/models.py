@@ -95,9 +95,11 @@ class Aprobacion(ModeloDeEsquema):
 
 
 class Perfil(ModeloDeEsquema):
-    """Datos personales de quien se registra (migración 008). Tabla aparte, solo `app_role` la toca y sin UPDATE ni DELETE.
+    """Datos personales de quien se registra (migración 008). Tabla aparte, solo `app_role` la toca y sin DELETE.
 
     La cédula nunca se guarda en claro: `cedula_cifrada` (Fernet) y `cedula_huella` (HMAC, para impedir duplicados).
+    Desde la migración 016 la persona puede corregir SOLO `correo`, `provincia` y `ciudad` (UPDATE por columna): hay que
+    actualizar con `Perfil.objects.filter(...).update(...)` y esas tres columnas, nunca con `save()` (escribiría todas).
     """
 
     usuario = models.OneToOneField(Usuario, primary_key=True, on_delete=models.DO_NOTHING, db_column="usuario_id", related_name="perfil")
@@ -110,6 +112,34 @@ class Perfil(ModeloDeEsquema):
     ciudad = models.TextField()
     correo = models.TextField()
     creado_en = models.DateTimeField(auto_now_add=True)
+    # Migración 016: `actualizado_en` lo sella un trigger de la base; el aviso queda en NULL en los perfiles anteriores
+    actualizado_en = models.DateTimeField(null=True, blank=True)
+    aviso_version = models.TextField(null=True, blank=True)
+    aviso_leido_en = models.DateTimeField(null=True, blank=True)
 
     class Meta(ModeloDeEsquema.Meta):
         db_table = "perfil"
+
+
+class SolicitudDerecho(ModeloDeEsquema):
+    """Rectificación, cancelación u oposición sobre los datos personales (migración 016, Ley 81 de 2019).
+
+    La base la protege: solo se insertan y se responden (una sola vez, con quién respondió y qué), sin DELETE; el auditor y
+    `pgadmin_lectura` no la leen porque el detalle puede contener datos personales.
+    """
+
+    TIPOS = [("rectificacion", "Rectificación"), ("cancelacion", "Cancelación"), ("oposicion", "Oposición")]
+    ESTADOS = [("recibida", "Recibida"), ("atendida", "Atendida"), ("rechazada", "Rechazada")]
+
+    usuario = models.ForeignKey(Usuario, on_delete=models.DO_NOTHING, db_column="usuario_id", related_name="solicitudes_derecho")
+    tipo = models.TextField(choices=TIPOS)
+    detalle = models.TextField()
+    estado = models.TextField(choices=ESTADOS, default="recibida")
+    creada_en = models.DateTimeField(auto_now_add=True)
+    vence_en = models.DateTimeField()
+    respondida_en = models.DateTimeField(null=True, blank=True)
+    respondida_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.DO_NOTHING, db_column="respondida_por", related_name="+")
+    respuesta = models.TextField(null=True, blank=True)
+
+    class Meta(ModeloDeEsquema.Meta):
+        db_table = "solicitud_derecho"

@@ -1726,3 +1726,102 @@ Si faltara algún archivo: `sudo tar xzf /root/respaldo-pt13-2026-11-17/checkpoi
 ### 38.3 Copia de `siget-docs-key` fuera de VM1
 
 El mismo día se sacó una copia de la clave de documentos al equipo anfitrión, en una carpeta fuera de todo repositorio y con permisos solo para el administrador. El valor viajó de `podman secret inspect --showsecret` directo al archivo, sin mostrarse, y se comprobó con la huella SHA-256 que la copia es idéntica (45 bytes). **Pendiente:** una segunda copia fuera del PC anfitrión (memoria USB cifrada o gestor de contraseñas), porque las VMs corren en ese mismo equipo. Para restaurarla: `podman secret create siget-docs-key <archivo>` como `siget` (ver la sección de documentos, rama `feature/backend-documentos`).
+
+## 39. Derechos sobre los datos personales y aviso de privacidad: aplicar la migración 016 (PT-15)
+
+**Estado: aplicado en producción el 24 de noviembre de 2026** (registro en 39.10).
+
+### 39.1 Qué cambia y en qué orden hay que aplicarlo
+
+La migración [`016-derechos-datos.sql`](../database/migraciones/016-derechos-datos.sql) agrega tres columnas a `perfil` (`actualizado_en`, `aviso_version`, `aviso_leido_en`), un trigger que sella `actualizado_en`, el permiso `UPDATE (correo, provincia, ciudad)` de `app_role` sobre `perfil` y la tabla `solicitud_derecho` (con su trigger, sus grants mínimos y `REVOKE` para `pgadmin_lectura`, `auditor_role` y `checkpoint_app`). Los números 013 a 015 existen en otras ramas: **no** se renumera la 016 salvo que dos migraciones choquen.
+
+**La base va primero, el código después.** El backend nuevo lee las columnas nuevas de `perfil`: sin la migración, el backend nuevo falla; en cambio el backend viejo sigue funcionando con la base ya migrada (las columnas nuevas admiten `NULL` y la tabla nueva no la toca nadie). Por eso: migrar, verificar y recién entonces reconstruir y desplegar.
+
+### 39.2 Respaldo previo, verificado
+
+En VM2: `systemctl start siget-respaldo.service` (hace `pg_dump` + roles, **restaura en una base desechable y compara con la viva**, ver 33.4) y comprobar que terminó bien (`systemctl is-failed siget-respaldo.service` no debe decir `failed`; mirar el último archivo en `/var/backups/siget/` y su huella SHA-256). Además, un respaldo manual con sello `pre-016`, que la retención de 14 días no borra:
+
+```bash
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/pre-016-tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+No seguir si el respaldo no se pudo restaurar. Los archivos tienen permisos 600 y **no van al repositorio** (llevan hashes de contraseña y datos personales).
+
+### 39.3 Ensayo con `ROLLBACK`
+
+Se ejecuta la migración completa dentro de una transacción que se revierte, para comprobar que no falla y no deja cambios. La migración trae su propio `COMMIT;`, así que el ensayo la envuelve sin él:
+
+```bash
+sed '$d' database/migraciones/016-derechos-datos.sql > /tmp/016-ensayo.sql   # sin el COMMIT; final
+echo 'ROLLBACK;' >> /tmp/016-ensayo.sql
+cat /tmp/016-ensayo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+```
+
+Debe terminar en `ROLLBACK` sin errores. Después, confirmar que no quedó nada: `\d siget.solicitud_derecho` debe responder que la relación no existe y `\d siget.perfil` no debe mostrar las columnas nuevas.
+
+### 39.4 Migración real
+
+```bash
+cat database/migraciones/016-derechos-datos.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+```
+
+Es una sola transacción: o queda todo o nada. Comprobar de inmediato, **con un login real de `app_role`** (regla del README de migraciones) y no solo como superusuario:
+
+- `\dp siget.perfil`: el permiso `UPDATE` de `app_role` aparece solo para `correo`, `provincia` y `ciudad`.
+- `\dp siget.solicitud_derecho`: `app_role` con `r` (SELECT), `a` (INSERT) y `w` solo por columnas; ningún permiso para `pgadmin_lectura`, `auditor_role` ni `checkpoint_app`; ningún `d` (DELETE) para nadie.
+- `select count(*) from siget.perfil where aviso_version is not null;` debe dar `0`: los perfiles existentes quedan sin constancia del aviso (no se inventa).
+- El login del checkpoint y el de `app_role` siguen funcionando.
+
+Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
+
+### 39.5 Reconstrucción y verificaciones (VM1)
+
+Con la base ya migrada, en VM1: `ejecutar-comando.sh` reconstruye la imagen con el código nuevo y corre cada comando contra la base real (todos se revierten y no dejan datos):
+
+1. `verificar_esquema`: el modelo `SolicitudDerecho` y las columnas nuevas de `Perfil` coinciden con la base.
+2. `verificar_autenticacion`: incluye el registro con aviso, la corrección con segundo factor, la exportación, las solicitudes, el trigger y los grants por columna (el paso que antes decía que el perfil «no se puede modificar» ahora comprueba que **solo** correo, provincia y ciudad se pueden modificar).
+3. `verificar_plataforma`: la consola de solicitudes del operador de identidades.
+4. `verificar_politicas` (el simulador ahora lista 25 acciones) y el resto (`verificar_tramites`, `verificar_equipo`, `verificar_auditoria`, `verificar_integracion`) como regresión.
+
+Si algún paso falla, **no desplegar**: revisar primero si es un problema del paso o del permiso en la base. Después, `desplegar.sh` (interfaz y reinicio ordenado del pod; ojo: devuelve la inactividad a 10 minutos, ver 34.2).
+
+### 39.6 Qué hacer si algo sale mal
+
+- **La migración falla:** al ser una transacción no queda nada a medias; se corrige el motivo y se repite el ensayo.
+- **Ya se aplicó pero hay que volver atrás:** el backend viejo funciona con la base nueva, así que basta con no desplegar el código nuevo (o volver a la imagen anterior). Revertir la base es la última opción y se hace restaurando el respaldo `pre-016`, **perdiendo todo lo posterior**: avisar antes. No se hace `DROP` a mano en producción.
+- **Una solicitud queda sin responder más de 10 días hábiles:** aparece como vencida en la consola de identidades; es un incumplimiento de plazo de la ley, no un fallo técnico. Responderla cuanto antes y anotarlo.
+
+### 39.7 Cómo se atiende una cancelación (lo que NO se borra)
+
+La consola solo registra la respuesta: **no borra ni modifica nada**. Los trámites y su historial son expediente público con conservación obligatoria y **no se borran**, tampoco a pedido de la persona; el registro de seguridad y el de auditoría son inalterables por diseño y no llevan cédula, correo ni nombre. Lo que sí puede suprimirse o anonimizarse es lo que no tiene esa obligación (por ejemplo, los datos de contacto del perfil cuando no queden trámites en curso). Si corresponde hacerlo, lo ejecuta una persona autorizada con un procedimiento aparte y con respaldo previo, y la respuesta a la solicitud dice exactamente qué se hizo y qué no, y por qué.
+
+### 39.8 Gotchas
+
+- Actualizar un perfil con `Perfil.save()` falla en producción (`permission denied`): `save()` escribe todas las columnas y solo hay `UPDATE` sobre tres. Hay que usar `Perfil.objects.filter(...).update(correo=..., provincia=..., ciudad=...)`.
+- `actualizado_en` lo sella la base con la hora de **inicio de la transacción** (`now()`), no la de la aplicación.
+- El plazo de 10 días hábiles usa `sumar_dias_habiles` de PT-3: salta fines de semana y los feriados de la tabla `feriado`, en hora de Panamá. Si la tabla no tiene los feriados del año siguiente, el plazo sale más corto que el legal: mantener `docs/feriados-panama.md` al día.
+- `GET /auth/mis-datos/` devuelve la cédula **enmascarada** (últimos 3 caracteres); la completa solo sale en `/auth/mis-datos/exportar/`, que exige segundo factor reciente. Ambas respuestas son `no-store` y nunca deben ir a un registro (log) ni a una herramienta de monitoreo.
+- La 016 pone triggers `BEFORE INSERT`: una solicitud nace siempre `recibida`, sin respuesta y con `vence_en` entre 10 y 30 días; un perfil nace con `actualizado_en` NULL y con `aviso_leido_en` de la hora de la base. Si una inserción manual falla con «El plazo de respuesta debe vencer entre 10 y 30 dias», es esa regla. Solo un operador de identidades puede ser `respondida_por`, y `respondida_en` lo fija la base (no hay `UPDATE` sobre esa columna).
+
+### 39.9 Riesgos aceptados
+
+- **Sin seguridad por filas (RLS) en `perfil` ni en `solicitud_derecho`**: la separación entre personas la impone la aplicación (PDP y consultas siempre sobre la propia cuenta) y los `GRANT` por columna, no la base. Si `app_role` tuviera un fallo (una consulta sin filtrar), la base no lo frenaría. Defensa en profundidad pendiente; se acepta porque ninguna ruta recibe el identificador de otra persona y las vistas pasan por el PDP.
+
+### 39.10 Registro de la aplicación (24 de noviembre de 2026)
+
+Evidencia completa en `docs/sdlc/evidencia/14_pt15_*` (salida en texto y captura de cada paso).
+
+1. **VM2, respaldo verificado:** `siget-respaldo.service` terminó en OK (`tramites_demo-20261124-112843.dump`, 17 tablas, restauración probada y comparada con la base viva) y se copió como `pre-016-tramites_demo-20261124-112843.dump`, fuera de la rotación de 14 días.
+2. **Ensayo de la 016** dentro de una transacción terminada en `ROLLBACK`, con 7 comprobaciones de permisos y triggers: 7/7. Después se confirmó que no quedó nada (la tabla no existe y `perfil` no tiene columnas nuevas).
+3. **Migración real** y las mismas 7 comprobaciones sobre la base migrada: 7/7. Los perfiles existentes quedaron sin constancia del aviso (no se inventa).
+4. **VM1, imagen candidata** con el código de `develop` (`siget-backend:pt15-candidata`) y las 8 verificaciones contra la base real **antes de reiniciar nada**. La primera corrida dio 2 fallas en `verificar_autenticacion`, las dos de la propia verificación y no de la plataforma: (a) el plazo esperaba 12 a 14 días corridos, pero el martes 8 de diciembre (Día de las Madres) es feriado y la solicitud del 24-nov vence correctamente el 9-dic; ahora el paso compara contra `sumar_dias_habiles` con la tabla de feriados; (b) la comprobación de permisos cortaba mal la tupla (`[7:]` en lugar de `[7:10]`). Corregidas, la segunda corrida: `verificar_esquema` OK, `verificar_autenticacion` 169/169, `verificar_plataforma` 125/125, `verificar_politicas` 41/41, `verificar_tramites` 77/77, `verificar_equipo` 51/51, `verificar_auditoria` 34/34 y `verificar_integracion` 15/15.
+5. **Despliegue:** la candidata pasó a `siget-backend:dev` y se reinició el backend; la unidad no cambió (conserva `SIGET_INACTIVIDAD_MINUTOS=2` de la demo). Interfaz nueva con respaldo en `/home/siget/frontend.respaldo-2026-11-24`. Servicios activos, salud 200 y `GET /auth/aviso-privacidad/` 200; sin sesión, `/auth/mis-datos/` y la consola de solicitudes responden 401.
+6. **Ensayo completo contra producción: 101/101.** Se actualizó su expectativa del menú de la ciudadanía (ahora incluye «Mis datos») y se le agregó salida UTF-8 para que el resumen no se corte en la consola de Windows.
+
+**Volver atrás:** `podman tag localhost/siget-backend:respaldo-2026-11-24 localhost/siget-backend:dev` y `systemctl --user restart siget-backend.service` (como `siget`), y restaurar la interfaz desde `frontend.respaldo-2026-11-24`. El backend anterior funciona con la base ya migrada. Revertir la base solo restaurando `pre-016-…dump`, perdiendo lo posterior (39.6).
+
+**Gotchas de esta aplicación:**
+- En un script que se ejecuta por SSH, `$(id -u)` dentro de comillas dobles se resuelve en la máquina local: la primera vez no se guardó la etiqueta de respaldo y se tuvo que rehacer a partir de la imagen del contenedor en ejecución (`podman inspect siget-backend --format {{.Image}}`). La parte remota va en un archivo aparte o entre comillas simples.
+- `ejecutar-comando.sh` reconstruye la imagen con la **misma etiqueta** que usa el backend en ejecución: el servicio no cambia hasta reiniciarlo, pero hay que guardar antes la imagen anterior y devolver la etiqueta si algo falla.
+- Correr el ensayo varias veces seguidas choca con el límite de 10 inicios de sesión por minuto (429): esperar un minuto entre corridas.
+- El ensayo lee las credenciales de la siembra de `demo-local/siembra.local.txt`, que está fuera de git: se corre desde la carpeta que lo tiene.

@@ -19,12 +19,15 @@ Cambios incrementales sobre el esquema `siget` que ya está aplicado. Se ejecuta
 | 014 | `014-invitaciones.sql` | Tabla `invitacion` (registro por invitación): solo el hash del código, vencimiento, un solo uso (trigger) y `app_role` solo marca el uso | 12-nov-2026 |
 | 015 | `015-documentos.sql` | Tabla `documento` con seguridad por filas (la ve el solicitante o el personal de la institución; adjunta solo el solicitante), sin modificación ni borrado (trigger), institución igual a la del trámite y nada en trámites resueltos | 12-nov-2026 |
 
+| 016 | `016-derechos-datos.sql` | Derechos sobre los datos personales (Ley 81): la persona corrige solo correo, provincia y ciudad (`UPDATE` por columna en `perfil`), constancia del aviso de privacidad y tabla `solicitud_derecho` (rectificación, cancelación y oposición, respuesta en 10 días hábiles) | 24-nov-2026 |
+
 ## Para una base nueva
 
-`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 009**.
+`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 009** (y las posteriores que ya estén en `main`, como la 016 cuando se libere).
 
 ## Reglas
 
 - La contraseña de `app_role` **nunca** va en una migración: se fija aparte y vive como `podman secret`.
 - Una migración debe ser segura de leer: sin datos personales ni secretos.
 - Al quitar un permiso a `PUBLIC`, conceder primero a los roles que lo usan y **verificar con un login real** (la migración 003 dejó el login del checkpoint sin base unos minutos por no hacerlo).
+- Los números 013 a 015 existen en otras ramas: no se reutilizan. Si dos ramas toman el mismo número, la que se integra después se renumera.

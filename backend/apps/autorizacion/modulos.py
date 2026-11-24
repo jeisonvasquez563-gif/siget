@@ -11,6 +11,7 @@ CATALOGO = {
     "bandeja": ("Bandeja de la institución", "Trámites de tu institución: revisarlos y cambiar su estado.", DISPONIBLE),
     "supervision": ("Supervisión", "Reasigna trámites y atiende los escalados de tu institución.", DISPONIBLE),
     "equipo": ("Equipo de la institución", "Personal y roles de tu institución.", DISPONIBLE),
+    "mis_datos": ("Mis datos", "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.", DISPONIBLE),
     "seguridad": ("Mi seguridad", "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.", DISPONIBLE),
     "mfa": ("Segundo factor (MFA)", "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.", DISPONIBLE),
     "roles_permisos": ("Roles y permisos", "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.", DISPONIBLE),
@@ -49,7 +50,7 @@ def modulos_para(rol_plataforma, roles_en_instituciones):
         ids = _POR_ROL_PLATAFORMA.get(rol_plataforma, []) + ["prueba_acceso", *_TRANSPARENCIA]
         return [_entrada(i) for i in ids]
     roles = set(roles_en_instituciones)
-    ids = ["mis_tramites", "nuevo_tramite"]
+    ids = ["mis_tramites", "nuevo_tramite", "mis_datos"]  # las cuentas de plataforma no tienen perfil de persona: no lo ven
     if roles & {"funcionario", "supervisor"}:
         ids.append("bandeja")
     if "supervisor" in roles:
