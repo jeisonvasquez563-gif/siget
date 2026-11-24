@@ -13,11 +13,16 @@
 --     - A quien lo solicito: Pendiente -> En Tramitacion (tramite_en_atencion), -> En Subsanacion (subsanacion_pedida), -> Aprobado y
 --       -> Rechazado.
 --     - A quien lo atiende (funcionario asignado, si hay): En Subsanacion -> En Tramitacion cuando QUIEN ACTUALIZA ES EL SOLICITANTE
---       (subsanacion_respondida). Si cierra la subsanacion el personal, no se avisa al asignado.
---     - A la supervision de la institucion del tramite (membresia de supervisor NO revocada): cuando escalado_en pasa de NULL a un
---       valor (tramite_escalado). Eso lo hace siget.escalar_vencidos() (013), que corre como escalador_role SIN contexto de usuario
+--       (subsanacion_respondida). Si cierra la subsanacion el personal, no se avisa al asignado. Solo si esa persona sigue teniendo
+--       acceso (membresia de funcionario o supervisor en la institucion NO revocada) y su cuenta esta activa: si se le quito el
+--       acceso despues de asignarle el tramite, el aviso no le llega.
+--     - A la supervision de la institucion del tramite (membresia de supervisor NO revocada y cuenta activa): cuando escalado_en pasa
+--       de NULL a un valor (tramite_escalado). Eso lo hace siget.escalar_vencidos() (013), que corre como escalador_role SIN contexto de usuario
 --       (ctx_usuario() es NULL): el disparador no lee nada del contexto salvo para no avisar al propio actor.
 --     - Nunca se notifica al propio actor: si quien cambia (ctx_usuario()) es el destinatario, no se crea.
+--     - Estado de la cuenta: al PERSONAL (asignado y supervision) solo se le avisa con la cuenta 'activa'. A la persona SOLICITANTE se le
+--       avisa siempre, aunque su cuenta este bloqueada (p. ej. por intentos fallidos) o suspendida: la notificacion no lleva datos, no se
+--       puede ver mientras la cuenta no este activa (el PDP lo niega) y al volver debe encontrar lo que paso con su tramite.
 -- * Seguridad por filas: app_role ve y marca SOLO las filas con usuario_id = ctx_usuario(). Permisos: SELECT y UPDATE (leida_en);
 --   NINGUN INSERT ni DELETE (solo el disparador inserta). Un disparador impide desmarcar: leida_en solo pasa de NULL a un valor (que
 --   fija la base con now(), no la aplicacion) y no vuelve a cambiar; ninguna otra columna cambia.
@@ -42,6 +47,10 @@ CREATE TABLE siget.notificacion (
   leida_en    timestamptz
 );
 CREATE INDEX notificacion_usuario_idx ON siget.notificacion (usuario_id, leida_en, creada_en);
+CREATE INDEX notificacion_tramite_idx ON siget.notificacion (tramite_id);  -- la clave foranea: sin indice, borrar o revisar un tramite recorre la tabla
+
+-- La supervision se busca por institucion (membresia solo tiene la clave primaria usuario + institucion + rol): indice parcial de las vigentes
+CREATE INDEX IF NOT EXISTS membresia_institucion_vigentes_idx ON siget.membresia (institucion_id) WHERE revocada_en IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 2. Generacion: disparador sobre tramite
@@ -69,7 +78,13 @@ BEGIN
        AND v_actor IS NOT NULL AND v_actor = NEW.solicitante_id
        AND NEW.funcionario_asignado_id <> v_actor THEN
       INSERT INTO siget.notificacion (usuario_id, tipo, tramite_id)
-      VALUES (NEW.funcionario_asignado_id, 'subsanacion_respondida', NEW.id);
+      SELECT u.id, 'subsanacion_respondida', NEW.id
+        FROM siget.usuario u
+       WHERE u.id = NEW.funcionario_asignado_id
+         AND u.estado_cuenta = 'activa'
+         AND EXISTS (SELECT 1 FROM siget.membresia m
+                      WHERE m.usuario_id = NEW.funcionario_asignado_id AND m.institucion_id = NEW.institucion_id
+                        AND m.rol IN ('funcionario', 'supervisor') AND m.revocada_en IS NULL);
     END IF;
   END IF;
 
@@ -78,6 +93,7 @@ BEGIN
     INSERT INTO siget.notificacion (usuario_id, tipo, tramite_id)
     SELECT m.usuario_id, 'tramite_escalado', NEW.id
       FROM siget.membresia m
+      JOIN siget.usuario u ON u.id = m.usuario_id AND u.estado_cuenta = 'activa'
      WHERE m.institucion_id = NEW.institucion_id
        AND m.rol = 'supervisor'
        AND m.revocada_en IS NULL
