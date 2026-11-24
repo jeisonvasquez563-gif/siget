@@ -13,6 +13,10 @@ import { plataformaMock } from './mock-plataforma.js'
 import { olvidarConfiguracion } from './api.js'
 import bdEjemplo from './mock-datos/base-de-datos.json'
 import simuladorEjemplo from './mock-datos/simulador.json'
+import {
+  FORMULARIO_CONSTRUCCION, FORMULARIO_DEMOSTRACION, FORMULARIO_DENUNCIA, FORMULARIO_EMPRESA, FORMULARIO_INTERINSTITUCIONAL,
+  respuestaDatosInvalidos, validarDatos, validarTextoLibre,
+} from './mock-contenido.js'
 
 const DIA = 86400000
 const hace = (ms) => new Date(Date.now() - ms).toISOString()
@@ -90,10 +94,12 @@ const TIPOS = [
   { id: 6, nombre: 'Registro de microempresa', sla_dias: 10, institucion: { id: 6, nombre: 'AMPYME' } },
 ]
 TIPOS.forEach((t) => { t.audiencia = 'ciudadania' })
+// Los formularios son los de la migración 017 (el catálogo de ejemplo usa otros nombres, pero la misma forma)
+const FORMULARIOS_BASE = [FORMULARIO_CONSTRUCCION, FORMULARIO_DEMOSTRACION, FORMULARIO_DEMOSTRACION, FORMULARIO_DEMOSTRACION, FORMULARIO_DENUNCIA, FORMULARIO_EMPRESA]
+FORMULARIOS_BASE.forEach((f, i) => { TIPOS[i].formulario = f })
 // Cada institución recibe también solicitudes de otras instituciones (audiencia «institucion»)
-for (const base of TIPOS.slice(0, 6)) TIPOS.push({ id: TIPOS.length + 1, nombre: 'Solicitud interinstitucional de información', sla_dias: 5, institucion: base.institucion, audiencia: 'institucion' })
+for (const base of TIPOS.slice(0, 6)) TIPOS.push({ id: TIPOS.length + 1, nombre: 'Solicitud interinstitucional de información', sla_dias: 5, institucion: base.institucion, audiencia: 'institucion', formulario: FORMULARIO_INTERINSTITUCIONAL })
 
-let siguiente = 40
 const T = (id, tipo, estado, solicitante, asignado, creadoDias, sla, extra = {}) => {
   const t = TIPOS[tipo - 1]
   const creado = Date.now() - creadoDias * DIA
@@ -110,13 +116,24 @@ const TRAMITES_BASE = [
   T(38, 3, 'Pendiente', 102, null, 1, 10), T(39, 1, 'Pendiente', 101, null, 2, 15), T(41, 3, 'En Tramitacion', 102, 201, 12, 10),
   T(42, 3, 'Pendiente', 101, null, 7, 10), T(43, 3, 'Rechazado', 102, 203, 14, 10), T(44, 3, 'En Tramitacion', 101, 202, 4, 10),
 ]
+// Contenido de los trámites de ejemplo (lo que se respondió al iniciar). Los demás son «anteriores a la función»: datos vacíos
+const DATOS_BASE = {
+  35: { asunto: 'Corte de calle por la fiesta patronal', descripcion: 'Se pide cerrar la calle principal el sábado de 8 a 18 h.' },
+  36: { asunto: 'Certificado para tres empleados nuevos' },
+  37: { asunto: 'Ocupación temporal de la acera frente al local', descripcion: 'Mesas y sillas del restaurante, de lunes a viernes.' },
+  39: { direccion_terreno: 'Calle 50, edificio Bella Vista, Panamá', numero_finca: '123456', tipo_obra: 'Ampliación', area_m2: 85.5 },
+}
+const MOTIVOS_BASE = {
+  37: 'Falta el croquis firmado de la zona que se va a ocupar. Adjúntalo en la sección de documentos y responde aquí.',
+  43: 'La solicitud no cumple con la distancia mínima exigida entre la ocupación y la intersección.',
+}
 const EVENTOS_BASE = {}
-const ev = (id, tramite, accion, de, a, actor, hacia) => ({ id, accion, estado_anterior: de, estado_nuevo: a, institucion_id: 3, creado_en: hace(hacia), actor_id: actor, atributos: {} })
+const ev = (id, tramite, accion, de, a, actor, hacia, motivo = null) => ({ id, accion, estado_anterior: de, estado_nuevo: a, institucion_id: 3, creado_en: hace(hacia), actor_id: actor, atributos: {}, motivo })
 TRAMITES_BASE.forEach((t, i) => {
   const lista = [ev(i * 10 + 1, t.id, 'creacion', null, 'Pendiente', t.solicitante_id, (i + 6) * 3600000 * 5)]
   if (t.estado !== 'Pendiente') lista.push(ev(i * 10 + 2, t.id, 'cambio_estado', 'Pendiente', 'En Tramitacion', t.funcionario_asignado_id || 201, (i + 3) * 3600000 * 4))
-  if (t.estado === 'En Subsanacion') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', 'En Subsanacion', 202, 3600000 * 9))
-  if (t.estado === 'Aprobado' || t.estado === 'Rechazado') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', t.estado, 203, 3600000 * 6))
+  if (t.estado === 'En Subsanacion') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', 'En Subsanacion', 202, 3600000 * 9, MOTIVOS_BASE[t.id]))
+  if (t.estado === 'Aprobado' || t.estado === 'Rechazado') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', t.estado, 203, 3600000 * 6, MOTIVOS_BASE[t.id] ?? null))
   if (t.escalado) lista.push({ ...ev(i * 10 + 4, t.id, 'escalamiento', t.estado, t.estado, null, 0), creado_en: t.escalado_en, atributos: { regla: 'plazo_vencido' } })
   EVENTOS_BASE[t.id] = lista
 })
@@ -125,6 +142,7 @@ const visibles = (u, t) => t.solicitante_id === u.id || u.membresias.some((m) =>
 const esPersonal = (u, t) => u.membresias.some((m) => m.institucion_id === t.institucion.id && ['funcionario', 'supervisor'].includes(m.rol))
 const paraCiudadania = (t) => { const { solicitante_id: _s, funcionario_asignado_id, sensibilidad: _n, ...resto } = t; return { ...resto, asignado: funcionario_asignado_id !== null } }
 const dto = (u, t) => (esPersonal(u, t) ? t : paraCiudadania(t))
+const formularioDe = (t) => TIPOS.find((x) => x.id === t.tipo_tramite.id).formulario
 
 // ---- auditoría
 const POLITICAS = [['ciudadano_sobre_lo_propio', true, 14], ['personal_ve_su_institucion', true, 22], ['funcionario_cambia_estado', true, 9], ['supervisor_reasigna_o_atiende_escalados', true, 4],
@@ -160,6 +178,8 @@ export function instalarMock(inicial, opciones = {}) {
   // Cada instalación parte del mismo estado: lo que se cambie en una sesión de ejemplo no contamina la siguiente
   const TRAMITES = structuredClone(TRAMITES_BASE)
   const EVENTOS = structuredClone(EVENTOS_BASE)
+  const DATOS = structuredClone(DATOS_BASE)
+  let siguiente = 100 // cada instalación numera desde cero, sin chocar con los trámites de ejemplo (35 a 44)
   const DOCUMENTOS = { 36: [{ id: 1, nombre: 'plano-del-local.pdf', tipo: 'application/pdf', tamano: 482133, creado_en: hace(3600000 * 30) }] }
   let actual = USUARIOS[inicial] ? inicial : null
   let enrolando = inicial === 'enrolar'
@@ -180,6 +200,8 @@ export function instalarMock(inicial, opciones = {}) {
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
     tramitesDe: (u) => TRAMITES.filter((t) => t.solicitante_id === u.id).map(paraCiudadania),
   })
+  // El detalle lleva el contenido (`datos`) y el formulario de su tipo; el listado no
+  const conContenido = (vista, t) => ({ ...vista, datos: DATOS[t.id] || {}, formulario: formularioDe(t) })
   const demora = (ms = opciones.demora ?? 140) => new Promise((r) => setTimeout(r, ms))
   const resp = (estado, cuerpo) => new Response(cuerpo === null ? null : JSON.stringify(cuerpo), { status: estado, headers: { 'Content-Type': 'application/json' } })
   const yo = () => {
@@ -268,10 +290,13 @@ export function instalarMock(inicial, opciones = {}) {
       if (!tipo) return resp(404, { codigo: 'tipo_tramite_inexistente' })
       if (u.membresias.some((m) => m.institucion_id === tipo.institucion.id)) return negado()
       if (u.membresias.length > 0 ? tipo.audiencia === 'ciudadania' : tipo.audiencia === 'institucion') return negado()
+      const { limpios, errores } = validarDatos(tipo.formulario, cuerpo.datos ?? {})
+      if (!limpios) return resp(400, respuestaDatosInvalidos(errores))
       const t = T(siguiente++, tipo.id, 'Pendiente', u.id, null, 0, tipo.sla_dias)
       TRAMITES.push(t)
+      DATOS[t.id] = limpios
       EVENTOS[t.id] = [ev(Date.now(), t.id, 'creacion', null, 'Pendiente', u.id, 1000)]
-      return resp(201, dto(u, t))
+      return resp(201, conContenido(dto(u, t), t))
     }
     const d = camino.match(/^\/tramites\/(\d+)\/documentos\/(?:(\d+)\/)?$/)
     if (d) {
@@ -292,21 +317,46 @@ export function instalarMock(inicial, opciones = {}) {
       EVENTOS[t.id].push({ ...ev(Date.now(), t.id, 'documento_adjuntado', t.estado, t.estado, u.id, 0), atributos: { documento: nuevo.id } })
       return resp(201, nuevo)
     }
-    const m = camino.match(/^\/tramites\/(\d+)\/(estado\/|reasignar\/|historial\/)?$/)
+    const m = camino.match(/^\/tramites\/(\d+)\/(estado\/|reasignar\/|historial\/|subsanacion\/)?$/)
     if (m) {
       const t = TRAMITES.find((x) => x.id === Number(m[1]))
       if (!t || !visibles(u, t)) return resp(404, { detalle: 'No encontrado.' })
       const sub = m[2]
-      if (!sub) return resp(200, dto(u, t))
-      if (sub === 'historial/') return resp(200, { tramite: t.id, eventos: EVENTOS[t.id].map((e) => (esPersonal(u, t) ? e : { id: e.id, accion: e.accion, estado_anterior: e.estado_anterior, estado_nuevo: e.estado_nuevo, institucion_id: e.institucion_id, creado_en: e.creado_en })) })
+      if (!sub) return resp(200, conContenido(dto(u, t), t))
+      if (sub === 'historial/') return resp(200, { tramite: t.id, eventos: EVENTOS[t.id].map((e) => (esPersonal(u, t) ? e : { id: e.id, accion: e.accion, estado_anterior: e.estado_anterior, estado_nuevo: e.estado_nuevo, institucion_id: e.institucion_id, creado_en: e.creado_en, motivo: e.motivo })) })
+      if (sub === 'subsanacion/') {
+        // La responde quien pidió el trámite, sin segundo factor reciente (igual que adjuntar documentos)
+        if (metodo !== 'POST' || t.solicitante_id !== u.id) return negado()
+        if (t.estado !== 'En Subsanacion') return resp(409, { codigo: 'no_en_subsanacion', detalle: 'El trámite no está en subsanación.' })
+        const errores = {}
+        const falla = validarTextoLibre(cuerpo.respuesta, 10, 2000)
+        if (falla) errores.respuesta = falla
+        let limpios = null
+        if (cuerpo.datos !== undefined) {
+          const r = validarDatos(formularioDe(t), cuerpo.datos)
+          if (r.limpios) limpios = r.limpios
+          else Object.assign(errores, r.errores)
+        }
+        if (Object.keys(errores).length) return resp(400, respuestaDatosInvalidos(errores))
+        if (limpios) DATOS[t.id] = limpios
+        t.estado = 'En Tramitacion'
+        EVENTOS[t.id].push(ev(Date.now(), t.id, 'cambio_estado', 'En Subsanacion', 'En Tramitacion', u.id, 500, cuerpo.respuesta.trim()))
+        return resp(200, conContenido(dto(u, t), t))
+      }
       if (!esPersonal(u, t) || t.solicitante_id === u.id) return negado()
       if (!mfaFresco) return pideCodigo()
       if (sub === 'estado/') {
         const antes = t.estado
+        // Rechazar, pedir subsanación y cerrarla exigen un motivo de 10 a 2000 caracteres (el servidor y la base lo vuelven a exigir)
+        const exige = cuerpo.estado === 'Rechazado' || cuerpo.estado === 'En Subsanacion' || antes === 'En Subsanacion'
+        const sinMotivo = cuerpo.motivo === undefined || cuerpo.motivo === null
+        if (exige && sinMotivo) return resp(400, { codigo: 'motivo_obligatorio', detalle: 'Esta decisión exige un motivo de al menos 10 caracteres.' })
+        const falla = sinMotivo ? null : validarTextoLibre(cuerpo.motivo, 10, 2000)
+        if (falla) return resp(400, respuestaDatosInvalidos({ motivo: falla }))
         t.estado = cuerpo.estado
         t.vencido = false
-        EVENTOS[t.id].push(ev(Date.now(), t.id, 'cambio_estado', antes, t.estado, u.id, 500))
-        return resp(200, dto(u, t))
+        EVENTOS[t.id].push(ev(Date.now(), t.id, 'cambio_estado', antes, t.estado, u.id, 500, sinMotivo ? null : cuerpo.motivo.trim()))
+        return resp(200, conContenido(dto(u, t), t))
       }
       if (!u.membresias.some((x) => x.rol === 'supervisor')) return negado()
       const de = t.funcionario_asignado_id
