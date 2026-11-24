@@ -8,6 +8,7 @@ import { RolesPermisos } from './Permisos.jsx'
 import { etiquetaDeRol } from './comun.jsx'
 import { agrupar, iconoDe } from './modulos.js'
 import { Equipo } from './Equipo.jsx'
+import { LimiteDeError } from './ErrorBoundary.jsx'
 import { Inicio, Proximamente, PruebaAcceso, Seguridad } from './Otras.jsx'
 import { MisDatos } from './MisDatos.jsx'
 import { Privacidad } from './Privacidad.jsx'
@@ -144,7 +145,9 @@ export default function App() {
           </div>
         </header>
         <AvisoDemostracion />
-        <main className="contenido" id="contenido">{contenido}</main>
+        <main className="contenido" id="contenido">
+          <LimiteDeError key={`${vista.modulo}-${vista.id ?? ''}`} nivel="pantalla" alVolverAlInicio={() => ir('inicio')}>{contenido}</LimiteDeError>
+        </main>
       </div>
       {restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}
     </div>
