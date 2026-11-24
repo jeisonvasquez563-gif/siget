@@ -19,7 +19,7 @@ Cambios incrementales sobre el esquema `siget` que ya está aplicado. Se ejecuta
 | 014 | `014-invitaciones.sql` | Tabla `invitacion` (registro por invitación): solo el hash del código, vencimiento, un solo uso (trigger) y `app_role` solo marca el uso | 12-nov-2026 |
 | 015 | `015-documentos.sql` | Tabla `documento` con seguridad por filas (la ve el solicitante o el personal de la institución; adjunta solo el solicitante), sin modificación ni borrado (trigger), institución igual a la del trámite y nada en trámites resueltos | 12-nov-2026 |
 
-| 016 | `016-derechos-datos.sql` | Derechos sobre los datos personales (Ley 81): la persona corrige solo correo, provincia y ciudad (`UPDATE` por columna en `perfil`), constancia del aviso de privacidad y tabla `solicitud_derecho` (rectificación, cancelación y oposición, respuesta en 10 días hábiles) | Pendiente |
+| 016 | `016-derechos-datos.sql` | Derechos sobre los datos personales (Ley 81): la persona corrige solo correo, provincia y ciudad (`UPDATE` por columna en `perfil`), constancia del aviso de privacidad y tabla `solicitud_derecho` (rectificación, cancelación y oposición, respuesta en 10 días hábiles) | 24-nov-2026 |
 
 ## Para una base nueva
 

@@ -15,6 +15,10 @@ import urllib.request
 
 import pyotp
 
+# La consola de Windows no siempre es UTF-8: sin esto, el resumen con «←» rompe el ensayo justo al final
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # Contraseña robusta para los pasos que no deben llegar a usarla (registro incompleto, código falso).
 # Se genera en cada ejecución: no queda ninguna contraseña escrita en el código (hallazgo de Gitleaks).
 CLAVE_DE_PRUEBA = "Ensayo-" + secrets.token_urlsafe(18)
@@ -149,7 +153,7 @@ _, yo = ana.pedir("GET", "/auth/yo/")
 inactividad = yo.get("inactividad_minutos")
 paso(isinstance(inactividad, int) and 1 <= inactividad <= 15, "el servidor informa el tiempo de inactividad (la interfaz no lo escribe a mano)", f"{inactividad} min")
 ids = [m["id"] for m in yo["modulos"]]
-paso(ids == ["mis_tramites", "nuevo_tramite", "seguridad", "mfa", "roles_permisos"], "su menú es el de la ciudadanía", ids)
+paso(ids == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa", "roles_permisos"], "su menú es el de la ciudadanía (con «Mis datos», PT-15)", ids)
 _, lista = ana.pedir("GET", "/tramites/?limite=100")
 antes = len(lista["resultados"])
 paso(antes >= 3 and all("solicitante_id" not in t for t in lista["resultados"]), "ve sus trámites y ningún dato interno del personal", antes)

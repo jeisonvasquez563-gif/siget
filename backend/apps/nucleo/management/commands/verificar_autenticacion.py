@@ -19,8 +19,9 @@ from rest_framework.test import APIClient
 
 from apps.autenticacion import contrasenas, derechos, mfa, perfil, tokens
 from apps.autenticacion.models import EventoSeguridad, Sesion
-from apps.catalogo.models import Institucion, TipoTramite
+from apps.catalogo.models import Institucion, TipoTramite, feriados_entre
 from apps.identidad.models import Membresia, Perfil, SolicitudDerecho, Usuario
+from apps.tramites.serializacion import sumar_dias_habiles
 
 CLAVE_BUENA = "una-frase-larga-y-poco-comun-7391"
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.7"}
@@ -501,7 +502,10 @@ class Command(BaseCommand):
         self._paso("crea una solicitud: queda «recibida», a nombre de quien llama (no de lo que diga el cuerpo)",
                    r.status_code == 201 and sol["estado"] == "recibida" and fila_sol is not None and fila_sol.estado == "recibida" and not SolicitudDerecho.objects.filter(usuario=mario).exists(), r.status_code)
         vence, creada = fila_sol.vence_en, fila_sol.creada_en
-        self._paso("vence en 10 días hábiles (nunca en fin de semana)", vence.weekday() < 5 and 12 <= (vence - creada).days <= 14, f"{creada:%a %d-%m} -> {vence:%a %d-%m}")
+        inicio = timezone.localtime(creada).date()
+        esperado = sumar_dias_habiles(creada, 10, feriados_entre(inicio, inicio + timedelta(days=45)))
+        self._paso("vence en 10 días hábiles de Panamá (sin fines de semana ni feriados de la tabla)", timezone.localtime(vence).date() == timezone.localtime(esperado).date() and timezone.localtime(vence).weekday() < 5,
+                   f"{timezone.localtime(creada):%a %d-%m} -> {timezone.localtime(vence):%a %d-%m}")
         self._paso("cada persona ve solo sus solicitudes", len(self._http("get", "/auth/mis-datos/solicitudes/", token=token_luz).json()["solicitudes"]) == 1
                    and self._http("get", "/auth/mis-datos/solicitudes/", token=token_mario).json()["solicitudes"] == [])
         self._paso("el evento de seguridad no lleva el detalle de la solicitud (podría tener datos personales)",
@@ -578,5 +582,5 @@ class Command(BaseCommand):
         self._paso("la aplicación lee e inserta solicitudes pero no las borra, ni borra perfiles",
                    privilegios["app_role"][0] and privilegios["app_role"][1] and not privilegios["app_role"][2] and not privilegios["app_role"][3])
         self._paso("de las columnas del perfil solo se pueden actualizar correo, provincia y ciudad",
-                   privilegios["app_role"][4:7] == (True, True, True) and privilegios["app_role"][7:] == (False, False, False))
+                   privilegios["app_role"][4:7] == (True, True, True) and privilegios["app_role"][7:10] == (False, False, False))
         self._paso("la aplicación no tiene UPDATE sobre `respondida_en` (la hora de la respuesta la fija la base)", privilegios["app_role"][13] is False)

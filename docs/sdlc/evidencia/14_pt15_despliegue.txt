@@ -1,0 +1,12 @@
+# PT-15: despliegue del backend y la interfaz (24-nov-2026)
+# 2026-11-24 11:33:52  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pt15/paso5.sh
+== 9. Backend: la candidata pasa a ser la imagen en uso (la unidad no cambia)
+servicios: active active active  salud: 200 aviso de privacidad: 404
+backend en uso: 955dae6ec42e
+== 10. Interfaz con respaldo y vuelta atras automatica
+interfaz index-DOBoyeQq.js -> 200
+todo desplegado
+diff: /home/siget/.config/containers/systemd/siget-backend.container: Permiso denegado
+diff: /home/siget/siget-backend.container.respaldo-2026-11-24: Permiso denegado
+# código de salida: 0

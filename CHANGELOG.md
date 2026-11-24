@@ -6,6 +6,18 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Despliegue (PT-15 aplicado en producción, 24-nov)
+- **Derechos sobre los datos personales y aviso de privacidad (Ley 81) en producción** (runbook 39.10, evidencia `docs/sdlc/evidencia/14_pt15_*`):
+  - VM2: respaldo verificado (`tramites_demo-20261124-112843.dump`, copia `pre-016`);
+  - ensayo de la 016 con `ROLLBACK` (7/7 y sin rastro);
+  - migración real (7/7 sobre la base migrada).
+- **VM1:** imagen nueva verificada **antes** de reiniciar. Resultados: `verificar_esquema` OK, `verificar_autenticacion` 169/169, `verificar_plataforma` 125/125, `verificar_politicas` 41/41, `verificar_tramites` 77/77, `verificar_equipo` 51/51, `verificar_auditoria` 34/34, `verificar_integracion` 15/15. Después, despliegue del backend y la interfaz con respaldo (`respaldo-2026-11-24`) y **ensayo 101/101**.
+- **Dos expectativas de la verificación estaban mal y se corrigieron (no la plataforma):**
+  - el plazo de 10 días hábiles no contaba los feriados: el 8 de diciembre corre el vencimiento un día;
+  - una comparación de permisos cortaba mal la tupla.
+- **El ensayo** ahora espera «Mis datos» en el menú de la ciudadanía y escribe en UTF-8.
+- **Requisitos:** RS-09 y RS-22 pasan a «Cumple» (23 de 26), igual que tres filas normativas de las leyes 81 y 6 (7 de 11).
+
 ### Seguridad (checkpoint PHP y pgAdmin web retirados, puerto 80 cerrado, PT-13, 17-nov)
 - **Retirados el checkpoint PHP (`/gestion/`) y pgAdmin 4 web (`/pgadmin4/`)**, que Apache servía por HTTP sin cifrar en el puerto 80 de VM1. pgAdmin apareció al revisar Apache: era el primer intento de checkpoint y seguía abierto a toda la red. SIGET no usa ninguno de los dos.
 - Con respaldo previo en `/root/respaldo-pt13-2026-11-17/` se detuvieron y deshabilitaron `httpd` y `php-fpm`, se quitó `http` del cortafuegos y el rol `checkpoint_app` quedó sin inicio de sesión (`NOLOGIN`), así que la contraseña que guardaba su configuración ya no sirve. Los paquetes siguen instalados pero apagados; volver atrás está en el runbook §38.2.

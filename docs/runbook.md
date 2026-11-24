@@ -1729,7 +1729,7 @@ El mismo día se sacó una copia de la clave de documentos al equipo anfitrión,
 
 ## 39. Derechos sobre los datos personales y aviso de privacidad: aplicar la migración 016 (PT-15)
 
-**Estado: pendiente de aplicar en producción** (este documento solo describe el procedimiento; nada de esto se ejecutó al escribir el código).
+**Estado: aplicado en producción el 24 de noviembre de 2026** (registro en 39.10).
 
 ### 39.1 Qué cambia y en qué orden hay que aplicarlo
 
@@ -1781,7 +1781,7 @@ Con la base ya migrada, en VM1: `ejecutar-comando.sh` reconstruye la imagen con 
 1. `verificar_esquema`: el modelo `SolicitudDerecho` y las columnas nuevas de `Perfil` coinciden con la base.
 2. `verificar_autenticacion`: incluye el registro con aviso, la corrección con segundo factor, la exportación, las solicitudes, el trigger y los grants por columna (el paso que antes decía que el perfil «no se puede modificar» ahora comprueba que **solo** correo, provincia y ciudad se pueden modificar).
 3. `verificar_plataforma`: la consola de solicitudes del operador de identidades.
-4. `verificar_politicas` (el simulador ahora lista 21 acciones) y el resto (`verificar_tramites`, `verificar_equipo`, `verificar_auditoria`, `verificar_integracion`) como regresión.
+4. `verificar_politicas` (el simulador ahora lista 25 acciones) y el resto (`verificar_tramites`, `verificar_equipo`, `verificar_auditoria`, `verificar_integracion`) como regresión.
 
 Si algún paso falla, **no desplegar**: revisar primero si es un problema del paso o del permiso en la base. Después, `desplegar.sh` (interfaz y reinicio ordenado del pod; ojo: devuelve la inactividad a 10 minutos, ver 34.2).
 
@@ -1806,3 +1806,22 @@ La consola solo registra la respuesta: **no borra ni modifica nada**. Los trámi
 ### 39.9 Riesgos aceptados
 
 - **Sin seguridad por filas (RLS) en `perfil` ni en `solicitud_derecho`**: la separación entre personas la impone la aplicación (PDP y consultas siempre sobre la propia cuenta) y los `GRANT` por columna, no la base. Si `app_role` tuviera un fallo (una consulta sin filtrar), la base no lo frenaría. Defensa en profundidad pendiente; se acepta porque ninguna ruta recibe el identificador de otra persona y las vistas pasan por el PDP.
+
+### 39.10 Registro de la aplicación (24 de noviembre de 2026)
+
+Evidencia completa en `docs/sdlc/evidencia/14_pt15_*` (salida en texto y captura de cada paso).
+
+1. **VM2, respaldo verificado:** `siget-respaldo.service` terminó en OK (`tramites_demo-20261124-112843.dump`, 17 tablas, restauración probada y comparada con la base viva) y se copió como `pre-016-tramites_demo-20261124-112843.dump`, fuera de la rotación de 14 días.
+2. **Ensayo de la 016** dentro de una transacción terminada en `ROLLBACK`, con 7 comprobaciones de permisos y triggers: 7/7. Después se confirmó que no quedó nada (la tabla no existe y `perfil` no tiene columnas nuevas).
+3. **Migración real** y las mismas 7 comprobaciones sobre la base migrada: 7/7. Los perfiles existentes quedaron sin constancia del aviso (no se inventa).
+4. **VM1, imagen candidata** con el código de `develop` (`siget-backend:pt15-candidata`) y las 8 verificaciones contra la base real **antes de reiniciar nada**. La primera corrida dio 2 fallas en `verificar_autenticacion`, las dos de la propia verificación y no de la plataforma: (a) el plazo esperaba 12 a 14 días corridos, pero el martes 8 de diciembre (Día de las Madres) es feriado y la solicitud del 24-nov vence correctamente el 9-dic; ahora el paso compara contra `sumar_dias_habiles` con la tabla de feriados; (b) la comprobación de permisos cortaba mal la tupla (`[7:]` en lugar de `[7:10]`). Corregidas, la segunda corrida: `verificar_esquema` OK, `verificar_autenticacion` 169/169, `verificar_plataforma` 125/125, `verificar_politicas` 41/41, `verificar_tramites` 77/77, `verificar_equipo` 51/51, `verificar_auditoria` 34/34 y `verificar_integracion` 15/15.
+5. **Despliegue:** la candidata pasó a `siget-backend:dev` y se reinició el backend; la unidad no cambió (conserva `SIGET_INACTIVIDAD_MINUTOS=2` de la demo). Interfaz nueva con respaldo en `/home/siget/frontend.respaldo-2026-11-24`. Servicios activos, salud 200 y `GET /auth/aviso-privacidad/` 200; sin sesión, `/auth/mis-datos/` y la consola de solicitudes responden 401.
+6. **Ensayo completo contra producción: 101/101.** Se actualizó su expectativa del menú de la ciudadanía (ahora incluye «Mis datos») y se le agregó salida UTF-8 para que el resumen no se corte en la consola de Windows.
+
+**Volver atrás:** `podman tag localhost/siget-backend:respaldo-2026-11-24 localhost/siget-backend:dev` y `systemctl --user restart siget-backend.service` (como `siget`), y restaurar la interfaz desde `frontend.respaldo-2026-11-24`. El backend anterior funciona con la base ya migrada. Revertir la base solo restaurando `pre-016-…dump`, perdiendo lo posterior (39.6).
+
+**Gotchas de esta aplicación:**
+- En un script que se ejecuta por SSH, `$(id -u)` dentro de comillas dobles se resuelve en la máquina local: la primera vez no se guardó la etiqueta de respaldo y se tuvo que rehacer a partir de la imagen del contenedor en ejecución (`podman inspect siget-backend --format {{.Image}}`). La parte remota va en un archivo aparte o entre comillas simples.
+- `ejecutar-comando.sh` reconstruye la imagen con la **misma etiqueta** que usa el backend en ejecución: el servicio no cambia hasta reiniciarlo, pero hay que guardar antes la imagen anterior y devolver la etiqueta si algo falla.
+- Correr el ensayo varias veces seguidas choca con el límite de 10 inicios de sesión por minuto (429): esperar un minuto entre corridas.
+- El ensayo lee las credenciales de la siembra de `demo-local/siembra.local.txt`, que está fuera de git: se corre desde la carpeta que lo tiene.
