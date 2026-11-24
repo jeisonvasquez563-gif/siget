@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from './api.js'
 import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Plazo, SIGUIENTES, fecha, fechaCorta, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { CamposFormulario, DatosSolicitud, ModalMotivo, ResponderSubsanacion, ResumenErrores, armarDatos, erroresDe, ultimoMotivoDeSubsanacion, validarCliente, valoresIniciales } from './Contenido.jsx'
 import { Documentos } from './Documentos.jsx'
 import { Seguimiento } from './Seguimiento.jsx'
 import { Alerta, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
@@ -119,6 +120,9 @@ export function NuevoTramite({ yo, abrir }) {
   const [tipo, setTipo] = useState(null)
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(false)
+  const [valores, setValores] = useState({})
+  const [errores, setErrores] = useState({})
+  const [general, setGeneral] = useState('')
   const { avisar } = useUI()
   // El personal inicia trámites hacia OTRAS instituciones (solicitudes interinstitucionales); la ciudadanía, los suyos. Nadie inicia en su propia institución.
   const esPersonal = yo.membresias.length > 0
@@ -132,15 +136,34 @@ export function NuevoTramite({ yo, abrir }) {
     api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then((l) => setTipos(l.filter((t) => t.audiencia === 'ambas' || t.audiencia === (esPersonal ? 'institucion' : 'ciudadania')))).catch((e) => setError(mensajeDe(e)))
   }, [institucion, esPersonal])
 
-  async function crear() {
+  // Cada tipo trae su formulario: al cambiar de trámite se parte de un formulario limpio
+  const campos = tipo?.formulario || []
+  const elegirTipo = (t) => {
+    setTipo(t)
+    setValores(valoresIniciales(t.formulario || []))
+    setErrores({})
+    setGeneral('')
+  }
+
+  async function crear(ev) {
+    ev.preventDefault()
     setError('')
+    setGeneral('')
+    const locales = validarCliente(campos, valores)
+    setErrores(locales)
+    if (Object.keys(locales).length) return
     setTrabajando(true)
     try {
-      const t = await api('/tramites/', { metodo: 'POST', cuerpo: { tipo_tramite: tipo.id } })
+      const t = await api('/tramites/', { metodo: 'POST', cuerpo: { tipo_tramite: tipo.id, datos: armarDatos(campos, valores) } })
       avisar(`Tu trámite #${t.id} quedó registrado.`)
       abrir(t.id)
     } catch (e) {
-      setError(mensajeDe(e))
+      const porCampo = erroresDe(e)
+      if (porCampo) {
+        // Lo que no es de un campo del formulario (la clave `datos`) va solo en el resumen
+        setErrores(Object.fromEntries(Object.entries(porCampo).filter(([k]) => campos.some((c) => c.id === k))))
+        setGeneral(Object.entries(porCampo).filter(([k]) => !campos.some((c) => c.id === k)).map(([, m]) => m).join(' '))
+      } else setError(mensajeDe(e))
       setTrabajando(false)
     }
   }
@@ -171,7 +194,7 @@ export function NuevoTramite({ yo, abrir }) {
               {tipos === null ? <BloquesEsqueleto n={2} /> : tipos.length === 0 ? <p className="suave">Esta institución aún no publicó trámites.</p> : (
                 <div className="opciones" role="radiogroup" aria-label="Trámite">
                   {tipos.map((t) => (
-                    <button key={t.id} className="opcion" role="radio" aria-checked={tipo?.id === t.id} onClick={() => setTipo(t)}>
+                    <button key={t.id} className="opcion" role="radio" aria-checked={tipo?.id === t.id} onClick={() => elegirTipo(t)}>
                       <span className="marca-opcion">{tipo?.id === t.id && <Icono nombre="check" />}</span>
                       <span className="cuerpo-opcion"><strong>{t.nombre}</strong><small>Plazo de atención: {t.sla_dias} días</small></span>
                     </button>
@@ -179,6 +202,17 @@ export function NuevoTramite({ yo, abrir }) {
                 </div>
               )}
             </section>
+          )}
+          {tipo && (
+            <form id="form-nuevo-tramite" onSubmit={crear} noValidate aria-labelledby={campos.length ? 'datos-nuevo' : undefined}>
+              <ResumenErrores campos={campos} errores={errores} general={general} />
+              {campos.length > 0 && (
+                <section className="panel">
+                  <div className="panel-cabecera"><h3 id="datos-nuevo">3. Datos de la solicitud</h3></div>
+                  <CamposFormulario campos={campos} valores={valores} cambiar={(id, v) => setValores((x) => ({ ...x, [id]: v }))} errores={errores} />
+                </section>
+              )}
+            </form>
           )}
         </div>
         <aside className="panel resumen-nuevo" aria-label="Resumen del trámite">
@@ -190,7 +224,7 @@ export function NuevoTramite({ yo, abrir }) {
                 <dt>Trámite</dt><dd>{tipo.nombre}</dd>
                 <dt>Plazo</dt><dd>{tipo.sla_dias} días</dd>
               </dl>
-              <button className="btn btn-ancho" onClick={crear} disabled={trabajando}>{trabajando ? 'Iniciando…' : 'Iniciar trámite'}</button>
+              <button className="btn btn-ancho" type="submit" form="form-nuevo-tramite" disabled={trabajando}>{trabajando ? 'Iniciando…' : 'Iniciar trámite'}</button>
               <p className="nota">Quedará registrado a tu nombre y podrás seguir cada paso, con quién lo hizo y cuándo.</p>
             </>
           ) : <p className="suave">Elige una institución y un trámite para ver el resumen.</p>}
@@ -298,6 +332,13 @@ export function Bandeja({ yo, abrir, modo }) {
 
 /* ---------------------------------------------------------------- detalle */
 
+// Un 400 de una decisión trae el motivo del rechazo por campo (`errores.motivo`) o su propio detalle
+function mensajeDeDecision(e) {
+  const porCampo = erroresDe(e)
+  if (porCampo && Object.keys(porCampo).length) return Object.values(porCampo).join(' ')
+  return mensajeDe(e)
+}
+
 const ICONO_EVENTO = { creacion: 'mas', cambio_estado: 'flujo', reasignacion: 'reasignar', escalamiento: 'alerta', documento_adjuntado: 'documento' }
 
 export function Detalle({ id, yo, volver, volverA }) {
@@ -305,6 +346,8 @@ export function Detalle({ id, yo, volver, volverA }) {
   const [eventos, setEventos] = useState([])
   const [personal, setPersonal] = useState([])
   const [error, setError] = useState('')
+  const [pidiendoMotivo, setPidiendoMotivo] = useState(null) // 'Rechazado' | 'En Subsanacion' | 'cierre' mientras el modal está abierto
+  const [errorMotivo, setErrorMotivo] = useState('')
   const { ejecutar, modal } = useReautenticacion()
   const { avisar, confirmar } = useUI()
 
@@ -334,27 +377,47 @@ export function Detalle({ id, yo, volver, volverA }) {
     }).catch(() => setPersonal([]))
   }, [esSupervisor, tramite])
 
-  async function accion(f, mensaje) {
+  // `enModal`: el error se muestra dentro del modal del motivo, que solo se cierra cuando el servidor acepta (2xx)
+  async function accion(f, mensaje, enModal = false) {
     setError('')
+    setErrorMotivo('')
     // Se ejecuta de nuevo tras la reautenticación, así que maneja sus propios errores (salvo el que pide reautenticar)
     await ejecutar(async () => {
       try {
         await f()
+        setPidiendoMotivo(null)
         await cargar()
         avisar(mensaje)
       } catch (e) {
         if (e instanceof ApiError && e.pideReautenticar) throw e
-        setError(mensajeDe(e))
+        const texto = mensajeDeDecision(e)
+        if (enModal) setErrorMotivo(texto)
+        else setError(texto)
       }
     })
   }
 
+  // Rechazar, pedir una subsanación y cerrarla piden un motivo: el servidor y la base lo vuelven a exigir
+  const claveMotivo = (estado) => (estado === 'Rechazado' || estado === 'En Subsanacion' ? estado : tramite.estado === 'En Subsanacion' ? 'cierre' : null)
+
+  const enviarMotivo = (motivo) => accion(
+    () => api(`/tramites/${id}/estado/`, { metodo: 'POST', cuerpo: { estado: pidiendoMotivo === 'cierre' ? 'En Tramitacion' : pidiendoMotivo, motivo } }),
+    `El trámite pasó a «${ESTADOS[pidiendoMotivo === 'cierre' ? 'En Tramitacion' : pidiendoMotivo].texto}».`,
+    true,
+  )
+
   async function cambiar(estado) {
+    const clave = claveMotivo(estado)
+    if (clave) {
+      setErrorMotivo('')
+      setPidiendoMotivo(clave)
+      return
+    }
     if (FINALES.includes(estado)) {
       const si = await confirmar({
-        titulo: estado === 'Aprobado' ? 'Aprobar este trámite' : 'Rechazar este trámite',
+        titulo: 'Aprobar este trámite',
         texto: 'Es un estado final: después no se puede cambiar. La decisión queda en el historial con tu nombre.',
-        etiqueta: estado === 'Aprobado' ? 'Aprobar trámite' : 'Rechazar trámite', peligro: estado === 'Rechazado',
+        etiqueta: 'Aprobar trámite',
       })
       if (!si) return
     }
@@ -375,6 +438,7 @@ export function Detalle({ id, yo, volver, volverA }) {
     return <><button className="migas" onClick={volver}><Icono nombre="izquierda" />Volver</button><Alerta>{error}</Alerta></>
   }
 
+  const puedeResponder = tramite.estado === 'En Subsanacion' && (!esPersonal || esPropio)
   const quien = (uid) => (uid === yo.id ? 'ti' : nombres[uid] || `persona #${uid}`)
   return (
     <>
@@ -398,6 +462,9 @@ export function Detalle({ id, yo, volver, volverA }) {
         </div>
       </section>
 
+      {puedeResponder && <ResponderSubsanacion tramite={tramite} motivo={ultimoMotivoDeSubsanacion(eventos)} alResponder={cargar} />}
+      <DatosSolicitud formulario={tramite.formulario} datos={tramite.datos} />
+
       <div className="rejilla-detalle">
         <section className="panel">
           <h3>Detalle</h3>
@@ -419,7 +486,7 @@ export function Detalle({ id, yo, volver, volverA }) {
                 <div className="fila-botones inicio">
                   {SIGUIENTES[tramite.estado].map((s) => (
                     <button key={s} className={`btn ${s === 'Rechazado' ? 'btn-peligro' : s === 'En Subsanacion' ? 'btn-sec' : ''}`} onClick={() => cambiar(s)}>
-                      {s === 'Aprobado' ? 'Aprobar' : s === 'Rechazado' ? 'Rechazar' : s === 'En Subsanacion' ? 'Pedir subsanación' : 'Pasar a tramitación'}
+                      {s === 'Aprobado' ? 'Aprobar' : s === 'Rechazado' ? 'Rechazar' : s === 'En Subsanacion' ? 'Pedir subsanación' : tramite.estado === 'En Subsanacion' ? 'Cerrar la subsanación' : 'Pasar a tramitación'}
                     </button>
                   ))}
                 </div>
@@ -451,6 +518,7 @@ export function Detalle({ id, yo, volver, volverA }) {
                   {e.accion === 'cambio_estado' && <span className="cambio"><Estado valor={e.estado_anterior} /><Icono nombre="derecha" className="tenue" /><Estado valor={e.estado_nuevo} /></span>}
                   {e.accion === 'escalamiento' && <span className="quien">Superó el plazo: el sistema lo pasó a la supervisión de la institución</span>}
                   {e.accion === 'reasignacion' && e.atributos && <span className="quien">{e.atributos.de ? `De ${quien(e.atributos.de)} a ` : 'Asignado a '}{e.atributos.a ? quien(e.atributos.a) : 'la cola'}</span>}
+                  {e.motivo && <blockquote className="cita-motivo"><span className="etiqueta-cita">Motivo</span>{e.motivo}</blockquote>}
                   <time dateTime={e.creado_en} title={fecha(e.creado_en)}>{fecha(e.creado_en)} · {hace(e.creado_en)}</time>
                   {'actor_id' in e && <span className="quien">Por {quien(e.actor_id)}</span>}
                 </div>
@@ -463,6 +531,7 @@ export function Detalle({ id, yo, volver, volverA }) {
       {/* Adjunta quien pidió el trámite (no el personal en su nombre) y solo mientras no tiene resolución final */}
       <Documentos tramiteId={tramite.id} puedeAdjuntar={!esPersonal && !FINALES.includes(tramite.estado)} alAdjuntar={cargar} />
       {modal}
+      {pidiendoMotivo && <ModalMotivo clave={pidiendoMotivo} error={errorMotivo} enviar={enviarMotivo} cancelar={() => setPidiendoMotivo(null)} />}
     </>
   )
 }
