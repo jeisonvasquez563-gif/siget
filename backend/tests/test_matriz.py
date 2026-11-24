@@ -92,14 +92,14 @@ def test_cada_operador_de_plataforma_tiene_solo_su_area():
         "auditor": {Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES},
     }
     for rol, acciones in esperado.items():
-        # cambiar la propia contraseña la tiene toda cuenta: no es parte de su área
-        permitidas = {a for a in Accion if celda(rol, a)["permitido"]} - {Accion.CAMBIAR_CONTRASENA}
+        # cambiar la propia contraseña y ver las propias notificaciones las tiene toda cuenta: no son parte de su área
+        permitidas = {a for a in Accion if celda(rol, a)["permitido"]} - {Accion.CAMBIAR_CONTRASENA, Accion.VER_MIS_NOTIFICACIONES}
         assert permitidas == acciones, (rol, permitidas)
 
 
 def test_el_auditor_solo_lee_y_no_puede_hacer_nada_mas():
     for a in Accion:
-        if a not in (Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES, Accion.CAMBIAR_CONTRASENA):
+        if a not in (Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES, Accion.CAMBIAR_CONTRASENA, Accion.VER_MIS_NOTIFICACIONES):
             assert celda("auditor", a)["permitido"] is False, a
 
 

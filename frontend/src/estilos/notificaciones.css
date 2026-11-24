@@ -1,0 +1,40 @@
+/* Campana de notificaciones de la barra superior (Notificaciones.jsx). Sin estilos en línea: la CSP de nginx no los admite. */
+.campana { position: relative; }
+.campana-boton { position: relative; }
+.campana-insignia {
+  position: absolute; top: 2px; right: 0; min-width: 1.15rem; height: 1.15rem; padding: 0 0.28rem; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center; border-radius: 999px;
+  background: var(--sello-rojo); color: #fff; font-size: 0.7rem; font-weight: 700; line-height: 1; pointer-events: none;
+  border: 2px solid var(--lienzo);
+}
+
+.notif-panel {
+  position: absolute; right: 0; top: calc(100% + 0.5rem); z-index: 40; width: min(26rem, calc(100vw - 2rem)); max-height: min(34rem, 75vh);
+  display: flex; flex-direction: column; overflow: hidden; background: var(--superficie); color: var(--tinta);
+  border: 1px solid var(--borde-fuerte); border-radius: var(--radio); box-shadow: var(--sombra-2);
+}
+.notif-panel:focus { outline: none; }
+.notif-panel:focus-visible { outline: 3px solid var(--foco); outline-offset: 0; }
+.notif-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.75rem 0.6rem 1rem; border-bottom: 1px solid var(--borde); }
+.notif-titulo { margin: 0; font-weight: 700; }
+.notif-todas { font-size: var(--t-s); min-height: 36px; padding: 0 0.6rem; }
+.notif-aviso, .notif-pie { margin: 0; padding: 0.9rem 1rem; font-size: var(--t-s); color: var(--tinta-suave); }
+.notif-pie { border-top: 1px solid var(--borde); }
+.notif-lista { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.notif-lista li + li { border-top: 1px solid var(--borde); }
+.notif-item {
+  display: flex; align-items: flex-start; gap: 0.65rem; width: 100%; padding: 0.7rem 1rem; border: 0; background: transparent; text-align: left;
+  color: inherit; cursor: pointer;
+}
+.notif-item:hover { background: var(--superficie-2); }
+.notif-item:focus-visible { outline-offset: -3px; }
+.notif-punto { flex: none; width: 0.55rem; height: 0.55rem; margin-top: 0.4rem; border-radius: 50%; background: transparent; }
+.notif-item.sin-leer .notif-punto { background: var(--boya); }
+.notif-item.sin-leer .notif-texto { font-weight: 700; }
+.notif-cuerpo { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.notif-detalle, .notif-fecha { font-size: var(--t-s); color: var(--tinta-suave); }
+.notif-fecha { color: var(--tinta-tenue); }
+
+@media (max-width: 720px) {
+  .notif-panel { position: fixed; left: 0.5rem; right: 0.5rem; top: 4rem; width: auto; }
+}

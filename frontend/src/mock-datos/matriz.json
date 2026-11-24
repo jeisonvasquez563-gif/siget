@@ -43,8 +43,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 10,
-            "acciones_totales": 27
+            "acciones_permitidas": 11,
+            "acciones_totales": 28
         },
         {
             "id": "funcionario",
@@ -95,8 +95,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 10,
-            "acciones_totales": 27
+            "acciones_permitidas": 11,
+            "acciones_totales": 28
         },
         {
             "id": "supervisor",
@@ -159,8 +159,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 12,
-            "acciones_totales": 27
+            "acciones_permitidas": 13,
+            "acciones_totales": 28
         },
         {
             "id": "coordinador_institucional",
@@ -211,8 +211,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 9,
-            "acciones_totales": 27
+            "acciones_permitidas": 10,
+            "acciones_totales": 28
         },
         {
             "id": "operador_infraestructura",
@@ -251,8 +251,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 2,
-            "acciones_totales": 27
+            "acciones_permitidas": 3,
+            "acciones_totales": 28
         },
         {
             "id": "operador_identidades",
@@ -291,8 +291,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 7,
-            "acciones_totales": 27
+            "acciones_permitidas": 8,
+            "acciones_totales": 28
         },
         {
             "id": "operador_catalogo",
@@ -331,8 +331,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 3,
-            "acciones_totales": 27
+            "acciones_permitidas": 4,
+            "acciones_totales": 28
         },
         {
             "id": "operador_seguridad",
@@ -371,8 +371,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 3,
-            "acciones_totales": 27
+            "acciones_permitidas": 4,
+            "acciones_totales": 28
         },
         {
             "id": "custodio_secretos",
@@ -411,8 +411,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 2,
-            "acciones_totales": 27
+            "acciones_permitidas": 3,
+            "acciones_totales": 28
         },
         {
             "id": "auditor",
@@ -451,8 +451,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 3,
-            "acciones_totales": 27
+            "acciones_permitidas": 4,
+            "acciones_totales": 28
         }
     ],
     "acciones": [
@@ -655,6 +655,15 @@
             "casos": [
                 "Su propia cuenta",
                 "La cuenta de otra persona"
+            ]
+        },
+        {
+            "id": "ver_mis_notificaciones",
+            "nombre": "Ver las propias notificaciones",
+            "grupo": "Cuenta",
+            "casos": [
+                "Sus propias notificaciones",
+                "Las notificaciones de otra persona"
             ]
         },
         {
@@ -946,6 +955,17 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": true
+            },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -1246,6 +1266,17 @@
                 },
                 "exige_segundo_factor": true
             },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -1544,6 +1575,17 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": true
+            },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -1844,6 +1886,17 @@
                 },
                 "exige_segundo_factor": true
             },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -2142,6 +2195,17 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": true
+            },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -2442,6 +2506,17 @@
                 },
                 "exige_segundo_factor": true
             },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -2740,6 +2815,17 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": true
+            },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
             },
             "consultar_auditoria": {
                 "favorable": {
@@ -3040,6 +3126,17 @@
                 },
                 "exige_segundo_factor": true
             },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -3339,6 +3436,17 @@
                 },
                 "exige_segundo_factor": true
             },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -3637,6 +3745,17 @@
                     "politica": "sin_regla_que_permita"
                 },
                 "exige_segundo_factor": true
+            },
+            "ver_mis_notificaciones": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
             },
             "consultar_auditoria": {
                 "favorable": {

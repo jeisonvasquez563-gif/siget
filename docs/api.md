@@ -58,7 +58,7 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 
 ## Derechos sobre los datos personales (`/auth/mis-datos/…`) — scope `completo` (PT-15, Ley 81 de 2019)
 
-Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (27 acciones en total en la matriz, con `responder_subsanacion` y `cambiar_contrasena`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
+Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (28 acciones en total en la matriz, con `responder_subsanacion`, `cambiar_contrasena` y `ver_mis_notificaciones`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
@@ -88,7 +88,7 @@ Solo el operador de identidades, con segundo factor reciente (acciones `consulta
 | `GET /tramites/<id>/` | — | `Tramite` con `datos` y `formulario` (se ve igual para quien lo pidió y para el personal de la institución). El listado `GET /tramites/` **no** lleva `datos` ni `formulario` |
 | `POST /tramites/<id>/estado/` | `{estado, motivo?}` | `200 Tramite`; `403` (el PDP decide **antes** de mirar el motivo: quien no puede cambiar el estado recibe 403 aunque falte o sobre el motivo, nunca 400); `400` (`motivo_obligatorio` o `datos_invalidos` con `errores.motivo`); `409`. **`motivo` es obligatorio** (texto de 10 a 2000 caracteres, con al menos una letra o un número; el mínimo no cuenta los invisibles) al pasar a `Rechazado`, al pasar a `En Subsanacion` y al cerrar una subsanación (`En Subsanacion` → `En Tramitacion`); en las demás transiciones es opcional (si viene, también se valida). La base lo exige de nuevo y lo guarda en el historial |
 | `POST /tramites/<id>/subsanacion/` | `{respuesta, datos?}` | La persona que pidió el trámite responde la subsanación: `200 Tramite` (vuelve a `En Tramitacion`; `respuesta` queda como `motivo` del evento). `respuesta`: texto de 10 a 2000 caracteres con al menos una letra o un número, obligatorio (`400 datos_invalidos`, `errores.respuesta`). `datos` es opcional: si viene, se valida completo contra el formulario y **reemplaza** al contenido anterior (`400` con `errores` por campo); si no viene, no se toca. `404` si el trámite no es de quien llama (como el resto de las rutas); `403` para el personal, la supervisión y las cuentas de plataforma sobre trámites que no pidieron (quien es personal y pidió su propio trámite sí responde, solo como solicitante); `503 formulario_no_disponible` si manda `datos` y el formulario está mal definido; `409 no_en_subsanacion` si el trámite no está en subsanación; `409 conflicto` si cambió mientras se procesaba (concurrencia optimista). Acción `responder_subsanacion` del PDP: solo el solicitante, **sin exigir segundo factor reciente** (igual que adjuntar documentos) |
-| `POST /tramites/<id>/reasignar/` | `{funcionario_id: <id>\|null}` | `200 Tramite` (solo supervisión) |
+| `POST /tramites/<id>/reasignar/` | `{funcionario_id: <id>\|null}` | `200 Tramite` (solo supervisión). El destino debe ser personal (funcionario o supervisor) de la misma institución con la **membresía vigente** (una revocada no sirve) y no el solicitante; si no, `400 destinatario_invalido` (el mismo para cualquiera de esos casos) |
 | `GET /tramites/<id>/historial/` | — | `{tramite, eventos: [Evento]}` |
 | `GET /tramites/<id>/documentos/` | — | `{tramite, documentos: [{id, nombre, tipo, tamano, creado_en}]}`; el personal ve además `subido_por` y `sha256` |
 | `POST /tramites/<id>/documentos/` | **multipart** con un solo campo `archivo` (la única ruta que no es JSON) | `201 Documento`. Solo quien pidió el trámite y mientras no tenga resolución final. `413 demasiado_grande` (más de 5 MB), `415` (`extension_no_permitida`, `contenido_no_permitido`, `extension_no_coincide`), `409 tramite_cerrado`, `409 demasiados_documentos` (20), `503 documentos_no_disponibles` (sin clave configurada) |
@@ -127,6 +127,34 @@ Los `Tramite` de detalle incluyen además `"datos": {…}` y `"formulario": […
 **Plazos (migración 013):** `fecha_limite` se calcula en **días hábiles de Panamá** (lunes a viernes, sin los feriados de la tabla `siget.feriado`), a la misma hora del inicio. Los trámites anteriores conservan su plazo en días calendario. `escalado` es `true` cuando el temporizador de escalamiento detectó el plazo vencido sin resolución; desde ahí lo atiende la supervisión. Ver [`feriados-panama.md`](./feriados-panama.md).
 
 **Evento** — `{id, accion, estado_anterior, estado_nuevo, institucion_id, creado_en, motivo}`; el personal ve además `actor_id` y `atributos`. `motivo` (texto o `null`): el personal ve el de todos los eventos; la ciudadanía **solo** el de los eventos `cambio_estado` hacia `Rechazado`, hacia `En Subsanacion` y de `En Subsanacion` a `En Tramitacion` (el cierre por el personal o su propia respuesta). En los demás cambios de estado el motivo es un comentario interno y le llega `null`. Del resto de `atributos` no ve nada. En los eventos de personal `atributos` puede traer `{motivo}` y `{datos_actualizados: true}` (la respuesta cambió el contenido). Acciones: `creacion`, `cambio_estado`, `reasignacion` y `escalamiento` (lo escribe el sistema: `actor_id` nulo, `atributos: {regla: "plazo_vencido", fecha_limite}`).
+
+## Notificaciones (`/notificaciones/`) — scope `completo` (PT-9, migración 018)
+
+Avisos dentro de la plataforma sobre los trámites de la persona. **Las genera la base de datos** (un disparador sobre `tramite`, en la misma transacción del cambio), no la API: la API solo las lista y las marca como leídas. Cada persona ve **únicamente las suyas** (seguridad por filas); lo ajeno responde `404`, igual que un trámite ajeno. Cada ruta consulta al PDP con la acción `ver_mis_notificaciones` (cualquier cuenta autenticada y activa, sobre las propias, sin segundo factor reciente) y deja la decisión registrada, **salvo las permitidas de la lectura** (`GET /notificaciones/`): es la consulta de fondo de la campana (una por minuto por pestaña) y solo registra las **denegaciones**; marcar como leída y leer todas registran siempre. Además de la seguridad por filas, cada consulta filtra por el `usuario_id` de la persona (segunda barrera). Las respuestas llevan `Cache-Control: no-store`.
+
+| Método y ruta | Cuerpo / parámetros | Respuesta |
+|---|---|---|
+| `GET /notificaciones/` | `?solo_no_leidas=1&limite=1..100&desplazamiento=` | `{resultados: [Notificacion], total, no_leidas, limite, desplazamiento}`, las más recientes primero. `total` cuenta todas las que cumplen el filtro; `no_leidas` cuenta **siempre** todas las no leídas de la persona (para la insignia). `solo_no_leidas` solo admite `1` (`400 filtro_invalido`); la paginación inválida da `400 paginacion_invalida` |
+| `POST /notificaciones/<id>/leida/` | — | `200 {id, leida: true, no_leidas}`. Es idempotente: marcar una ya leída responde igual y no cambia nada. `404` si no existe o es de otra persona |
+| `POST /notificaciones/leer-todas/` | — | `200 {marcadas, no_leidas}`: marca las no leídas de la persona |
+
+**Notificacion** — sin texto libre ni datos personales: el texto lo arma la interfaz según el `tipo`; el motivo y los datos se leen en el detalle del trámite, que ya tiene sus controles.
+
+```json
+{ "id": 12, "tipo": "subsanacion_pedida", "tramite_id": 30,
+  "tramite": {"tipo_tramite": "…", "institucion": "MOP"},   // lo que la persona ya ve del trámite; null si la base ya no se lo muestra
+  "creada_en": "…", "leida": false }
+```
+
+| `tipo` | Se crea cuando | Para quién |
+|---|---|---|
+| `tramite_en_atencion` | `Pendiente → En Tramitacion` | Quien pidió el trámite |
+| `subsanacion_pedida` | `→ En Subsanacion` | Quien pidió el trámite |
+| `tramite_aprobado` / `tramite_rechazado` | `→ Aprobado` / `→ Rechazado` | Quien pidió el trámite |
+| `subsanacion_respondida` | `En Subsanacion → En Tramitacion` **hecho por quien pidió el trámite** (si lo cierra el personal, no) | El funcionario asignado, si hay, **con membresía vigente (funcionario o supervisor) en la institución y la cuenta activa** |
+| `tramite_escalado` | `escalado_en` pasa de nulo a una fecha (`escalar_vencidos()`) | La supervisión de la institución con membresía vigente y la cuenta activa |
+
+Nunca se notifica a quien hizo el cambio. Al personal (asignado y supervisión) solo se le avisa con la cuenta `activa`; a quien **solicitó** el trámite se le avisa siempre, aunque su cuenta esté bloqueada o suspendida (no ve nada mientras tanto y al volver encuentra lo que pasó con su trámite). Ni la API ni la aplicación pueden crear, borrar o desmarcar notificaciones: `app_role` solo tiene `SELECT` y `UPDATE (leida_en)`, y la hora de lectura la pone la base.
 
 ## Catálogo y equipo
 
