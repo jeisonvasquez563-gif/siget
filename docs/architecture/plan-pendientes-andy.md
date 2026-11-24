@@ -130,7 +130,7 @@ Cada tarea es una casilla; al terminarla se marca en el PR. «Evidencia» es lo 
 | ☐ | Comprobar que la plataforma cubre registro, login, restablecimiento, segundo factor y bloqueo | Lista de equivalencias |
 | ☑ | **Respaldo previo** de la base y de `checkpoints/` | Hash del respaldo |
 | ☑ | Comandos listos para Jeison: apagar `php-fpm`/Apache de la app, quitar `/gestion/`, revocar `checkpoint_app`, cerrar el puerto 80 | Runbook |
-| ☑ | Ensayo en 55 de 55 y matriz de Zero Trust con el desvío del HTTP cerrado | Salida y `zero-trust-cobertura.md` | *(hecho el 17-nov: ensayo 101/101, ver runbook 38)*
+| ☑ | Ensayo en 55 de 55 y matriz de Zero Trust con el desvío del HTTP cerrado | Salida y `zero-trust-cobertura.md` *(hecho el 17-nov: ensayo 101/101, ver runbook 38)* |
 
 ### PT-8 · Documentos adjuntos (S7) — P2
 
@@ -140,7 +140,7 @@ Cada tarea es una casilla; al terminarla se marca en el PR. «Evidencia» es lo 
 | ☑ | Almacenamiento cifrado por archivo (AES-GCM); ruta que nunca viene del cliente | Prueba |
 | ☑ | Validación: lista cerrada (PDF, PNG, JPEG), contenido real, máximo 5 MB, nombre saneado | Pruebas con archivos hostiles |
 | ☑ | `POST /tramites/<id>/documentos/` (solo esa vista admite `multipart`) y descarga con `attachment` y `nosniff` | `api.md` y pruebas |
-| ☑ | `verificar_documentos` contra la base real (otro ciudadano recibe 404; el archivo no se lee en claro en disco) | Salida | *(cubierto en `verificar_tramites`)*
+| ☑ | `verificar_documentos` contra la base real (otro ciudadano recibe 404; el archivo no se lee en claro en disco) | Salida *(cubierto en `verificar_tramites`)* |
 | ☑ | Pantalla de carga y listado con accesibilidad; (opcional) análisis con ClamAV | `npm run verificar` |
 
 ### PT-7 · Reemisión de la CA con `keyUsage` (S7) — con ventana acordada
