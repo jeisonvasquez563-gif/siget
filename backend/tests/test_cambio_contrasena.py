@@ -71,7 +71,7 @@ def test_otro_tipo_de_recurso_no_sirve():
 
 def test_la_matriz_la_calcula_para_los_diez_roles():
     M = matriz.construir()
-    assert len(M["acciones"]) == len(Accion) == 27
+    assert len(M["acciones"]) == len(Accion) == 28
     for rol in M["matriz"].values():
         celda = rol["cambiar_contrasena"]
         assert celda["favorable"]["permitido"] and not celda["desfavorable"]["permitido"] and celda["exige_segundo_factor"] is True
@@ -80,7 +80,7 @@ def test_la_matriz_la_calcula_para_los_diez_roles():
 
 
 def test_el_simulador_la_conoce_y_explica_el_resultado():
-    assert len(simulador.meta()["variables"]) == 27
+    assert len(simulador.meta()["variables"]) == 28
     entrada, errores = simulador.normalizar({"rol": "auditor", "accion": "cambiar_contrasena", "segundo_factor": "vencido"})
     assert errores == []
     r = simulador.simular(entrada, AHORA)

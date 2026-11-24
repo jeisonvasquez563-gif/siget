@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "apps.catalogo",
     "apps.identidad",
     "apps.tramites",
+    "apps.notificaciones",
     "apps.auditoria",
     "apps.autorizacion",
     "apps.autenticacion",

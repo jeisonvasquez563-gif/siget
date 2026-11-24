@@ -47,6 +47,7 @@ class Accion(str, Enum):
     CONSULTAR_SOLICITUDES_DATOS = "consultar_solicitudes_datos"
     RESPONDER_SOLICITUD_DATOS = "responder_solicitud_datos"
     CAMBIAR_CONTRASENA = "cambiar_contrasena"
+    VER_MIS_NOTIFICACIONES = "ver_mis_notificaciones"
 
 
 # Transiciones válidas de un trámite (espejo de siget.transicion en la base, que es la autoridad).
@@ -235,6 +236,13 @@ def _titular_de_su_cuenta(s, a, r, e):
         return Decision(True, "titular_cambia_su_contrasena")
 
 
+def _titular_de_sus_notificaciones(s, a, r, e):
+    """Leer y marcar las propias notificaciones: cualquier cuenta autenticada y activa (incluidas las de plataforma, que es SU cuenta) y
+    solo las suyas. No exige segundo factor reciente: son avisos de lectura, y el detalle de cada trámite tiene sus propios controles."""
+    if a == Accion.VER_MIS_NOTIFICACIONES and r.tipo == "notificacion" and r.solicitante_id == s.id:
+        return Decision(True, "titular_ve_sus_notificaciones")
+
+
 _ACCIONES_POR_ROL_PLATAFORMA = {
     "operador_infraestructura": {Accion.ADMINISTRAR_INFRAESTRUCTURA},
     "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA, Accion.EMITIR_INVITACION,
@@ -261,7 +269,7 @@ def _auditor(s, a, r, e):
         return Decision(True, "auditor_consulta")
 
 
-PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _titular_de_sus_datos, _titular_de_su_cuenta, _operadores, _auditor]
+PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _titular_de_sus_datos, _titular_de_su_cuenta, _titular_de_sus_notificaciones, _operadores, _auditor]
 
 
 # ----------------------------------------------------------------------------- decisión
