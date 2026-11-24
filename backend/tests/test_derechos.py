@@ -378,7 +378,7 @@ def celda(rol, accion, caso="favorable"):
 def test_la_matriz_muestra_las_acciones_nuevas_calculadas_por_el_pdp():
     ids = {a["id"] for a in M["acciones"]}
     assert {"ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"} <= ids
-    assert len(M["acciones"]) == len(Accion) == 25
+    assert len(M["acciones"]) == len(Accion) == 26
     assert all(next(a for a in M["acciones"] if a["id"] == i)["grupo"] == "Datos personales" for i in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos"))
     assert next(a for a in M["acciones"] if a["id"] == "corregir_mis_datos")["grupo"] == "Datos personales"
 
@@ -422,7 +422,7 @@ def test_el_simulador_conoce_las_acciones_nuevas():
     meta = simulador.meta()
     for accion in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"):
         assert accion in meta["variables"]
-    assert len(meta["variables"]) == 25
+    assert len(meta["variables"]) == 26
     for accion in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos"):
         assert "perfil_de" in meta["variables"][accion]
     assert "perfil_de" in meta["variables"]["corregir_mis_datos"] and "perfil_de" in meta["valores"] and "perfil_de" in meta["defectos"]

@@ -23,6 +23,7 @@ from apps.autorizacion import permisos
 from apps.autenticacion.models import Sesion
 from apps.catalogo.models import Institucion, TipoTramite
 from apps.identidad.models import Membresia, Usuario
+from apps.tramites.formulario import datos_de_ejemplo
 
 PALABRAS = ["rio", "cobre", "faro", "canal", "ceiba", "tucan", "isla", "puente", "bahia", "selva", "cerro", "nube",
             "roble", "ancla", "brisa", "coral", "duna", "estero", "fuerte", "garza", "hamaca", "iguana", "jade",
@@ -115,13 +116,13 @@ class Command(BaseCommand):
 
     def _crear(self, usuario, institucion):
         tipo = TipoTramite.objects.filter(institucion__nombre=institucion).order_by("id").first()
-        r = self._http("post", "/tramites/", usuario, {"tipo_tramite": tipo.pk})
+        r = self._http("post", "/tramites/", usuario, {"tipo_tramite": tipo.pk, "datos": datos_de_ejemplo(tipo.formulario)})
         if not (r.status_code == 201):
             raise CommandError(f"respuesta inesperada de la API: {usuario, r.status_code, r.content[:200]}")
         return r.json()["id"]
 
-    def _estado(self, usuario, tramite, estado):
-        r = self._http("post", f"/tramites/{tramite}/estado/", usuario, {"estado": estado})
+    def _estado(self, usuario, tramite, estado, motivo=None):
+        r = self._http("post", f"/tramites/{tramite}/estado/", usuario, {"estado": estado, **({"motivo": motivo} if motivo else {})})
         if not (r.status_code == 200):
             raise CommandError(f"respuesta inesperada de la API: {usuario, tramite, estado, r.status_code, r.content[:200]}")
 
@@ -143,6 +144,6 @@ class Command(BaseCommand):
         self._estado(saul, t1, "Aprobado")
         self._estado(fabio, t3, "En Tramitacion")
         self._asignar(saul, t3, flor)
-        self._estado(flor, t3, "En Subsanacion")
+        self._estado(flor, t3, "En Subsanacion", "Falta el plano firmado del terreno; adjúntalo para continuar.")
         self._estado(felix, t2, "En Tramitacion")
         self.stdout.write(f"# trámites de ejemplo: {t1} aprobado, {t2} en tramitación (MINSA), {t3} en subsanación, {t4} y {t5} pendientes")

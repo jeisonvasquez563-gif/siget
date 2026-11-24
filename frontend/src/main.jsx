@@ -14,6 +14,7 @@ import './estilos/plataforma.css'
 import './estilos/seguimiento.css'
 import './estilos/mapa.css'
 import './estilos/derechos.css'
+import './estilos/contenido.css'
 import App from './App.jsx'
 import { ProveedorUI } from './ui.jsx'
 

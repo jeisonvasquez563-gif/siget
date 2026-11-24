@@ -21,6 +21,8 @@ class TipoTramite(ModeloDeEsquema):
     nombre = models.TextField()
     sla_dias = models.IntegerField()
     audiencia = models.TextField(default="ciudadania")  # ciudadania | institucion | ambas
+    # Datos que pide el trámite (migración 017): lista de campos; la validación está en apps/tramites/formulario.py
+    formulario = models.JSONField(default=list)
 
     class Meta(ModeloDeEsquema.Meta):
         db_table = "tipo_tramite"

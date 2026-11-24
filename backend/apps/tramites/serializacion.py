@@ -73,7 +73,7 @@ def _iso(valor):
     return valor.isoformat() if valor is not None else None
 
 
-def tramite_a_dict(tramite, personal, ahora):
+def tramite_a_dict(tramite, personal, ahora, detalle=False):
     datos = {
         "id": tramite.pk,
         "tipo_tramite": {"id": tramite.tipo_tramite_id, "nombre": tramite.tipo_tramite.nombre},
@@ -89,13 +89,34 @@ def tramite_a_dict(tramite, personal, ahora):
                      sensibilidad=tramite.sensibilidad, escalado_en=_iso(tramite.escalado_en))
     else:
         datos["asignado"] = tramite.funcionario_asignado_id is not None  # quién, no: es dato del personal
+    if detalle:  # el listado no lleva el contenido (pesa): solo el detalle y la exportación
+        datos["datos"] = tramite.datos
+        datos["formulario"] = tramite.tipo_tramite.formulario
     return datos
+
+
+def _motivo_de(atributos):
+    motivo = atributos.get("motivo") if isinstance(atributos, dict) else None
+    return motivo if isinstance(motivo, str) else None
+
+
+def _motivo_para_la_persona(evento):
+    """La persona que pidió el trámite lee el motivo solo cuando es para ella: al rechazarlo, al pedirle una subsanación, y al cerrarla
+    (la respuesta de ella misma o el cierre del personal, ambos En Subsanacion -> En Tramitacion). El resto de los motivos son
+    comentarios internos del personal (y texto libre que podría llevar datos de terceros): no se le muestran."""
+    if evento.accion != "cambio_estado":
+        return None
+    destino_para_ella = evento.estado_nuevo in {"Rechazado", "En Subsanacion"}
+    cierre_de_subsanacion = evento.estado_anterior == "En Subsanacion" and evento.estado_nuevo == "En Tramitacion"
+    return _motivo_de(evento.atributos) if destino_para_ella or cierre_de_subsanacion else None
 
 
 def evento_a_dict(evento, personal):
     datos = {
         "id": evento.pk, "accion": evento.accion, "estado_anterior": evento.estado_anterior,
         "estado_nuevo": evento.estado_nuevo, "institucion_id": evento.institucion_id, "creado_en": _iso(evento.creado_en),
+        # Del resto de `atributos` solo se ve el motivo (el personal, todos; la persona, los de las transiciones que le conciernen)
+        "motivo": _motivo_de(evento.atributos) if personal else _motivo_para_la_persona(evento),
     }
     if personal:
         datos.update(actor_id=evento.actor_id, atributos=evento.atributos)

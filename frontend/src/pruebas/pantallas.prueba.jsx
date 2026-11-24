@@ -166,7 +166,7 @@ describe('acciones sobre un trámite', () => {
     const { user } = await abrirComo('fabio.mop')
     await abrirTramite(user, 44)
     await user.click(screen.getByRole('button', { name: 'Rechazar' }))
-    const pregunta = await screen.findByRole('alertdialog', { name: /Rechazar este trámite/ })
+    const pregunta = await screen.findByRole('dialog', { name: /Rechazar este trámite/ })   // pide el motivo (ver contenido.prueba.jsx)
     expect(pregunta).toHaveTextContent(/estado final/)
     await user.click(within(pregunta).getByRole('button', { name: 'Cancelar' }))
     expect(screen.getByRole('img', { name: /En tramitación/ })).toBeInTheDocument() // no cambió
@@ -211,6 +211,7 @@ describe('acciones sobre un trámite', () => {
     await irA(user, 'Iniciar un trámite')
     await user.click(await screen.findByRole('radio', { name: /^MINSA/ }))
     await user.click(await screen.findByRole('radio', { name: /Solicitud interinstitucional/ }))
+    await user.type(await screen.findByRole('textbox', { name: 'Información solicitada' }), 'Padrón de contribuyentes de la zona norte')
     await user.click(screen.getByRole('button', { name: 'Iniciar trámite' }))
     expect(await screen.findByRole('img', { name: 'Recorrido del trámite: Recepción' })).toBeInTheDocument()
     // Un trámite «Pendiente» solo tiene la acción «Pasar a tramitación»: debe faltar (no vale mirar «Aprobar», que no aparece en ese estado)

@@ -126,7 +126,7 @@ def exportar(usuario, con_tramites, ahora=None) -> dict:
         eventos = {}
         for e in EventoAuditoria.objects.filter(tramite_id__in=[t.pk for t in filas]).order_by("id"):
             eventos.setdefault(e.tramite_id, []).append(evento_a_dict(e, False))
-        tramites = [{**tramite_a_dict(t, False, ahora), "historial": eventos.get(t.pk, [])} for t in filas]
+        tramites = [{**tramite_a_dict(t, False, ahora, detalle=True), "historial": eventos.get(t.pk, [])} for t in filas]
     actividad = EventoSeguridad.objects.filter(actor_id=usuario.pk).order_by("-id").values("evento", "creado_en", "ip")[:LIMITE_EVENTOS_EXPORTADOS]
     return {
         "formato": "siget-mis-datos/1", "generado_en": _iso(ahora),

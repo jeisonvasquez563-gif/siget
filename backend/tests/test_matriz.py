@@ -39,7 +39,7 @@ def test_la_prueba_detecta_un_superusuario_si_alguien_lo_introdujera(monkeypatch
 
 @pytest.mark.parametrize("rol", [r[0] for r in matriz.ROLES[4:]])
 def test_un_rol_de_plataforma_nunca_toca_tramites_ni_documentos(rol):
-    for a in (Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Accion.REASIGNAR_TRAMITE, Accion.ESCALAR_TRAMITE, Accion.ADJUNTAR_DOCUMENTO, Accion.VER_DOCUMENTO):
+    for a in (Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Accion.REASIGNAR_TRAMITE, Accion.ESCALAR_TRAMITE, Accion.ADJUNTAR_DOCUMENTO, Accion.RESPONDER_SUBSANACION, Accion.VER_DOCUMENTO):
         for caso in ("favorable", "desfavorable"):
             c = celda(rol, a, caso)
             assert c["permitido"] is False and c["politica"] == "plataforma_sin_acceso_a_tramites", (rol, a, caso, c)
@@ -161,3 +161,15 @@ def test_el_personal_inicia_en_otra_institucion_y_no_en_la_suya():
         assert celda(rol, Accion.CREAR_TRAMITE)["permitido"] is True, rol
         c = celda(rol, Accion.CREAR_TRAMITE, "desfavorable")
         assert c["permitido"] is False and c["politica"] == "personal_no_inicia_en_su_institucion", (rol, c)
+
+
+def test_solo_la_ciudadania_responde_una_subsanacion_y_sin_segundo_factor_reciente():
+    assert celda("ciudadano", Accion.RESPONDER_SUBSANACION)["politica"] == "solicitante_responde_subsanacion"
+    assert celda("ciudadano", Accion.RESPONDER_SUBSANACION, "desfavorable")["permitido"] is False
+    assert M["matriz"]["ciudadano"]["responder_subsanacion"]["exige_segundo_factor"] is False
+    # El personal solo por la vía de la ciudadanía: su propio trámite, en OTRA institución; un trámite ajeno sigue negado
+    for rol in ("funcionario", "supervisor", "coordinador_institucional"):
+        assert celda(rol, Accion.RESPONDER_SUBSANACION)["politica"] == "solicitante_responde_subsanacion", rol
+        assert celda(rol, Accion.RESPONDER_SUBSANACION, "desfavorable")["permitido"] is False, rol
+    for rol in ("operador_infraestructura", "auditor"):
+        assert celda(rol, Accion.RESPONDER_SUBSANACION)["permitido"] is False, rol

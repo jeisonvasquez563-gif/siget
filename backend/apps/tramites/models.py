@@ -27,6 +27,8 @@ class Tramite(ModeloDeEsquema):
     fecha_limite = models.DateTimeField(null=True, blank=True)
     # Lo marca solo la función siget.escalar_vencidos() de la base (la aplicación no puede escribir esta columna)
     escalado_en = models.DateTimeField(null=True, blank=True)
+    # Lo que la persona respondió al formulario del tipo (migración 017). Solo cambia al responder una subsanación: la base lo impone
+    datos = models.JSONField(default=dict)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta(ModeloDeEsquema.Meta):

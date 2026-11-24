@@ -45,6 +45,23 @@ def titulo(t):
     print(f"\n== {t}")
 
 
+def datos_para(tipo, **cambios):
+    """Un contenido válido para el formulario que publica el catálogo (`tipo["formulario"]`): los campos obligatorios con valores de prueba."""
+    datos = {}
+    for campo in tipo["formulario"]:
+        if not campo["obligatorio"]:
+            continue
+        if campo["tipo"] in ("texto", "texto_largo"):
+            datos[campo["id"]] = ("Ensayo: " + campo["etiqueta"])[: campo.get("max", 200)]
+        elif campo["tipo"] == "numero":
+            datos[campo["id"]] = min(10, campo.get("max", 10))
+        elif campo["tipo"] == "fecha":
+            datos[campo["id"]] = "2026-01-15"
+        else:
+            datos[campo["id"]] = campo["opciones"][0]
+    return {**datos, **cambios}
+
+
 class Sesion:
     def __init__(self, usuario):
         self.usuario = usuario
@@ -161,8 +178,10 @@ _, instituciones = ana.pedir("GET", "/catalogo/instituciones/")
 mop = next(i["id"] for i in instituciones if i["nombre"] == "MOP")
 minsa = next(i["id"] for i in instituciones if i["nombre"] == "MINSA")
 _, tipos = ana.pedir("GET", f"/catalogo/tipos-tramite/?institucion={mop}")
-e, nuevo = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"]})
-paso(e == 201 and nuevo["estado"] == "Pendiente", "inicia un trámite del MOP", f"#{nuevo.get('id')}")
+e, nuevo = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0])})
+paso(e == 201 and nuevo["estado"] == "Pendiente" and nuevo["datos"] == datos_para(tipos[0]), "inicia un trámite del MOP con los datos de su formulario", f"#{nuevo.get('id')}")
+e, malo = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": {}})
+paso(e == 400 and (malo or {}).get("errores"), "sin los datos obligatorios del formulario se rechaza (400, dice qué campo falta)", e)
 tramite = nuevo["id"]
 e, h = ana.pedir("GET", f"/tramites/{tramite}/historial/")
 paso(e == 200 and [x["accion"] for x in h["eventos"]] == ["creacion"] and "actor_id" not in h["eventos"][0], "el historial muestra la creación y no revela quién actuó")
@@ -195,7 +214,7 @@ e, _ = fabio.pedir("POST", "/tramites/", {"tipo_tramite": tipos_mop[0]["id"]})
 paso(e == 403, "no puede iniciar un trámite en su propia institución (el MOP no se hace trámites a sí mismo)", e)
 _, tipos_minsa = fabio.pedir("GET", f"/catalogo/tipos-tramite/?institucion={minsa}")
 inter = next(t for t in tipos_minsa if t["audiencia"] == "institucion")
-e, solicitud = fabio.pedir("POST", "/tramites/", {"tipo_tramite": inter["id"]})
+e, solicitud = fabio.pedir("POST", "/tramites/", {"tipo_tramite": inter["id"], "datos": datos_para(inter)})
 paso(e == 201, "sí puede iniciar una solicitud interinstitucional hacia el MINSA", e)
 e, _ = fabio.pedir("POST", f"/tramites/{solicitud['id']}/estado/", {"estado": "En Tramitacion"})
 paso(e in (403, 404), "pero no la gestiona: la atiende el personal del MINSA", e)
@@ -214,13 +233,40 @@ paso(e == 200, "entra", e)
 _, eq = saul.pedir("GET", "/equipo/")
 personal = {p["usuario"]: p["usuario_id"] for p in eq["equipos"][0]["personal"]}
 paso({"fabio.mop", "flor.mop", "saul.mop", "carla.mop"} <= set(personal), "ve al equipo del MOP", sorted(personal))
-_, t2 = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"]})
+_, t2 = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0])})
 e, r = saul.pedir("POST", f"/tramites/{t2['id']}/reasignar/", {"funcionario_id": personal["flor.mop"]})
 paso(e == 200 and r["funcionario_asignado_id"] == personal["flor.mop"], "reasigna un trámite a Flor", e)
 e, _ = fabio.pedir("POST", f"/tramites/{t2['id']}/reasignar/", {"funcionario_id": personal["fabio.mop"]})
 paso(e == 403, "un funcionario no puede reasignar (403)", e)
 e, _ = fabio.pedir("POST", f"/tramites/{t2['id']}/estado/", {"estado": "En Tramitacion"})
 paso(e == 403, "Fabio no mueve lo asignado a Flor (403)", e)
+
+# --------------------------------------------------------------------------- 3b. subsanación
+titulo("3b. Subsanación: Ana crea con datos, Fabio pide corregir con un motivo, Ana responde y Fabio aprueba")
+e, sub_t = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0], asunto="Ensayo: falta un documento")})
+paso(e == 201 and sub_t["datos"]["asunto"] == "Ensayo: falta un documento", "Ana crea un trámite con sus datos", f"#{sub_t.get('id')}")
+st = sub_t["id"]
+e, _ = fabio.pedir("POST", f"/tramites/{st}/estado/", {"estado": "En Tramitacion"})
+paso(e == 200, "Fabio lo pasa a «En tramitación»", e)
+e, r = fabio.pedir("POST", f"/tramites/{st}/estado/", {"estado": "En Subsanacion"})
+paso(e == 400 and (r or {}).get("codigo") == "motivo_obligatorio", "pedir una subsanación sin motivo se rechaza (400)", e)
+e, r = fabio.pedir("POST", f"/tramites/{st}/estado/", {"estado": "En Subsanacion", "motivo": "Falta el plano firmado; adjúntalo y corrige el asunto."})
+paso(e == 200 and r["estado"] == "En Subsanacion", "con motivo, lo pasa a «En subsanación»", e)
+e, h = ana.pedir("GET", f"/tramites/{st}/historial/")
+paso(e == 200 and h["eventos"][-1]["motivo"] == "Falta el plano firmado; adjúntalo y corrige el asunto." and "actor_id" not in h["eventos"][-1] and "atributos" not in h["eventos"][-1],
+     "Ana ve el motivo en su historial (sin saber quién actuó)")
+e, _ = ana.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "corta"})
+paso(e == 400, "una respuesta demasiado corta se rechaza (400)", e)
+e, _ = fabio.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "Respondo yo por la persona, que no corresponde."})
+paso(e == 403, "el funcionario no responde por la persona (403)", e)
+e, r = ana.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "Adjunto el plano y corrijo el asunto.", "datos": datos_para(tipos[0], asunto="Ensayo: documento completo")})
+paso(e == 200 and r["estado"] == "En Tramitacion" and r["datos"]["asunto"] == "Ensayo: documento completo", "Ana responde: vuelve a «En tramitación» con los datos corregidos", e)
+e, r = fabio.pedir("POST", f"/tramites/{st}/estado/", {"estado": "Aprobado"})
+paso(e == 200 and r["estado"] == "Aprobado", "Fabio lo aprueba", e)
+e, h = fabio.pedir("GET", f"/tramites/{st}/historial/")
+paso(e == 200 and [x["accion"] for x in h["eventos"]] == ["creacion", "cambio_estado", "cambio_estado", "cambio_estado", "cambio_estado"]
+     and h["eventos"][-2]["motivo"] == "Adjunto el plano y corrijo el asunto." and h["eventos"][-2]["actor_id"] != h["eventos"][-3]["actor_id"],
+     "el historial guarda cada paso, con la respuesta de Ana como motivo y quién actuó")
 
 # --------------------------------------------------------------------------- 4. otra institución y coordinación
 titulo("4. Félix (MINSA) y Carla (coordinadora)")
@@ -387,5 +433,5 @@ paso(e == 401 and sin_filtrar["codigo"] == "credenciales_invalidas" and "acceso_
 
 malos = resultados.count(False)
 print(f"\nENSAYO: {len(resultados) - malos} de {len(resultados)} comprobaciones correctas" + ("" if not malos else f"  ← {malos} FALLARON"))
-print(f"Se creó el trámite #{tramite} (aprobado) y el #{t2['id']} (asignado a Flor) durante el ensayo; la solicitud interinstitucional #{solicitud['id']} es de Fabio.")
+print(f"Se creó el trámite #{tramite} (aprobado), el #{st} (con subsanación, aprobado) y el #{t2['id']} (asignado a Flor) durante el ensayo; la solicitud interinstitucional #{solicitud['id']} es de Fabio.")
 sys.exit(1 if malos else 0)
