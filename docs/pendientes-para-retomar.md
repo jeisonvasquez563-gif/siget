@@ -26,7 +26,7 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 | Pendiente | Impacto | Esfuerzo |
 |---|---|---|
 | ~~El trámite no tiene contenido~~ **HECHO el 24-nov** (PR #22 y #23, runbook 40.9): formulario por tipo, motivo obligatorio en la base y respuesta de la ciudadanía a la subsanación; ensayo 112/112 | — | — |
-| Notificaciones dentro de la plataforma (PT-9) | Medio | 2–3 días |
+| ~~Notificaciones dentro de la plataforma (PT-9)~~ **HECHO el 24-nov** (PR #27 y #28, runbook 42.9; ensayo 113/113) | — | — |
 | ~~Cambio de contraseña desde la sesión~~ **HECHO el 24-nov** (PR #25 y #26, runbook 41.6) | — | — |
 | Gestión de los tipos de trámite por institución: la acción del PDP existe, la ruta no | Medio | 2–3 días |
 | Catálogo de demostración más rico (hoy 6 instituciones y 6 trámites) | Medio | 1 día |
@@ -86,7 +86,7 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 5. ~~Corregir la documentación desactualizada~~ (hecho el 24-nov, PR #24).
 
 **Semana 2**
-1. Notificaciones y gestión del catálogo.
+1. ~~Notificaciones~~ (hecho el 24-nov) y gestión del catálogo.
 2. Alertas (PT-10).
 3. Playwright y contraste.
 4. Aviso si falla el escalamiento.
