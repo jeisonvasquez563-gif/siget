@@ -320,6 +320,64 @@ class Command(BaseCommand):
         ev = eventos(tc)[0]
         self._paso("el evento de creación no lleva motivo", ev.accion == "creacion" and "motivo" not in ev.atributos)
 
+        # ---------------------------------------------------------------- el motivo no se arrastra por un UPDATE que no toca el estado (D1)
+        th = crear_en("En Tramitacion")
+
+        def reasignar_y_rechazar():
+            Tramite.objects.filter(pk=th).update(funcionario_asignado_id=super_mop.pk)  # un UPDATE sin `estado`: no debe dejar el motivo puesto
+            Tramite.objects.filter(pk=th).update(estado="Rechazado")  # sin motivo propio: la base debe rechazarlo
+        error, _ = self._bd(func_mop, [mop.pk], reasignar_y_rechazar, "Motivo suficientemente largo.")
+        self._paso("un UPDATE que no toca el estado (reasignación) no deja el motivo puesto: el rechazo siguiente de la transacción lo exige de nuevo",
+                   self._dice(error, "motivo") and tramite(th).estado == "En Tramitacion", str(error)[:90])
+
+        # ---------------------------------------------------------------- un motivo sin contenido real ni caracteres de control (D2)
+        fallas = []
+        for nombre, motivo in (("10 espacios duros (U+00A0)", "\u00a0" * 10), ("10 espacios ideográficos (U+3000)", "\u3000" * 10),
+                               ("10 espacios de ancho cero (U+200B)", "\u200b" * 10), ("10 tabulaciones verticales", "\x0b" * 10),
+                               ("10 saltos de página", "\x0c" * 10), ("10 signos sin letras ni números", "?" * 10)):
+            error, _ = self._bd(func_mop, [mop.pk], lambda: Tramite.objects.filter(pk=th).update(estado="Rechazado"), motivo)
+            if not self._dice(error, "motivo"):
+                fallas.append(nombre)
+        self._paso("la base rechaza un motivo de 10 caracteres sin ninguna letra ni número (espacios duros, ideográficos, de ancho cero, \v, \f, signos)", not fallas, fallas)
+        error, _ = self._bd(func_mop, [mop.pk], lambda: Tramite.objects.filter(pk=th).update(estado="Rechazado"), "Plano incompleto\x0b" + "x" * 10)
+        self._paso("y un motivo con letras pero con un carácter de control (\v)", self._dice(error, "control"), str(error)[:90])
+        error, filas = self._bd(func_mop, [mop.pk], lambda: Tramite.objects.filter(pk=th).update(estado="Rechazado"), "Plano incompleto,\n\tfalta la firma.")
+        self._paso("pero un motivo de varias líneas (salto de línea y tabulación) con letras sí pasa", error is None and filas == 1 and tramite(th).estado == "Rechazado", str(error)[:90])
+
+        # ---------------------------------------------------------------- conflicto de interés sobrevenido (D3)
+        # Una persona que pidió un trámite y DESPUÉS recibe membresía en la institución del trámite: la 012 solo lo impide al crearlo.
+        conflicto = self._persona("conflicto")
+        t_conflicto = self._token(conflicto)
+        hc = lambda metodo, ruta, datos=None: self._http(metodo, ruta, t_conflicto, datos)  # noqa: E731
+        r = hc("post", "/tramites/", {"tipo_tramite": tipo_mop.pk, "datos": datos_de_ejemplo(tipo_mop.formulario)})
+        tx = r.json()["id"]
+        h("post", f"/tramites/{tx}/estado/", func_mop, {"estado": "En Tramitacion"})  # En Tramitacion: la persona intentará decidirlo
+        r = hc("post", "/tramites/", {"tipo_tramite": tipo_mop.pk, "datos": datos_de_ejemplo(tipo_mop.formulario)})
+        ty = r.json()["id"]
+        h("post", f"/tramites/{ty}/estado/", func_mop, {"estado": "En Tramitacion"})
+        h("post", f"/tramites/{ty}/estado/", func_mop, {"estado": "En Subsanacion", "motivo": "Falta el plano firmado del terreno."})  # En Subsanacion
+        Membresia.objects.create(usuario=conflicto, institucion=mop, rol="funcionario", asignado_por=super_mop)
+        Usuario.objects.filter(pk=conflicto.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=1))
+        como_personal = lambda accion, motivo="Motivo suficientemente largo.": self._bd(conflicto, [mop.pk], accion, motivo)  # noqa: E731
+        for destino in ("Aprobado", "Rechazado"):
+            error, filas = como_personal(lambda: Tramite.objects.filter(pk=tx).update(estado=destino))
+            self._paso(f"quien pidió el trámite y luego recibió membresía no puede pasarlo a {destino} (la base aplica las reglas del solicitante)",
+                       self._dice(error, "solo puede responder") and tramite(tx).estado == "En Tramitacion", str(error)[:90])
+        error, filas = como_personal(lambda: Tramite.objects.filter(pk=tx).update(funcionario_asignado_id=func_mop.pk, estado="Aprobado"))
+        self._paso("ni asignárselo a alguien al decidirlo", self._dice(error, "solo puede responder") and tramite(tx).funcionario_asignado_id is None)
+        error, _ = como_personal(lambda: Tramite.objects.filter(pk=ty).update(estado="En Tramitacion", funcionario_asignado_id=func_mop.pk))
+        self._paso("ni al cerrar su subsanación elegir quién atiende el trámite", self._dice(error, "solo puede responder") and tramite(ty).estado == "En Subsanacion")
+        error, _ = como_personal(lambda: Tramite.objects.filter(pk=tx).update(datos={"asunto": "Reescrito por el solicitante con membresía"}))
+        self._paso("ni reescribir el contenido fuera de una subsanación", error is not None and tramite(tx).datos == datos_de_ejemplo(tipo_mop.formulario))
+        self._paso("tampoco por la API: decidir su propio trámite da 403 (conflicto de interés)",
+                   hc("post", f"/tramites/{tx}/estado/", {"estado": "Aprobado"}).status_code == 403)
+        r = hc("post", f"/tramites/{ty}/subsanacion/", {"respuesta": "Adjunto el plano firmado del terreno."})
+        self._paso("lo único que puede hacer es responder la subsanación (En Subsanacion -> En Tramitacion)",
+                   r.status_code == 200 and r.json()["estado"] == "En Tramitacion" and tramite(ty).estado == "En Tramitacion", r.status_code)
+        # El personal que NO es el solicitante sigue reasignando con normalidad
+        error, filas = self._bd(func_mop, [mop.pk], lambda: Tramite.objects.filter(pk=tx).update(funcionario_asignado_id=super_mop.pk))
+        self._paso("y la reasignación por el personal (que no es el solicitante) sigue funcionando", error is None and filas == 1 and tramite(tx).funcionario_asignado_id == super_mop.pk, str(error)[:90])
+
     def _recorrer(self):
         mop = Institucion.objects.get(nombre="MOP")
         minsa = Institucion.objects.get(nombre="MINSA")
@@ -330,11 +388,11 @@ class Command(BaseCommand):
 
         coord = self._persona("coord")
         ana, beto = self._persona("ana"), self._persona("beto")
-        func_mop, func2_mop, super_mop, func_minsa = (self._persona(n) for n in ("func_mop", "func2_mop", "super_mop", "func_minsa"))
+        func_mop, super_mop, super_mop, func_minsa = (self._persona(n) for n in ("func_mop", "super_mop", "super_mop", "func_minsa"))
         operador = self._persona("operador", rol_plataforma="operador_infraestructura")
-        for u, inst, rol in ((func_mop, mop, "funcionario"), (func2_mop, mop, "funcionario"), (super_mop, mop, "supervisor"), (func_minsa, minsa, "funcionario")):
+        for u, inst, rol in ((func_mop, mop, "funcionario"), (super_mop, mop, "funcionario"), (super_mop, mop, "supervisor"), (func_minsa, minsa, "funcionario")):
             Membresia.objects.create(usuario=u, institucion=inst, rol=rol, asignado_por=coord)
-        t = {u.username: self._token(u) for u in (ana, beto, func_mop, func2_mop, super_mop, func_minsa, operador)}
+        t = {u.username: self._token(u) for u in (ana, beto, func_mop, super_mop, super_mop, func_minsa, operador)}
         tok = lambda u: t[u.username]  # noqa: E731
 
         def cuantos(persona):
@@ -510,7 +568,7 @@ class Command(BaseCommand):
         self._paso("la ciudadanía no inicia solicitudes interinstitucionales", r.status_code == 403)
 
         # ---------------------------------------------------------------- reasignación
-        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(func_mop), {"funcionario_id": func2_mop.pk})
+        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(func_mop), {"funcionario_id": super_mop.pk})
         self._paso("un funcionario no puede reasignar (solo el supervisor)", r.status_code == 403)
         for malo in ({"funcionario_id": func_minsa.pk}, {"funcionario_id": ana.pk}, {"funcionario_id": "x"}, {}):
             if self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(super_mop), malo).status_code != 400:
@@ -518,8 +576,8 @@ class Command(BaseCommand):
                 break
         else:
             self._paso("reasignar a otra institución, al solicitante o con datos inválidos se rechaza con 400", True)
-        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(super_mop), {"funcionario_id": func2_mop.pk})
-        self._paso("el supervisor reasigna a personal de su institución", r.status_code == 200 and r.json()["funcionario_asignado_id"] == func2_mop.pk, r.status_code)
+        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(super_mop), {"funcionario_id": super_mop.pk})
+        self._paso("el supervisor reasigna a personal de su institución", r.status_code == 200 and r.json()["funcionario_asignado_id"] == super_mop.pk, r.status_code)
         r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), {"estado": "Aprobado"})
         self._paso("un funcionario no mueve un trámite asignado a otro", r.status_code == 403)
         Usuario.objects.filter(pk=super_mop.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=1))

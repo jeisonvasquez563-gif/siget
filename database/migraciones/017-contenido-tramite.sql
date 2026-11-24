@@ -16,11 +16,13 @@
 --   valor al terminar el UPDATE, para que no se arrastre a otro cambio de la misma transaccion.
 -- * `datos` solo cambia cuando la PERSONA SOLICITANTE responde una subsanacion (En Subsanacion -> En Tramitacion en el mismo UPDATE).
 -- * La ciudadania responde la subsanacion: nueva politica RLS de UPDATE sobre tramite para el solicitante, solo sobre filas «En
---   Subsanacion» y que queden «En Tramitacion». Un disparador la acota aun mas: quien actualiza como solicitante (y no es personal
---   de la institucion) solo puede hacer exactamente ese paso y sin tocar a quien atiende el tramite.
+--   Subsanacion» y que queden «En Tramitacion». Un disparador la acota aun mas: quien actualiza como solicitante (tenga o no
+--   membresia en la institucion del tramite) solo puede hacer exactamente ese paso y sin tocar a quien atiende el tramite.
 -- * No se concede nada a escalador_role, auditor_role, pgadmin_lectura ni checkpoint_app. Nota: pgadmin_lectura (009) tiene SELECT
 --   de tabla sobre tramite, pero la seguridad por filas no le abre ninguna fila (las politicas son solo de app_role), asi que no lee
---   `datos`; auditor_role lee evento_auditoria completo, pero la API de auditoria no expone `atributos`.
+--   `datos`; auditor_role lee evento_auditoria completo (incluido
+--   atributos.motivo, texto libre que puede llevar datos personales: riesgo aceptado, runbook 40), pero la API de auditoria no
+--   expone `atributos`.
 -- ============================================================================
 BEGIN;
 SET LOCAL ROLE siget_owner;
@@ -77,8 +79,10 @@ GRANT UPDATE (datos) ON siget.tramite TO app_role;
 -- ---------------------------------------------------------------------------
 -- 3. Motivo de las transiciones (lo fija la aplicacion con set_config('siget.motivo', ..., true))
 -- ---------------------------------------------------------------------------
--- Pasar a Rechazado o a En Subsanacion, o cerrar una subsanacion, exige motivo (10 a 2000 caracteres). Cualquier motivo, si viene,
--- no supera los 2000. Sigue siendo invoker: lee siget.transicion con los permisos de quien actualiza.
+-- Pasar a Rechazado o a En Subsanacion, o cerrar una subsanacion, exige motivo (10 a 2000 caracteres, con al menos un caracter
+-- alfanumerico: diez espacios duros, U+3000 o U+200B no valen). Cualquier motivo, si viene, no supera los 2000 y no lleva caracteres
+-- de control (C0 y C1) salvo el salto de linea y la tabulacion, que se admiten porque el texto es libre y de varias lineas.
+-- Sigue siendo invoker: lee siget.transicion con los permisos de quien actualiza.
 CREATE OR REPLACE FUNCTION siget.validar_transicion() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   v_motivo text := nullif(btrim(current_setting('siget.motivo', true), E' \t\r\n'), '');
@@ -90,9 +94,12 @@ BEGIN
     IF v_motivo IS NOT NULL AND char_length(v_motivo) > 2000 THEN
       RAISE EXCEPTION 'El motivo de la transicion no puede superar los 2000 caracteres';
     END IF;
+    IF v_motivo IS NOT NULL AND v_motivo ~ '[\x01-\x08\x0b-\x1f\x7f-\x9f]' THEN
+      RAISE EXCEPTION 'El motivo de la transicion no puede llevar caracteres de control';
+    END IF;
     IF (NEW.estado IN ('Rechazado', 'En Subsanacion') OR OLD.estado = 'En Subsanacion')
-       AND (v_motivo IS NULL OR char_length(v_motivo) < 10) THEN
-      RAISE EXCEPTION 'La transicion % -> % exige un motivo de al menos 10 caracteres', OLD.estado, NEW.estado;
+       AND (v_motivo IS NULL OR char_length(v_motivo) < 10 OR v_motivo !~ '[[:alnum:]]') THEN
+      RAISE EXCEPTION 'La transicion % -> % exige un motivo de al menos 10 caracteres con letras o numeros', OLD.estado, NEW.estado;
     END IF;
   END IF;
   RETURN NEW;
@@ -119,14 +126,15 @@ BEGIN
 END $$;
 
 -- El motivo vale para UN solo UPDATE: al terminar la sentencia se limpia (los disparadores por fila ya lo leyeron).
--- Por sentencia y no por fila, para no borrarlo antes de que lo lean las demas filas del mismo UPDATE.
+-- Por sentencia y no por fila, para no borrarlo antes de que lo lean las demas filas del mismo UPDATE. Sin lista de columnas: corre
+-- con CUALQUIER UPDATE de tramite (una reasignacion, por ejemplo, no puede dejar el motivo puesto para el siguiente cambio de estado).
 CREATE FUNCTION siget.limpiar_motivo() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM set_config('siget.motivo', '', true);
   RETURN NULL;
 END $$;
 REVOKE ALL ON FUNCTION siget.limpiar_motivo() FROM PUBLIC;
-CREATE TRIGGER tramite_limpia_motivo AFTER UPDATE OF estado ON siget.tramite
+CREATE TRIGGER tramite_limpia_motivo AFTER UPDATE ON siget.tramite
   FOR EACH STATEMENT EXECUTE FUNCTION siget.limpiar_motivo();
 
 -- ---------------------------------------------------------------------------
@@ -154,12 +162,14 @@ CREATE POLICY tramite_responder_subsanacion ON siget.tramite FOR UPDATE TO app_r
   USING (solicitante_id = siget.ctx_usuario() AND estado = 'En Subsanacion')
   WITH CHECK (solicitante_id = siget.ctx_usuario() AND estado = 'En Tramitacion');
 
--- Segunda barrera: quien actualiza como solicitante (sin ser personal de la institucion del tramite) solo puede hacer EXACTAMENTE
--- En Subsanacion -> En Tramitacion y sin cambiar a quien atiende el tramite (sus unicas columnas actualizables son estado,
--- funcionario_asignado_id y datos).
+-- Segunda barrera: quien actualiza como solicitante solo puede hacer EXACTAMENTE En Subsanacion -> En Tramitacion y sin cambiar a
+-- quien atiende el tramite (sus unicas columnas actualizables son estado, funcionario_asignado_id y datos). Vale TENGA O NO
+-- membresia en la institucion del tramite: la 012 solo impide esa combinacion al crear el tramite, no si la membresia se da despues,
+-- y sin esta regla esa persona decidiria su propio tramite. El personal que NO es el solicitante no se ve afectado (reasignar,
+-- escalar: escalar_vencidos de la 013 solo actualiza escalado_en, columna que este trigger no vigila).
 CREATE FUNCTION siget.validar_respuesta_solicitante() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF OLD.solicitante_id = siget.ctx_usuario() AND NOT (OLD.institucion_id = ANY (siget.ctx_instituciones())) THEN
+  IF OLD.solicitante_id = siget.ctx_usuario() THEN
     IF NOT (OLD.estado = 'En Subsanacion' AND NEW.estado = 'En Tramitacion')
        OR NEW.funcionario_asignado_id IS DISTINCT FROM OLD.funcionario_asignado_id THEN
       RAISE EXCEPTION 'Quien solicito el tramite solo puede responder una subsanacion (En Subsanacion -> En Tramitacion)';
