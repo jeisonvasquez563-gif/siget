@@ -149,6 +149,36 @@ export function useModal(alCerrar) {
   }, [abridor])
 }
 
+// Paginación: 20 por página en los listados de trámites. `Paginacion` solo se dibuja si hay más de una página; el texto «Mostrando a–b de N» y
+// «Página X de Y» es una región viva (role=status) para que los lectores de pantalla anuncien cada cambio de página.
+export const TAM_PAGINA = 20
+
+export function Paginacion({ total, tamano = TAM_PAGINA, pagina, cambiar, unidad = 'registros' }) {
+  const paginas = Math.max(1, Math.ceil(total / tamano))
+  if (total <= tamano) return null
+  const desde = pagina * tamano + 1
+  const hasta = Math.min(total, (pagina + 1) * tamano)
+  return (
+    <nav className="paginador" aria-label="Paginación">
+      <span role="status" aria-live="polite" aria-atomic="true">Mostrando {desde} a {hasta} de {total} {unidad} · Página {pagina + 1} de {paginas}</span>
+      <div className="fila-botones">
+        <button type="button" className="btn btn-sec btn-s" disabled={pagina === 0} onClick={() => cambiar(pagina - 1)}><Icono nombre="izquierda" />Anterior</button>
+        <button type="button" className="btn btn-sec btn-s" disabled={pagina + 1 >= paginas} onClick={() => cambiar(pagina + 1)}>Siguiente<Icono nombre="derecha" /></button>
+      </div>
+    </nav>
+  )
+}
+
+// Reparte una lista ya filtrada en páginas. `reinicio` es una clave de los filtros: al cambiarla se vuelve a la primera página, y si la lista
+// se acorta (p. ej. un trámite que ya no cumple el filtro) la página se ajusta a la última que exista.
+export function usePagina(filas, tamano = TAM_PAGINA, reinicio = '') {
+  const [pagina, setPagina] = useState(0)
+  useEffect(() => { setPagina(0) }, [reinicio])
+  const paginas = Math.max(1, Math.ceil(filas.length / tamano))
+  const actual = Math.min(pagina, paginas - 1)
+  return { pagina: actual, setPagina, total: filas.length, visibles: filas.slice(actual * tamano, (actual + 1) * tamano) }
+}
+
 // Reautenticación escalonada: las acciones sensibles piden un código reciente del segundo factor.
 export function useReautenticacion() {
   const [pendiente, setPendiente] = useState(null)

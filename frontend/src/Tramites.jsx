@@ -1,27 +1,48 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from './api.js'
-import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Plazo, SIGUIENTES, fecha, fechaCorta, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Paginacion, Plazo, SIGUIENTES, fecha, fechaCorta, hace, mensajeDe, usePagina, useReautenticacion } from './comun.jsx'
 import { CamposFormulario, DatosSolicitud, ModalMotivo, ResponderSubsanacion, ResumenErrores, armarDatos, erroresDe, ultimoMotivoDeSubsanacion, validarCliente, valoresIniciales } from './Contenido.jsx'
 import { Documentos } from './Documentos.jsx'
 import { Seguimiento } from './Seguimiento.jsx'
 import { Alerta, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
 
+const LOTE = 100 // lo máximo que admite el servidor por petición
+const MAX_LOTES = 50 // tope de seguridad: 5000 trámites; si hubiera más se avisa en pantalla
+
+// Trae TODOS los trámites que la persona puede ver, de a 100, usando el `total` del servidor: antes se pedían solo 100 y el resto no aparecía
+// nunca. Los filtros, la búsqueda y los indicadores trabajan sobre todos; la pantalla los reparte de a 20 por página.
+export async function traerTramites() {
+  const primera = await api(`/tramites/?limite=${LOTE}`)
+  const total = primera.total ?? primera.resultados.length
+  const pedidas = []
+  for (let desde = LOTE; desde < total && pedidas.length < MAX_LOTES - 1; desde += LOTE) pedidas.push(api(`/tramites/?limite=${LOTE}&desplazamiento=${desde}`))
+  const resto = await Promise.all(pedidas)
+  // Si alguien creó un trámite mientras se pedían las páginas, el desplazamiento corre una fila: se descartan los repetidos
+  const vistos = new Set()
+  const filas = [primera, ...resto].flatMap((p) => p.resultados).filter((t) => !vistos.has(t.id) && vistos.add(t.id))
+  return { filas, total, truncado: total > LOTE * MAX_LOTES }
+}
+
 function useTramites() {
   const [filas, setFilas] = useState(null)
+  const [truncado, setTruncado] = useState(false)
   const [error, setError] = useState('')
   const cargar = useCallback(async () => {
     setError('')
     try {
-      const d = await api('/tramites/?limite=100')
-      setFilas(d.resultados)
+      const d = await traerTramites()
+      setFilas(d.filas)
+      setTruncado(d.truncado)
     } catch (e) {
       setError(mensajeDe(e))
       setFilas([])
     }
   }, [])
   useEffect(() => { cargar() }, [cargar])
-  return { filas, error, cargar }
+  return { filas, truncado, error, cargar }
 }
+
+const AvisoTruncado = ({ truncado }) => (truncado ? <Alerta tipo="info">Hay muchísimos trámites: aquí se muestran los {LOTE * MAX_LOTES} más recientes.</Alerta> : null)
 
 // El personal también puede ser solicitante: «Mis trámites» son los que él pidió; el resto es de la bandeja.
 export const esMio = (t, yo) => !('solicitante_id' in t) || t.solicitante_id === yo.id
@@ -77,10 +98,11 @@ function Indicador({ valor, texto, clase = '' }) {
 /* ---------------------------------------------------------------- mis trámites */
 
 export function MisTramites({ yo, abrir, nuevo }) {
-  const { filas, error } = useTramites()
+  const { filas, truncado, error } = useTramites()
   const [q, setQ] = useState('')
   const mios = useMemo(() => (filas || []).filter((t) => esMio(t, yo)), [filas, yo])
-  const visibles = useMemo(() => mios.filter((t) => coincide(t, q)), [mios, q])
+  const coinciden = useMemo(() => mios.filter((t) => coincide(t, q)), [mios, q])
+  const { pagina, setPagina, visibles, total } = usePagina(coinciden, undefined, q)
   const enCurso = mios.filter(esAbierto)
   const vencen = enCurso.filter((t) => t.vencido).length
   return (
@@ -90,6 +112,7 @@ export function MisTramites({ yo, abrir, nuevo }) {
         <button className="btn" onClick={nuevo}><Icono nombre="mas" />Iniciar un trámite</button>
       </div>
       <Alerta>{error}</Alerta>
+      <AvisoTruncado truncado={truncado} />
       {filas === null ? <><BloquesEsqueleto n={3} /><Esqueleto /></> : (
         <>
           <div className="indicadores">
@@ -102,7 +125,7 @@ export function MisTramites({ yo, abrir, nuevo }) {
           ) : (
             <>
               <div className="barra-herramientas"><Buscador valor={q} cambiar={setQ} /></div>
-              {visibles.length ? <Tabla filas={visibles} yo={yo} abrir={abrir} /> : <Vacio titulo="Nada coincide con tu búsqueda" texto="Prueba con otro número o con el nombre del trámite." />}
+              {total ? <><Tabla filas={visibles} yo={yo} abrir={abrir} /><Paginacion total={total} pagina={pagina} cambiar={setPagina} unidad="trámites" /></> : <Vacio titulo="Nada coincide con tu búsqueda" texto="Prueba con otro número o con el nombre del trámite." />}
             </>
           )}
         </>
@@ -243,15 +266,18 @@ const COLUMNAS = [
   { clave: 'Resueltos', titulo: 'Resueltos', estados: FINALES },
 ]
 
-function Tablero({ filas, yo, abrir, nombres }) {
+// `todas` es la lista completa (con los filtros activos): de ahí sale el número de cada columna. `filas` es solo la página actual: de ahí salen las fichas.
+function Tablero({ filas, todas, yo, abrir, nombres }) {
   return (
     <div className="tablero">
       {COLUMNAS.map((c) => {
         const items = filas.filter((t) => c.estados.includes(t.estado))
+        const cuenta = todas.filter((t) => c.estados.includes(t.estado)).length
         return (
           <section key={c.clave} className="columna" aria-label={c.titulo}>
-            <div className="columna-cabecera"><span>{c.titulo}</span><span className="cuenta">{items.length}</span></div>
-            {items.length === 0 && <p className="columna-vacia">Sin trámites</p>}
+            <div className="columna-cabecera"><span>{c.titulo}</span><span className="cuenta">{cuenta}</span></div>
+            {cuenta === 0 && <p className="columna-vacia">Sin trámites</p>}
+            {cuenta > 0 && items.length === 0 && <p className="columna-vacia">En otras páginas</p>}
             {items.map((t) => (
               <button key={t.id} className="ficha" onClick={() => abrir(t.id)}>
                 <span className="num">#{t.id} · {t.institucion.nombre}</span>
@@ -268,7 +294,7 @@ function Tablero({ filas, yo, abrir, nombres }) {
 }
 
 export function Bandeja({ yo, abrir, modo }) {
-  const { filas, error } = useTramites()
+  const { filas, truncado, error } = useTramites()
   const supervision = modo === 'supervision'
   const [filtro, setFiltro] = useState('abiertos')
   const [vista, setVista] = useState('lista')
@@ -280,7 +306,7 @@ export function Bandeja({ yo, abrir, modo }) {
     api('/equipo/').then((d) => setNombres(Object.fromEntries(d.equipos.flatMap((e) => e.personal.map((p) => [p.usuario_id, p.usuario]))))).catch(() => {})
   }, [yo])
   const ajenos = useMemo(() => (filas || []).filter((t) => !esMio(t, yo)), [filas, yo])
-  const visibles = useMemo(() => ajenos.filter((t) => {
+  const coinciden = useMemo(() => ajenos.filter((t) => {
     if (!coincide(t, q)) return false
     if (filtro === 'abiertos') return esAbierto(t)
     if (filtro === 'sin_asignar') return esAbierto(t) && !t.funcionario_asignado_id
@@ -289,6 +315,8 @@ export function Bandeja({ yo, abrir, modo }) {
     if (filtro === 'mios') return t.funcionario_asignado_id === yo.id
     return true
   }), [ajenos, filtro, q, yo])
+  // Cambiar el filtro o la búsqueda vuelve a la primera página; la vista (lista o tablero) comparte la página
+  const { pagina, setPagina, visibles, total } = usePagina(coinciden, undefined, `${filtro}|${q}`)
   const cuenta = (f) => ajenos.filter(f).length
   const filtros = supervision
     ? [['abiertos', 'Abiertos'], ['sin_asignar', 'Sin asignar'], ['escalados', 'Escalados'], ['vencidos', 'Vencidos'], ['todos', 'Todos']]
@@ -303,6 +331,7 @@ export function Bandeja({ yo, abrir, modo }) {
         </div>
       </div>
       <Alerta>{error}</Alerta>
+      <AvisoTruncado truncado={truncado} />
       {filas === null ? <><BloquesEsqueleto n={4} /><Esqueleto /></> : (
         <>
           <div className="indicadores">
@@ -321,9 +350,14 @@ export function Bandeja({ yo, abrir, modo }) {
               <button aria-pressed={vista === 'tablero'} onClick={() => setVista('tablero')}><Icono nombre="tablero" />Tablero</button>
             </div>
           </div>
-          {visibles.length === 0
+          {total === 0
             ? <Vacio titulo={ajenos.length ? 'Nada coincide con este filtro' : 'No hay trámites en tu institución'} texto={ajenos.length ? 'Cambia el filtro o la búsqueda para ver más.' : 'Cuando la ciudadanía inicie trámites, aparecerán aquí.'} />
-            : vista === 'lista' ? <Tabla filas={visibles} yo={yo} abrir={abrir} nombres={nombres} /> : <Tablero filas={visibles} yo={yo} abrir={abrir} nombres={nombres} />}
+            : (
+              <>
+                {vista === 'lista' ? <Tabla filas={visibles} yo={yo} abrir={abrir} nombres={nombres} /> : <Tablero filas={visibles} todas={coinciden} yo={yo} abrir={abrir} nombres={nombres} />}
+                <Paginacion total={total} pagina={pagina} cambiar={setPagina} unidad="trámites" />
+              </>
+            )}
         </>
       )}
     </>

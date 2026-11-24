@@ -1925,3 +1925,39 @@ Aplicado el **24 de noviembre de 2026**. Evidencia completa en `docs/sdlc/eviden
 **Volver atrás:** `podman tag localhost/siget-backend:respaldo-2026-11-24b localhost/siget-backend:dev` y reiniciar el backend (como `siget`), y restaurar la interfaz desde `frontend.respaldo-2026-11-24b`. Con la 017 aplicada, el backend anterior no puede rechazar ni pedir subsanación: lo razonable es corregir hacia adelante (40.7).
 
 **Lección de esta aplicación:** un reemplazo de texto en un archivo de verificación puede romper pasos que ya existían sin que ninguna prueba unitaria lo note, porque los `verificar_*` solo corren contra la base real. Por eso la imagen se verifica **antes** de reiniciar: el error quedó atrapado sin tocar producción.
+
+
+## 41. Cuenta y pulido: cambio de contraseña, pantalla de error y paginación (sin migración)
+
+**Estado: sin desplegar.** No hay migración: no toca la base (el cambio de contraseña usa el `UPDATE (password_hash, …)` que `app_role` ya tiene sobre `usuario`, el mismo del restablecimiento asistido, y los eventos nuevos `contrasena_cambiada`, `sesion_nueva_tras_cambio_contrasena`, `cambio_contrasena_fallido` y `cambio_contrasena_rechazado_bloqueada` entran en `evento_seguridad`, cuyo campo `evento` es texto libre; revocar la sesión actual y enlazarla con la nueva usa los mismos `UPDATE (revocada, reemplazada_por)` que ya hace el refresco). Por eso el orden es solo **imagen candidata verificada, despliegue, ensayo**.
+
+### 41.1 Qué cambia
+
+- **Backend:** `POST /auth/contrasena/` (`{actual, nueva}`), con la acción nueva `cambiar_contrasena` del PDP (27 acciones en la matriz y en el simulador), límite de **5 por hora** por persona (`contrasena` en `DEFAULT_THROTTLE_RATES`) y `total` en `GET /tramites/`. Contrato en `docs/api.md`.
+- **Interfaz:** «Cambiar la contraseña» en «Mi seguridad», pantalla de error global y por pantalla, y paginación de 20 en «Mis trámites», la bandeja y la supervisión.
+- **Compatibilidad:** el backend nuevo con la interfaz vieja y viceversa funcionan: `total` es un campo agregado y la interfaz vieja lo ignora; la interfaz nueva sin `total` (backend viejo) trae solo los primeros 100, como antes.
+
+### 41.2 Imagen candidata y verificaciones (VM1)
+
+Igual que 40.5: guardar la imagen en uso (`podman tag localhost/siget-backend:dev localhost/siget-backend:respaldo-AAAA-MM-DD`), reconstruir con el código nuevo y correr **antes de reiniciar**, contra la base real (todas se revierten y no dejan datos):
+
+1. `verificar_autenticacion`: trae los pasos nuevos de `/auth/contrasena/` (sin sesión 401, token de enrolamiento 403, segundo factor vencido 403 con `reautenticacion_sugerida`, política y «igual a la actual» 400, cambio correcto que cierra las otras sesiones, **revoca también la actual y entrega tokens nuevos** (el acceso viejo da 401, el nuevo sirve, el refresco nuevo sirve y el viejo se rechaza), evento `contrasena_cambiada` sin contraseñas, topes de 128 caracteres, contraseña actual incorrecta como intento fallido (`cambio_contrasena_fallido`, medido por diferencia de eventos) hasta el bloqueo, cuenta de plataforma y 429 al sexto intento).
+2. `verificar_politicas`: el simulador ahora lista **27** acciones.
+3. `verificar_tramites`: pasos nuevos con `total` en el listado de tres personas distintas.
+4. `verificar_esquema`, `verificar_equipo`, `verificar_plataforma`, `verificar_auditoria` e `verificar_integracion` como regresión.
+
+Si algún paso falla, **no desplegar**. Los pasos nuevos de `verificar_autenticacion` y `verificar_tramites` se escribieron sin poder correrlos contra la base real (lección de 40.9): es la primera vez que corren.
+
+### 41.3 Despliegue y ensayo
+
+`desplegar.sh` (backend e interfaz; devuelve la inactividad a 10 minutos, ver 34.2). Después, el ensayo (`demo/ensayo.py`). **El ensayo no cambia ninguna contraseña**: las cuentas de demostración conservan la suya. El cambio de contraseña se prueba a mano con una cuenta creada para ello, no con las de la demostración.
+
+### 41.4 Si algo sale mal
+
+Sin migración, volver atrás es solo el código: `podman tag localhost/siget-backend:respaldo-AAAA-MM-DD localhost/siget-backend:dev`, reiniciar el backend (como `siget`) y restaurar la interfaz desde su respaldo. Una contraseña ya cambiada sigue siendo válida con el backend viejo (es el mismo hash Argon2).
+
+### 41.5 Riesgos aceptados
+
+**Límite conocido de la paginación.** La interfaz trae la lista completa de trámites del servidor (de a 100, con tope de 5000) y la pagina en el navegador, porque el backend todavía no filtra ni busca. Los indicadores y los contadores del tablero se calculan sobre la lista completa (con los filtros activos); solo las filas y las fichas se reparten de a 20. Si el volumen crece, el paso siguiente es filtrar, buscar y paginar en el servidor.
+
+**El «segundo factor reciente» es de la cuenta, no de la sesión.** `mfa_verificado_en` vive en `usuario`: si la persona verifica su código en su sesión legítima, una sesión robada de la misma cuenta también queda con el segundo factor reciente durante la ventana (15 minutos) y el PDP la deja intentar el cambio de contraseña. Se acepta porque el cambio exige además la **contraseña actual** (con su bloqueo progresivo y su límite de 5 por hora), y porque cambiarla revoca todas las sesiones, la robada incluida. Mejora pendiente: guardar la verificación del segundo factor en `Sesion` (columna nueva, **requiere migración**).

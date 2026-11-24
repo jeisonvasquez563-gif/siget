@@ -96,6 +96,14 @@ export async function confirmarMfa(codigo) {
   return d
 }
 
+// El servidor revoca TODAS las sesiones, también la actual, y abre una nueva: el acceso viejo ya no sirve. La respuesta trae el
+// acceso nuevo (y el refresco nuevo viaja en la cookie); hay que guardarlo o la siguiente llamada fallaría con 401.
+export async function cambiarContrasena(actual, nueva) {
+  const d = await api('/auth/contrasena/', { metodo: 'POST', cuerpo: { actual, nueva } })
+  if (d && d.access_token) tokenDeAcceso = d.access_token
+  return d
+}
+
 export async function cerrarSesion() {
   try { await api('/auth/logout/', { metodo: 'POST', cuerpo: {} }) } catch { /* ya estaba cerrada */ }
   tokenDeAcceso = null

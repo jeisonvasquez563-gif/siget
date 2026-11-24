@@ -173,7 +173,7 @@ describe('ver mis datos', () => {
     expect(within(seccion).getByText('Solo tú los ves')).toBeInTheDocument()
     expect(seccion).not.toHaveTextContent('8-765-4321') // la cédula completa solo va en la descarga
     expect(within(seccion).getByText(/solo ves los últimos 3 caracteres de tu cédula/)).toBeInTheDocument()
-    expect(within(seccion).getByText(/Tienes 5 trámites/)).toBeInTheDocument()
+    expect(within(seccion).getByText(/Tienes 28 trámites/)).toBeInTheDocument()
     expect(within(seccion).getByText(/expediente público con conservación obligatoria: no se borran/)).toBeInTheDocument()
     expect(within(seccion).getByText(/No has cambiado tus datos de contacto/)).toBeInTheDocument()
   })
@@ -316,7 +316,7 @@ describe('descargar mis datos', () => {
     const documento = JSON.parse(texto)
     expect(documento.formato).toBe('siget-mis-datos/1')
     expect(documento.perfil.cedula).toBe('8-765-4321')
-    expect(documento.tramites.length).toBe(5)
+    expect(documento.tramites.length).toBe(28)
     expect(documento.solicitudes.length).toBe(2)
     expect(documento.actividad_de_seguridad.some((a) => a.evento === 'datos_personales_exportados')).toBe(true)
     expect(texto).not.toMatch(/password|argon2|mfa_secreto|beto\.castillo|4-321-9876/)

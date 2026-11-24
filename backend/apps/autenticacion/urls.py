@@ -11,6 +11,7 @@ urlpatterns = [
     path("login/", vistas.Login.as_view(), name="login"),
     path("refresh/", vistas.Refresh.as_view(), name="refresh"),
     path("logout/", vistas.Logout.as_view(), name="logout"),
+    path("contrasena/", vistas.CambiarContrasena.as_view(), name="contrasena"),
     path("yo/", vistas.Yo.as_view(), name="yo"),
     path("actividad/", vistas.Actividad.as_view(), name="actividad"),
     path("mis-datos/", vistas_derechos.MisDatos.as_view(), name="mis-datos"),

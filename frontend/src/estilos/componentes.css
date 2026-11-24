@@ -202,3 +202,13 @@
 .lista-documentos li > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .lista-documentos strong { overflow-wrap: anywhere; }
 .lista-documentos small { color: var(--tinta-suave); font-size: var(--t-xs); }
+
+/* Pantalla de error (ErrorBoundary.jsx): una para toda la aplicación y otra por pantalla */
+.error-global { min-height: 100vh; display: grid; place-items: center; padding: 2rem 1.25rem; background: var(--lienzo); }
+.error-global .panel { max-width: 34rem; margin: 0; }
+.error-global .marca-logo { width: 56px; height: 56px; margin-bottom: 1rem; }
+.error-pantalla { display: grid; gap: 0.7rem; justify-items: start; }
+.error-pantalla h2 { margin: 0; }
+.error-pantalla p { margin: 0; }
+.error-pantalla .icono-grande { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--sello-rojo-fondo); color: var(--sello-rojo); }
+.error-pantalla .fila-botones { justify-content: flex-start; margin-top: 0.3rem; }
