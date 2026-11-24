@@ -43,9 +43,13 @@ def _registrar_decision(actor_id, accion, recurso, decision):
     ).save(using="decisiones")
 
 
-def evaluar(usuario, accion, recurso):
+def evaluar(usuario, accion, recurso, registrar_permitidas=True):
     """Decide y REGISTRA la decisión. Si no se puede decidir o registrar, devuelve una denegación: no debe haber
-    ninguna acción permitida sin su evidencia."""
+    ninguna acción permitida sin su evidencia.
+
+    `registrar_permitidas=False` es una excepción EXPLÍCITA y de uso acotado: solo para lecturas de fondo y repetitivas sobre lo propio
+    (la consulta periódica de la campana de notificaciones), que dejarían una decisión «permitida» por minuto por pestaña sin valor de
+    auditoría. Las denegaciones se registran SIEMPRE y las escrituras no deben usarla. Ver runbook 42."""
     from apps.autorizacion.pdp import Decision
     from apps.identidad.sujeto import construir_sujeto
 
@@ -54,7 +58,8 @@ def evaluar(usuario, accion, recurso):
         entorno = Entorno(ahora=timezone.now(), mfa_reciente_minutos=settings.SIGET_MFA_RECIENTE_MINUTOS,
                           mfa_ciudadano_obligatorio=settings.SIGET_MFA_CIUDADANO_OBLIGATORIO)
         decision = decidir(sujeto, accion, recurso, entorno)
-        _registrar_decision(usuario.pk, accion, recurso, decision)
+        if registrar_permitidas or not decision.permitido:
+            _registrar_decision(usuario.pk, accion, recurso, decision)
         return decision
     except Exception:  # noqa: BLE001 - sin decisión registrada no se permite nada
         registro.exception("No se pudo decidir o registrar la decisión de acceso: se deniega")
@@ -67,14 +72,14 @@ def _mfa_reciente(usuario):
     return timezone.now() - usuario.mfa_verificado_en <= timedelta(minutes=settings.SIGET_MFA_RECIENTE_MINUTOS)
 
 
-def autorizar(request, accion, recurso):
-    """Consulta al PDP; si no permite, lanza 403. El mensaje es siempre el mismo: no explica qué regla falló.
+def autorizar(request, accion, recurso, registrar_permitidas=True):
+    """Consulta al PDP; si no permite, lanza 403 (`registrar_permitidas`: ver `evaluar`; las denegaciones siempre se registran). El mensaje es siempre el mismo: no explica qué regla falló.
 
     Única pista que se da: si la persona tiene segundo factor pero hace rato que no lo verifica, se sugiere
     reautenticarse (es lo que la interfaz necesita para pedirle el código y reintentar).
     """
     usuario = request.user.usuario
-    decision = evaluar(usuario, accion, recurso)
+    decision = evaluar(usuario, accion, recurso, registrar_permitidas=registrar_permitidas)
     if not decision.permitido:
         raise AccesoDenegado({
             "codigo": "acceso_denegado", "detalle": "No tienes autorización para esta operación.",

@@ -3,6 +3,9 @@
 - El contexto de seguridad por filas se fija igual que en los trámites; la base solo deja ver y marcar las filas con `usuario_id` igual
   al de la persona (migración 018). Lo ajeno responde 404, como un trámite ajeno: no se distingue «no existe» de «no es tuyo».
 - El PDP decide con `ver_mis_notificaciones` (cualquier cuenta activa, sobre las propias, sin segundo factor reciente).
+- Toda consulta filtra además por `usuario_id` de la persona: segunda barrera por si la seguridad por filas fallara o se relajara.
+- La lectura (GET) es la consulta periódica de la campana: registra en `decision_pdp` solo las denegaciones. Las escrituras (marcar
+  leída, leer todas) registran siempre. Ver runbook 42.
 - La aplicación no crea ni borra notificaciones: las genera la base al cambiar el trámite. Solo las marca como leídas, una vez.
 - Las respuestas no se guardan en caché: son datos de la persona.
 """
@@ -38,23 +41,29 @@ class _Propias(APIView):
         instituciones = sorted({m.institucion_id for m in _membresias(usuario) if m.rol in ROLES_QUE_ATIENDEN})
         fijar_contexto(usuario.pk, instituciones)
 
-    def _autorizar(self, request):
-        """El PDP decide sobre las PROPIAS notificaciones (el recurso nunca sale de la petición) y deja la decisión registrada."""
-        autorizar(request, Accion.VER_MIS_NOTIFICACIONES, Recurso(tipo="notificacion", solicitante_id=request.user.usuario.pk))
+    def _autorizar(self, request, registrar_permitidas=True):
+        """El PDP decide sobre las PROPIAS notificaciones (el recurso nunca sale de la petición) y deja la decisión registrada
+        (las permitidas solo si `registrar_permitidas`; las denegadas, siempre)."""
+        autorizar(request, Accion.VER_MIS_NOTIFICACIONES, Recurso(tipo="notificacion", solicitante_id=request.user.usuario.pk),
+                  registrar_permitidas=registrar_permitidas)
+
+    @staticmethod
+    def _mias(request):
+        """Las notificaciones de la persona: el filtro explícito por usuario va además de la seguridad por filas de la base."""
+        return Notificacion.objects.filter(usuario_id=request.user.usuario.pk)
 
     @staticmethod
     def _sin_cache(respuesta):
         respuesta["Cache-Control"] = "no-store"
         return respuesta
 
-    @staticmethod
-    def _no_leidas():
-        return Notificacion.objects.filter(leida_en__isnull=True).count()  # la base ya filtra por filas: solo las de esta persona
+    def _no_leidas(self, request):
+        return self._mias(request).filter(leida_en__isnull=True).count()
 
 
 class NotificacionesColeccion(_Propias):
     def get(self, request):
-        self._autorizar(request)
+        self._autorizar(request, registrar_permitidas=False)  # consulta de fondo de la campana: solo se registran las denegaciones
         pagina = paginacion(request.query_params)
         if pagina is None:
             return _error("paginacion_invalida", "limite (1 a 100) y desplazamiento deben ser enteros válidos.", status.HTTP_400_BAD_REQUEST)
@@ -62,7 +71,7 @@ class NotificacionesColeccion(_Propias):
         solo_no_leidas = request.query_params.get("solo_no_leidas")
         if solo_no_leidas not in (None, "1"):
             return _error("filtro_invalido", "`solo_no_leidas` solo admite el valor 1.", status.HTTP_400_BAD_REQUEST)
-        consulta = Notificacion.objects.order_by("-creada_en", "-id")
+        consulta = self._mias(request).order_by("-creada_en", "-id")
         if solo_no_leidas:
             consulta = consulta.filter(leida_en__isnull=True)
         filas = list(consulta[desplazamiento:desplazamiento + limite])
@@ -70,7 +79,7 @@ class NotificacionesColeccion(_Propias):
         # persona ya no puede ver, y ella debe poder leerla y marcarla igual
         visibles = {t.pk: t for t in Tramite.objects.select_related("tipo_tramite", "institucion").filter(pk__in={n.tramite_id for n in filas})}
         cuerpo = pagina_de([notificacion_a_dict(n, visibles.get(n.tramite_id)) for n in filas], consulta.count(), limite, desplazamiento)
-        cuerpo["no_leidas"] = self._no_leidas()
+        cuerpo["no_leidas"] = self._no_leidas(request)
         return self._sin_cache(Response(cuerpo))
 
 
@@ -79,17 +88,17 @@ class NotificacionLeida(_Propias):
         self._autorizar(request)
         if entero_positivo(pk) is None:
             raise NotFound()
-        notificacion = Notificacion.objects.filter(pk=pk).first()
+        notificacion = self._mias(request).filter(pk=pk).first()
         if notificacion is None:  # la base ya filtró lo ajeno: para quien pregunta, no existe
             raise NotFound()
         if notificacion.leida_en is None:
             # `leida_en is null` en el filtro: si otra petición ya la marcó, no se vuelve a escribir (la base no lo permite). La hora la fija la base.
-            Notificacion.objects.filter(pk=pk, leida_en__isnull=True).update(leida_en=timezone.now())
-        return self._sin_cache(Response({"id": pk, "leida": True, "no_leidas": self._no_leidas()}))
+            self._mias(request).filter(pk=pk, leida_en__isnull=True).update(leida_en=timezone.now())
+        return self._sin_cache(Response({"id": pk, "leida": True, "no_leidas": self._no_leidas(request)}))
 
 
 class NotificacionesLeerTodas(_Propias):
     def post(self, request):
         self._autorizar(request)
-        marcadas = Notificacion.objects.filter(leida_en__isnull=True).update(leida_en=timezone.now())
-        return self._sin_cache(Response({"marcadas": marcadas, "no_leidas": self._no_leidas()}))
+        marcadas = self._mias(request).filter(leida_en__isnull=True).update(leida_en=timezone.now())
+        return self._sin_cache(Response({"marcadas": marcadas, "no_leidas": self._no_leidas(request)}))

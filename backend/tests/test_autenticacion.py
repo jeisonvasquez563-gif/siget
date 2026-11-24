@@ -257,6 +257,30 @@ def test_una_negacion_tambien_se_registra(decisiones, monkeypatch):
     assert len(decisiones) == 1 and decisiones[0][2].permitido is False
 
 
+def test_evaluar_puede_omitir_solo_el_registro_de_las_permitidas(decisiones):
+    recurso = VistaDePrueba.recurso_pdp(None)
+    assert permisos_pdp.evaluar(peticion().user.usuario, Accion.VER_TRAMITE, recurso, registrar_permitidas=False).permitido is True
+    assert decisiones == []                                                     # permitida y sin registro: lo pidió quien llama
+    assert permisos_pdp.evaluar(peticion().user.usuario, Accion.VER_TRAMITE, recurso).permitido is True
+    assert len(decisiones) == 1                                                 # por omisión se registra todo
+
+
+def test_las_denegaciones_se_registran_aunque_se_omitan_las_permitidas(decisiones, monkeypatch):
+    monkeypatch.setattr(permisos_pdp, "_membresias", lambda u: [])
+    d = permisos_pdp.evaluar(peticion().user.usuario, Accion.VER_TRAMITE, VistaDePrueba.recurso_pdp(None), registrar_permitidas=False)
+    assert d.permitido is False and len(decisiones) == 1 and decisiones[0][2].permitido is False
+
+
+def test_autorizar_pasa_la_opcion_y_sigue_negando(decisiones, monkeypatch):
+    from apps.nucleo.errores import AccesoDenegado
+    permisos_pdp.autorizar(peticion(), Accion.VER_TRAMITE, VistaDePrueba.recurso_pdp(None), registrar_permitidas=False)
+    assert decisiones == []
+    monkeypatch.setattr(permisos_pdp, "_membresias", lambda u: [])
+    with pytest.raises(AccesoDenegado):
+        permisos_pdp.autorizar(peticion(), Accion.VER_TRAMITE, VistaDePrueba.recurso_pdp(None), registrar_permitidas=False)
+    assert len(decisiones) == 1
+
+
 def test_un_token_de_enrolamiento_no_sirve_para_el_pdp(decisiones):
     assert permisos_pdp.PermisoPDP().has_permission(peticion(scope="enrolar_mfa"), VistaDePrueba) is False
     assert decisiones == []

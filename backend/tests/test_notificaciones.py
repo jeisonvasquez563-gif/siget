@@ -104,7 +104,7 @@ def test_el_simulador_la_conoce_y_explica_el_resultado():
 # --------------------------------------------------------------------------- modelo y salida
 
 def una_notificacion(**kw):
-    base = dict(pk=5, tipo="subsanacion_pedida", tramite_id=9, creada_en=AHORA, leida_en=None)
+    base = dict(pk=5, usuario_id=7, tipo="subsanacion_pedida", tramite_id=9, creada_en=AHORA, leida_en=None)
     base.update(kw)
     return SimpleNamespace(**base)
 
@@ -177,6 +177,8 @@ class Consulta:
 
     def filter(self, **filtros):
         filas = self.filas
+        if "usuario_id" in filtros:
+            filas = [f for f in filas if f.usuario_id == filtros["usuario_id"]]
         if filtros.get("leida_en__isnull") is True:
             filas = [f for f in filas if f.leida_en is None]
         if "pk" in filtros:
@@ -207,7 +209,7 @@ class Consulta:
 @pytest.fixture
 def base(monkeypatch):
     """Tres notificaciones de la persona 7 (una ya leída) y un trámite visible; el resto de la base no existe para ella (la RLS lo filtra)."""
-    contexto, decisiones = [], []
+    contexto, decisiones, registrar = [], [], []
     filas = [una_notificacion(pk=1, tipo="tramite_en_atencion", creada_en=AHORA - timedelta(hours=3), leida_en=AHORA - timedelta(hours=2)),
              una_notificacion(pk=2, tipo="subsanacion_pedida", creada_en=AHORA - timedelta(hours=1)),
              una_notificacion(pk=3, tipo="tramite_aprobado", tramite_id=10, creada_en=AHORA)]
@@ -217,8 +219,9 @@ def base(monkeypatch):
     monkeypatch.setattr(vistas, "_membresias", lambda usuario: [SimpleNamespace(institucion_id=3, rol="funcionario"),
                                                                 SimpleNamespace(institucion_id=4, rol="coordinador_institucional")])
     monkeypatch.setattr(vistas, "fijar_contexto", lambda usuario_id, instituciones: contexto.append((usuario_id, list(instituciones))))
-    monkeypatch.setattr(vistas, "autorizar", lambda request, accion, recurso: decisiones.append((accion, recurso)))
-    return SimpleNamespace(filas=filas, contexto=contexto, decisiones=decisiones)
+    monkeypatch.setattr(vistas, "autorizar", lambda request, accion, recurso, registrar_permitidas=True:
+                        (decisiones.append((accion, recurso)), registrar.append(registrar_permitidas)))
+    return SimpleNamespace(filas=filas, contexto=contexto, decisiones=decisiones, registrar=registrar)
 
 
 def llamar(vista, metodo, ruta="/x/", kwargs=None, scope="completo"):
@@ -292,12 +295,29 @@ def test_leer_todas_marca_solo_las_no_leidas(base):
 
 
 def test_si_el_pdp_niega_no_se_toca_nada(base, monkeypatch):
-    def negar(request, accion, recurso):
+    def negar(request, accion, recurso, registrar_permitidas=True):
         raise AccesoDenegado({"codigo": "acceso_denegado", "detalle": "No tienes autorización para esta operación.", "reautenticacion_sugerida": False})
     monkeypatch.setattr(vistas, "autorizar", negar)
     for vista, metodo, kw in ((vistas.NotificacionesColeccion, "get", None), (vistas.NotificacionLeida, "post", {"pk": 2}), (vistas.NotificacionesLeerTodas, "post", None)):
         assert llamar(vista, metodo, kwargs=kw).status_code == 403
     assert base.filas[1].leida_en is None and base.filas[2].leida_en is None
+
+
+def test_la_consulta_de_fondo_solo_registra_las_denegaciones_y_las_escrituras_siempre(base):
+    llamar(vistas.NotificacionesColeccion, "get")
+    llamar(vistas.NotificacionLeida, "post", kwargs={"pk": 2})
+    llamar(vistas.NotificacionesLeerTodas, "post")
+    assert base.registrar == [False, True, True]  # GET: solo denegaciones; marcar leída y leer todas: todo
+
+
+def test_toda_consulta_filtra_ademas_por_la_persona_aunque_la_base_no_lo_hiciera(base):
+    ajena = una_notificacion(pk=40, usuario_id=8, tipo="tramite_aprobado", creada_en=AHORA + timedelta(hours=1))  # sin RLS en este simulacro
+    vistas.Notificacion.objects.filas.append(ajena)
+    r = llamar(vistas.NotificacionesColeccion, "get")
+    assert [n["id"] for n in r.data["resultados"]] == [3, 2, 1] and r.data["total"] == 3 and r.data["no_leidas"] == 2
+    assert llamar(vistas.NotificacionLeida, "post", kwargs={"pk": 40}).status_code == 404 and ajena.leida_en is None
+    assert llamar(vistas.NotificacionLeida, "post", kwargs={"pk": 2}).data["no_leidas"] == 1  # no cuenta la ajena
+    assert llamar(vistas.NotificacionesLeerTodas, "post").data == {"marcadas": 1, "no_leidas": 0} and ajena.leida_en is None
 
 
 def test_un_token_de_enrolamiento_no_sirve(base):
@@ -362,6 +382,30 @@ def test_el_disparador_cubre_las_seis_notificaciones_y_no_avisa_al_actor():
     assert "m.usuario_id IS DISTINCT FROM v_actor" in funcion             # a la supervisión, salvo el propio actor
     assert "m.rol = 'supervisor'" in funcion and "m.revocada_en IS NULL" in funcion
     assert "OLD.escalado_en IS NULL AND NEW.escalado_en IS NOT NULL" in funcion
+
+
+def test_la_asignada_solo_recibe_el_aviso_con_acceso_vigente_y_cuenta_activa():
+    funcion = re.search(r"CREATE FUNCTION siget\.generar_notificaciones\(\).*?\$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
+    insercion = re.search(r"SELECT u\.id, 'subsanacion_respondida'.*?;", funcion, re.S).group(0)
+    assert "u.estado_cuenta = 'activa'" in insercion
+    assert re.search(r"m\.usuario_id = NEW\.funcionario_asignado_id AND m\.institucion_id = NEW\.institucion_id\s+AND m\.rol IN \('funcionario', 'supervisor'\) AND m\.revocada_en IS NULL", insercion)
+
+
+def test_la_supervision_solo_recibe_el_aviso_con_la_cuenta_activa():
+    funcion = re.search(r"CREATE FUNCTION siget\.generar_notificaciones\(\).*?\$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
+    insercion = re.search(r"SELECT m\.usuario_id, 'tramite_escalado'.*?;", funcion, re.S).group(0)
+    assert "JOIN siget.usuario u ON u.id = m.usuario_id AND u.estado_cuenta = 'activa'" in insercion
+
+
+def test_el_solicitante_se_avisa_sin_mirar_el_estado_de_su_cuenta():
+    funcion = re.search(r"CREATE FUNCTION siget\.generar_notificaciones\(\).*?\$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
+    assert re.search(r"IF v_tipo IS NOT NULL AND NEW\.solicitante_id IS DISTINCT FROM v_actor THEN\s+INSERT INTO siget\.notificacion \(usuario_id, tipo, tramite_id\) "
+                     r"VALUES \(NEW\.solicitante_id, v_tipo, NEW\.id\);", funcion)  # un INSERT ... VALUES directo: ningún filtro por cuenta
+
+
+def test_hay_indices_para_la_supervision_por_institucion_y_para_el_tramite():
+    assert re.search(r"CREATE INDEX IF NOT EXISTS \w+ ON siget\.membresia \(institucion_id\) WHERE revocada_en IS NULL;", SQL_SIN_COMENTARIOS)
+    assert re.search(r"CREATE INDEX \w+ ON siget\.notificacion \(tramite_id\);", SQL_SIN_COMENTARIOS)
 
 
 def test_la_lectura_solo_pasa_de_nulo_a_un_valor_que_fija_la_base():
