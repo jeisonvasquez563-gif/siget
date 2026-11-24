@@ -1,0 +1,16 @@
+# Pruebas del frontend con las dependencias actualizadas y el escenario del simulador corregido
+# 2026-11-08 13:50:55  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5\frontend
+$ npm test -- --run
+
+> siget-frontend@0.1.0 test
+> vitest run --run
+
+
+ RUN  v4.1.12 C:/Users/jeiva/Desktop/Proyecto-Ciber5/frontend
+
+
+ Test Files  11 passed (11)
+      Tests  191 passed (191)
+   Start at  13:50:57
+   Duration  21.88s (transform 5.26s, setup 17.37s, import 10.05s, tests 51.01s, environment 28.00s)
+# código de salida: 0

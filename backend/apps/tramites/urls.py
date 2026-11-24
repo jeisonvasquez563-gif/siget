@@ -8,4 +8,6 @@ urlpatterns = [
     path("<int:pk>/estado/", vistas.TramiteEstado.as_view(), name="tramite-estado"),
     path("<int:pk>/reasignar/", vistas.TramiteReasignar.as_view(), name="tramite-reasignar"),
     path("<int:pk>/historial/", vistas.TramiteHistorial.as_view(), name="tramite-historial"),
+    path("<int:pk>/documentos/", vistas.TramiteDocumentos.as_view(), name="tramite-documentos"),
+    path("<int:pk>/documentos/<int:documento_id>/", vistas.DocumentoDescarga.as_view(), name="tramite-documento"),
 ]

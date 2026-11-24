@@ -1,0 +1,8 @@
+# Etapa 8 — Temporizador de escalamiento automático (VM1)
+# 2026-11-16 22:12:36  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 "sudo machinectl shell --quiet siget@ /usr/bin/bash -c \"systemctl --user list-timers siget-escalar.timer --no-pager | head -2; journalctl --user -u siget-escalar --since -1day --no-pager -o cat | grep escalar_vencidos | tail -3\" 2>/dev/null || sudo -u siget XDG_RUNTIME_DIR=/run/user/$(id -u siget) bash -c \"systemctl --user list-timers siget-escalar.timer --no-pager | head -2; journalctl --user -u siget-escalar --since -1day --no-pager -o cat | grep escalar_vencidos | tail -3\""
+NEXT                        LEFT       LAST                        PASSED   UNIT                ACTIVATES
+Mon 2026-11-16 23:05:07 EST 52min left Mon 2026-11-16 22:05:45 EST 6min ago siget-escalar.timer siget-escalar.service
+escalar_vencidos: 0 trámite(s) escalado(s)
+escalar_vencidos: 0 trámite(s) escalado(s)
+# código de salida: 0

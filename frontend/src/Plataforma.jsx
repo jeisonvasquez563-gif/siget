@@ -156,7 +156,7 @@ function PanelAprobaciones({ yo, titulo, nuevo, resumen, formulario }) {
 
 /* ---------------------------------------------------------------- identidades */
 
-function CodigoEmitido({ datos, alCerrar }) {
+function CodigoEmitido({ datos, alCerrar, titulo = 'Código de restablecimiento', texto }) {
   const [copiado, setCopiado] = useState(false)
   async function copiar() {
     try { await navigator.clipboard.writeText(datos.codigo); setCopiado(true) } catch { /* sin portapapeles: se lee en pantalla */ }
@@ -164,8 +164,8 @@ function CodigoEmitido({ datos, alCerrar }) {
   return (
     <div className="fondo-modal">
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-codigo">
-        <h2 id="titulo-codigo"><span className="icono-grande"><Icono nombre="llave" /></span>Código de restablecimiento</h2>
-        <p className="suave">Entrégaselo a <strong>{datos.usuario}</strong> por un canal seguro (en persona o por teléfono). Sirve una sola vez y vence en 15 minutos. <strong>No se vuelve a mostrar.</strong></p>
+        <h2 id="titulo-codigo"><span className="icono-grande"><Icono nombre="llave" /></span>{titulo}</h2>
+        <p className="suave">{texto || <>Entrégaselo a <strong>{datos.usuario}</strong> por un canal seguro (en persona o por teléfono). Sirve una sola vez y vence en 15 minutos.</>} <strong>No se vuelve a mostrar.</strong></p>
         <p className="codigo-grande" aria-label={`Código ${datos.codigo.split('').join(' ')}`}>{datos.codigo}</p>
         <div className="fila-botones">
           <button className="btn btn-sec" onClick={copiar}>{copiado ? 'Copiado' : 'Copiar'}</button>
@@ -200,6 +200,55 @@ function FormularioAltaCoordinador({ correr, recargar }) {
   )
 }
 
+const MODO_REGISTRO = {
+  abierto: 'Abierto: cualquiera puede crear su cuenta. Las invitaciones no son necesarias.',
+  invitacion: 'Por invitación: solo se crean cuentas con un código que emites aquí.',
+  cerrado: 'Cerrado: nadie puede crear cuentas desde la web.',
+}
+
+function PanelInvitaciones({ correr }) {
+  const { datos, recargar } = useCarga('/plataforma/invitaciones/')
+  const [nota, setNota] = useState('')
+  const [emitida, setEmitida] = useState(null)
+  return (
+    <section className="panel" aria-labelledby="titulo-invitaciones">
+      {emitida && <CodigoEmitido datos={emitida} alCerrar={() => setEmitida(null)} titulo="Invitación para crear cuenta"
+        texto={<>Entrégala por un canal seguro{emitida.nota ? <> ({emitida.nota})</> : null}. Sirve para crear <strong>una</strong> cuenta y vence el {new Date(emitida.vence_en).toLocaleDateString('es-PA')}.</>} />}
+      <div className="panel-cabecera"><h3 id="titulo-invitaciones">Invitaciones para crear cuenta</h3></div>
+      {datos && <p className="suave">Registro hoy: {MODO_REGISTRO[datos.modo_registro] || datos.modo_registro}</p>}
+      <form className="formulario-fila" onSubmit={async (e) => {
+        e.preventDefault()
+        const r = await correr(() => api('/plataforma/invitaciones/', { metodo: 'POST', cuerpo: { nota } }))
+        if (r) { setEmitida({ codigo: r.codigo_invitacion, vence_en: r.vence_en, nota }); setNota(''); recargar() }
+      }}>
+        <label className="campo"><span>Para quién (sin datos personales)</span>
+          <input className="entrada" value={nota} onChange={(e) => setNota(e.target.value)} maxLength={120} placeholder="Ej.: prueba con el grupo B" />
+        </label>
+        <button className="btn" type="submit">Emitir invitación</button>
+      </form>
+      {datos && datos.invitaciones.length > 0 && (
+        <div className="tabla-caja">
+          <table className="tabla">
+            <thead><tr><th>N.º</th><th>Nota</th><th>Emitida</th><th>Vence</th><th>Estado</th></tr></thead>
+            <tbody>
+              {datos.invitaciones.map((i) => (
+                <tr key={i.id}>
+                  <td className="num">#{i.id}</td>
+                  <td>{i.nota || '—'}</td>
+                  <td>{new Date(i.creado_en).toLocaleDateString('es-PA')}</td>
+                  <td>{new Date(i.vence_en).toLocaleDateString('es-PA')}</td>
+                  <td>{{ vigente: 'Vigente', usada: 'Usada', vencida: 'Vencida' }[i.estado]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="nota">El código solo se muestra al emitirlo: en la base queda una huella irreversible. Una invitación usada o vencida no vuelve a servir.</p>
+    </section>
+  )
+}
+
 export function ConsolaIdentidades({ yo }) {
   const [emitido, setEmitido] = useState(null)
   const { correr, modal, error } = useAccion()
@@ -230,6 +279,7 @@ export function ConsolaIdentidades({ yo }) {
         </>
       )} />
       <p className="nota">Separación de funciones: quien emite el código de contraseña de una cuenta no puede además restablecer su segundo factor en las siguientes 24 horas (y al revés): así nadie reúne lo necesario para adueñarse de una cuenta.</p>
+      <PanelInvitaciones correr={correr} />
       <PanelAprobaciones yo={yo} titulo="Altas de coordinadoras" nuevo="Proponer el alta de una coordinadora"
         resumen={(o) => `Alta de ${o.usuario} como coordinadora (institución n.º ${o.institucion_id})`}
         formulario={(props) => <FormularioAltaCoordinador {...props} />} />

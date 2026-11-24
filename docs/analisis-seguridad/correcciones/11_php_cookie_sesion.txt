@@ -1,0 +1,11 @@
+# VM1 — PHP: cookie de sesión con HttpOnly, SameSite=Strict y modo estricto; reiniciar php-fpm
+# 2026-11-08 14:41:37  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "set -e; F=/etc/php.d/99-siget-endurecimiento.ini; sudo cp -p $F $F.respaldo; printf \"%s\n\" \"; La cookie de sesión no es legible desde JavaScript ni viaja en peticiones iniciadas por otros sitios\" \"session.cookie_httponly = 1\" \"session.cookie_samesite = Strict\" \"session.use_strict_mode = 1\" | sudo tee -a $F >/dev/null; sudo cat $F; if sudo php-fpm -t 2>&1 | tail -1 | grep -q successful; then sudo rm -f $F.respaldo; sudo systemctl restart php-fpm; sleep 2; systemctl is-active php-fpm; else echo \"php-fpm -t FALLÓ: se restaura\"; sudo mv $F.respaldo $F; exit 1; fi"
+; SIGET: no anunciar la versión de PHP en la cabecera X-Powered-By (análisis dinámico del 8-nov-2026)
+expose_php = Off
+; La cookie de sesión no es legible desde JavaScript ni viaja en peticiones iniciadas por otros sitios
+session.cookie_httponly = 1
+session.cookie_samesite = Strict
+session.use_strict_mode = 1
+active
+# código de salida: 0

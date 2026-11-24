@@ -1,0 +1,8 @@
+# Etapa 8 — Parches después de actualizar: avisos pendientes en VM1 y VM2
+# 2026-11-16 22:51:58  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ bash -c "echo '== VM1'; ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 'sudo dnf -q --disablerepo=\"pgdg*\" updateinfo summary; echo \"(sin avisos pendientes si no aparece nada arriba)\"'; echo '== VM2'; ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.100.20 'sudo dnf -q updateinfo summary; echo \"(sin avisos pendientes si no aparece nada arriba)\"'"
+== VM1
+(sin avisos pendientes si no aparece nada arriba)
+== VM2
+(sin avisos pendientes si no aparece nada arriba)
+# código de salida: 0

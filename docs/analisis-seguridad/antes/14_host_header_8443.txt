@@ -1,0 +1,28 @@
+# Prueba de cabecera Host manipulada contra la API por HTTPS (inicial)
+# 2026-11-08 14:03:59  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ curl -sS -i -k -H "Host: sitio-malicioso.example" https://192.168.159.137:8443/salud/
+HTTP/1.1 400 Bad Request
+Server: nginx
+Date: Sun, 08 Nov 2026 19:03:59 GMT
+Content-Type: text/html; charset=utf-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: same-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Cross-Origin-Opener-Policy: same-origin
+
+
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Bad Request (400)</title>
+</head>
+<body>
+  <h1>Bad Request (400)</h1><p></p>
+</body>
+</html>
+# código de salida: 0

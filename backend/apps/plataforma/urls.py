@@ -12,6 +12,7 @@ urlpatterns = [
     path("solicitudes-datos/", vistas.SolicitudesDatos.as_view(), name="plataforma-solicitudes-datos"),
     path("solicitudes-datos/<int:pk>/responder/", vistas.SolicitudDatosResponder.as_view(), name="plataforma-solicitud-datos-responder"),
     path("eventos/", vistas.EventosSeguridad.as_view(), name="plataforma-eventos"),
+    path("invitaciones/", vistas.Invitaciones.as_view(), name="plataforma-invitaciones"),
     path("aprobaciones/", vistas.Aprobaciones.as_view(), name="plataforma-aprobaciones"),
     path("aprobaciones/<int:pk>/resolver/", vistas.AprobacionResolver.as_view(), name="plataforma-aprobacion-resolver"),
     path("secretos/", vistas.Secretos.as_view(), name="plataforma-secretos"),

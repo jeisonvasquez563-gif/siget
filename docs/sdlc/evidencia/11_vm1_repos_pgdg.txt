@@ -1,0 +1,16 @@
+# Corrección — VM1: deshabilitar todos los repositorios pgdg (firma GPG inválida)
+# 2026-11-17 00:02:16  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 "echo \"== Habilitados antes:\"; sudo dnf repolist --enabled 2>/dev/null | grep -i pgdg | cut -c1-40; sudo dnf config-manager --set-disabled \"pgdg*\" && echo \"== Repositorios pgdg habilitados ahora: $(sudo dnf repolist --enabled 2>/dev/null | grep -ci pgdg)\"; echo \"== Actualización de metadatos:\"; sudo dnf -q makecache 2>&1 | grep -iE \"error|firma|gpg\" || echo \"sin errores\"; echo \"Avisos de seguridad pendientes: $(sudo dnf -q updateinfo list --security | wc -l)\"; echo \"Actualizaciones pendientes: $(sudo dnf -q check-update | grep -c \"^[a-zA-Z]\")\"; echo \"Respaldo del archivo del repositorio: $(sudo ls /root/pgdg-redhat-all.repo.respaldo-2026-11-17)\"; echo \"Plataforma: $(curl -sk -o /dev/null -w %{http_code} https://127.0.0.1:8443/salud/ -H Host:localhost)\""
+== Habilitados antes:
+pgdg15             PostgreSQL 15 for RHE
+pgdg16             PostgreSQL 16 for RHE
+pgdg17             PostgreSQL 17 for RHE
+pgdg18             PostgreSQL 18 for RHE
+== Repositorios pgdg habilitados ahora: 0
+== Actualización de metadatos:
+sin errores
+Avisos de seguridad pendientes: 0
+Actualizaciones pendientes: 0
+Respaldo del archivo del repositorio: /root/pgdg-redhat-all.repo.respaldo-2026-11-17
+Plataforma: 200
+# código de salida: 0

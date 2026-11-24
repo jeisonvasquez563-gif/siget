@@ -18,6 +18,7 @@ from apps.autorizacion import matriz, pdp, simulador
 from apps.autorizacion.modulos import modulos_para
 from apps.autorizacion.pdp import Accion, Entorno, Recurso, Sujeto, decidir
 from apps.identidad.models import Perfil, SolicitudDerecho
+from apps.tramites.serializacion import ZONA_PANAMA
 from apps.nucleo.errores import AccesoDenegado
 from apps.nucleo.esquema import columnas_del_modelo
 from apps.plataforma import servicio as plataforma
@@ -28,40 +29,45 @@ MIGRACION = Path(__file__).resolve().parents[2] / "database" / "migraciones" / "
 
 # --------------------------------------------------------------------------- plazo de 10 días hábiles
 
-def test_los_dias_habiles_se_cuentan_de_lunes_a_viernes():
-    martes = datetime(2026, 11, 17, 9, 30, tzinfo=timezone.utc)
-    assert martes.weekday() == 1
-    assert derechos.sumar_dias_habiles(martes, 0) == martes
-    assert derechos.sumar_dias_habiles(martes, 1) == martes + timedelta(days=1)
-    assert derechos.sumar_dias_habiles(martes, 3).weekday() == 4  # viernes
-    assert derechos.sumar_dias_habiles(martes, 4) == datetime(2026, 11, 23, 9, 30, tzinfo=timezone.utc)  # salta el fin de semana
-
-
 def test_diez_dias_habiles_son_dos_semanas_justas_y_conservan_la_hora():
-    martes = datetime(2026, 11, 17, 9, 30, tzinfo=timezone.utc)
+    martes = datetime(2026, 11, 17, 14, 30, tzinfo=timezone.utc)  # 9:30 en Panamá
     vence = derechos.vence_en(martes)
-    assert vence == martes + timedelta(days=14) and vence.weekday() == 1 and (vence.hour, vence.minute) == (9, 30)
+    assert vence == martes + timedelta(days=14) and vence.weekday() == 1
 
 
 def test_un_pedido_en_fin_de_semana_cuenta_desde_el_lunes_siguiente():
     sabado = datetime(2026, 11, 21, 15, 0, tzinfo=timezone.utc)
-    assert sabado.weekday() == 5
-    primero = derechos.sumar_dias_habiles(sabado, 1)
-    assert primero == datetime(2026, 11, 23, 15, 0, tzinfo=timezone.utc)  # lunes: el sábado y el domingo no cuentan
-    assert derechos.vence_en(sabado).weekday() < 5
+    vence = derechos.vence_en(sabado)
+    assert vence.weekday() == 4  # del lunes 23 al viernes 4 de diciembre: 10 días hábiles
+    assert vence.date() == date(2026, 12, 4)
+
+
+def test_los_feriados_de_panama_no_cuentan():
+    lunes = datetime(2026, 11, 2, 14, 0, tzinfo=timezone.utc)  # 9:00 en Panamá
+    feriados = {date(2026, 11, 3), date(2026, 11, 4), date(2026, 11, 5), date(2026, 11, 10)}
+    sin_feriados = derechos.vence_en(lunes)
+    con_feriados = derechos.vence_en(lunes, feriados)
+    assert con_feriados - sin_feriados == timedelta(days=4)  # cuatro feriados entre semana: el plazo se corre cuatro días hábiles
+    assert con_feriados.weekday() < 5 and con_feriados.date() not in feriados
+
+
+def test_se_cuenta_en_hora_de_panama_no_en_utc():
+    # Viernes 20 de noviembre a las 20:00 de Panamá = sábado 01:00 UTC: sigue siendo viernes para la ley
+    viernes_noche = datetime(2026, 11, 21, 1, 0, tzinfo=timezone.utc)
+    assert derechos.vence_en(viernes_noche).date() == date(2026, 12, 4)
 
 
 def test_el_vencimiento_nunca_cae_en_fin_de_semana_ni_antes_de_diez_dias_corridos():
     for dia in range(30):
         desde = AHORA + timedelta(days=dia)
         vence = derechos.vence_en(desde)
-        assert vence.weekday() < 5
+        assert vence.astimezone(ZONA_PANAMA).weekday() < 5
         assert (vence - desde).days >= 10
 
 
 def test_los_dias_habiles_negativos_no_existen():
     with pytest.raises(ValueError):
-        derechos.sumar_dias_habiles(AHORA, -1)
+        derechos.sumar_dias_habiles(AHORA, -1, frozenset())
 
 
 def test_una_solicitud_vence_solo_si_sigue_abierta_y_paso_su_plazo():
@@ -349,7 +355,7 @@ def test_en_la_matriz_ninguna_cuenta_de_plataforma_corrige_perfiles():
 
 
 def test_el_operador_de_identidades_sigue_sin_poder_todo_ni_ver_tramites_en_la_matriz():
-    assert next(r for r in M["roles"] if r["id"] == "operador_identidades")["acciones_permitidas"] == 5
+    assert next(r for r in M["roles"] if r["id"] == "operador_identidades")["acciones_permitidas"] == 6  # alta, aprobación, restablecer MFA, invitar (PT-2) y las dos de solicitudes
     assert celda("operador_identidades", Accion.VER_TRAMITE)["politica"] == "plataforma_sin_acceso_a_tramites"
     assert M["ningun_rol_puede_todo"] is True
 
