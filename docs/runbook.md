@@ -1800,4 +1800,9 @@ La consola solo registra la respuesta: **no borra ni modifica nada**. Los trámi
 - Actualizar un perfil con `Perfil.save()` falla en producción (`permission denied`): `save()` escribe todas las columnas y solo hay `UPDATE` sobre tres. Hay que usar `Perfil.objects.filter(...).update(correo=..., provincia=..., ciudad=...)`.
 - `actualizado_en` lo sella la base con la hora de **inicio de la transacción** (`now()`), no la de la aplicación.
 - El plazo de 10 días hábiles usa `sumar_dias_habiles` de PT-3: salta fines de semana y los feriados de la tabla `feriado`, en hora de Panamá. Si la tabla no tiene los feriados del año siguiente, el plazo sale más corto que el legal: mantener `docs/feriados-panama.md` al día.
-- Un `GET /auth/mis-datos/` devuelve la cédula descifrada: la respuesta es `no-store` y nunca debe ir a un registro (log) ni a una herramienta de monitoreo.
+- `GET /auth/mis-datos/` devuelve la cédula **enmascarada** (últimos 3 caracteres); la completa solo sale en `/auth/mis-datos/exportar/`, que exige segundo factor reciente. Ambas respuestas son `no-store` y nunca deben ir a un registro (log) ni a una herramienta de monitoreo.
+- La 016 pone triggers `BEFORE INSERT`: una solicitud nace siempre `recibida`, sin respuesta y con `vence_en` entre 10 y 30 días; un perfil nace con `actualizado_en` NULL y con `aviso_leido_en` de la hora de la base. Si una inserción manual falla con «El plazo de respuesta debe vencer entre 10 y 30 dias», es esa regla. Solo un operador de identidades puede ser `respondida_por`, y `respondida_en` lo fija la base (no hay `UPDATE` sobre esa columna).
+
+### 39.9 Riesgos aceptados
+
+- **Sin seguridad por filas (RLS) en `perfil` ni en `solicitud_derecho`**: la separación entre personas la impone la aplicación (PDP y consultas siempre sobre la propia cuenta) y los `GRANT` por columna, no la base. Si `app_role` tuviera un fallo (una consulta sin filtrar), la base no lo frenaría. Defensa en profundidad pendiente; se acepta porque ninguna ruta recibe el identificador de otra persona y las vistas pasan por el PDP.
