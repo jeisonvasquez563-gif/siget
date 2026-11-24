@@ -1,10 +1,15 @@
 -- ============================================================================
 -- SIGET: pruebas de la migracion 018 (notificaciones dentro de la plataforma)
 -- Se ejecuta como el superusuario del contenedor, DESPUES de aplicar la migracion, dentro de una transaccion que se
--- revierte (no deja nada guardado):  psql -v ON_ERROR_STOP=1 -1 -f pruebas-notificaciones.sql  ... y termina en ROLLBACK.
+-- revierte (no deja nada guardado):  psql -v ON_ERROR_STOP=1 -f pruebas-notificaciones.sql  ... y termina en ROLLBACK.
 -- Cada prueba imprime PASA o FALLA con RAISE NOTICE.
 -- Cubre lo que verificar_tramites (por la API, como app_role) no puede: el aviso a la supervision cuando corre
 -- siget.escalar_vencidos() como escalador_role, sin contexto de usuario.
+-- ADVERTENCIAS:
+--  * escalar_vencidos() corre aqui sobre TODA la base: mientras dura el script escala (y bloquea) tambien los tramites vencidos
+--    REALES. El ROLLBACK final lo deshace todo, pero esas filas quedan bloqueadas hasta entonces.
+--  * Conviene correrlo fuera de la hora en punto: el temporizador del escalador corre cada hora y, si coincide con el script, uno de los
+--    dos espera al otro o escala primero (los resultados de la prueba del escalamiento dejarian de ser deterministas).
 -- ============================================================================
 BEGIN;
 
@@ -300,6 +305,86 @@ BEGIN
   EXCEPTION WHEN raise_exception THEN
     RAISE NOTICE 'PASA  el disparador impide cambiar cualquier columna que no sea leida_en, incluso al duenio';
   END;
+END $$;
+
+-- 26 a 30. Cuentas y accesos: no se avisa a quien ya no tiene acceso ni a una cuenta de personal no activa (D1 y D2); al solicitante si
+GRANT SELECT, INSERT ON _p018 TO siget_owner;  -- la tabla temporal es de quien corre el script, no del duenio
+SET LOCAL ROLE siget_owner;
+INSERT INTO siget.usuario (username, password_hash, estado_cuenta) VALUES
+  ('p018_funcrev', '!', 'activa'), ('p018_funcsus', '!', 'suspendida'), ('p018_supsus', '!', 'suspendida'), ('p018_supok', '!', 'activa'),
+  ('p018_blq', '!', 'bloqueada');
+INSERT INTO siget.membresia (usuario_id, institucion_id, rol, asignado_por)
+  SELECT u.id, i.id, x.rol::siget.rol_membresia, c.id
+    FROM (VALUES ('p018_funcrev', 'funcionario'), ('p018_funcsus', 'funcionario'), ('p018_supsus', 'supervisor'), ('p018_supok', 'supervisor')) AS x(username, rol)
+    JOIN siget.usuario u ON u.username = x.username
+    CROSS JOIN siget.institucion i
+    CROSS JOIN siget.usuario c
+   WHERE i.nombre = 'Prueba-018' AND c.username = 'p018_coord';
+INSERT INTO _p018 SELECT substr(username, 6), id FROM siget.usuario WHERE username IN ('p018_funcrev', 'p018_funcsus', 'p018_supsus', 'p018_supok', 'p018_blq');
+-- Cuatro tramites nuevos con plazo futuro: ta (asignado con acceso revocado), tb (asignado con cuenta suspendida), tc (supervision con una
+-- cuenta suspendida) y td (solicitante con la cuenta bloqueada)
+DO $$
+DECLARE
+  v_id bigint;
+  v_clave text;
+BEGIN
+  FOREACH v_clave IN ARRAY ARRAY['ta', 'tb', 'tc', 'td'] LOOP
+    INSERT INTO siget.tramite (tipo_tramite_id, institucion_id, solicitante_id, fecha_limite)
+      SELECT tt.id, tt.institucion_id, (SELECT id FROM _p018 WHERE clave = CASE WHEN v_clave = 'td' THEN 'blq' ELSE 'ciudadana' END), now() + interval '3 days'
+        FROM siget.tipo_tramite tt WHERE tt.nombre = 'Tramite prueba 018'
+      RETURNING id INTO v_id;
+    INSERT INTO _p018 VALUES (v_clave, v_id);
+  END LOOP;
+END $$;
+RESET ROLE;
+
+DO $$
+DECLARE
+  v_ok boolean;
+BEGIN
+  -- 26. Un asignado al que ya se le quito el acceso no recibe subsanacion_respondida (y uno con acceso vigente si: es la prueba 3)
+  PERFORM pg_temp.ctx('func');
+  UPDATE siget.tramite SET estado = 'En Tramitacion', funcionario_asignado_id = pg_temp.id('funcrev') WHERE id = pg_temp.id('ta');
+  PERFORM pg_temp.motivo('Falta el plano firmado del terreno.');
+  UPDATE siget.tramite SET estado = 'En Subsanacion' WHERE id = pg_temp.id('ta');
+  UPDATE siget.membresia
+     SET revocada_en = now(), revocada_por = pg_temp.id('coord')
+   WHERE usuario_id = pg_temp.id('funcrev');
+  PERFORM pg_temp.ctx('ciudadana');
+  PERFORM pg_temp.motivo('Adjunto el plano firmado del terreno.');
+  UPDATE siget.tramite SET estado = 'En Tramitacion' WHERE id = pg_temp.id('ta');
+  v_ok := pg_temp.total('funcrev') = 0 AND pg_temp.n('ciudadana', 'subsanacion_pedida', 'ta') = 1;
+  RAISE NOTICE '% un asignado con la membresia revocada no recibe subsanacion_respondida', CASE WHEN v_ok THEN 'PASA ' ELSE 'FALLA' END;
+
+  -- 27. Tampoco un asignado con la cuenta no activa
+  PERFORM pg_temp.ctx('func');
+  UPDATE siget.tramite SET estado = 'En Tramitacion', funcionario_asignado_id = pg_temp.id('funcsus') WHERE id = pg_temp.id('tb');
+  PERFORM pg_temp.motivo('Falta el plano firmado del terreno.');
+  UPDATE siget.tramite SET estado = 'En Subsanacion' WHERE id = pg_temp.id('tb');
+  PERFORM pg_temp.ctx('ciudadana');
+  PERFORM pg_temp.motivo('Adjunto el plano firmado del terreno.');
+  UPDATE siget.tramite SET estado = 'En Tramitacion' WHERE id = pg_temp.id('tb');
+  v_ok := pg_temp.total('funcsus') = 0 AND pg_temp.n('ciudadana', 'subsanacion_pedida', 'tb') = 1;
+  RAISE NOTICE '% un asignado con la cuenta suspendida no recibe subsanacion_respondida', CASE WHEN v_ok THEN 'PASA ' ELSE 'FALLA' END;
+
+  -- 28. Al escalarse, la supervision con la cuenta suspendida no recibe tramite_escalado; la activa si (lo hace la coordinacion: no es destinataria)
+  PERFORM pg_temp.ctx('coord');
+  UPDATE siget.tramite SET escalado_en = now() WHERE id = pg_temp.id('tc');
+  v_ok := pg_temp.n('supsus', 'tramite_escalado', 'tc') = 0 AND pg_temp.total('supsus') = 0;
+  RAISE NOTICE '% una supervisora con la cuenta suspendida no recibe tramite_escalado', CASE WHEN v_ok THEN 'PASA ' ELSE 'FALLA' END;
+  v_ok := pg_temp.n('supok', 'tramite_escalado', 'tc') = 1 AND pg_temp.n('sup1', 'tramite_escalado', 'tc') = 1 AND pg_temp.n('sup2', 'tramite_escalado', 'tc') = 1
+          AND pg_temp.n('suprev', 'tramite_escalado', 'tc') = 0;
+  RAISE NOTICE '% y la supervision activa y vigente si (la revocada, no)', CASE WHEN v_ok THEN 'PASA ' ELSE 'FALLA' END;
+
+  -- 29. Los avisos que ya existian no cambian: el funcionario con acceso vigente conserva el suyo; la otra ciudadana y la coordinacion, ninguno
+  v_ok := pg_temp.total('func') = 1 AND pg_temp.total('otra') = 0 AND pg_temp.total('coord') = 0;
+  RAISE NOTICE '% el funcionario con acceso vigente conserva su unico aviso; la otra persona y la coordinacion siguen sin ninguno', CASE WHEN v_ok THEN 'PASA ' ELSE 'FALLA' END;
+
+  -- 30. Al SOLICITANTE con la cuenta bloqueada si se le avisa: lo vera al volver
+  PERFORM pg_temp.ctx('func');
+  UPDATE siget.tramite SET estado = 'En Tramitacion' WHERE id = pg_temp.id('td');
+  v_ok := pg_temp.n('blq', 'tramite_en_atencion', 'td') = 1;
+  RAISE NOTICE '% un solicitante con la cuenta bloqueada si recibe el aviso de su tramite (lo ve al volver)', CASE WHEN v_ok THEN 'PASA ' ELSE 'FALLA' END;
 END $$;
 
 ROLLBACK;
