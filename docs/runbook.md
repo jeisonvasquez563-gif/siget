@@ -1770,7 +1770,7 @@ Es una sola transacción: o queda todo o nada. Comprobar de inmediato, **con un 
 - `\dp siget.perfil`: el permiso `UPDATE` de `app_role` aparece solo para `correo`, `provincia` y `ciudad`.
 - `\dp siget.solicitud_derecho`: `app_role` con `r` (SELECT), `a` (INSERT) y `w` solo por columnas; ningún permiso para `pgadmin_lectura`, `auditor_role` ni `checkpoint_app`; ningún `d` (DELETE) para nadie.
 - `select count(*) from siget.perfil where aviso_version is not null;` debe dar `0`: los perfiles existentes quedan sin constancia del aviso (no se inventa).
-- El login del checkpoint y el de `app_role` siguen funcionando.
+- El login de `app_role` sigue funcionando (el checkpoint PHP y su rol `checkpoint_app` están retirados desde el 17-nov-2026, sección 38: no hay que comprobarlos).
 
 Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
 
@@ -1871,7 +1871,7 @@ Es una sola transacción: o queda todo o nada. Comprobar de inmediato, **con un 
 - `\dp siget.tramite`: `app_role` con `UPDATE` por columna que ahora incluye `datos`; ningún permiso nuevo para `pgadmin_lectura`, `auditor_role`, `escalador_role` ni `checkpoint_app`.
 - `\d siget.tramite`: triggers `tramite_valida_datos`, `tramite_valida_solicitante`, `tramite_limpia_motivo` (además de los de antes) y la política `tramite_responder_subsanacion` en `\dp`/`pg_policies`.
 - Con `app_role` en una transacción que se revierte: un `UPDATE` de estado a `Rechazado` **sin** `siget.motivo` debe fallar con «exige un motivo», y con `select set_config('siget.motivo', 'motivo de prueba largo', true)` antes, pasar.
-- El login del checkpoint y el de `app_role` siguen funcionando.
+- El login de `app_role` sigue funcionando (el checkpoint PHP y su rol `checkpoint_app` están retirados desde el 17-nov-2026, sección 38: no hay que comprobarlos).
 
 Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
 
