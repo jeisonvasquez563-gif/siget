@@ -378,6 +378,184 @@ class Command(BaseCommand):
         error, filas = self._bd(func_mop, [mop.pk], lambda: Tramite.objects.filter(pk=tx).update(funcionario_asignado_id=super_mop.pk))
         self._paso("y la reasignación por el personal (que no es el solicitante) sigue funcionando", error is None and filas == 1 and tramite(tx).funcionario_asignado_id == super_mop.pk, str(error)[:90])
 
+    # ------------------------------------------------------------------ notificaciones (migración 018)
+
+    @staticmethod
+    def _sqlstate(error):
+        causa = getattr(error, "__cause__", None)
+        return getattr(causa, "sqlstate", None)
+
+    def _cuenta_filas(self, consulta, parametros):
+        """Ejecuta un comando directo y devuelve las filas afectadas (para `_bd`)."""
+        with connection.cursor() as c:
+            c.execute(consulta, parametros)
+            return c.rowcount
+
+    def _notificaciones(self, mop, tipo_mop, coord, super_mop, ana, operador):
+        """Las genera la base al cambiar el trámite (disparador) y cada persona ve solo las suyas (seguridad por filas).
+        Personas NUEVAS (lola, nando): su lista parte vacía y cada paso se compara con la lista completa. Todo ocurre en una sola
+        transacción: todas las notificaciones comparten `creada_en`, por eso el orden es por id. `escalar_vencidos()` no se puede
+        ejecutar desde aquí (app_role no tiene permiso): su aviso a la supervisión lo prueba database/pruebas-notificaciones.sql."""
+        lola, nando = self._persona("nota_lola"), self._persona("nota_nando")
+        Membresia.objects.create(usuario=nando, institucion=mop, rol="funcionario", asignado_por=coord)
+        Usuario.objects.filter(pk=super_mop.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=1))
+        t_lola, t_nando, t_super, t_ana, t_op = (self._token(p) for p in (lola, nando, super_mop, ana, operador))
+        h = lambda metodo, ruta, token, datos=None: self._http(metodo, ruta, token, datos)  # noqa: E731
+
+        def leer_sql(persona, consulta, parametros=()):
+            """Una consulta directa a la base como `persona` (su contexto de seguridad por filas, sin pasar por la API)."""
+            fijar_contexto(persona.pk, [])
+            with connection.cursor() as c:
+                c.execute(consulta, parametros)
+                return c.fetchall()
+
+        def tipos(persona):
+            return [f[0] for f in leer_sql(persona, "SELECT tipo FROM siget.notificacion ORDER BY id")]
+
+        def nueva_solicitud():
+            r = h("post", "/tramites/", t_lola, {"tipo_tramite": tipo_mop.pk, "datos": datos_de_ejemplo(tipo_mop.formulario)})
+            return r.json()["id"]
+
+        def estado(pk, destino, motivo=None):
+            cuerpo = {"estado": destino} if motivo is None else {"estado": destino, "motivo": motivo}
+            return h("post", f"/tramites/{pk}/estado/", t_nando, cuerpo)
+
+        MOTIVO = "Falta el plano firmado del terreno."
+        RESPUESTA = "Adjunto el plano firmado del terreno."
+
+        # ---------------------------------------------------------------- una cuenta nueva no tiene nada, y crear un trámite no notifica
+        self._paso("una cuenta nueva no tiene notificaciones", tipos(lola) == [] and tipos(nando) == [])
+        t1 = nueva_solicitud()
+        self._paso("crear un trámite no genera ninguna (solo notifican los cambios de un trámite ya creado)", tipos(lola) == [] and tipos(nando) == [])
+
+        # ---------------------------------------------------------------- cada transición avisa a quien corresponde
+        self._paso("el personal toma el trámite: el solicitante recibe «tramite_en_atencion»", estado(t1, "En Tramitacion").status_code == 200 and tipos(lola) == ["tramite_en_atencion"])
+        self._paso("y quien actuó no recibe nada de su propio cambio", tipos(nando) == [])
+        self._paso("el personal pide una subsanación: el solicitante recibe «subsanacion_pedida»",
+                   estado(t1, "En Subsanacion", MOTIVO).status_code == 200 and tipos(lola) == ["tramite_en_atencion", "subsanacion_pedida"])
+        columnas = leer_sql(lola, "SELECT column_name FROM information_schema.columns WHERE table_schema = 'siget' AND table_name = 'notificacion' ORDER BY ordinal_position")
+        self._paso("la notificación no lleva el motivo ni datos de nadie: solo tipo, trámite y fechas",
+                   columnas == [("id",), ("usuario_id",), ("tipo",), ("tramite_id",), ("creada_en",), ("leida_en",)], columnas)
+        r = h("post", f"/tramites/{t1}/reasignar/", t_super, {"funcionario_id": nando.pk})
+        self._paso("reasignar el trámite no genera notificaciones (no cambia el estado)",
+                   r.status_code == 200 and tipos(lola) == ["tramite_en_atencion", "subsanacion_pedida"] and tipos(nando) == [], r.status_code)
+        r = h("post", f"/tramites/{t1}/subsanacion/", t_lola, {"respuesta": RESPUESTA})
+        self._paso("el solicitante responde la subsanación: el funcionario asignado recibe «subsanacion_respondida»", r.status_code == 200 and tipos(nando) == ["subsanacion_respondida"], r.status_code)
+        self._paso("y el solicitante, que fue quien actuó, no recibe nada nuevo", tipos(lola) == ["tramite_en_atencion", "subsanacion_pedida"])
+        self._paso("se pide otra subsanación y el solicitante la recibe",
+                   estado(t1, "En Subsanacion", MOTIVO).status_code == 200 and tipos(lola)[-1] == "subsanacion_pedida" and len(tipos(lola)) == 3)
+        r = estado(t1, "En Tramitacion", "La persona no respondió; se retoma el trámite.")
+        self._paso("si cierra la subsanación el personal (no el solicitante), no se avisa al asignado ni al solicitante",
+                   r.status_code == 200 and tipos(nando) == ["subsanacion_respondida"] and len(tipos(lola)) == 3)
+        self._paso("el personal aprueba: el solicitante recibe «tramite_aprobado»", estado(t1, "Aprobado").status_code == 200 and tipos(lola)[-1] == "tramite_aprobado" and len(tipos(lola)) == 4)
+
+        t2 = nueva_solicitud()
+        estado(t2, "En Tramitacion")
+        self._paso("el personal rechaza (con motivo): el solicitante recibe «tramite_rechazado»",
+                   estado(t2, "Rechazado", "No cumple con los requisitos del trámite.").status_code == 200 and tipos(lola)[-2:] == ["tramite_en_atencion", "tramite_rechazado"])
+        t3 = nueva_solicitud()
+        estado(t3, "En Tramitacion")
+        estado(t3, "En Subsanacion", MOTIVO)
+        antes = tipos(nando)
+        r = h("post", f"/tramites/{t3}/subsanacion/", t_lola, {"respuesta": RESPUESTA})
+        self._paso("responder una subsanación en un trámite sin funcionario asignado no avisa al personal", r.status_code == 200 and tipos(nando) == antes, r.status_code)
+        self._paso("lola acumuló exactamente las notificaciones esperadas, en orden",
+                   tipos(lola) == ["tramite_en_atencion", "subsanacion_pedida", "subsanacion_pedida", "tramite_aprobado", "tramite_en_atencion", "tramite_rechazado",
+                                   "tramite_en_atencion", "subsanacion_pedida"], tipos(lola))
+
+        # ---------------------------------------------------------------- una transición que la base rechaza no deja notificación (misma transacción)
+        antes = tipos(lola)
+        error, _ = self._bd(nando, [mop.pk], lambda: Tramite.objects.filter(pk=t1).update(estado="En Tramitacion"), "Motivo suficientemente largo.")
+        self._paso("un cambio de estado que la base rechaza (Aprobado -> En Tramitacion) no deja ninguna notificación", error is not None and tipos(lola) == antes)
+
+        # ---------------------------------------------------------------- por la API: lista, total, no leídas, paginación y formato
+        r = h("get", "/notificaciones/", t_lola)
+        cuerpo = r.json()
+        self._paso("lola lista sus 8 notificaciones, las más recientes primero, con el total y las no leídas",
+                   r.status_code == 200 and cuerpo["total"] == 8 and cuerpo["no_leidas"] == 8 and len(cuerpo["resultados"]) == 8
+                   and [n["tipo"] for n in cuerpo["resultados"]] == list(reversed(tipos(lola))), r.status_code)
+        primera = cuerpo["resultados"][0]
+        self._paso("cada una lleva el trámite con el nombre del tipo y la institución, que ella ya ve",
+                   primera["tramite_id"] == t3 and primera["tramite"] == {"tipo_tramite": tipo_mop.nombre, "institucion": "MOP"} and primera["leida"] is False
+                   and set(primera) == {"id", "tipo", "tramite_id", "tramite", "creada_en", "leida"}, primera)
+        r = h("get", "/notificaciones/?limite=3&desplazamiento=3", t_lola)
+        self._paso("se pagina (limite y desplazamiento) sin perder el total",
+                   r.status_code == 200 and r.json()["total"] == 8 and [n["id"] for n in r.json()["resultados"]] == [n["id"] for n in cuerpo["resultados"][3:6]])
+        fallas = [consulta for consulta in ("limite=0", "limite=101", "limite=x", "desplazamiento=-1", "solo_no_leidas=0", "solo_no_leidas=si")
+                  if h("get", f"/notificaciones/?{consulta}", t_lola).status_code != 400]
+        self._paso("una paginación o un filtro inválido se rechaza con 400", not fallas, fallas)
+        r = h("get", "/notificaciones/", t_nando)
+        self._paso("nando ve solo la suya (una), no las de lola", r.status_code == 200 and r.json()["total"] == 1 and r.json()["resultados"][0]["tipo"] == "subsanacion_respondida")
+        self._paso("la respuesta no se guarda en caché", r["Cache-Control"] == "no-store")
+
+        # ---------------------------------------------------------------- una persona no ve ni marca las de otra
+        ajena = primera["id"]
+        r = h("get", "/notificaciones/", t_ana)
+        self._paso("otra ciudadana no ve ninguna de las de lola en su lista",
+                   r.status_code == 200 and ajena not in {n["id"] for n in r.json()["resultados"]} and all(n["tramite_id"] not in {t1, t2, t3} for n in r.json()["resultados"]))
+        self._paso("ni por la base directamente (la seguridad por filas): cuenta 0 filas de lola", leer_sql(ana, "SELECT count(*) FROM siget.notificacion WHERE usuario_id = %s", [lola.pk]) == [(0,)])
+        self._paso("marcar la notificación de lola como otra persona da 404 (ciudadana y personal)",
+                   h("post", f"/notificaciones/{ajena}/leida/", t_ana).status_code == 404 and h("post", f"/notificaciones/{ajena}/leida/", t_nando).status_code == 404)
+        self._paso("una notificación inexistente también (404)", h("post", "/notificaciones/999999999/leida/", t_lola).status_code == 404)
+        r = h("post", "/notificaciones/leer-todas/", t_ana)
+        self._paso("«leer todas» de otra persona no toca las de lola", r.status_code == 200 and h("get", "/notificaciones/?solo_no_leidas=1", t_lola).json()["total"] == 8)
+        error, filas = self._bd(ana, [], lambda: self._cuenta_filas("UPDATE siget.notificacion SET leida_en = now() WHERE id = %s", [ajena]))
+        self._paso("ni con un UPDATE directo: la base no le muestra la fila (0 filas) y la de lola sigue sin leer",
+                   error is None and filas == 0 and leer_sql(lola, "SELECT leida_en FROM siget.notificacion WHERE id = %s", [ajena]) == [(None,)], str(error)[:80])
+        r = h("get", "/notificaciones/", t_op)
+        self._paso("un rol de plataforma tiene su propia lista (vacía) y no las de nadie", r.status_code == 200 and r.json()["total"] == 0 and r.json()["resultados"] == [], r.status_code)
+        self._paso("sin token se responde 401", self._http("get", "/notificaciones/").status_code == 401)
+        self._paso("un token de enrolamiento no sirve (403)", self._http("get", "/notificaciones/", self._token(lola, tokens.SCOPE_ENROLAR_MFA)).status_code == 403)
+
+        # ---------------------------------------------------------------- marcar como leída
+        r = h("post", f"/notificaciones/{ajena}/leida/", t_lola)
+        self._paso("lola marca una como leída y recibe las que le quedan", r.status_code == 200 and r.json() == {"id": ajena, "leida": True, "no_leidas": 7}, r.json())
+        r = h("post", f"/notificaciones/{ajena}/leida/", t_lola)
+        self._paso("marcarla otra vez no falla ni cambia nada (idempotente)", r.status_code == 200 and r.json()["no_leidas"] == 7, r.status_code)
+        self._paso("la lista con solo_no_leidas trae 7 y el total general sigue en 8",
+                   h("get", "/notificaciones/?solo_no_leidas=1", t_lola).json()["total"] == 7 and h("get", "/notificaciones/", t_lola).json()["total"] == 8)
+        self._paso("la base fijó la hora de lectura (la de la transacción)", leer_sql(lola, "SELECT leida_en = now() FROM siget.notificacion WHERE id = %s", [ajena]) == [(True,)])
+
+        # ---------------------------------------------------------------- lo que la base impone a app_role
+        propia_sin_leer = next(n["id"] for n in cuerpo["resultados"] if n["id"] != ajena)
+        error, _ = self._bd(lola, [], lambda: self._cuenta_filas("INSERT INTO siget.notificacion (usuario_id, tipo, tramite_id) VALUES (%s, 'tramite_aprobado', %s)", [lola.pk, t1]))
+        self._paso("app_role no puede insertar una notificación (ni para sí misma): solo el disparador", self._sqlstate(error) == "42501", str(error)[:80])
+        error, _ = self._bd(lola, [], lambda: self._cuenta_filas("DELETE FROM siget.notificacion WHERE id = %s", [ajena]))
+        self._paso("ni borrarla", self._sqlstate(error) == "42501", str(error)[:80])
+        error, _ = self._bd(lola, [], lambda: self._cuenta_filas("UPDATE siget.notificacion SET tipo = 'tramite_aprobado' WHERE id = %s", [propia_sin_leer]))
+        self._paso("ni cambiarle el tipo (solo se le concede leida_en)", self._sqlstate(error) == "42501", str(error)[:80])
+        error, _ = self._bd(lola, [], lambda: self._cuenta_filas("UPDATE siget.notificacion SET leida_en = NULL WHERE id = %s", [ajena]))
+        self._paso("ni desmarcar una ya leída (la base lo rechaza)",
+                   self._dice(error, "desmarca") and leer_sql(lola, "SELECT leida_en IS NOT NULL FROM siget.notificacion WHERE id = %s", [ajena]) == [(True,)], str(error)[:80])
+        error, _ = self._bd(lola, [], lambda: self._cuenta_filas("UPDATE siget.notificacion SET leida_en = now() + interval '1 day' WHERE id = %s", [ajena]))
+        self._paso("ni volver a marcarla con otra hora", self._dice(error, "desmarca"), str(error)[:80])
+        error, filas = self._bd(lola, [], lambda: self._cuenta_filas("UPDATE siget.notificacion SET leida_en = '2000-01-01' WHERE id = %s", [propia_sin_leer]))
+        self._paso("al marcar una pendiente con una hora inventada, la base pone la suya y no la que mande la aplicación",
+                   error is None and filas == 1 and leer_sql(lola, "SELECT leida_en = now() FROM siget.notificacion WHERE id = %s", [propia_sin_leer]) == [(True,)], str(error)[:80])
+        with connection.cursor() as c:
+            c.execute("""select r.rolname, has_table_privilege(r.rolname, 'siget.notificacion', 'SELECT'), has_table_privilege(r.rolname, 'siget.notificacion', 'INSERT'),
+                         has_table_privilege(r.rolname, 'siget.notificacion', 'UPDATE'), has_table_privilege(r.rolname, 'siget.notificacion', 'DELETE'),
+                         has_any_column_privilege(r.rolname, 'siget.notificacion', 'SELECT'), has_any_column_privilege(r.rolname, 'siget.notificacion', 'INSERT'),
+                         has_any_column_privilege(r.rolname, 'siget.notificacion', 'UPDATE'), has_column_privilege(r.rolname, 'siget.notificacion', 'leida_en', 'UPDATE'),
+                         has_column_privilege(r.rolname, 'siget.notificacion', 'tipo', 'UPDATE'), has_sequence_privilege(r.rolname, 'siget.notificacion_id_seq', 'USAGE')
+                         from pg_roles r where r.rolname in ('app_role', 'auditor_role', 'pgadmin_lectura', 'checkpoint_app', 'escalador_role')""")
+            privilegios = {f[0]: f[1:] for f in c.fetchall()}
+        app = privilegios["app_role"]
+        # posiciones: 0-3 tabla (SELECT, INSERT, UPDATE, DELETE), 4-6 alguna columna (SELECT, INSERT, UPDATE), 7 leida_en UPDATE, 8 tipo UPDATE, 9 secuencia
+        self._paso("app_role: lee, marca solo leida_en, no inserta, no borra y no usa la secuencia",
+                   app[0] and app[6] and app[7] and not (app[1] or app[2] or app[3] or app[5] or app[8] or app[9]), app)
+        self._paso("ni el auditor, ni pgadmin_lectura, ni el checkpoint, ni el escalador tienen nada sobre las notificaciones, ni por tabla ni por columna",
+                   not any(any(privilegios[rol]) for rol in ("auditor_role", "pgadmin_lectura", "checkpoint_app", "escalador_role")))
+
+        # ---------------------------------------------------------------- leer todas, y lo nuevo vuelve a contar
+        r = h("post", "/notificaciones/leer-todas/", t_lola)
+        self._paso("«leer todas» marca las pendientes de lola y deja la cuenta en cero", r.status_code == 200 and r.json() == {"marcadas": 6, "no_leidas": 0}, r.json())
+        self._paso("y la lista confirma que ya no queda ninguna sin leer", h("get", "/notificaciones/?solo_no_leidas=1", t_lola).json()["total"] == 0)
+        estado(nueva_solicitud(), "En Tramitacion")  # un cuarto trámite: el personal lo toma y lola recibe una nueva
+        r = h("get", "/notificaciones/", t_lola)
+        self._paso("una notificación nueva vuelve a contar como no leída", r.json()["no_leidas"] == 1 and r.json()["total"] == 9 and r.json()["resultados"][0]["leida"] is False, r.json()["no_leidas"])
+        self._paso("las de nando no se tocaron por lo que hizo lola", h("get", "/notificaciones/", t_nando).json()["no_leidas"] == 1)
+
     def _recorrer(self):
         mop = Institucion.objects.get(nombre="MOP")
         minsa = Institucion.objects.get(nombre="MINSA")
@@ -607,6 +785,9 @@ class Command(BaseCommand):
 
         # ---------------------------------------------------------------- contenido del trámite (migración 017)
         self._contenido(mop, tipo_mop, ana, beto, func_mop, super_mop, func_minsa, operador, coordinador, tok)
+
+        # ---------------------------------------------------------------- notificaciones (migración 018)
+        self._notificaciones(mop, tipo_mop, coord, super_mop, ana, operador)
 
         # ---------------------------------------------------------------- decisiones registradas
         negadas = [d for d in DECISIONES if d[2] is False]
