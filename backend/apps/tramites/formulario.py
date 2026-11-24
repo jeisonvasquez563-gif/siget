@@ -75,7 +75,7 @@ def _caracteres_no_permitidos(texto, permitir_saltos):
         if c in "\n\t" and permitir_saltos:
             continue
         categoria = unicodedata.category(c)
-        if categoria in {"Cc", "Cs", "Co", "Cn"} or (categoria == "Cf" and c not in _FORMATO_PERMITIDO) or c in {" ", " "}:
+        if categoria in {"Cc", "Cs", "Co", "Cn"} or (categoria == "Cf" and c not in _FORMATO_PERMITIDO) or c in {"\u2028", "\u2029"}:
             return True
     return False
 

@@ -153,7 +153,7 @@ class Command(BaseCommand):
         self._paso("el listado no lleva el contenido (solo el detalle)", all("datos" not in t for t in h("get", "/tramites/?limite=100", ana).json()["resultados"]))
         invalidos = (({}, "asunto", "obligatorio ausente"), ({"asunto": "   "}, "asunto", "obligatorio en blanco"), ({"asunto": 5}, "asunto", "texto que es un número"),
                      ({"asunto": ["a"]}, "asunto", "texto que es una lista"), ({"asunto": {"a": 1}}, "asunto", "texto que es un objeto"),
-                     ({"asunto": "x" * 151}, "asunto", "texto más largo que el máximo"), ({"asunto": "a‮b"}, "asunto", "carácter de control bidireccional"),
+                     ({"asunto": "x" * 151}, "asunto", "texto más largo que el máximo"), ({"asunto": "a\u202eb"}, "asunto", "carácter de control bidireccional"),
                      ({"asunto": "a\x00b"}, "asunto", "carácter nulo"), ({"asunto": "ok", "cedula": "8-123-456"}, "datos", "campo desconocido"),
                      ({"asunto": "ok", "descripcion": "d" * 2001}, "descripcion", "texto largo más largo que el máximo"))
         fallas = [motivo for datos, campo, motivo in invalidos

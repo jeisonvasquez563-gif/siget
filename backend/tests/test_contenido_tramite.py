@@ -130,7 +130,7 @@ def test_crear_sin_datos_obligatorios_da_400_con_el_error_por_campo(registro):
 
 
 @pytest.mark.parametrize("datos", [[], "x", 5, None, [{"asunto": "a"}], {"asunto": ["a"]}, {"asunto": {"a": 1}}, {"asunto": 5}, {"asunto": "x" * 100_000},
-                                   {"asunto": "a‮b"}, {"asunto": "a\x00b"}, {"asunto": "ok", "cedula": "8-123-456"}, {"asunto": "ok", "descripcion": {"a": {"b": {"c": 1}}}}])
+                                   {"asunto": "a\u202eb"}, {"asunto": "a\x00b"}, {"asunto": "ok", "cedula": "8-123-456"}, {"asunto": "ok", "descripcion": {"a": {"b": {"c": 1}}}}])
 def test_crear_rechaza_datos_hostiles_sin_tocar_la_base(registro, datos):
     r = crear({"tipo_tramite": 1, "datos": datos})
     assert r.status_code == 400 and r.data["codigo"] == "datos_invalidos" and r.data["errores"]
@@ -159,7 +159,7 @@ def test_el_motivo_es_obligatorio_para_rechazar_pedir_y_cerrar_una_subsanacion(r
     assert not pasos(registro, "update") and not pasos(registro, "pdp")
 
 
-@pytest.mark.parametrize("malo", [5, True, ["largo texto de motivo"], {"a": "largo texto de motivo"}, "x" * 2001, "motivo\x00largo", "motivo‮largo", pytest.param("m" * 100_000, id="enorme")])
+@pytest.mark.parametrize("malo", [5, True, ["largo texto de motivo"], {"a": "largo texto de motivo"}, "x" * 2001, "motivo\x00largo", "motivo\u202elargo", pytest.param("m" * 100_000, id="enorme")])
 def test_un_motivo_que_no_es_texto_valido_se_rechaza_tambien_cuando_es_opcional(registro, malo):
     r = estado({"estado": "Aprobado", "motivo": malo})
     assert r.status_code == 400 and "motivo" in r.data["errores"] and not pasos(registro, "update")

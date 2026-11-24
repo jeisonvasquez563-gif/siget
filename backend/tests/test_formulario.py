@@ -77,13 +77,13 @@ def test_el_largo_cuenta_despues_de_quitar_los_espacios():
     assert validar(con(numero_finca="  " + "x" * 40 + "  "))[1] == {}
 
 
-@pytest.mark.parametrize("hostil", ["a\x00b", "a\x1bb", "a\x7fb", "a‮b", "a﻿b", "a b", "a\ud800b", "ab", "a\nb", "a\tb"])
+@pytest.mark.parametrize("hostil", ["a\x00b", "a\x1bb", "a\x7fb", "a\u202eb", "a\ufeffb", "a\u2028b", "a\ud800b", "ab", "a\nb", "a\tb"])
 def test_un_texto_de_una_linea_rechaza_caracteres_de_control_y_formato(hostil):
     _, errores = validar(con(direccion_terreno=hostil))
     assert "direccion_terreno" in errores
 
 
-@pytest.mark.parametrize("hostil", ["a\x00b", "a\x1bb", "a‮b", "a﻿b", "a b"])
+@pytest.mark.parametrize("hostil", ["a\x00b", "a\x1bb", "a\u202eb", "a\ufeffb", "a\u2028b"])
 def test_un_texto_largo_rechaza_control_y_formato_pero_admite_saltos(hostil):
     assert "descripcion" in validar(con(descripcion=hostil))[1]
     assert validar(con(descripcion="uno\ndos\n\ttres"))[1] == {}
