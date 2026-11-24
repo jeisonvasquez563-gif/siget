@@ -95,7 +95,7 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 8,
+            "acciones_permitidas": 9,
             "acciones_totales": 26
         },
         {
@@ -159,7 +159,7 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 10,
+            "acciones_permitidas": 11,
             "acciones_totales": 26
         },
         {
@@ -211,7 +211,7 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 7,
+            "acciones_permitidas": 8,
             "acciones_totales": 26
         },
         {
@@ -515,7 +515,7 @@
             "nombre": "Responder una subsanación",
             "grupo": "Trámites",
             "casos": [
-                "En un trámite propio",
+                "En un trámite propio (el personal, en otra institución)",
                 "En un trámite ajeno"
             ]
         },
@@ -1019,8 +1019,8 @@
             },
             "responder_subsanacion": {
                 "favorable": {
-                    "permitido": false,
-                    "politica": "sin_regla_que_permita"
+                    "permitido": true,
+                    "politica": "solicitante_responde_subsanacion"
                 },
                 "desfavorable": {
                     "permitido": false,
@@ -1307,8 +1307,8 @@
             },
             "responder_subsanacion": {
                 "favorable": {
-                    "permitido": false,
-                    "politica": "sin_regla_que_permita"
+                    "permitido": true,
+                    "politica": "solicitante_responde_subsanacion"
                 },
                 "desfavorable": {
                     "permitido": false,
@@ -1595,8 +1595,8 @@
             },
             "responder_subsanacion": {
                 "favorable": {
-                    "permitido": false,
-                    "politica": "sin_regla_que_permita"
+                    "permitido": true,
+                    "politica": "solicitante_responde_subsanacion"
                 },
                 "desfavorable": {
                     "permitido": false,

@@ -167,5 +167,9 @@ def test_solo_la_ciudadania_responde_una_subsanacion_y_sin_segundo_factor_recien
     assert celda("ciudadano", Accion.RESPONDER_SUBSANACION)["politica"] == "solicitante_responde_subsanacion"
     assert celda("ciudadano", Accion.RESPONDER_SUBSANACION, "desfavorable")["permitido"] is False
     assert M["matriz"]["ciudadano"]["responder_subsanacion"]["exige_segundo_factor"] is False
+    # El personal solo por la vía de la ciudadanía: su propio trámite, en OTRA institución; un trámite ajeno sigue negado
     for rol in ("funcionario", "supervisor", "coordinador_institucional"):
-        assert celda(rol, Accion.RESPONDER_SUBSANACION)["permitido"] is False
+        assert celda(rol, Accion.RESPONDER_SUBSANACION)["politica"] == "solicitante_responde_subsanacion", rol
+        assert celda(rol, Accion.RESPONDER_SUBSANACION, "desfavorable")["permitido"] is False, rol
+    for rol in ("operador_infraestructura", "auditor"):
+        assert celda(rol, Accion.RESPONDER_SUBSANACION)["permitido"] is False, rol
