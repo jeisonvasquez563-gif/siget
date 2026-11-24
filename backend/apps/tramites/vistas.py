@@ -13,7 +13,7 @@ Lo que la persona no puede ver, para ella no existe (404): no se distingue "no e
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import DatabaseError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
@@ -65,6 +65,20 @@ def _fijar_motivo(motivo):
     Debe llamarse dentro de `transaction.atomic()`, justo antes del UPDATE de estado (la base lo limpia al terminar la sentencia)."""
     with connection.cursor() as cursor:
         cursor.execute("SELECT set_config('siget.motivo', %s, true)", [motivo or ""])
+
+
+def _validar_contenido(request, tipo_id, definicion, datos):
+    """Valida `datos` contra la definición del formulario del tipo `tipo_id`. Devuelve `(contenido, None)` o `(None, respuesta_de_error)`.
+    Un formulario mal definido es un fallo del catálogo, no de quien envía: 503 y un evento de seguridad (sin datos personales)."""
+    try:
+        contenido, errores = formulario.validar_datos(definicion, datos)
+    except formulario.FormularioMalDefinido:
+        registrar_evento(request.user.usuario.pk, "formulario_no_disponible", None, {"tipo_tramite": tipo_id})
+        return None, _error("formulario_no_disponible", "El formulario de este trámite no está disponible por ahora. Inténtalo más tarde.",
+                            status.HTTP_503_SERVICE_UNAVAILABLE)
+    if errores:
+        return None, _error("datos_invalidos", "Los datos del trámite no cumplen con su formulario.", status.HTTP_400_BAD_REQUEST, errores)
+    return contenido, None
 
 
 class _Base(APIView):
@@ -127,14 +141,21 @@ class TramitesColeccion(_Base):
         # El solicitante siempre es quien actúa: cualquier otro campo del cuerpo se ignora
         autorizar(request, Accion.CREAR_TRAMITE, Recurso(tipo="tramite", institucion_id=tipo.institucion_id, solicitante_id=usuario.pk,
                                                                      audiencia=tipo.audiencia))
-        contenido, errores = formulario.validar_datos(tipo.formulario, _datos(request).get("datos", {}))
-        if errores:
-            return _error("datos_invalidos", "Los datos del trámite no cumplen con su formulario.", status.HTTP_400_BAD_REQUEST, errores)
+        contenido, fallo = _validar_contenido(request, tipo.pk, tipo.formulario, _datos(request).get("datos", {}))
+        if fallo:
+            return fallo
         ahora = timezone.now()
         # Holgura amplia: un plazo de N días hábiles nunca ocupa más de N*3 + 30 días calendario
         feriados = feriados_entre(ahora.date(), ahora.date() + timedelta(days=tipo.sla_dias * 3 + 30))
-        tramite = Tramite.objects.create(tipo_tramite=tipo, institucion=tipo.institucion, solicitante=usuario, datos=contenido,
-                                         fecha_limite=calcular_fecha_limite(ahora, tipo.sla_dias, feriados))
+        try:
+            with transaction.atomic():  # punto de guardado: si la base rechaza el contenido, la petición sigue viva para responder 400
+                tramite = Tramite.objects.create(tipo_tramite=tipo, institucion=tipo.institucion, solicitante=usuario, datos=contenido,
+                                                 fecha_limite=calcular_fecha_limite(ahora, tipo.sla_dias, feriados))
+        except IntegrityError as error:
+            if "tramite_datos" not in str(error):  # solo el CHECK del contenido (tamaño u objeto); cualquier otro fallo sí es un error del servidor
+                raise
+            return _error("datos_invalidos", "Los datos del trámite no cumplen con su formulario.", status.HTTP_400_BAD_REQUEST,
+                          {formulario.CLAVE_GENERAL: "El contenido es demasiado grande."})
         EventoAuditoria.objects.create(tramite=tramite, institucion_id=tipo.institucion_id, actor_id=usuario.pk, accion="creacion",
                                        estado_nuevo=tramite.estado, atributos={"tipo_tramite": tipo.pk, "sla_dias": tipo.sla_dias,
                                                                                          "plazo": "dias_habiles"})
@@ -154,6 +175,7 @@ class TramiteEstado(_Base):
         destino = texto(_datos(request).get("estado"))
         if destino not in ESTADOS_VALIDOS:
             return _error("datos_invalidos", "`estado` debe ser uno de: " + ", ".join(sorted(ESTADOS_VALIDOS)) + ".", status.HTTP_400_BAD_REQUEST)
+        autorizar(request, Accion.CAMBIAR_ESTADO, _recurso(tramite, destino))  # primero el PDP: quien no puede decidir no aprende nada del motivo
         # El motivo es obligatorio al rechazar, al pedir subsanación y al cerrarla; en las demás transiciones es opcional
         exige_motivo = destino in DESTINOS_CON_MOTIVO or tramite.estado == "En Subsanacion"
         crudo = _datos(request).get("motivo")
@@ -165,7 +187,6 @@ class TramiteEstado(_Base):
         if exige_motivo and motivo is None:
             return _error("motivo_obligatorio", f"Indica el `motivo` ({MOTIVO_MINIMO} a {MOTIVO_MAXIMO} caracteres) de esta decisión.",
                           status.HTTP_400_BAD_REQUEST, {"motivo": "Este campo es obligatorio."})
-        autorizar(request, Accion.CAMBIAR_ESTADO, _recurso(tramite, destino))
         try:
             with transaction.atomic():
                 _fijar_motivo(motivo)
@@ -194,9 +215,9 @@ class TramiteSubsanacion(_Base):
             return _error("datos_invalidos", f"`respuesta`: {error}", status.HTTP_400_BAD_REQUEST, {"respuesta": error})
         cambios = {"estado": "En Tramitacion"}
         if "datos" in cuerpo:  # si viene, reemplaza al contenido anterior y se valida completo contra el formulario del tipo
-            contenido, errores = formulario.validar_datos(tramite.tipo_tramite.formulario, cuerpo["datos"])
-            if errores:
-                return _error("datos_invalidos", "Los datos del trámite no cumplen con su formulario.", status.HTTP_400_BAD_REQUEST, errores)
+            contenido, fallo = _validar_contenido(request, tramite.tipo_tramite_id, tramite.tipo_tramite.formulario, cuerpo["datos"])
+            if fallo:
+                return fallo
             cambios["datos"] = contenido
         try:
             with transaction.atomic():

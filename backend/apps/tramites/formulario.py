@@ -13,7 +13,8 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 TIPOS = {"texto", "texto_largo", "numero", "fecha", "seleccion"}
-TAMANO_MAXIMO_DATOS = 16384  # bytes de JSON: espejo del CHECK de la base (pg_column_size)
+TAMANO_BASE_DATOS = 16384  # CHECK de la base (pg_column_size de la columna jsonb)
+TAMANO_MAXIMO_DATOS = 15000  # bytes de JSON que acepta Python: deja margen, porque jsonb pesa distinto que el JSON de texto
 MAX_DEFECTO = {"texto": 200, "texto_largo": 2000}
 MAX_NUMERO_DEFECTO = 10**9
 MAX_CAMPOS = 50
@@ -23,6 +24,10 @@ ZONA_PANAMA = ZoneInfo("America/Panama")
 _FECHA = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 # Formato (Cf) permitido: los unidos de emoji y de escrituras que los necesitan. El resto (bidireccionales, BOM, etc.) se rechaza.
 _FORMATO_PERMITIDO = {"‌", "‍"}
+
+
+class FormularioMalDefinido(ValueError):
+    """La definición del formulario del tipo de trámite no es coherente: es un problema del catálogo, no de quien envía los datos."""
 
 
 def definicion_valida(formulario):
@@ -80,6 +85,16 @@ def _caracteres_no_permitidos(texto, permitir_saltos):
     return False
 
 
+def _tiene_contenido(texto):
+    """Al menos una letra o un número (categorías Unicode L y N): un texto de solo invisibles, espacios o signos no dice nada."""
+    return any(unicodedata.category(c)[0] in {"L", "N"} for c in texto)
+
+
+def _largo_real(texto):
+    """Caracteres que cuentan para el mínimo: sin los invisibles de formato (Cf), con los que no se puede rellenar un texto."""
+    return sum(1 for c in texto if unicodedata.category(c) != "Cf")
+
+
 def _texto(valor, campo):
     if not isinstance(valor, str):
         return None, "Debe ser un texto."
@@ -97,18 +112,21 @@ def _texto(valor, campo):
         return None, f"No puede superar los {maximo} caracteres."
     if _caracteres_no_permitidos(valor, permitir_saltos=largo):
         return None, "Contiene caracteres no permitidos" + ("." if largo else " (ni saltos de línea).")
+    if campo.get("obligatorio") and not _tiene_contenido(valor):
+        return None, "Debe tener al menos una letra o un número."
     return valor, None
 
 
 def validar_texto_libre(valor, minimo, maximo):
     """Un texto suelto (motivo de una decisión, respuesta a una subsanación): de `minimo` a `maximo` caracteres, con saltos de línea
-    pero sin caracteres de control. Devuelve `(texto, None)` o `(None, mensaje)`."""
+    pero sin caracteres de control, y con al menos una letra o un número. El mínimo se cuenta sin los invisibles de formato.
+    Devuelve `(texto, None)` o `(None, mensaje)`."""
     if not isinstance(valor, str):
         return None, "Debe ser un texto."
-    limpio, error = _texto(valor, {"tipo": "texto_largo", "max": maximo})
+    limpio, error = _texto(valor, {"tipo": "texto_largo", "max": maximo, "obligatorio": True})
     if error:
         return None, error
-    if len(limpio) < minimo:
+    if _largo_real(limpio) < minimo:
         return None, f"Debe tener al menos {minimo} caracteres."
     return limpio, None
 
@@ -157,8 +175,9 @@ def validar_datos(formulario, datos, hoy=None):
 
     Un campo opcional vacío (ausente, nulo o texto en blanco) no se guarda. `hoy` (una fecha) es la referencia para «no futura».
     """
-    if definicion_valida(formulario):
-        raise ValueError("el formulario del tipo de trámite está mal definido: " + "; ".join(definicion_valida(formulario)))
+    problemas = definicion_valida(formulario)
+    if problemas:
+        raise FormularioMalDefinido("el formulario del tipo de trámite está mal definido: " + "; ".join(problemas))
     if not isinstance(datos, dict):
         return None, {CLAVE_GENERAL: "Los datos deben ser un objeto."}
     hoy = hoy or hoy_en_panama()

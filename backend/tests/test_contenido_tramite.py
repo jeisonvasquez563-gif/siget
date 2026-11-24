@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
-from django.db import DatabaseError
+from django.db import DatabaseError, IntegrityError
 from django.urls import reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -32,6 +32,7 @@ class Registro:
         self.pasos = []
         self.filas = 1
         self.fallo = None
+        self.fallo_crear = None
 
 
 @pytest.fixture
@@ -58,10 +59,14 @@ def registro(monkeypatch):
                 raise reg.fallo
             return reg.filas
 
+    def crear_tramite(**campos):
+        reg.pasos.append(("crear", campos))
+        if reg.fallo_crear:
+            raise reg.fallo_crear
+        return un_tramite(pk=50, datos=campos["datos"])
+
     class FalsoTramite:
-        objects = SimpleNamespace(
-            filter=lambda **filtros: Consulta(filtros),
-            create=lambda **campos: reg.pasos.append(("crear", campos)) or un_tramite(pk=50, datos=campos["datos"]))
+        objects = SimpleNamespace(filter=lambda **filtros: Consulta(filtros), create=crear_tramite)
 
     @contextmanager
     def atomico():
@@ -70,6 +75,7 @@ def registro(monkeypatch):
 
     monkeypatch.setattr(vistas, "Tramite", FalsoTramite)
     monkeypatch.setattr(vistas, "transaction", SimpleNamespace(atomic=atomico))
+    monkeypatch.setattr(vistas, "registrar_evento", lambda actor, evento, ip, detalle=None: reg.pasos.append(("seguridad", actor, evento, detalle)))
     monkeypatch.setattr(vistas, "_fijar_motivo", lambda motivo: reg.pasos.append(("motivo", motivo)))
     monkeypatch.setattr(vistas, "_membresias", lambda usuario: [])
     monkeypatch.setattr(vistas, "fijar_contexto", lambda *a: None)
@@ -142,6 +148,42 @@ def test_crear_no_repite_en_la_respuesta_los_campos_desconocidos(registro):
     assert r.status_code == 400 and "8-123-456" not in str(r.data) and "cedula" not in str(r.data)
 
 
+def test_crear_rechaza_un_obligatorio_de_solo_caracteres_invisibles(registro):
+    r = crear({"tipo_tramite": 1, "datos": {"asunto": "‍‌‍"}})
+    assert r.status_code == 400 and "asunto" in r.data["errores"] and not pasos(registro, "crear")
+
+
+def test_si_el_check_de_tamano_de_la_base_salta_responde_400_y_no_500(registro):
+    registro.fallo_crear = IntegrityError('new row for relation "tramite" violates check constraint "tramite_datos_tamano"')
+    r = crear({"tipo_tramite": 1, "datos": {"asunto": "ok"}})
+    assert r.status_code == 400 and r.data["codigo"] == "datos_invalidos" and "datos" in r.data["errores"]
+    assert not pasos(registro, "evento")  # no se audita una creación que no ocurrió
+
+
+def test_otro_fallo_de_integridad_al_crear_no_se_disfraza_de_400(registro):
+    registro.fallo_crear = IntegrityError('insert or update on table "tramite" violates foreign key constraint "tramite_x_fkey"')
+    with pytest.raises(IntegrityError):
+        crear({"tipo_tramite": 1, "datos": {"asunto": "ok"}})
+
+
+def test_el_tope_de_python_deja_margen_bajo_el_check_de_la_base():
+    from apps.tramites import formulario
+    assert formulario.TAMANO_MAXIMO_DATOS == 15000 < formulario.TAMANO_BASE_DATOS == 16384
+
+
+def test_un_formulario_mal_definido_da_503_con_un_evento_de_seguridad_sin_datos_personales(registro, monkeypatch):
+    mal = [{"id": "Asunto Con Espacios", "tipo": "inventado"}]
+    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=mal)
+    monkeypatch.setattr(vistas, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(
+        select_related=lambda *a: SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: tipo)))))
+    r = crear({"tipo_tramite": 1, "datos": {"asunto": "Mi dato personal 8-123-456"}})
+    assert r.status_code == 503 and r.data["codigo"] == "formulario_no_disponible"
+    assert "Asunto Con Espacios" not in str(r.data) and "8-123-456" not in str(r.data)  # no se filtra la definición ni lo recibido
+    assert not pasos(registro, "crear")
+    evento = pasos(registro, "seguridad")[0]
+    assert evento[1:3] == (7, "formulario_no_disponible") and evento[3] == {"tipo_tramite": 1} and "8-123-456" not in str(evento)
+
+
 def test_crear_ignora_el_resto_del_cuerpo(registro):
     crear({"tipo_tramite": 1, "datos": {"asunto": "ok"}, "estado": "Aprobado", "solicitante_id": 99})
     campos = pasos(registro, "crear")[0][1]
@@ -156,7 +198,27 @@ def test_el_motivo_es_obligatorio_para_rechazar_pedir_y_cerrar_una_subsanacion(r
     registro.tramite["estado"] = desde
     r = estado({"estado": destino, **cuerpo_motivo})
     assert r.status_code == 400 and "motivo" in r.data["errores"]
-    assert not pasos(registro, "update") and not pasos(registro, "pdp")
+    assert not pasos(registro, "update") and not pasos(registro, "motivo")
+    assert pasos(registro, "pdp")[0][1] == Accion.CAMBIAR_ESTADO  # el PDP decidió antes de mirar el motivo
+
+
+@pytest.mark.parametrize("motivo", ["‍" * 12, "‌‍" * 6, "?" * 12, " " * 12])
+def test_un_motivo_sin_ninguna_letra_ni_numero_no_vale_aunque_tenga_largo(registro, motivo):
+    registro.tramite["estado"] = "En Tramitacion"
+    r = estado({"estado": "Rechazado", "motivo": motivo})
+    assert r.status_code == 400 and "motivo" in r.data["errores"] and not pasos(registro, "update")
+
+
+def test_el_ciudadano_que_llama_a_estado_sin_motivo_recibe_403_y_no_400(registro, monkeypatch):
+    # El PDP va primero: quien no puede decidir no se entera de qué exige la decisión, y la negación queda registrada por el PDP
+    def negar(request, accion, recurso):
+        registro.pasos.append(("pdp", accion, recurso))
+        raise AccesoDenegado({"codigo": "acceso_denegado", "detalle": "No tienes autorización para esta operación."})
+    monkeypatch.setattr(vistas, "autorizar", negar)
+    for cuerpo in ({"estado": "Rechazado"}, {"estado": "Rechazado", "motivo": "corto"}, {"estado": "Aprobado", "motivo": 5}):
+        r = estado(cuerpo)
+        assert r.status_code == 403 and "errores" not in r.data
+    assert len(pasos(registro, "pdp")) == 3 and not pasos(registro, "update") and not pasos(registro, "motivo")
 
 
 @pytest.mark.parametrize("malo", [5, True, ["largo texto de motivo"], {"a": "largo texto de motivo"}, "x" * 2001, "motivo\x00largo", "motivo\u202elargo", pytest.param("m" * 100_000, id="enorme")])
@@ -299,8 +361,8 @@ def test_el_listado_no_lleva_el_contenido():
     assert "datos" not in d and "formulario" not in d
 
 
-def un_evento(**atributos):
-    return SimpleNamespace(pk=1, accion="cambio_estado", estado_anterior="En Tramitacion", estado_nuevo="En Subsanacion", institucion_id=3,
+def un_evento(anterior="En Tramitacion", nuevo="En Subsanacion", accion="cambio_estado", **atributos):
+    return SimpleNamespace(pk=1, accion=accion, estado_anterior=anterior, estado_nuevo=nuevo, institucion_id=3,
                            creado_en=AHORA, actor_id=88, atributos=atributos)
 
 
@@ -318,3 +380,41 @@ def test_el_personal_ve_el_motivo_y_los_atributos():
 @pytest.mark.parametrize("atributos", [{}, {"motivo": 5}, {"motivo": ["x"]}, {"motivo": None}])
 def test_sin_motivo_o_con_un_motivo_que_no_es_texto_se_devuelve_null(atributos):
     assert ser.evento_a_dict(un_evento(**atributos), personal=False)["motivo"] is None
+
+
+# La persona lee el motivo solo cuando es para ella; el resto son comentarios internos del personal
+CON_MOTIVO_PARA_LA_PERSONA = [("En Tramitacion", "Rechazado"), ("Pendiente", "Rechazado"), ("En Tramitacion", "En Subsanacion"),
+                              ("En Subsanacion", "En Tramitacion")]  # el último: respuesta de ella o cierre del personal
+SIN_MOTIVO_PARA_LA_PERSONA = [("Pendiente", "En Tramitacion"), ("En Tramitacion", "Aprobado"), ("Pendiente", "Aprobado")]
+
+
+@pytest.mark.parametrize("anterior,nuevo", CON_MOTIVO_PARA_LA_PERSONA)
+def test_la_persona_ve_el_motivo_de_rechazar_pedir_subsanar_y_cerrar_la_subsanacion(anterior, nuevo):
+    assert ser.evento_a_dict(un_evento(anterior, nuevo, motivo=MOTIVO), personal=False)["motivo"] == MOTIVO
+
+
+@pytest.mark.parametrize("anterior,nuevo", SIN_MOTIVO_PARA_LA_PERSONA)
+def test_la_persona_no_ve_el_motivo_de_las_demas_transiciones_pero_el_personal_si(anterior, nuevo):
+    comentario = "Comentario interno: revisar con el supervisor."
+    assert ser.evento_a_dict(un_evento(anterior, nuevo, motivo=comentario), personal=False)["motivo"] is None
+    assert comentario not in str(ser.evento_a_dict(un_evento(anterior, nuevo, motivo=comentario), personal=False))
+    assert ser.evento_a_dict(un_evento(anterior, nuevo, motivo=comentario), personal=True)["motivo"] == comentario
+
+
+def test_el_personal_ve_todos_los_motivos_de_cualquier_transicion():
+    for anterior, nuevo in CON_MOTIVO_PARA_LA_PERSONA + SIN_MOTIVO_PARA_LA_PERSONA:
+        assert ser.evento_a_dict(un_evento(anterior, nuevo, motivo=MOTIVO), personal=True)["motivo"] == MOTIVO
+
+
+def test_un_evento_que_no_es_un_cambio_de_estado_no_muestra_motivo_a_la_persona():
+    assert ser.evento_a_dict(un_evento("En Tramitacion", "Rechazado", accion="reasignacion", motivo=MOTIVO), personal=False)["motivo"] is None
+
+
+def test_un_formulario_mal_definido_al_responder_la_subsanacion_da_503(en_subsanacion, monkeypatch):
+    mal = SimpleNamespace(nombre="Demo", formulario=[{"id": "X", "tipo": "inventado"}])
+    tramite = en_subsanacion.un_tramite()
+    tramite.tipo_tramite = mal
+    monkeypatch.setattr(vistas._Base, "_tramite_visible", lambda self, pk: tramite)
+    r = subsanacion({"respuesta": MOTIVO, "datos": {"asunto": "Corregido"}})
+    assert r.status_code == 503 and r.data["codigo"] == "formulario_no_disponible" and not pasos(en_subsanacion, "update")
+    assert pasos(en_subsanacion, "seguridad")[0][2] == "formulario_no_disponible"

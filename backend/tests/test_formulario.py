@@ -89,6 +89,43 @@ def test_un_texto_largo_rechaza_control_y_formato_pero_admite_saltos(hostil):
     assert validar(con(descripcion="uno\ndos\n\ttres"))[1] == {}
 
 
+@pytest.mark.parametrize("invisible", ["‍", "‌‍‌", "‍" * 20])
+def test_un_obligatorio_de_solo_caracteres_invisibles_no_vale(invisible):
+    _, errores = validar(con(direccion_terreno=invisible))
+    assert list(errores) == ["direccion_terreno"]
+
+
+@pytest.mark.parametrize("sin_contenido", ["?!?", "---", "‍?‍", "👨‍👩‍👧"])
+def test_un_obligatorio_sin_letras_ni_numeros_no_vale(sin_contenido):
+    assert "direccion_terreno" in validar(con(direccion_terreno=sin_contenido))[1]
+
+
+@pytest.mark.parametrize("valido", ["5", "Ａ", "ñ", "Calle 5", "‍A‍"])
+def test_basta_una_letra_o_un_numero_en_cualquier_alfabeto(valido):
+    assert validar(con(direccion_terreno=valido))[1] == {}
+
+
+def test_un_opcional_con_solo_signos_se_conserva_pero_el_obligatorio_no():
+    limpios, errores = validar(con(descripcion="???"))
+    assert errores == {} and limpios["descripcion"] == "???"
+
+
+@pytest.mark.parametrize("texto", ["‍" * 12, "‌" * 12, "‍‌" * 6, "?" * 12, "." * 12])
+def test_el_texto_libre_exige_una_letra_o_un_numero(texto):
+    assert f.validar_texto_libre(texto, 10, 2000)[0] is None
+
+
+def test_el_minimo_del_texto_libre_se_cuenta_sobre_texto_con_contenido_real():
+    # 5 letras + 10 invisibles: 15 caracteres en total pero solo 5 de verdad
+    assert f.validar_texto_libre("ab‍cd‍" + "‍" * 8 + "e", 10, 2000) == (None, "Debe tener al menos 10 caracteres.")
+    assert f.validar_texto_libre("Falta el plano.", 10, 2000) == ("Falta el plano.", None)
+    assert f.validar_texto_libre("1234567890", 10, 2000)[1] is None
+
+
+def test_el_texto_libre_admite_saltos_y_unicode_normal():
+    assert f.validar_texto_libre("Línea uno\nLínea dos\n\tcon sangría", 10, 2000)[1] is None
+
+
 def test_los_emojis_y_el_unicode_normal_se_admiten():
     limpios, errores = validar(con(direccion_terreno="Calle ñandú 5 – 👨‍👩‍👧 ✓", numero_finca="Ａ１"))
     assert errores == {} and limpios["direccion_terreno"].startswith("Calle ñandú")
@@ -156,7 +193,7 @@ def test_varios_errores_se_devuelven_juntos():
     assert set(errores) == {"direccion_terreno", "area_m2", "tipo_obra"}
 
 
-def test_el_contenido_total_no_puede_pasar_de_16_kb():
+def test_el_contenido_total_no_puede_pasar_del_tope_de_python_que_deja_margen_bajo_los_16_kb_de_la_base():
     grande = [{"id": f"c{i}", "etiqueta": "c", "tipo": "texto_largo", "obligatorio": True, "max": 3000} for i in range(6)]
     datos = {f"c{i}": "ñ" * 3000 for i in range(6)}  # 36 000 bytes
     limpios, errores = f.validar_datos(grande, datos, hoy=HOY)
@@ -169,8 +206,9 @@ def test_un_formulario_vacio_solo_acepta_un_objeto_vacio():
 
 
 def test_un_formulario_mal_definido_es_un_error_de_configuracion():
-    with pytest.raises(ValueError):
+    with pytest.raises(f.FormularioMalDefinido):
         f.validar_datos([{"id": "a", "tipo": "raro", "etiqueta": "a", "obligatorio": True}], {}, hoy=HOY)
+    assert issubclass(f.FormularioMalDefinido, ValueError)
 
 
 @pytest.mark.parametrize("campo,fragmento", [
