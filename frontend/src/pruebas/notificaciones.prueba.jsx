@@ -277,6 +277,112 @@ describe('la consulta periódica', () => {
     expect(screen.getByRole('button', { name: 'Notificaciones, 2 sin leer' })).toBeInTheDocument()
   })
 
+  // El servidor «se queda pensando»: las consultas de la lista (GET /notificaciones/?...) quedan retenidas hasta que se suelten, con el
+  // cuerpo que tenga `cuerpo` en ese momento. Lo demás (marcar como leída, etc.) pasa al servidor de ejemplo.
+  function retener(cuerpo) {
+    const original = window.fetch
+    const pendientes = []
+    const control = { cuerpo, retenidas: () => pendientes.length }
+    control.soltar = async () => { pendientes.splice(0).forEach((soltar) => soltar()); await pasar(1) }
+    window.fetch = (ruta, ...resto) => (String(ruta).startsWith('/notificaciones/?')
+      ? new Promise((resolver) => { pendientes.push(() => resolver(new Response(JSON.stringify(control.cuerpo), { status: 200 }))) })
+      : original(ruta, ...resto))
+    return control
+  }
+  const sinLeer = (id) => ({ id, tipo: 'tramite_aprobado', tramite_id: 30 + id, tramite: { tipo_tramite: 'Permiso', institucion: 'MOP' }, creada_en: new Date().toISOString(), leida: false })
+  const lista = (...items) => ({ resultados: items, total: items.length, limite: 10, desplazamiento: 0, no_leidas: items.filter((i) => !i.leida).length })
+  const conUsuario = () => userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) })
+
+  it('una consulta de fondo con el acceso vencido se salta en silencio: ni error ni anuncio, y se conserva lo último que se vio', async () => {
+    instalarMock('ana.ciudadana', { demora: 0 })
+    render(<ProveedorUI><App /></ProveedorUI>)
+    await esperarCuenta('Notificaciones, 2 sin leer')
+    const original = window.fetch
+    let turnos = 0
+    window.fetch = (ruta, ...resto) => {
+      if (!String(ruta).startsWith('/notificaciones/?')) return original(ruta, ...resto)
+      turnos += 1
+      return turnos === 1 ? Promise.resolve(new Response('{"codigo":"no_autenticado"}', { status: 401 })) : new Promise(() => {}) // luego, sin respuesta
+    }
+    await pasar(CADA_MS)
+    expect(turnos).toBe(1)
+    await conUsuario().click(campana()) // al abrirlo se vuelve a pedir (queda sin respuesta): lo único que se ve es lo que dejó el turno saltado
+    const ventana = await screen.findByRole('dialog', { name: 'Notificaciones' })
+    expect(within(ventana).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(ventana).getByText('Aprobaron tu trámite #35')).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('')
+  })
+
+  it('en cambio un error del servidor en la consulta de fondo sí se avisa (con lo último que se vio)', async () => {
+    instalarMock('ana.ciudadana', { demora: 0 })
+    render(<ProveedorUI><App /></ProveedorUI>)
+    await esperarCuenta('Notificaciones, 2 sin leer')
+    const original = window.fetch
+    let turnos = 0
+    window.fetch = (ruta, ...resto) => {
+      if (!String(ruta).startsWith('/notificaciones/?')) return original(ruta, ...resto)
+      turnos += 1
+      return turnos === 1 ? Promise.resolve(new Response('{}', { status: 500 })) : new Promise(() => {})
+    }
+    await pasar(CADA_MS)
+    await conUsuario().click(campana())
+    const ventana = await screen.findByRole('dialog', { name: 'Notificaciones' })
+    expect(await within(ventana).findByRole('alert')).toHaveTextContent('No pudimos actualizar tus notificaciones')
+    expect(within(ventana).getByText('Aprobaron tu trámite #35')).toBeInTheDocument()
+  })
+
+  it('una consulta lenta que salió antes de «Marcar todas como leídas» no vuelve a mostrar como no leído lo ya leído', async () => {
+    instalarMock('ana.ciudadana', { demora: 0 })
+    render(<ProveedorUI><App /></ProveedorUI>)
+    await esperarCuenta('Notificaciones, 2 sin leer')
+    const user = conUsuario()
+    await user.click(campana())
+    const ventana = await screen.findByRole('dialog', { name: 'Notificaciones' })
+    await within(ventana).findByText('Aprobaron tu trámite #35')
+    const servidor = retener(lista(sinLeer(1), sinLeer(2))) // lo que sabía el servidor ANTES de la escritura
+    await pasar(CADA_MS)
+    expect(servidor.retenidas()).toBe(1) // la consulta de fondo salió y todavía no vuelve
+    await user.click(within(ventana).getByRole('button', { name: 'Marcar todas como leídas' }))
+    expect(await esperarCuenta('Notificaciones, 0 sin leer')).toBeInTheDocument()
+    await servidor.soltar() // ahora llega la respuesta vieja
+    expect(screen.getByRole('button', { name: 'Notificaciones, 0 sin leer' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Sin leer\./ })).not.toBeInTheDocument()
+    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Marcaste todas las notificaciones como leídas.') // y no anuncia «una nueva»
+  })
+
+  it('lo mismo al marcar una sola: la consulta que salió antes no la devuelve a «sin leer»', async () => {
+    instalarMock('ana.ciudadana', { demora: 0 })
+    render(<ProveedorUI><App /></ProveedorUI>)
+    await esperarCuenta('Notificaciones, 2 sin leer')
+    const user = conUsuario()
+    await user.click(campana())
+    const ventana = await screen.findByRole('dialog', { name: 'Notificaciones' })
+    await within(ventana).findByText('Aprobaron tu trámite #35')
+    const servidor = retener(lista(sinLeer(1), sinLeer(2)))
+    await pasar(CADA_MS)
+    expect(servidor.retenidas()).toBe(1)
+    await user.click(within(ventana).getByRole('button', { name: /Aprobaron tu trámite #35/ }))
+    expect(await esperarCuenta('Notificaciones, 1 sin leer')).toBeInTheDocument()
+    await servidor.soltar()
+    expect(screen.getByRole('button', { name: 'Notificaciones, 1 sin leer' })).toBeInTheDocument()
+  })
+
+  it('una consulta que sale DESPUÉS de la escritura sí se acepta', async () => {
+    instalarMock('ana.ciudadana', { demora: 0 })
+    render(<ProveedorUI><App /></ProveedorUI>)
+    await esperarCuenta('Notificaciones, 2 sin leer')
+    const user = conUsuario()
+    await user.click(campana())
+    const ventana = await screen.findByRole('dialog', { name: 'Notificaciones' })
+    await user.click(await within(ventana).findByRole('button', { name: 'Marcar todas como leídas' }))
+    expect(await esperarCuenta('Notificaciones, 0 sin leer')).toBeInTheDocument()
+    const servidor = retener(lista(sinLeer(7))) // otra persona hizo algo después: llega una nueva
+    await pasar(CADA_MS)
+    expect(servidor.retenidas()).toBe(1)
+    await servidor.soltar()
+    expect(await esperarCuenta('Notificaciones, 1 sin leer')).toBeInTheDocument()
+  })
+
   it('anuncia a los lectores de pantalla las que llegan después, no las de la carga inicial', async () => {
     instalarMock('flor.mop', { demora: 0 })
     render(<ProveedorUI><App /></ProveedorUI>)

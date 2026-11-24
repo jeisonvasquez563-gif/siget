@@ -30,24 +30,36 @@ export function Campana({ clave, abrir }) {
   const boton = useRef(null)
   const panel = useRef(null)
   const ultima = useRef(0) // solo vale la respuesta de la última petición: una lenta no pisa a una más nueva
+  const escrituras = useRef(0) // marca que sube al empezar y al terminar cada escritura (marcar leída / todas): una consulta que salió antes no vale
   const previas = useRef(null) // sin leer en la carga anterior, para anunciar solo lo que llega después
 
+  // Una escritura (marcar leída / todas) cuenta desde que sale hasta que termina: las consultas que salieron antes, o que se cruzaron con
+  // ella, pueden traer el estado de antes y no deben volver a mostrar como no leído lo que ya se leyó
+  const escribir = (peticion) => {
+    escrituras.current += 1
+    return peticion.finally(() => { escrituras.current += 1 })
+  }
+
   // `deFondo`: la consulta periódica. No pregunta con la pestaña oculta ni sin sesión, y si el acceso venció no lo renueva (eso alargaría una
-  // sesión inactiva): se retoma en la próxima navegación o al abrir el panel, que sí son de la persona.
+  // sesión inactiva): ese turno se salta EN SILENCIO (ni error ni anuncio) y se retoma en la próxima navegación o al abrir el panel, que sí
+  // son de la persona.
   const refrescar = useCallback(async ({ deFondo = false } = {}) => {
     if (!hayToken() || (deFondo && document.visibilityState !== 'visible')) return
     const mia = ++ultima.current
+    const marca = escrituras.current
+    const vigente = () => mia === ultima.current && marca === escrituras.current
     try {
       const d = await api(`/notificaciones/?limite=${ULTIMAS}`, deFondo ? { renovar: false } : {})
-      if (mia !== ultima.current) return
+      if (!vigente()) return
       setEstado({ cargado: true, error: false, no_leidas: d.no_leidas, total: d.total, items: d.resultados })
       if (previas.current !== null && d.no_leidas > previas.current) {
         const nuevas = d.no_leidas - previas.current
         setAnuncio(nuevas === 1 ? 'Tienes una notificación nueva.' : `Tienes ${nuevas} notificaciones nuevas.`)
       }
       previas.current = d.no_leidas
-    } catch {
-      if (mia === ultima.current) setEstado((e) => ({ ...e, error: true })) // se conserva lo último que se vio y se reintenta en el siguiente turno
+    } catch (fallo) {
+      if (deFondo && fallo?.estado === 401) return // acceso vencido: no es un error de las notificaciones; se salta el turno sin avisar
+      if (vigente()) setEstado((e) => ({ ...e, error: true })) // se conserva lo último que se vio y se reintenta en el siguiente turno
     }
   }, [])
 
@@ -94,7 +106,7 @@ export function Campana({ clave, abrir }) {
     setAbierto(false)
     if (!n.leida) {
       setEstado((e) => ({ ...e, no_leidas: Math.max(0, e.no_leidas - 1), items: e.items.map((x) => (x.id === n.id ? { ...x, leida: true } : x)) }))
-      api(`/notificaciones/${n.id}/leida/`, { metodo: 'POST', cuerpo: {} })
+      escribir(api(`/notificaciones/${n.id}/leida/`, { metodo: 'POST', cuerpo: {} }))
         .then((d) => { previas.current = d.no_leidas; setEstado((e) => ({ ...e, no_leidas: d.no_leidas })) })
         .catch(() => refrescar()) // si no se pudo marcar, se vuelve a pedir lo que dice el servidor
     }
@@ -103,7 +115,7 @@ export function Campana({ clave, abrir }) {
 
   async function leerTodas() {
     try {
-      await api('/notificaciones/leer-todas/', { metodo: 'POST', cuerpo: {} })
+      await escribir(api('/notificaciones/leer-todas/', { metodo: 'POST', cuerpo: {} }))
       previas.current = 0
       setEstado((e) => ({ ...e, no_leidas: 0, items: e.items.map((x) => ({ ...x, leida: true })) }))
       setAnuncio('Marcaste todas las notificaciones como leídas.')
