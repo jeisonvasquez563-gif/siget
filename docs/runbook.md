@@ -1978,7 +1978,7 @@ Evidencia en `docs/sdlc/evidencia/16_pulido_*`. Sin migración, así que no hubo
 
 ## 42. Notificaciones dentro de la plataforma: aplicar la migración 018 (PT-9)
 
-**Estado: preparado, sin aplicar en producción.** El registro de la aplicación (42.9) se completa cuando se despliegue.
+**Estado: aplicado en producción el 24 de noviembre de 2026** (registro en 42.9).
 
 ### 42.1 Qué cambia y en qué orden hay que aplicarlo
 
@@ -2059,4 +2059,15 @@ Si algún paso falla, **no desplegar**.
 
 ### 42.9 Registro de la aplicación
 
-Pendiente: se completa cuando se aplique en producción (respaldo, ensayo, migración, pruebas de la base, imagen candidata, despliegue y ensayo).
+Aplicado el **24 de noviembre de 2026**, a las 15:17, lejos de la hora en punto del escalador. Evidencia en `docs/sdlc/evidencia/17_notificaciones_*`.
+
+1. **VM2, respaldo verificado:** `tramites_demo-20261124-151721.dump` (18 tablas, restauración probada), copiado como `pre-018-…` (SHA-256 `e49754db796d0b95…`).
+2. **Ensayo en una sola transacción revertida:** la migración 018 completa **y**, en la misma transacción, todo `pruebas-notificaciones.sql`, incluido `escalar_vencidos()` corriendo como `escalador_role`: **36 de 36 comprobaciones**. Después: la tabla `notificacion` no existía. (El control de «no quedó nada» encontró una función con «notific» en el nombre: era `pg_catalog.pg_notification_queue_usage`, propia de PostgreSQL, no de la migración.)
+3. **Migración real** y `pruebas-notificaciones.sql` otra vez sobre la base migrada: 36/36.
+4. **VM1, imagen candidata** (`notificaciones-candidata`) y las 8 verificaciones **antes** de reiniciar, todas a la primera: `verificar_tramites` **214/214** (notificaciones y reasignación), `verificar_autenticacion` 200/200, `verificar_plataforma` 125/125, `verificar_politicas` 41/41, `verificar_equipo` 51/51, `verificar_auditoria` 34/34, `verificar_integracion` 15/15 y `verificar_esquema` OK. Despliegue con respaldo (`respaldo-2026-11-24d`, `frontend.respaldo-2026-11-24d`).
+5. **El ensayo dio 112/112, pero desde afuera `/notificaciones/` respondía 404.** nginx solo pasa al backend una lista fija de rutas (`location ~ ^/(auth|tramites|…|plataforma|salud)`) y `notificaciones` no estaba. Ninguna prueba lo podía ver: las unitarias y las `verificar_*` hablan directo con Django, sin pasar por nginx. Se corrigió en producción con respaldo (`nginx.conf.respaldo-2026-11-24`), **escribiendo en el mismo inodo** (el archivo está montado en el contenedor; ver 35.3), `nginx -t` dentro del contenedor y `nginx -s reload` sin cortar conexiones. Después: `/notificaciones/` responde 401 sin sesión.
+6. **Ensayo con una comprobación nueva que atraviesa nginx** (`/notificaciones/` con la sesión de la persona → 200): **113/113**.
+
+**Volver atrás:** imagen `respaldo-2026-11-24d` como `dev` y reiniciar el backend; interfaz desde `frontend.respaldo-2026-11-24d`; nginx con `sudo sh -c 'cat /home/siget/config/nginx.conf.respaldo-2026-11-24 > /home/siget/config/nginx.conf'` y `nginx -s reload`. El backend anterior funciona con la base migrada.
+
+**Lección:** toda ruta nueva de primer nivel (`/algo/`) necesita tres cambios: la vista en Django, la lista de `location` de `infra/podman/vm1-app-backend/nginx.conf` y la lista `rutas` de `frontend/vite.config.js`. El ensayo ahora pide `/notificaciones/` con sesión real; las rutas nuevas futuras deberían sumar una comprobación igual.

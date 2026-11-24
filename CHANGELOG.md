@@ -6,6 +6,14 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Despliegue (notificaciones en producción, 24-nov)
+- **Migración 018 aplicada** (runbook 42.9, evidencia `docs/sdlc/evidencia/17_notificaciones_*`):
+  - respaldo verificado (`pre-018`);
+  - ensayo de la migración **junto con sus 36 pruebas de base** en una sola transacción revertida (36/36, incluido el escalamiento automático como `escalador_role`);
+  - migración real y las mismas 36 pruebas (36/36).
+- **Imagen nueva verificada antes de reiniciar,** con las 8 verificaciones a la primera (`verificar_tramites` **214/214**), y despliegue con respaldo.
+- **nginx no dejaba pasar `/notificaciones/`** (404 desde afuera, aunque el ensayo diera 112/112): la ruta no estaba en su lista de `location`. Se corrigió en producción (mismo inodo, `nginx -t`, recarga sin cortes) y en el repositorio, junto con `/plataforma` y `/notificaciones` en el proxy de desarrollo (`vite.config.js`). El ensayo suma una comprobación que atraviesa nginx con sesión real: **113/113**.
+
 ### Notificaciones dentro de la plataforma (PT-9; migración 018, runbook 42)
 - **Estado: implementado, sin aplicar en producción.** La migración se escribió sin poder ejecutarla contra PostgreSQL: se prueba con `database/pruebas-notificaciones.sql` y `verificar_tramites` (pasos nuevos) al aplicarla (runbook 42.4 y 42.5).
 - **Base de datos (`018-notificaciones.sql`):** tabla `siget.notificacion` (`usuario_id`, `tipo` de una lista cerrada de seis, `tramite_id`, `creada_en`, `leida_en`) **sin texto libre ni datos personales**: el texto lo arma la interfaz y el motivo se lee en el detalle del trámite, con sus controles de siempre. **La genera la base**: un disparador `AFTER UPDATE OF estado, escalado_en` sobre `tramite` (`SECURITY DEFINER`, ruta de búsqueda fija) inserta en la misma transacción del cambio:
