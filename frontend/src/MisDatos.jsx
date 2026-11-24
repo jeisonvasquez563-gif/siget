@@ -67,6 +67,7 @@ function Perfil({ perfil, tramites }) {
       <dl className="datos">
         {filas.map(([etiqueta, valor]) => <div key={etiqueta} className="dato-fila"><dt>{etiqueta}</dt><dd>{valor ?? '—'}</dd></div>)}
       </dl>
+      <p className="nota">Por seguridad solo ves los últimos 3 caracteres de tu cédula; la completa va en el archivo de «Descargar mis datos».</p>
       <p className="nota">Cuenta creada el {fechaCorta(perfil.creado_en)}. {perfil.actualizado_en ? `Último cambio de tus datos de contacto: ${fecha(perfil.actualizado_en)}` : 'No has cambiado tus datos de contacto.'}</p>
       <p className="nota">Tienes {tramites.total} {tramites.total === 1 ? 'trámite' : 'trámites'}. Los trámites son expediente público con conservación obligatoria: no se borran, tampoco si pides cancelar tus datos.</p>
     </section>
@@ -135,6 +136,7 @@ function Corregir({ perfil, alCambiar }) {
 /* ---------------------------------------------------------------- descargar */
 
 function Descargar({ usuario }) {
+  const { ejecutar, modal } = useReautenticacion()
   const [trabajando, setTrabajando] = useState(false)
   const [error, setError] = useState('')
   const { avisar } = useUI()
@@ -142,19 +144,25 @@ function Descargar({ usuario }) {
     setError('')
     setTrabajando(true)
     try {
-      const documento = await api('/auth/mis-datos/exportar/')
-      guardarComoArchivo(documento, `siget-mis-datos-${usuario}-${new Date().toISOString().slice(0, 10)}.json`)
-      avisar('Descargamos tus datos en un archivo JSON.')
-    } catch (e) {
-      setError(mensaje(e))
+      await ejecutar(async () => {
+        try {
+          const documento = await api('/auth/mis-datos/exportar/')
+          guardarComoArchivo(documento, `siget-mis-datos-${usuario}-${new Date().toISOString().slice(0, 10)}.json`)
+          avisar('Descargamos tus datos en un archivo JSON.')
+        } catch (e) {
+          if (e instanceof ApiError && e.pideReautenticar) throw e // el modal pide el código y repite la descarga
+          setError(mensaje(e))
+        }
+      })
     } finally {
       setTrabajando(false)
     }
   }
   return (
     <section className="panel">
-      <div className="panel-cabecera"><h3>Descargar mis datos</h3></div>
-      <p className="suave">Un solo archivo (JSON) con tu perfil, tus trámites con su historial, tus solicitudes y tu actividad de seguridad. Es tu derecho de portabilidad: puedes llevarlo a donde quieras. Guárdalo en un lugar seguro: trae tu cédula.</p>
+      {modal}
+      <div className="panel-cabecera"><h3>Descargar mis datos</h3><Insignia clase="insignia-rol" punto={false}>Pide tu segundo factor</Insignia></div>
+      <p className="suave">Un solo archivo (JSON) con tu perfil, tus trámites con su historial, tus solicitudes y tu actividad de seguridad. Es tu derecho de portabilidad: puedes llevarlo a donde quieras. Guárdalo en un lugar seguro: trae tu cédula completa.</p>
       <Alerta>{error}</Alerta>
       <button className="btn btn-sec" type="button" onClick={descargar} disabled={trabajando}>{trabajando ? 'Preparando…' : 'Descargar mis datos'}</button>
     </section>
@@ -202,8 +210,9 @@ function Solicitudes({ datos, alCambiar }) {
           </select>
         </label>
         <label className="campo"><span>Cuéntanos qué necesitas</span>
-          <textarea className="entrada" value={detalle} onChange={(e) => setDetalle(e.target.value)} rows={4} minLength={DETALLE_MIN} maxLength={DETALLE_MAX} required disabled={lleno} aria-describedby="ayuda-detalle" />
+          <textarea className="entrada" value={detalle} onChange={(e) => setDetalle(e.target.value)} rows={4} minLength={DETALLE_MIN} maxLength={DETALLE_MAX} required disabled={lleno} aria-describedby="ayuda-detalle ayuda-lectura" />
           <small id="ayuda-detalle">Entre {DETALLE_MIN} y {DETALLE_MAX} caracteres ({largo}/{DETALLE_MAX}). No escribas contraseñas ni códigos.</small>
+          <small id="ayuda-lectura">Lo lee el operador de identidades: no escribas datos que no hagan falta.</small>
         </label>
         <button className="btn" type="submit" disabled={trabajando || lleno || largo < DETALLE_MIN}>{trabajando ? 'Enviando…' : 'Enviar solicitud'}</button>
       </form>
@@ -211,11 +220,11 @@ function Solicitudes({ datos, alCambiar }) {
       {datos.solicitudes.length === 0 ? <p className="suave">Todavía no enviaste ninguna solicitud.</p> : (
         <ul className="lista-solicitudes">
           {datos.solicitudes.map((s) => {
-            const [clase, texto] = ESTADOS[s.estado]
+            const [clase, texto] = ESTADOS[s.estado] ?? ['', s.estado]
             return (
               <li key={s.id}>
                 <div className="cabecera-solicitud">
-                  <strong>{TIPOS[s.tipo][0]}</strong>
+                  <strong>{TIPOS[s.tipo]?.[0] ?? s.tipo}</strong>
                   <Insignia clase={clase}>{texto}</Insignia>
                 </div>
                 <p className="detalle-solicitud">{s.detalle}</p>

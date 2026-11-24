@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from './api.js'
-import { fecha, fechaCorta, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { fecha, fechaCorta, hace, mensajeDe, useModal, useReautenticacion } from './comun.jsx'
 import { Alerta, BloquesEsqueleto, Icono, Insignia, Vacio, useUI } from './ui.jsx'
 
 // Consolas de los operadores de plataforma. Ninguna muestra datos de trámites ni datos personales: una persona es su usuario,
@@ -18,9 +18,11 @@ function mensaje(e) {
 function useCarga(ruta) {
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
-  const recargar = useCallback(() => api(ruta).then((d) => { setDatos(d); setError('') }).catch((e) => setError(mensaje(e))), [ruta])
+  const [pideCodigo, setPideCodigo] = useState(false)
+  const recargar = useCallback(() => api(ruta).then((d) => { setDatos(d); setError(''); setPideCodigo(false) })
+    .catch((e) => { setPideCodigo(e instanceof ApiError && e.pideReautenticar); setError(mensaje(e)) }), [ruta])
   useEffect(() => { recargar() }, [recargar])
-  return { datos, error, recargar }
+  return { datos, error, recargar, pideCodigo }
 }
 
 function Encabezado({ titulo, texto }) {
@@ -205,15 +207,23 @@ function FormularioAltaCoordinador({ correr, recargar }) {
 const TIPO_SOLICITUD = { rectificacion: 'Rectificación', cancelacion: 'Cancelación', oposicion: 'Oposición' }
 const ESTADO_SOLICITUD = { recibida: ['e-pendiente', 'Recibida'], atendida: ['e-aprobado', 'Atendida'], rechazada: ['e-rechazado', 'Rechazada'] }
 
-function ModalRespuesta({ solicitud, alCancelar, alEnviar }) {
+function ModalRespuesta({ solicitud, error, alCancelar, alEnviar }) {
+  useModal(alCancelar)
   const [estado, setEstado] = useState('atendida')
   const [respuesta, setRespuesta] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  async function enviar(e) {
+    e.preventDefault()
+    setEnviando(true)
+    try { await alEnviar(estado, respuesta.trim()) } finally { setEnviando(false) } // el modal sigue abierto (con el texto) hasta que el servidor responda 2xx
+  }
   return (
     <div className="fondo-modal">
-      <form className="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-respuesta" onSubmit={(e) => { e.preventDefault(); alEnviar(estado, respuesta.trim()) }}>
+      <form className="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-respuesta" onSubmit={enviar}>
         <h2 id="titulo-respuesta"><span className="icono-grande"><Icono nombre="documento" /></span>Responder a {solicitud.persona.usuario}</h2>
-        <p className="suave"><strong>{TIPO_SOLICITUD[solicitud.tipo]}:</strong> {solicitud.detalle}</p>
+        <p className="suave"><strong>{TIPO_SOLICITUD[solicitud.tipo] ?? solicitud.tipo}:</strong> {solicitud.detalle}</p>
         <p className="suave">Esta respuesta <strong>no borra ni cambia nada</strong>: solo queda registrada. Explica con claridad qué se puede hacer y qué no (los trámites son expediente público con conservación obligatoria). Quien la pidió la verá tal cual.</p>
+        <Alerta>{error}</Alerta>
         <fieldset className="campo opciones">
           <legend>Resultado</legend>
           <label className="casilla"><input type="radio" name="resultado" value="atendida" checked={estado === 'atendida'} onChange={() => setEstado('atendida')} /><span>Atendida</span></label>
@@ -225,7 +235,7 @@ function ModalRespuesta({ solicitud, alCancelar, alEnviar }) {
         </label>
         <div className="fila-botones">
           <button type="button" className="btn btn-sec" onClick={alCancelar}>Cancelar</button>
-          <button type="submit" className="btn" disabled={respuesta.trim().length < 10}>Enviar respuesta</button>
+          <button type="submit" className="btn" disabled={respuesta.trim().length < 10 || enviando}>Enviar respuesta</button>
         </div>
       </form>
     </div>
@@ -234,19 +244,20 @@ function ModalRespuesta({ solicitud, alCancelar, alEnviar }) {
 
 function SolicitudesDatos({ yo }) {
   const [filtro, setFiltro] = useState('')
-  const { datos, error, recargar } = useCarga(`/plataforma/solicitudes-datos/${filtro ? `?estado=${filtro}` : ''}`)
-  const { correr, modal, error: errorAccion } = useAccion(recargar)
+  const ruta = `/plataforma/solicitudes-datos/${filtro ? `?estado=${filtro}` : ''}`
+  const { datos, error, recargar, pideCodigo } = useCarga(ruta)
+  const { correr, modal, error: errorAccion, limpiar } = useAccion(recargar)
   const [objetivo, setObjetivo] = useState(null)
 
   return (
     <section className="panel">
+      {objetivo && <ModalRespuesta solicitud={objetivo} error={errorAccion} alCancelar={() => { limpiar(); setObjetivo(null) }}
+        alEnviar={(estado, respuesta) => correr(async () => {
+          const r = await api(`/plataforma/solicitudes-datos/${objetivo.id}/responder/`, { metodo: 'POST', cuerpo: { estado, respuesta } })
+          setObjetivo(null) // solo se cierra con un 2xx: si falla, el texto escrito sigue ahí
+          return r
+        }, `Respuesta enviada a ${objetivo.persona.usuario}.`)} />}
       {modal}
-      {objetivo && <ModalRespuesta solicitud={objetivo} alCancelar={() => setObjetivo(null)}
-        alEnviar={async (estado, respuesta) => {
-          const s = objetivo
-          setObjetivo(null)
-          await correr(() => api(`/plataforma/solicitudes-datos/${s.id}/responder/`, { metodo: 'POST', cuerpo: { estado, respuesta } }), `Respuesta enviada a ${s.persona.usuario}.`)
-        }} />}
       <div className="panel-cabecera">
         <h3>Solicitudes sobre datos personales</h3>
         <label className="campo filtro-estado"><span className="solo-lector">Filtrar por estado</span>
@@ -256,21 +267,26 @@ function SolicitudesDatos({ yo }) {
         </label>
       </div>
       <p className="suave">Rectificación, cancelación y oposición que piden las personas (Ley 81 de 2019). Hay que responder en no más de 10 días hábiles. <strong>Cancelar no borra nada automáticamente:</strong> los trámites son expediente público con conservación obligatoria, así que tu respuesta explica qué se puede eliminar y qué no. Solo ves quién pide por su usuario, nunca sus datos ni sus trámites.</p>
-      <Alerta>{error}</Alerta>
-      <Alerta>{errorAccion}</Alerta>
-      {!datos ? <BloquesEsqueleto n={2} /> : (
+      {!pideCodigo && <Alerta>{error}</Alerta>}
+      {!objetivo && <Alerta>{errorAccion}</Alerta>}
+      {pideCodigo ? (
+        <Alerta tipo="info">
+          Estas solicitudes piden que hayas verificado tu segundo factor hace poco.{' '}
+          <button className="btn btn-sec" type="button" onClick={() => correr(() => api(ruta))}>Verificar segundo factor</button>
+        </Alerta>
+      ) : !datos ? <BloquesEsqueleto n={2} /> : (
         <>
           <p className="resumen-solicitudes" role="status">{datos.resumen.recibidas} {datos.resumen.recibidas === 1 ? 'abierta' : 'abiertas'}{datos.resumen.vencidas > 0 && <> · <strong className="vencidas">{datos.resumen.vencidas} {datos.resumen.vencidas === 1 ? 'vencida' : 'vencidas'}</strong></>}</p>
           {datos.solicitudes.length === 0 ? <Vacio titulo="Sin solicitudes" texto="Cuando alguien pida algo sobre sus datos personales aparecerá aquí." /> : (
             <ul className="lista-solicitudes">
               {datos.solicitudes.map((s) => {
-                const [clase, texto] = ESTADO_SOLICITUD[s.estado]
+                const [clase, texto] = ESTADO_SOLICITUD[s.estado] ?? ['', s.estado]
                 const propia = s.persona.id === yo.id
                 return (
                   <li key={s.id}>
                     <div className="cabecera-solicitud">
                       <strong>{s.persona.usuario}{propia && ' (eres tú)'}</strong>
-                      <span className="suave">{TIPO_SOLICITUD[s.tipo]}</span>
+                      <span className="suave">{TIPO_SOLICITUD[s.tipo] ?? s.tipo}</span>
                       <Insignia clase={clase}>{texto}</Insignia>
                       {s.vencida && <Insignia clase="e-rechazado">Vencida</Insignia>}
                     </div>
@@ -424,6 +440,7 @@ export function ConsolaCatalogo({ yo }) {
 /* ---------------------------------------------------------------- seguridad */
 
 function ModalMotivo({ persona, alCancelar, alEnviar }) {
+  useModal(alCancelar)
   const [motivo, setMotivo] = useState('')
   return (
     <div className="fondo-modal">

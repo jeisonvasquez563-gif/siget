@@ -6,7 +6,7 @@ import { axe } from 'jest-axe'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { instalarMock } from '../mock.js'
-import { sumarDiasHabiles } from '../mock-derechos.js'
+import { enmascarar, sumarDiasHabiles } from '../mock-derechos.js'
 import { ProveedorUI } from '../ui.jsx'
 
 vi.mock('qrcode', () => ({ default: { toCanvas: vi.fn() } }))
@@ -169,8 +169,10 @@ describe('ver mis datos', () => {
     await abrirComo('ana.ciudadana', 'Mis datos')
     const perfil = await screen.findByRole('heading', { name: 'Tus datos personales' })
     const seccion = perfil.closest('section')
-    for (const texto of ['Ana', 'Rodríguez Pérez', '8-765-4321', 'San Miguelito', 'ana.rodriguez@ejemplo.com', 'Panamá']) expect(within(seccion).getByText(texto)).toBeInTheDocument()
+    for (const texto of ['Ana', 'Rodríguez Pérez', '*-***-*321', 'San Miguelito', 'ana.rodriguez@ejemplo.com', 'Panamá']) expect(within(seccion).getByText(texto)).toBeInTheDocument()
     expect(within(seccion).getByText('Solo tú los ves')).toBeInTheDocument()
+    expect(seccion).not.toHaveTextContent('8-765-4321') // la cédula completa solo va en la descarga
+    expect(within(seccion).getByText(/solo ves los últimos 3 caracteres de tu cédula/)).toBeInTheDocument()
     expect(within(seccion).getByText(/Tienes 5 trámites/)).toBeInTheDocument()
     expect(within(seccion).getByText(/expediente público con conservación obligatoria: no se borran/)).toBeInTheDocument()
     expect(within(seccion).getByText(/No has cambiado tus datos de contacto/)).toBeInTheDocument()
@@ -178,7 +180,8 @@ describe('ver mis datos', () => {
 
   it('cada persona ve solo lo suyo', async () => {
     await abrirComo('beto.ciudadano', 'Mis datos')
-    expect(await screen.findByText('4-321-9876')).toBeInTheDocument()
+    expect(await screen.findByText('*-***-*876')).toBeInTheDocument()
+    expect(screen.queryByText('*-***-*321')).not.toBeInTheDocument()
     expect(screen.queryByText('8-765-4321')).not.toBeInTheDocument()
   })
 
@@ -237,7 +240,9 @@ describe('corregir correo, provincia y ciudad', () => {
     await user.type(ciudad, 'Colón')
     await user.click(within(formulario()).getByRole('button', { name: 'Guardar cambios' }))
     await reautenticar(user, '000000')
-    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(/no sirve/)
+    const dialogo = screen.getByRole('dialog')
+    expect(await within(dialogo).findByRole('alert')).toHaveTextContent(/no sirve/)
+    expect(within(dialogo).getByLabelText(/Código de 6 dígitos/)).toHaveValue('') // el código rechazado se limpia
   })
 
   it('si no cambió nada, lo dice y no molesta al servidor', async () => {
@@ -303,6 +308,7 @@ describe('descargar mis datos', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function nombrarDescarga() { nombre = this.download })
     const { user } = await abrirComo('ana.ciudadana', 'Mis datos')
     await user.click(await screen.findByRole('button', { name: 'Descargar mis datos' }))
+    await reautenticar(user) // exportar exige segundo factor reciente
     expect(await screen.findByText(/Descargamos tus datos en un archivo JSON/)).toBeInTheDocument()
     expect(nombre).toMatch(/^siget-mis-datos-ana\.ciudadana-\d{4}-\d{2}-\d{2}\.json$/)
     expect(guardados[0].type).toBe('application/json')
@@ -314,6 +320,31 @@ describe('descargar mis datos', () => {
     expect(documento.solicitudes.length).toBe(2)
     expect(documento.actividad_de_seguridad.some((a) => a.evento === 'datos_personales_exportados')).toBe(true)
     expect(texto).not.toMatch(/password|argon2|mfa_secreto|beto\.castillo|4-321-9876/)
+  })
+})
+
+describe('descargar exige segundo factor reciente', () => {
+  it('sin factor reciente no baja nada hasta verificar el código, y entonces la descarga repite sola', async () => {
+    window.URL.createObjectURL = vi.fn(() => 'blob:prueba')
+    window.URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const { user } = await abrirComo('ana.ciudadana', 'Mis datos')
+    await user.click(await screen.findByRole('button', { name: 'Descargar mis datos' }))
+    expect(await screen.findByRole('dialog', { name: /Confirma que eres tú/ })).toBeInTheDocument()
+    expect(window.URL.createObjectURL).not.toHaveBeenCalled()
+    expect(screen.queryByText('El servidor la negó')).not.toBeInTheDocument()
+    await reautenticar(user)
+    expect(await screen.findByText(/Descargamos tus datos en un archivo JSON/)).toBeInTheDocument()
+    expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1)
+  })
+
+  it('el servidor de ejemplo enmascara la cédula al ver y la entrega completa solo al exportar', async () => {
+    instalarMock('ana.ciudadana', { demora: 0 })
+    expect((await (await fetch('/auth/mis-datos/')).json()).perfil.cedula).toBe('*-***-*321')
+    expect((await fetch('/auth/mis-datos/exportar/')).status).toBe(403)
+    await fetch('/auth/mfa/verificar/', { method: 'POST', body: JSON.stringify({ codigo: '123456' }) })
+    expect((await (await fetch('/auth/mis-datos/exportar/')).json()).perfil.cedula).toBe('8-765-4321')
+    expect(enmascarar('PE-12-3456')).toBe('**-**-*456')
   })
 })
 
@@ -363,6 +394,29 @@ describe('solicitudes sobre mis datos', () => {
     expect(within(seccion()).getByLabelText(/^Cuéntanos qué necesitas/)).toHaveValue('') // el formulario queda limpio
   })
 
+  it('avisa que el detalle lo lee el operador de identidades', async () => {
+    await abrirSolicitudes()
+    const ayuda = within(seccion()).getByText('Lo lee el operador de identidades: no escribas datos que no hagan falta.')
+    expect(within(seccion()).getByLabelText(/^Cuéntanos qué necesitas/)).toHaveAccessibleDescription(expect.stringContaining(ayuda.textContent))
+  })
+
+  it('un estado o tipo desconocido no tumba la pantalla', async () => {
+    instalarMock('ana.ciudadana', { demora: 0 })
+    const original = window.fetch
+    window.fetch = async (ruta, o) => {
+      const r = await original(ruta, o)
+      if (ruta !== '/auth/mis-datos/' || (o?.method || 'GET') !== 'GET') return r
+      const cuerpo = await r.json()
+      cuerpo.solicitudes = cuerpo.solicitudes.map((x) => ({ ...x, estado: 'archivada', tipo: 'otro' }))
+      return new Response(JSON.stringify(cuerpo), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    render(<ProveedorUI><App /></ProveedorUI>)
+    const user = userEvent.setup()
+    await user.click(within(await screen.findByRole('navigation', { name: 'Módulos' })).getByRole('button', { name: /^Mis datos/ }))
+    const lista = within(await screen.findByRole('heading', { name: 'Solicitudes sobre mis datos personales' }).then((h) => h.closest('section'))).getByRole('list')
+    expect(within(lista).getAllByRole('listitem')[0]).toHaveTextContent(/otro.*archivada/s)
+  })
+
   it('el botón espera a que el detalle tenga el largo mínimo', async () => {
     const { user } = await abrirSolicitudes()
     const boton = within(seccion()).getByRole('button', { name: 'Enviar solicitud' })
@@ -400,9 +454,13 @@ describe('solicitudes sobre mis datos', () => {
 /* ---------------------------------------------------------------- consola del operador de identidades */
 
 describe('consola de solicitudes del operador de identidades', () => {
+  // Ver las solicitudes exige segundo factor reciente: el panel ofrece verificarlo y recarga solo
   async function abrirConsola(usuario = 'ivan.identidades') {
     const o = await abrirComo(usuario, 'Identidades')
     await screen.findByRole('heading', { name: 'Solicitudes sobre datos personales' })
+    await o.user.click(await within(panel('Solicitudes sobre datos personales')).findByRole('button', { name: 'Verificar segundo factor' }))
+    await reautenticar(o.user)
+    await within(panel('Solicitudes sobre datos personales')).findByRole('list')
     return o
   }
   const seccion = () => panel('Solicitudes sobre datos personales')
@@ -447,7 +505,7 @@ describe('consola de solicitudes del operador de identidades', () => {
     expect(within(seccion()).getByRole('status')).toHaveTextContent('2 abiertas')
   })
 
-  it('responder pide segundo factor reciente, explica que no borra nada y deja la solicitud atendida con su respuesta', async () => {
+  it('responder explica que no borra nada y deja la solicitud atendida con su respuesta', async () => {
     const { user } = await abrirConsola()
     const item = (await within(seccion()).findByText(/Quiero que eliminen mi cuenta y todos mis datos/)).closest('li')
     await user.click(within(item).getByRole('button', { name: 'Responder' }))
@@ -457,7 +515,6 @@ describe('consola de solicitudes del operador de identidades', () => {
     await user.click(within(modal).getByLabelText('Rechazada'))
     await user.type(within(modal).getByLabelText(/^Respuesta para la persona/), 'Tus trámites son expediente público y no se pueden borrar; sí eliminamos tus datos de contacto.')
     await user.click(within(modal).getByRole('button', { name: 'Enviar respuesta' }))
-    await reautenticar(user)
     expect(await screen.findByText('Respuesta enviada a beto.ciudadano.')).toBeInTheDocument()
     await waitFor(() => expect(within(seccion()).getByText(/Tus trámites son expediente público y no se pueden borrar/)).toBeInTheDocument())
     const cerrada = within(seccion()).getByText(/Quiero que eliminen mi cuenta y todos mis datos/).closest('li')
@@ -465,6 +522,71 @@ describe('consola de solicitudes del operador de identidades', () => {
     expect(cerrada).toHaveTextContent('por ivan.identidades')
     expect(within(cerrada).queryByRole('button', { name: 'Responder' })).not.toBeInTheDocument() // se responde una sola vez
     expect(within(seccion()).getByRole('status')).toHaveTextContent('1 abierta')
+  })
+
+  it('sin segundo factor reciente no muestra «El servidor la negó»: ofrece verificar y carga la lista', async () => {
+    const { user } = await abrirComo('ivan.identidades', 'Identidades')
+    const sec = await screen.findByRole('heading', { name: 'Solicitudes sobre datos personales' }).then((h) => h.closest('section'))
+    expect(await within(sec).findByText(/piden que hayas verificado tu segundo factor/)).toBeInTheDocument()
+    expect(within(sec).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(sec).queryByRole('list')).not.toBeInTheDocument()
+    await user.click(within(sec).getByRole('button', { name: 'Verificar segundo factor' }))
+    await reautenticar(user)
+    expect(await within(sec).findByRole('list')).toBeInTheDocument()
+    expect(within(sec).queryByText(/piden que hayas verificado/)).not.toBeInTheDocument()
+  })
+
+  it('el modal de respuesta no se cierra ni pierde el texto hasta que el servidor responde 2xx', async () => {
+    const { user } = await abrirConsola()
+    const original = window.fetch
+    let fallos = 1
+    window.fetch = async (ruta, o) => {
+      if (String(ruta).includes('/responder/') && fallos-- > 0) return new Response(JSON.stringify({ codigo: 'ya_resuelta', detalle: 'Esta propuesta o solicitud ya fue resuelta.' }), { status: 409, headers: { 'Content-Type': 'application/json' } })
+      return original(ruta, o)
+    }
+    const item = (await within(seccion()).findByText(/Quiero que eliminen mi cuenta y todos mis datos/)).closest('li')
+    await user.click(within(item).getByRole('button', { name: 'Responder' }))
+    const modal = await screen.findByRole('dialog', { name: /Responder a beto\.ciudadano/ })
+    const texto = 'Explicamos qué se puede eliminar y qué no se puede.'
+    await user.type(within(modal).getByLabelText(/^Respuesta para la persona/), texto)
+    await user.click(within(modal).getByRole('button', { name: 'Enviar respuesta' }))
+    expect(await within(modal).findByRole('alert')).toHaveTextContent(/ya fue resuelta/)
+    expect(screen.getByRole('dialog', { name: /Responder a beto\.ciudadano/ })).toBeInTheDocument()
+    expect(within(modal).getByLabelText(/^Respuesta para la persona/)).toHaveValue(texto)
+    await user.click(within(modal).getByRole('button', { name: 'Enviar respuesta' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await screen.findByText('Respuesta enviada a beto.ciudadano.')).toBeInTheDocument()
+  })
+
+  it('Escape cierra el modal de respuesta y el foco vuelve al botón «Responder»', async () => {
+    const { user } = await abrirConsola()
+    const item = (await within(seccion()).findByText(/Quiero que eliminen mi cuenta y todos mis datos/)).closest('li')
+    const boton = within(item).getByRole('button', { name: 'Responder' })
+    await user.click(boton)
+    await screen.findByRole('dialog')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(boton).toHaveFocus()
+  })
+
+  it('un estado o tipo desconocido no tumba el panel', async () => {
+    instalarMock('ivan.identidades', { demora: 0 })
+    await fetch('/auth/mfa/verificar/', { method: 'POST', body: JSON.stringify({ codigo: '123456' }) })
+    const original = window.fetch
+    window.fetch = async (ruta, o) => {
+      const r = await original(ruta, o)
+      if (!String(ruta).startsWith('/plataforma/solicitudes-datos/') || (o?.method || 'GET') !== 'GET') return r
+      const cuerpo = await r.json()
+      cuerpo.solicitudes = cuerpo.solicitudes.map((x) => ({ ...x, estado: 'archivada', tipo: 'otro', respondida_por: null }))
+      return new Response(JSON.stringify(cuerpo), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    render(<ProveedorUI><App /></ProveedorUI>)
+    const user = userEvent.setup()
+    await user.click(within(await screen.findByRole('navigation', { name: 'Módulos' })).getByRole('button', { name: /^Identidades/ }))
+    const sec = await screen.findByRole('heading', { name: 'Solicitudes sobre datos personales' }).then((h) => h.closest('section'))
+    const items = await within(sec).findAllByRole('listitem')
+    expect(items[0]).toHaveTextContent(/otro/)
+    expect(items[0]).toHaveTextContent(/archivada/)
   })
 
   it('«Cancelar» en el diálogo no responde nada', async () => {
@@ -483,7 +605,6 @@ describe('consola de solicitudes del operador de identidades', () => {
     const modal = await screen.findByRole('dialog', { name: /Responder a ana\.ciudadana/ })
     await user.type(within(modal).getByLabelText(/^Respuesta para la persona/), 'Solo usamos tus datos para tus trámites y no los compartimos.')
     await user.click(within(modal).getByRole('button', { name: 'Enviar respuesta' }))
-    await reautenticar(user)
     await screen.findByText('Respuesta enviada a ana.ciudadana.')
     // Misma instalación del servidor de ejemplo: la sesión pasa a ser la de la persona y lee sus propias solicitudes
     await fetch('/auth/logout/', { method: 'POST', body: '{}' })

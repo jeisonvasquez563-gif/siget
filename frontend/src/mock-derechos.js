@@ -31,6 +31,12 @@ const PERFILES_FIJOS = {
   'beto.ciudadano': { nombre: 'Beto', apellidos: 'Castillo Mora', cedula: '4-321-9876', fecha_nacimiento: '1985-11-02', provincia: 'Chiriquí', ciudad: 'David', correo: 'beto.castillo@ejemplo.com' },
 }
 
+// Igual que el servidor: solo quedan visibles los últimos 3 caracteres alfanuméricos y se respetan los guiones
+export function enmascarar(cedula) {
+  let restantes = [...cedula].filter((c) => /[A-Za-z0-9]/.test(c)).length
+  return [...cedula].map((c) => (/[A-Za-z0-9]/.test(c) ? (--restantes < 3 ? c : '*') : c)).join('')
+}
+
 export function derechosMock({ usuarios, actual, resp, hace, mfaFresco, tramitesDe }) {
   const perfiles = {}
   for (const [nombre, u] of Object.entries(usuarios)) {
@@ -61,7 +67,8 @@ export function derechosMock({ usuarios, actual, resp, hace, mfaFresco, tramites
   const paraPersona = (s) => ({ id: s.id, tipo: s.tipo, detalle: s.detalle, estado: s.estado, creada_en: s.creada_en, vence_en: s.vence_en, vencida: vencida(s), respondida_en: s.respondida_en, respuesta: s.respuesta })
   const paraOperador = (s) => ({ ...paraPersona(s), persona: { id: usuarios[s.usuario].id, usuario: s.usuario }, respondida_por: s.respondida_por ? { id: usuarios[s.respondida_por].id, usuario: s.respondida_por } : null })
   const constancia = (p) => (p.aviso_version ? { version: p.aviso_version, leido_en: p.aviso_leido_en, vigente: p.aviso_version === aviso.version } : null)
-  const perfilVisible = ({ aviso_version: _v, aviso_leido_en: _l, ...resto }) => resto
+  const perfilCompleto = ({ aviso_version: _v, aviso_leido_en: _l, ...resto }) => resto
+  const perfilVisible = (p) => ({ ...perfilCompleto(p), cedula: enmascarar(p.cedula) }) // al ver, la cédula sale enmascarada
 
   const pideCodigo = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: true })
   const negado = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false })
@@ -70,6 +77,7 @@ export function derechosMock({ usuarios, actual, resp, hace, mfaFresco, tramites
     const nombre = actual()
     const u = usuarios[nombre]
     const perfil = perfiles[nombre] || null
+    if (u.plataforma !== 'ninguno') return negado() // el PDP: las cuentas de plataforma no ejercen estos derechos
     const propias = solicitudes.filter((s) => s.usuario === nombre).sort((a, b) => b.id - a.id)
     const cuenta = { id: u.id, usuario: nombre, estado_cuenta: 'activa', rol_plataforma: u.plataforma, mfa_activo: true, nivel_aseguramiento: 2, creada_en: hace(40 * DIA), membresias: u.membresias.map((m) => ({ institucion: m.institucion, rol: m.rol })) }
 
@@ -111,10 +119,11 @@ export function derechosMock({ usuarios, actual, resp, hace, mfaFresco, tramites
       return resp(200, { codigo: cambiados.length ? 'datos_corregidos' : 'sin_cambios', campos_cambiados: cambiados.sort(), perfil: perfilVisible(perfil) })
     }
     if (camino === '/auth/mis-datos/exportar/' && metodo === 'GET') {
+      if (!mfaFresco()) return pideCodigo() // la exportación lleva la cédula completa: pide segundo factor reciente
       eventos.unshift({ evento: 'datos_personales_exportados', creado_en: new Date().toISOString(), ip: '192.168.100.10' })
       return resp(200, {
         formato: 'siget-mis-datos/1', generado_en: new Date().toISOString(), aviso_privacidad: perfil ? constancia(perfil) : null, cuenta,
-        perfil: perfil ? perfilVisible(perfil) : null, tramites: u.plataforma === 'ninguno' ? tramitesDe(u).map((t) => ({ ...t, historial: [] })) : [],
+        perfil: perfil ? perfilCompleto(perfil) : null, tramites: u.plataforma === 'ninguno' ? tramitesDe(u).map((t) => ({ ...t, historial: [] })) : [],
         solicitudes: propias.map(paraPersona), actividad_de_seguridad: [...eventos, { evento: 'login_ok', creado_en: hace(9 * 60000), ip: '192.168.100.10' }],
       })
     }
@@ -142,6 +151,7 @@ export function derechosMock({ usuarios, actual, resp, hace, mfaFresco, tramites
     const u = usuarios[nombre]
     if (u.plataforma !== 'operador_identidades') return negado() // solo identidades ve y responde
     if (camino === '/plataforma/solicitudes-datos/' && metodo === 'GET') {
+      if (!mfaFresco()) return pideCodigo() // ver las solicitudes también exige segundo factor reciente
       const estado = parametros.get('estado') || ''
       if (estado && !['recibida', 'atendida', 'rechazada'].includes(estado)) return resp(400, { codigo: 'datos_invalidos', errores: ['el estado debe ser «recibida», «atendida» o «rechazada»'] })
       const filtradas = solicitudes.filter((s) => !estado || s.estado === estado)
