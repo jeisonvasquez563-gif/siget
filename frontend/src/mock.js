@@ -119,6 +119,12 @@ const TRAMITES_BASE = [
   T(38, 3, 'Pendiente', 102, null, 1, 10), T(39, 1, 'Pendiente', 101, null, 2, 15), T(41, 3, 'En Tramitacion', 102, 201, 12, 10),
   T(42, 3, 'Pendiente', 101, null, 7, 10), T(43, 3, 'Rechazado', 102, 203, 14, 10), T(44, 3, 'En Tramitacion', 101, 202, 4, 10),
 ]
+// Trámites antiguos, ya resueltos (ids 1 a 34): hacen falta más de 20 por lista para probar la paginación. Quedan debajo de los demás (se
+// ordena del id más alto al más bajo) y, al estar resueltos, no cambian los indicadores de lo vencido ni lo escalado.
+// Ana (101) queda con 28 trámites propios y la bandeja del MOP con 41 de otras personas: dos y tres páginas de 20.
+for (let id = 1; id <= 34; id++) {
+  TRAMITES_BASE.push(T(id, 3, id % 3 === 0 ? 'Rechazado' : 'Aprobado', id % 3 === 2 ? 102 : 101, id % 2 ? 201 : 202, 30 + id, 10))
+}
 // Contenido de los trámites de ejemplo (lo que se respondió al iniciar). Los demás son «anteriores a la función»: datos vacíos
 const DATOS_BASE = {
   35: { asunto: 'Corte de calle por la fiesta patronal', descripcion: 'Se pide cerrar la calle principal el sábado de 8 a 18 h.' },
@@ -172,8 +178,14 @@ const ACTUACIONES = Object.values(EVENTOS_BASE).flat().sort((a, b) => b.id - a.i
 function paginar(lista, p) {
   const limite = Number(p.get('limite') || 20)
   const desde = Number(p.get('desplazamiento') || 0)
-  return { total: lista.length, limite, desplazamiento: desde, resultados: lista.slice(desde, desde + limite) }
+  return { resultados: lista.slice(desde, desde + limite), total: lista.length, limite, desplazamiento: desde }
 }
+
+// Como el servidor: `limite` de 1 a 100 y `desplazamiento` entero no negativo; otra cosa es `paginacion_invalida`
+const paginacionValida = (p) => ['limite', 'desplazamiento'].every((k) => {
+  const v = p.get(k)
+  return v === null || (/^\d+$/.test(v) && (k === 'desplazamiento' || (Number(v) >= 1 && Number(v) <= 100)))
+})
 
 export function instalarMock(inicial, opciones = {}) {
   const ajustes = opciones // dentro de fetch, «opciones» es la de cada petición
@@ -309,7 +321,9 @@ export function instalarMock(inicial, opciones = {}) {
     if (deEquipo) return deEquipo
     if (camino === '/tramites/' && metodo === 'GET') {
       if (u.plataforma !== 'ninguno') return negado()
-      return resp(200, { resultados: TRAMITES.filter((t) => visibles(u, t)).sort((a, b) => b.id - a.id).map((t) => dto(u, t)), limite: 100, desplazamiento: 0 })
+      if (!paginacionValida(p)) return resp(400, { codigo: 'paginacion_invalida', detalle: 'limite (1 a 100) y desplazamiento deben ser enteros válidos.' })
+      const lista = TRAMITES.filter((t) => visibles(u, t) && (p.get('escalados') !== '1' || t.escalado)).sort((a, b) => b.id - a.id).map((t) => dto(u, t))
+      return resp(200, paginar(lista, p))
     }
     if (camino === '/tramites/' && metodo === 'POST') {
       const tipo = TIPOS.find((t) => t.id === cuerpo.tipo_tramite)

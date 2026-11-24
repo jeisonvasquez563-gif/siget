@@ -35,7 +35,7 @@ from apps.autenticacion.servicio import registrar_evento
 from apps.tramites import almacen, documentos, formulario
 from apps.tramites.models import Documento, Tramite
 
-from .serializacion import (ESTADOS_FINALES, ESTADOS_VALIDOS, calcular_fecha_limite, entero_positivo, evento_a_dict, paginacion,
+from .serializacion import (ESTADOS_FINALES, ESTADOS_VALIDOS, calcular_fecha_limite, entero_positivo, evento_a_dict, pagina_de, paginacion,
                             texto, tramite_a_dict)
 
 
@@ -127,8 +127,8 @@ class TramitesColeccion(_Base):
         if escalados:
             consulta = consulta.filter(escalado_en__isnull=False)
         filas = list(consulta[desplazamiento:desplazamiento + limite])
-        return Response({"resultados": [tramite_a_dict(t, self._es_personal(t), ahora) for t in filas],
-                         "limite": limite, "desplazamiento": desplazamiento})
+        # `total`: cuántos trámites ve la persona con este filtro (la base ya filtra por filas), para paginar sin adivinar
+        return Response(pagina_de([tramite_a_dict(t, self._es_personal(t), ahora) for t in filas], consulta.count(), limite, desplazamiento))
 
     def post(self, request):
         usuario = request.user.usuario

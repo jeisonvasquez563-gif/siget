@@ -43,6 +43,12 @@ def paginacion(parametros):
     return limite, desplazamiento
 
 
+def pagina_de(resultados, total, limite, desplazamiento):
+    """Cuerpo de una página del listado: lo que pide la interfaz para paginar («Página X de Y») sin adivinar.
+    `total` cuenta TODAS las filas que la persona puede ver con el filtro aplicado (la base ya filtra por filas), no solo las de la página."""
+    return {"resultados": resultados, "total": total, "limite": limite, "desplazamiento": desplazamiento}
+
+
 def sumar_dias_habiles(inicio, dias, feriados):
     """`inicio` más `dias` días hábiles (lunes a viernes que no son feriado), a la misma hora y en hora de Panamá.
 
