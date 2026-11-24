@@ -25,7 +25,7 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 ### Funcionalidades
 | Pendiente | Impacto | Esfuerzo |
 |---|---|---|
-| **El trámite no tiene contenido**: solo guarda tipo, estado y plazo. Faltan los datos del formulario de cada tipo, el motivo al rechazar o pedir subsanación, y que la ciudadanía responda una subsanación | Alto | 4+ días |
+| ~~El trámite no tiene contenido~~ **HECHO el 24-nov** (PR #22 y #23, runbook 40.9): formulario por tipo, motivo obligatorio en la base y respuesta de la ciudadanía a la subsanación; ensayo 112/112 | — | — |
 | Notificaciones dentro de la plataforma (PT-9) | Medio | 2–3 días |
 | Perfil y cambio de contraseña desde la sesión | Medio | 2–3 días |
 | Gestión de los tipos de trámite por institución: la acción del PDP existe, la ruta no | Medio | 2–3 días |
@@ -80,7 +80,7 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 
 **Semana 1**
 1. ~~Terminar PT-15~~ (hecho el 24-nov).
-2. Contenido del trámite, en el backend y en el frontend.
+2. ~~Contenido del trámite~~ (hecho el 24-nov).
 3. Cambio de contraseña.
 4. Pantalla de error global y paginación.
 5. Corregir la documentación desactualizada.
