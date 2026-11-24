@@ -158,9 +158,10 @@ def responder_solicitud_de_datos(operador, solicitud, estado, respuesta, ip, aho
     if errores:
         return Resultado(False, "datos_invalidos", detalle={"errores": errores})
     with transaction.atomic():
-        # `estado="recibida"` en el filtro: si otro operador la respondió entre tanto, no se pisa su respuesta
+        # `estado="recibida"` en el filtro: si otro operador la respondió entre tanto, no se pisa su respuesta.
+        # La hora de la respuesta no se envía: la fija la base (trigger) y la aplicación no tiene UPDATE sobre esa columna
         filas = SolicitudDerecho.objects.filter(pk=solicitud.pk, estado="recibida").update(
-            estado=datos[0], respuesta=datos[1], respondida_por=operador, respondida_en=ahora)
+            estado=datos[0], respuesta=datos[1], respondida_por=operador)
         if filas != 1:
             return Resultado(False, "ya_resuelta")
         registrar_evento(operador.pk, "solicitud_derecho_respondida", ip,

@@ -581,14 +581,14 @@ def test_nadie_recibe_delete_ni_truncate_en_nada():
 
 def test_las_solicitudes_solo_se_pueden_responder_en_sus_columnas_de_respuesta():
     updates = re.findall(r"GRANT\s+UPDATE\s*\(([^)]*)\)\s+ON\s+siget\.solicitud_derecho", SQL_SIN_COMENTARIOS)
-    assert len(updates) == 1 and {c.strip() for c in updates[0].split(",")} == {"estado", "respondida_en", "respondida_por", "respuesta"}
+    assert len(updates) == 1 and {c.strip() for c in updates[0].split(",")} == {"estado", "respondida_por", "respuesta"}
     assert re.search(r"GRANT\s+SELECT,\s*INSERT\s+ON\s+siget\.solicitud_derecho\s+TO\s+app_role", SQL_SIN_COMENTARIOS)
 
 
 def test_ni_el_auditor_ni_pgadmin_ni_el_checkpoint_leen_las_solicitudes():
     revocados = {r.strip() for grupo in re.findall(r"REVOKE\s+ALL\s+ON\s+siget\.solicitud_derecho\s+FROM\s+([^;]*);", SQL_SIN_COMENTARIOS) for r in grupo.split(",")}
-    assert revocados == {"PUBLIC", "pgadmin_lectura", "auditor_role", "checkpoint_app"}
-    assert not re.search(r"GRANT[^;]*solicitud_derecho[^;]*(auditor_role|pgadmin_lectura|checkpoint_app|PUBLIC)", SQL_SIN_COMENTARIOS)
+    assert revocados == {"PUBLIC", "pgadmin_lectura", "auditor_role", "checkpoint_app", "escalador_role"}
+    assert not re.search(r"GRANT[^;]*solicitud_derecho[^;]*(auditor_role|pgadmin_lectura|checkpoint_app|escalador_role|PUBLIC)", SQL_SIN_COMENTARIOS)
 
 
 def test_la_tabla_de_solicitudes_coincide_con_el_modelo():
@@ -612,3 +612,39 @@ def test_un_trigger_impide_tocar_una_solicitud_respondida_y_exige_respuesta_y_re
 def test_la_migracion_no_lleva_datos_personales_ni_secretos():
     for prohibido in ("password", "INSERT INTO", "@", "8-"):
         assert prohibido not in SQL_SIN_COMENTARIOS, prohibido
+
+
+def _funcion(nombre):
+    return re.search(rf"CREATE FUNCTION siget\.{nombre}\(\).*?END \$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
+
+
+def test_d1_una_solicitud_nace_recibida_sin_respuesta_y_con_un_plazo_razonable():
+    assert "BEFORE INSERT ON siget.solicitud_derecho" in SQL_SIN_COMENTARIOS
+    cuerpo = _funcion("solicitud_derecho_validar_alta")
+    for asignacion in ("NEW.estado := 'recibida'", "NEW.respondida_en := NULL", "NEW.respondida_por := NULL", "NEW.respuesta := NULL", "NEW.creada_en := now()"):
+        assert asignacion in cuerpo, asignacion
+    assert "NEW.vence_en < now() + interval '10 days'" in cuerpo and "NEW.vence_en > now() + interval '30 days'" in cuerpo and "RAISE EXCEPTION" in cuerpo
+    assert "EXECUTE FUNCTION siget.solicitud_derecho_validar_alta()" in SQL_SIN_COMENTARIOS
+
+
+def test_d2_solo_un_operador_de_identidades_responde_y_nadie_su_propia_solicitud():
+    cuerpo = _funcion("solicitud_derecho_validar_respuesta")
+    assert "siget.usuario WHERE id = NEW.respondida_por AND rol_plataforma = 'operador_identidades'" in cuerpo and "RAISE EXCEPTION" in cuerpo
+    assert "SECURITY DEFINER" in SQL_SIN_COMENTARIOS and "SET search_path = siget, pg_temp" in SQL_SIN_COMENTARIOS  # no depende de los grants de app_role sobre usuario
+    assert "respondida_por <> usuario_id" in SQL_SIN_COMENTARIOS
+    assert "NEW.respondida_en := now()" in cuerpo
+
+
+def test_d3_el_perfil_nace_sin_fecha_de_actualizacion_y_con_la_constancia_fechada_por_la_base():
+    assert "BEFORE INSERT ON siget.perfil" in SQL_SIN_COMENTARIOS
+    cuerpo = _funcion("perfil_sellar_alta")
+    assert "NEW.actualizado_en := NULL" in cuerpo and "IF NEW.aviso_version IS NOT NULL THEN" in cuerpo and "NEW.aviso_leido_en := now()" in cuerpo
+    assert "EXECUTE FUNCTION siget.perfil_sellar_alta()" in SQL_SIN_COMENTARIOS
+
+
+def test_d4_la_aplicacion_ya_no_envia_la_hora_de_la_respuesta():
+    servicio = (Path(plataforma.__file__).parent / "servicio.py").read_text(encoding="utf-8")
+    llamada = re.search(r"SolicitudDerecho\.objects\.filter\(pk=solicitud\.pk, estado=\"recibida\"\)\.update\((.*?)\)\n", servicio, re.S).group(1)
+    assert "respondida_en" not in llamada and "respondida_por=operador" in llamada
+    verificacion = (Path(plataforma.__file__).parents[1] / "nucleo" / "management" / "commands" / "verificar_autenticacion.py").read_text(encoding="utf-8")
+    assert not re.search(r"\.update\([^)]*respondida_en", verificacion)
