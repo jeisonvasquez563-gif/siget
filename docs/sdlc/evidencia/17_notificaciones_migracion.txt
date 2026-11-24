@@ -1,0 +1,9 @@
+# Notificaciones: migracion 018 aplicada y sus pruebas sobre la base migrada (24-nov-2026)
+# 2026-11-24 15:18:15  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/n018/paso2.sh
+== 4. Migracion 018 real (una sola transaccion) (15:18)
+CREATE POLICY
+COMMIT
+== 5. Las mismas pruebas sobre la base migrada (el script termina en ROLLBACK)
+resumen: 36 pasan, 0 fallan
+# código de salida: 0
