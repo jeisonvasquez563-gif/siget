@@ -69,7 +69,7 @@ describe('roles y módulos', () => {
     expect(within(auditor).getByText('Auditoría')).toBeInTheDocument()
     expect(within(auditor).queryByText('Mis trámites')).not.toBeInTheDocument()
     expect(within(auditor).getByRole('progressbar', { name: /2 de 26/ })).toBeInTheDocument()
-    expect(within(screen.getByRole('article', { name: 'Supervisor' })).getByRole('progressbar', { name: /10 de 26/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: 'Supervisor' })).getByRole('progressbar', { name: /11 de 26/ })).toBeInTheDocument()
   })
 })
 

@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { instalarMock } from '../mock.js'
 import { ProveedorUI } from '../ui.jsx'
+import { ModalMotivo } from '../Contenido.jsx'
+import { motivoParaLaPersona, validarTextoLibre } from '../mock-contenido.js'
 
 vi.mock('qrcode', () => ({ default: { toCanvas: vi.fn() } }))
 const AXE = { rules: { 'color-contrast': { enabled: false } } } // jsdom no calcula colores: el contraste se revisa en el navegador
@@ -298,6 +300,62 @@ describe('el motivo de las decisiones del personal', () => {
     const r = await window.fetch('/tramites/44/estado/', { method: 'POST', body: JSON.stringify({ estado: 'Rechazado' }) })
     expect(r.status).toBe(400)
     expect((await r.json()).codigo).toBe('motivo_obligatorio')
+  })
+
+  it('rechazar, pedir una subsanación y cerrarla avisan que la persona va a leer el motivo', async () => {
+    const { user, unmount } = await abrirDetalle('fabio.mop', 'Bandeja de la institución', 44)
+    await user.click(screen.getByRole('button', { name: 'Rechazar' }))
+    let modal = await screen.findByRole('dialog', { name: 'Rechazar este trámite' })
+    expect(within(modal).getByText('La persona que pidió el trámite va a leer este motivo')).toBeInTheDocument()
+    await user.click(within(modal).getByRole('button', { name: 'Cancelar' }))
+    await user.click(screen.getByRole('button', { name: 'Pedir subsanación' }))
+    modal = await screen.findByRole('dialog', { name: 'Pedir una subsanación' })
+    expect(within(modal).getByText('La persona que pidió el trámite va a leer este motivo')).toBeInTheDocument()
+    unmount()
+    const cierre = await abrirDetalle('saul.mop', 'Bandeja de la institución', 37)
+    await cierre.user.click(screen.getByRole('button', { name: 'Cerrar la subsanación' }))
+    modal = await screen.findByRole('dialog', { name: 'Cerrar la subsanación' })
+    expect(within(modal).getByText('La persona que pidió el trámite va a leer este motivo')).toBeInTheDocument()
+    expect(within(modal).queryByText('Este comentario es interno')).not.toBeInTheDocument()
+  })
+
+  it('para las demás transiciones el modal avisa que el comentario es interno', () => {
+    render(<ModalMotivo clave="Aprobado" enviar={() => {}} cancelar={() => {}} />)
+    const modal = screen.getByRole('dialog')
+    expect(within(modal).getByText('Este comentario es interno')).toBeInTheDocument()
+    expect(within(modal).queryByText(/va a leer este motivo/)).not.toBeInTheDocument()
+  })
+
+  it('el servidor de ejemplo solo trae a la ciudadanía los motivos que le conciernen; el personal ve todos', async () => {
+    instalarMock('fabio.mop', { demora: 0 })
+    await window.fetch('/auth/mfa/verificar/', { method: 'POST', body: JSON.stringify({ codigo: '123456' }) })
+    const comentario = 'Comentario interno: revisar con el supervisor.'
+    const r = await window.fetch('/tramites/44/estado/', { method: 'POST', body: JSON.stringify({ estado: 'Aprobado', motivo: comentario }) })
+    expect(r.status).toBe(200)
+    const delPersonal = (await (await window.fetch('/tramites/44/historial/')).json()).eventos
+    expect(delPersonal.some((e) => e.motivo === comentario)).toBe(true)
+    for (const [id, usuario] of [[37, 'beto.ciudadano'], [43, 'beto.ciudadano']]) {
+      instalarMock(usuario, { demora: 0 })
+      const eventos = (await (await window.fetch(`/tramites/${id}/historial/`)).json()).eventos
+      const conMotivo = eventos.filter((e) => e.motivo)
+      expect(conMotivo.length).toBeGreaterThan(0)
+      expect(conMotivo.every((e) => ['Rechazado', 'En Subsanacion'].includes(e.estado_nuevo) || e.estado_anterior === 'En Subsanacion')).toBe(true)
+    }
+  })
+
+  it('el criterio de lo que lee la persona: rechazo, subsanación y su cierre; lo demás, no', () => {
+    const ev = (accion, de, a) => ({ accion, estado_anterior: de, estado_nuevo: a, motivo: 'texto suficientemente largo' })
+    expect(motivoParaLaPersona(ev('cambio_estado', 'En Tramitacion', 'Rechazado'))).toBeTruthy()
+    expect(motivoParaLaPersona(ev('cambio_estado', 'En Tramitacion', 'En Subsanacion'))).toBeTruthy()
+    expect(motivoParaLaPersona(ev('cambio_estado', 'En Subsanacion', 'En Tramitacion'))).toBeTruthy()
+    expect(motivoParaLaPersona(ev('cambio_estado', 'En Tramitacion', 'Aprobado'))).toBeNull()
+    expect(motivoParaLaPersona(ev('cambio_estado', 'Pendiente', 'En Tramitacion'))).toBeNull()
+    expect(motivoParaLaPersona(ev('reasignacion', 'En Tramitacion', 'Rechazado'))).toBeNull()
+  })
+
+  it('el servidor de ejemplo también exige una letra o un número en el texto libre', () => {
+    expect(validarTextoLibre('?'.repeat(12), 10, 2000)).toMatch(/letra o un número/)
+    expect(validarTextoLibre('Falta el croquis firmado', 10, 2000)).toBeNull()
   })
 
   it('el modal del motivo no tiene violaciones de accesibilidad', async () => {

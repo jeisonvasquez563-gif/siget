@@ -89,7 +89,17 @@ export function validarTextoLibre(valor, minimo, maximo) {
   const v = valor.trim()
   if (v.length < minimo) return `Debe tener al menos ${minimo} caracteres.`
   if (v.length > maximo) return `No puede superar los ${maximo} caracteres.`
+  if (!/[\p{L}\p{N}]/u.test(v)) return 'Debe tener al menos una letra o un número.'
   return null
+}
+
+// Qué motivo ve la persona que pidió el trámite (el personal los ve todos): solo los de rechazar, pedir una subsanación y cerrarla
+// (su propia respuesta o el cierre del personal). Los demás son comentarios internos.
+export function motivoParaLaPersona(evento) {
+  if (evento.accion !== 'cambio_estado') return null
+  const paraElla = evento.estado_nuevo === 'Rechazado' || evento.estado_nuevo === 'En Subsanacion'
+  const cierre = evento.estado_anterior === 'En Subsanacion' && evento.estado_nuevo === 'En Tramitacion'
+  return paraElla || cierre ? evento.motivo : null
 }
 
 export const respuestaDatosInvalidos = (errores) => ({ codigo: 'datos_invalidos', detalle: 'Hay datos que corregir.', errores })

@@ -167,18 +167,28 @@ export function DatosSolicitud({ formulario = [], datos }) {
 
 /* ---------------------------------------------------------------- motivo del personal */
 
+const AVISO_LA_PERSONA_LO_LEE = 'La persona que pidió el trámite va a leer este motivo'
 const TEXTOS_MOTIVO = {
   Rechazado: {
     titulo: 'Rechazar este trámite', peligro: true, etiqueta: 'Confirmar el rechazo',
     texto: 'Es un estado final: después no se puede cambiar. La decisión queda en el historial con tu nombre y la persona verá el motivo.',
+    aviso: AVISO_LA_PERSONA_LO_LEE,
   },
   'En Subsanacion': {
     titulo: 'Pedir una subsanación', etiqueta: 'Enviar la solicitud',
     texto: 'Explica qué debe corregir o completar la persona. Lo verá en su trámite y podrá responder y adjuntar documentos.',
+    aviso: AVISO_LA_PERSONA_LO_LEE,
   },
   cierre: {
     titulo: 'Cerrar la subsanación', etiqueta: 'Cerrar y pasar a tramitación',
     texto: 'El trámite vuelve a tramitación. Deja constancia de por qué la respuesta de la persona es suficiente.',
+    aviso: AVISO_LA_PERSONA_LO_LEE,
+  },
+  // Las demás transiciones (si se pidiera un motivo): el servidor no lo muestra a la ciudadanía
+  interno: {
+    titulo: 'Comentar esta decisión', etiqueta: 'Guardar el comentario',
+    texto: 'Queda en el historial del trámite, visible solo para el personal de la institución.',
+    aviso: 'Este comentario es interno',
   },
 }
 
@@ -187,7 +197,7 @@ export function ModalMotivo({ clave, error, enviar, cancelar }) {
   useModal(cancelar)
   const [motivo, setMotivo] = useState('')
   const [trabajando, setTrabajando] = useState(false)
-  const t = TEXTOS_MOTIVO[clave]
+  const t = TEXTOS_MOTIVO[clave] || TEXTOS_MOTIVO.interno
   const largo = motivo.trim().length
   async function alEnviar(ev) {
     ev.preventDefault()
@@ -200,6 +210,7 @@ export function ModalMotivo({ clave, error, enviar, cancelar }) {
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-motivo">
         <h2 id="titulo-motivo"><span className={`icono-grande ${t.peligro ? 'peligro' : ''}`}><Icono nombre={t.peligro ? 'alerta' : 'info'} /></span>{t.titulo}</h2>
         <p className="suave">{t.texto}</p>
+        <Alerta tipo="info">{t.aviso}</Alerta>
         <Alerta>{error}</Alerta>
         <form onSubmit={alEnviar} noValidate>
           <CampoTexto etiqueta="Motivo" valor={motivo} cambiar={setMotivo} autoFocus />

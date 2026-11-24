@@ -15,7 +15,7 @@ import bdEjemplo from './mock-datos/base-de-datos.json'
 import simuladorEjemplo from './mock-datos/simulador.json'
 import {
   FORMULARIO_CONSTRUCCION, FORMULARIO_DEMOSTRACION, FORMULARIO_DENUNCIA, FORMULARIO_EMPRESA, FORMULARIO_INTERINSTITUCIONAL,
-  respuestaDatosInvalidos, validarDatos, validarTextoLibre,
+  motivoParaLaPersona, respuestaDatosInvalidos, validarDatos, validarTextoLibre,
 } from './mock-contenido.js'
 
 const DIA = 86400000
@@ -323,7 +323,7 @@ export function instalarMock(inicial, opciones = {}) {
       if (!t || !visibles(u, t)) return resp(404, { detalle: 'No encontrado.' })
       const sub = m[2]
       if (!sub) return resp(200, conContenido(dto(u, t), t))
-      if (sub === 'historial/') return resp(200, { tramite: t.id, eventos: EVENTOS[t.id].map((e) => (esPersonal(u, t) ? e : { id: e.id, accion: e.accion, estado_anterior: e.estado_anterior, estado_nuevo: e.estado_nuevo, institucion_id: e.institucion_id, creado_en: e.creado_en, motivo: e.motivo })) })
+      if (sub === 'historial/') return resp(200, { tramite: t.id, eventos: EVENTOS[t.id].map((e) => (esPersonal(u, t) ? e : { id: e.id, accion: e.accion, estado_anterior: e.estado_anterior, estado_nuevo: e.estado_nuevo, institucion_id: e.institucion_id, creado_en: e.creado_en, motivo: motivoParaLaPersona(e) })) })
       if (sub === 'subsanacion/') {
         // La responde quien pidió el trámite, sin segundo factor reciente (igual que adjuntar documentos)
         if (metodo !== 'POST' || t.solicitante_id !== u.id) return negado()
