@@ -14,51 +14,11 @@ Estado al **17 de noviembre de 2026**. Este documento dice dónde quedó cada co
 - **Único PR abierto**: #6 (`develop` → `main`). Se fusiona el día de la entrega.
 - El repositorio lo usa solo Jeison: los PR se fusionan como administrador (`gh pr merge N --admin --merge`) **solo con el CI de seguridad en verde**.
 
-## 2. PT-15: derechos sobre los datos personales (Ley 81) — implementado, sin revisar ni integrar
+## 2. PT-15: derechos sobre los datos personales (Ley 81) — HECHO (24-nov)
 
-**Qué es:** cumplir los requisitos RS-09 y RS-22 («No cumple» en `docs/sdlc/02-requisitos-de-seguridad.md`).
-- La persona puede ver, corregir y exportar sus datos.
-- Puede pedir rectificación, cancelación u oposición, con respuesta en 10 días hábiles.
-- Se agrega un aviso de privacidad, que hay que aceptar al registrarse.
+Revisado (3 revisiones de seguridad, 0 críticos o altos, 14 hallazgos corregidos), integrado con `develop` (PR #20) y **aplicado en producción el 24-nov** (PR #21, runbook 39.10): migración 016, 8 verificaciones en verde contra la base real y ensayo 101/101. RS-09 y RS-22 pasan a «Cumple».
 
-**Dónde está:**
-- Carpeta: `C:\Users\jeiva\Desktop\siget-derechos`.
-- Backend: `feature/backend-derechos-datos` (`b26b252`).
-- Frontend: `feature/frontend-derechos-datos` (`a3247e4`).
-- Las dos ramas están subidas a GitHub como respaldo (17-nov), todavía sin PR.
-
-**Contenido:**
-- Migración `016-derechos-datos.sql`.
-- Rutas `/auth/mis-datos/` y `/auth/aviso-privacidad/`.
-- Consola del operador de identidades para responder solicitudes.
-- Pantallas «Mis datos» y «Aviso de privacidad».
-- Tres acciones nuevas del PDP (`corregir_mis_datos`, `consultar_solicitudes_datos`, `responder_solicitud_datos`).
-- Pruebas: 618 del backend y 230 de 231 del frontend. La que falla es del simulador, por tiempo de espera, y ya fallaba antes.
-
-**Lo que falta, en orden:**
-1. **Revisión crítica de seguridad.** Hay que leer `git diff 14d3bd6..a3247e4` por partes. Se intentó dos veces con un subagente y la primera se trabó, así que conviene dividirla en encargos chicos. Qué mirar:
-   - permisos de la migración 016 (UPDATE solo de correo, provincia y ciudad; nadie borra; nadie responde su propia solicitud);
-   - acceso a datos de otra persona (IDOR);
-   - respuestas que delaten si una cuenta o una solicitud existe;
-   - qué sale en la exportación (que no incluya hashes ni la huella de la cédula);
-   - que los eventos lleven nombres de campos, nunca valores;
-   - XSS en las pantallas.
-2. **Integrar con `develop`.** Las ramas salen del `develop` viejo (`14d3bd6`). Al combinar:
-   - **Runbook:** su sección dice 35 y hay que pasarla a la **39** (35–38 ya están tomadas).
-   - **Plazo de 10 días hábiles:** hoy solo salta sábados y domingos; hay que usar `sumar_dias_habiles` de PT-3 (feriados de Panamá).
-   - **`Acceso.jsx`:** la casilla del aviso de privacidad tiene que convivir con el campo de invitación de PT-2.
-   - **`Plataforma.jsx`:** el panel de solicitudes va junto al de invitaciones.
-   - **Conteos:** acciones del PDP (21), módulos (16) y `test_modelos.py`.
-   - Comprobar que la 016 no le dé nada a `escalador_role`.
-3. **Regenerar** `docs/diagrama-roles-modulos.svg` y `docs/modulos.md`, que tienen los conteos viejos.
-4. **Push y PR**, con el CI de seguridad en verde.
-5. **Aplicar en producción** (necesita OK de Jeison):
-   - respaldo verificado;
-   - ensayo de la 016 con `ROLLBACK` y después la migración real;
-   - reconstruir el backend y la interfaz;
-   - correr los `verificar_*`.
-
-   **Ojo:** la migración 016 y los pasos nuevos de `verificar_autenticacion`, `verificar_plataforma` y `verificar_politicas` **nunca se corrieron contra PostgreSQL**. Es lo primero que puede fallar.
+Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` ni en `solicitud_derecho`.
 
 ## 3. Lo que le falta a la plataforma (auditoría del 17-nov)
 
@@ -119,7 +79,7 @@ Estado al **17 de noviembre de 2026**. Este documento dice dónde quedó cada co
 ## 4. Orden sugerido
 
 **Semana 1**
-1. Terminar PT-15: revisión, integración y PR.
+1. ~~Terminar PT-15~~ (hecho el 24-nov).
 2. Contenido del trámite, en el backend y en el frontend.
 3. Cambio de contraseña.
 4. Pantalla de error global y paginación.
