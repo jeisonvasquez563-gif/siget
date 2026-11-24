@@ -1,5 +1,7 @@
 # Plan de ejecución: trabajo pendiente de SIGET (responsable: Andy Martínez)
 > **Actualización del 22-oct:** los paquetes **PT-4** (consolas de los operadores de plataforma con control dual) y **PT-5** (recuperación de contraseña asistida) ya están construidos, probados y desplegados por Jeison; ver [`runbook.md` §34](../runbook.md). Quedan para Andy el resto de los paquetes.
+>
+> **Actualización del 24-nov-2026:** también están hechos y en producción **PT-1** (respaldos automáticos con restauración probada, runbook 33.4; falta decidir la copia fuera de VM2), **PT-2** (registro por invitación, aviso de demostración; el bloque de IP real de nginx sigue comentado a propósito), **PT-3** (plazos en días hábiles y escalamiento, 12-nov), **PT-8** (documentos adjuntos, 12-nov), **PT-13** (checkpoint PHP, pgAdmin web y puerto 80 retirados, 17-nov) y **PT-15** (derechos sobre los datos personales, 24-nov). Las casillas ☑ de abajo solo se marcaron donde el CHANGELOG o el runbook lo confirman; quedan ☐ PT-0, PT-6, PT-7, PT-9 a PT-12 y PT-14, y las cifras «354», «130» y «55 de 55» de esas tareas son las del momento en que se escribió el plan (hoy: 1044, 292 y 112 de 112).
 
 
 **Especificación (qué se construye, diseño y criterios de aceptación):** [`../superpowers/specs/2026-10-21-pendientes-design.md`](../superpowers/specs/2026-10-21-pendientes-design.md). Este documento dice **en qué orden, cuándo y cómo** se hace. Aprobador de todo lo que toque las VMs: **Jeison Vásquez**. Semana 1 = 12 de octubre de 2026.
@@ -52,11 +54,11 @@ Cada tarea es una casilla; al terminarla se marca en el PR. «Evidencia» es lo 
 | ☐ | Tarea | Evidencia |
 |---|---|---|
 | ☐ | Decidir con Jeison **dónde** va la copia fuera de la VM (decisión abierta 2 de la especificación) y cómo se cifra (`age` u otro; la clave **no** vive en la VM) | Decisión en el PR |
-| ☐ | Script de respaldo: `pg_dump -Fc` + `pg_dumpall --globals-only` desde el contenedor, permisos 600, retención 14 diarios y 8 semanales, registro en el journal | Script y prueba en un directorio temporal |
-| ☐ | Unidad `systemd timer` (usuario `siget`, VM2) y su servicio; **comando de instalación listo para Jeison** | Archivos en `infra/podman/vm2-db-server/` |
-| ☐ | Script de **prueba de restauración**: restaurar el último volcado en una base temporal, comparar esquema y conteos (`verificar_esquema`) y borrarla | Salida de una ejecución real |
+| ☑ | Script de respaldo: `pg_dump -Fc` + `pg_dumpall --globals-only` desde el contenedor, permisos 600, retención 14 diarios y 8 semanales, registro en el journal | Script y prueba en un directorio temporal |
+| ☑ | Unidad `systemd timer` (usuario `siget`, VM2) y su servicio; **comando de instalación listo para Jeison** | Archivos en `infra/podman/vm2-db-server/` |
+| ☑ | Script de **prueba de restauración**: restaurar el último volcado en una base temporal, comparar esquema y conteos (`verificar_esquema`) y borrarla | Salida de una ejecución real |
 | ☐ | Procedimiento de recuperación completa (de cero a plataforma funcionando) en el runbook, probado una vez | Sección nueva del runbook |
-| ☐ | Jeison instala el temporizador; Andy confirma la primera ejecución y la primera restauración | Capturas del journal |
+| ☑ | Jeison instala el temporizador; Andy confirma la primera ejecución y la primera restauración | Capturas del journal |
 
 **Se puede repartir:** la redacción del procedimiento de recuperación (documentación).
 
@@ -65,9 +67,9 @@ Cada tarea es una casilla; al terminarla se marca en el PR. «Evidencia» es lo 
 | ☐ | Tarea | Evidencia |
 |---|---|---|
 | ☐ | nginx: `set_real_ip_from` (solo el proxy) y `real_ip_header`; los límites de tasa por la IP real | Prueba con dos IPs distintas que muestra cupos separados |
-| ☐ | Variable `SIGET_REGISTRO` (`cerrado`, `invitacion`, `abierto`), por defecto `abierto`; pruebas de los tres modos | `pytest` |
-| ☐ | Modo `invitacion`: tabla `invitacion` (código de un solo uso con vencimiento, solo el hash) y alta por el operador de identidades | Migración `008` + `verificar_autenticacion` ampliado |
-| ☐ | Aviso opcional de «demostración académica» en la interfaz, por configuración, con su prueba y accesibilidad | `npm run verificar` |
+| ☑ | Variable `SIGET_REGISTRO` (`cerrado`, `invitacion`, `abierto`), por defecto `abierto`; pruebas de los tres modos | `pytest` |
+| ☑ | Modo `invitacion`: tabla `invitacion` (código de un solo uso con vencimiento, solo el hash) y alta por el operador de identidades | Migración `008` + `verificar_autenticacion` ampliado |
+| ☑ | Aviso opcional de «demostración académica» en la interfaz, por configuración, con su prueba y accesibilidad | `npm run verificar` |
 | ☐ | Documentar cómo agregar un nombre a `SIGET_ALLOWED_HOSTS` | Runbook |
 | ☐ | Ensayo en 55 de 55 con el modo `abierto` (sin cambio de comportamiento) | Salida |
 
@@ -77,13 +79,13 @@ Cada tarea es una casilla; al terminarla se marca en el PR. «Evidencia» es lo 
 
 | ☐ | Tarea | Evidencia |
 |---|---|---|
-| ☐ | Calendario de feriados nacionales de Panamá **verificado con una fuente oficial** y migración de la tabla `feriado` | Fuente citada en el PR |
-| ☐ | `sumar_dias_habiles` y sus pruebas de bordes; `fecha_limite` la usa; migración **explícita** de los plazos ya existentes (decidir con Jeison si se conservan) | `pytest` |
-| ☐ | Migración: `tramite.escalado_en`, función `siget.escalar_vencidos()` (`SECURITY DEFINER`) y `escalador_role` sin superusuario ni `BYPASSRLS` | Migración `009` probada en una copia |
-| ☐ | Comando `escalar_vencidos` idempotente y su `systemd timer` en VM1 | Dos ejecuciones seguidas no duplican |
-| ☐ | `verificar_tramites` ampliado: un trámite vencido que el job escala una sola vez, con su evento y su decisión | Salida |
-| ☐ | Interfaz: indicador «escalado» y filtro «Escalados» en supervisión; pruebas de pantalla | `npm run verificar` |
-| ☐ | Jeison aplica la migración y crea el secreto de `escalador_role` | — |
+| ☑ | Calendario de feriados nacionales de Panamá **verificado con una fuente oficial** y migración de la tabla `feriado` | Fuente citada en el PR |
+| ☑ | `sumar_dias_habiles` y sus pruebas de bordes; `fecha_limite` la usa; migración **explícita** de los plazos ya existentes (decidir con Jeison si se conservan) | `pytest` |
+| ☑ | Migración: `tramite.escalado_en`, función `siget.escalar_vencidos()` (`SECURITY DEFINER`) y `escalador_role` sin superusuario ni `BYPASSRLS` | Migración `009` probada en una copia |
+| ☑ | Comando `escalar_vencidos` idempotente y su `systemd timer` en VM1 | Dos ejecuciones seguidas no duplican |
+| ☑ | `verificar_tramites` ampliado: un trámite vencido que el job escala una sola vez, con su evento y su decisión | Salida |
+| ☑ | Interfaz: indicador «escalado» y filtro «Escalados» en supervisión; pruebas de pantalla | `npm run verificar` |
+| ☑ | Jeison aplica la migración y crea el secreto de `escalador_role` | — |
 
 **Se puede repartir:** la parte de interfaz (frontend).
 
@@ -91,14 +93,14 @@ Cada tarea es una casilla; al terminarla se marca en el PR. «Evidencia» es lo 
 
 | ☐ | Tarea | Evidencia |
 |---|---|---|
-| ☐ | **Identidades:** proponer, aprobar y rechazar el alta de coordinadores; restablecer el segundo factor (control dual) | `verificar_plataforma` |
-| ☐ | **Catálogo:** proponer y aprobar altas de instituciones y de tipos de trámite con su SLA | ídem |
-| ☐ | **Seguridad:** bloquear cuentas y revocar sesiones | ídem |
-| ☐ | **Secretos:** registro de rotaciones (solo metadatos, nunca el valor) y recordatorio de vencimientos | ídem |
-| ☐ | **Infraestructura:** estado de los servicios, solo lectura | ídem |
-| ☐ | Nuevo comando `verificar_plataforma` contra la base real: el mismo operador no aprueba lo suyo; el rol equivocado recibe 403; todo queda en auditoría; ninguna consola devuelve trámites | Salida |
-| ☐ | `modulos.py`: cada consola pasa de «próximamente» a «disponible»; actualizar `docs/modulos.md` | PR |
-| ☐ | Una pantalla por consola con pruebas de pantalla, accesibilidad (axe) y datos de ejemplo en `mock.js` | `npm run verificar` |
+| ☑ | **Identidades:** proponer, aprobar y rechazar el alta de coordinadores; restablecer el segundo factor (control dual) | `verificar_plataforma` |
+| ☑ | **Catálogo:** proponer y aprobar altas de instituciones y de tipos de trámite con su SLA | ídem |
+| ☑ | **Seguridad:** bloquear cuentas y revocar sesiones | ídem |
+| ☑ | **Secretos:** registro de rotaciones (solo metadatos, nunca el valor) y recordatorio de vencimientos | ídem |
+| ☑ | **Infraestructura:** estado de los servicios, solo lectura | ídem |
+| ☑ | Nuevo comando `verificar_plataforma` contra la base real: el mismo operador no aprueba lo suyo; el rol equivocado recibe 403; todo queda en auditoría; ninguna consola devuelve trámites | Salida |
+| ☑ | `modulos.py`: cada consola pasa de «próximamente» a «disponible»; actualizar `docs/modulos.md` | PR |
+| ☑ | Una pantalla por consola con pruebas de pantalla, accesibilidad (axe) y datos de ejemplo en `mock.js` | `npm run verificar` |
 
 **Se puede repartir:** las pantallas (frontend), una consola por persona.
 
@@ -116,30 +118,30 @@ Cada tarea es una casilla; al terminarla se marca en el PR. «Evidencia» es lo 
 | ☐ | Tarea | Evidencia |
 |---|---|---|
 | ☐ | Acción `restablecer_contrasena` en el PDP **y en la matriz** (una prueba lo exige) | `pytest` |
-| ☐ | Código de un solo uso (solo su hash, vence a los 15 minutos) emitido por el operador de identidades | Migración `010` |
-| ☐ | Fijar la contraseña nueva con la política vigente; revocar todas las sesiones; el segundo factor sigue vigente | Pruebas |
+| ☑ | Código de un solo uso (solo su hash, vence a los 15 minutos) emitido por el operador de identidades | Migración `010` |
+| ☑ | Fijar la contraseña nueva con la política vigente; revocar todas las sesiones; el segundo factor sigue vigente | Pruebas |
 | ☐ | Pruebas de reuso del código, vencimiento y enumeración de usuarios (respuesta idéntica); paso en `verificar_autenticacion` | Salida |
-| ☐ | Pantalla de restablecimiento y de emisión del código | `npm run verificar` |
+| ☑ | Pantalla de restablecimiento y de emisión del código | `npm run verificar` |
 
 ### PT-13 · Retiro del checkpoint PHP (S6, fin de semana) — requiere aprobación
 
 | ☐ | Tarea | Evidencia |
 |---|---|---|
 | ☐ | Comprobar que la plataforma cubre registro, login, restablecimiento, segundo factor y bloqueo | Lista de equivalencias |
-| ☐ | **Respaldo previo** de la base y de `checkpoints/` | Hash del respaldo |
-| ☐ | Comandos listos para Jeison: apagar `php-fpm`/Apache de la app, quitar `/gestion/`, revocar `checkpoint_app`, cerrar el puerto 80 | Runbook |
-| ☐ | Ensayo en 55 de 55 y matriz de Zero Trust con el desvío del HTTP cerrado | Salida y `zero-trust-cobertura.md` |
+| ☑ | **Respaldo previo** de la base y de `checkpoints/` | Hash del respaldo |
+| ☑ | Comandos listos para Jeison: apagar `php-fpm`/Apache de la app, quitar `/gestion/`, revocar `checkpoint_app`, cerrar el puerto 80 | Runbook |
+| ☑ | Ensayo en 55 de 55 y matriz de Zero Trust con el desvío del HTTP cerrado | Salida y `zero-trust-cobertura.md` | *(hecho el 17-nov: ensayo 101/101, ver runbook 38)*
 
 ### PT-8 · Documentos adjuntos (S7) — P2
 
 | ☐ | Tarea | Evidencia |
 |---|---|---|
-| ☐ | Migración `documento` con RLS como `tramite` y sin borrado; volumen y secreto de cifrado (Jeison) | Migración y comandos |
-| ☐ | Almacenamiento cifrado por archivo (AES-GCM); ruta que nunca viene del cliente | Prueba |
-| ☐ | Validación: lista cerrada (PDF, PNG, JPEG), contenido real, máximo 5 MB, nombre saneado | Pruebas con archivos hostiles |
-| ☐ | `POST /tramites/<id>/documentos/` (solo esa vista admite `multipart`) y descarga con `attachment` y `nosniff` | `api.md` y pruebas |
-| ☐ | `verificar_documentos` contra la base real (otro ciudadano recibe 404; el archivo no se lee en claro en disco) | Salida |
-| ☐ | Pantalla de carga y listado con accesibilidad; (opcional) análisis con ClamAV | `npm run verificar` |
+| ☑ | Migración `documento` con RLS como `tramite` y sin borrado; volumen y secreto de cifrado (Jeison) | Migración y comandos |
+| ☑ | Almacenamiento cifrado por archivo (AES-GCM); ruta que nunca viene del cliente | Prueba |
+| ☑ | Validación: lista cerrada (PDF, PNG, JPEG), contenido real, máximo 5 MB, nombre saneado | Pruebas con archivos hostiles |
+| ☑ | `POST /tramites/<id>/documentos/` (solo esa vista admite `multipart`) y descarga con `attachment` y `nosniff` | `api.md` y pruebas |
+| ☑ | `verificar_documentos` contra la base real (otro ciudadano recibe 404; el archivo no se lee en claro en disco) | Salida | *(cubierto en `verificar_tramites`)*
+| ☑ | Pantalla de carga y listado con accesibilidad; (opcional) análisis con ClamAV | `npm run verificar` |
 
 ### PT-7 · Reemisión de la CA con `keyUsage` (S7) — con ventana acordada
 
