@@ -75,6 +75,13 @@ export function fechaCorta(iso) {
   return new Date(iso).toLocaleDateString('es-PA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// «1992-03-14» es una fecha sin hora: se arma en la zona local para que no se corra un día (new Date('1992-03-14') es medianoche UTC)
+export function fechaCalendario(iso) {
+  const [a, m, d] = String(iso).split('-').map(Number)
+  if (!a || !m || !d) return String(iso)
+  return new Date(a, m - 1, d).toLocaleDateString('es-PA', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 export function hace(iso) {
   if (!iso) return ''
   const min = Math.round((Date.now() - new Date(iso)) / 60000)
