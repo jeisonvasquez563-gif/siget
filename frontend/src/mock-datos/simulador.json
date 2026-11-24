@@ -78,6 +78,10 @@
     "segundo_factor",
     "cuenta"
    ],
+   "emitir_invitacion": [
+    "segundo_factor",
+    "cuenta"
+   ],
    "bloquear_cuenta": [
     "segundo_factor",
     "cuenta"
@@ -105,6 +109,21 @@
     "cuenta"
    ],
    "responder_solicitud_datos": [
+    "segundo_factor",
+    "cuenta"
+   ],
+   "ver_mis_datos": [
+    "perfil_de",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "exportar_mis_datos": [
+    "perfil_de",
+    "segundo_factor",
+    "cuenta"
+   ],
+   "crear_solicitud_datos": [
+    "perfil_de",
     "segundo_factor",
     "cuenta"
    ],
@@ -598,7 +617,7 @@
      },
      {
       "fase": "permiso",
-      "regla": "Reglas de quien corrige sus propios datos de contacto",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -800,7 +819,7 @@
      },
      {
       "fase": "permiso",
-      "regla": "Reglas de quien corrige sus propios datos de contacto",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -936,7 +955,7 @@
      },
      {
       "fase": "permiso",
-      "regla": "Reglas de quien corrige sus propios datos de contacto",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1080,7 +1099,7 @@
      },
      {
       "fase": "permiso",
-      "regla": "Reglas de quien corrige sus propios datos de contacto",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1189,9 +1208,9 @@
      "accion": "crear_tramite",
      "institucion": "propia",
      "solicitante": "yo",
-     "audiencia": "ciudadania",
      "segundo_factor": "reciente",
-     "cuenta": "bloqueada"
+     "cuenta": "bloqueada",
+     "audiencia": "ciudadania"
     },
     "decision": {
      "permitido": false,
@@ -1377,7 +1396,7 @@
      },
      {
       "fase": "permiso",
-      "regla": "Reglas de quien corrige sus propios datos de contacto",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1505,7 +1524,7 @@
      },
      {
       "fase": "permiso",
-      "regla": "Reglas de quien corrige sus propios datos de contacto",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1635,7 +1654,7 @@
      },
      {
       "fase": "permiso",
-      "regla": "Reglas de quien corrige sus propios datos de contacto",
+      "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
