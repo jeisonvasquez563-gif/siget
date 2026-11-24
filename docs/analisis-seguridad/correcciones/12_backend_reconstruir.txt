@@ -1,0 +1,12 @@
+# VM1 — reconstruir la imagen del backend con las correcciones y reiniciarlo (con respaldo de la imagen anterior)
+# 2026-11-08 14:31:07  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "set -e; cd /tmp && rm -rf bk_src && tar xzf bk_src.tgz && chmod -R a+rX bk_src; R(){ sudo -H -u siget bash -lc \"cd /tmp && export XDG_RUNTIME_DIR=/run/user/\$(id -u) && $1\"; }; R \"podman tag localhost/siget-backend:dev localhost/siget-backend:respaldo-2026-11-08\"; echo \"== construir\"; R \"cd /tmp/bk_src && timeout 600 podman build -q -t localhost/siget-backend:dev -f Containerfile .\"; rm -rf /tmp/bk_src /tmp/bk_src.tgz; echo \"== reiniciar\"; R \"systemctl --user restart siget-backend.service\"; sleep 10; E=$(R \"systemctl --user is-active siget-pod.service siget-backend.service siget-nginx.service\" | tr \"\n\" \" \"); echo \"estado: $E\"; S=$(curl -sk -o /dev/null -w \"%{http_code}\" https://127.0.0.1:8443/salud/ -H \"Host: localhost\"); echo \"salud: $S\"; if [ \"$E\" != \"active active active \" ] || [ \"$S\" != \"200\" ]; then echo \"FALLO: se vuelve a la imagen anterior\"; R \"podman tag localhost/siget-backend:respaldo-2026-11-08 localhost/siget-backend:dev && systemctl --user restart siget-backend.service\"; exit 1; fi; R \"podman images --format \\\"{{.Repository}}:{{.Tag}} {{.ID}} {{.CreatedSince}}\\\" | grep siget-backend\"; echo \"backend desplegado\""
+== construir
+c3574648668bda2d123c95adc42cac4c5a6abdf9cda5d152cb7966296ff7e13c
+== reiniciar
+estado: active active active 
+salud: 200
+localhost/siget-backend:dev c3574648668b 13 seconds ago
+localhost/siget-backend:respaldo-2026-11-08 da68b688599b 2 weeks ago
+backend desplegado
+# código de salida: 0

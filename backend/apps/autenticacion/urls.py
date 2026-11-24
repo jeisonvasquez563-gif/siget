@@ -4,6 +4,7 @@ from . import vistas, vistas_derechos
 
 urlpatterns = [
     path("registro/", vistas.Registro.as_view(), name="registro"),
+    path("configuracion/", vistas.Configuracion.as_view(), name="configuracion"),
     path("aviso-privacidad/", vistas_derechos.AvisoPrivacidad.as_view(), name="aviso-privacidad"),
     path("instituciones/", vistas.InstitucionesPublicas.as_view(), name="instituciones-publicas"),
     path("restablecer/", vistas.RestablecerContrasena.as_view(), name="restablecer"),

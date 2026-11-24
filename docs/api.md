@@ -28,6 +28,9 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
+| `GET /auth/configuracion/` | — (pública) | `{registro: "abierto"\|"invitacion"\|"cerrado", aviso_demostracion: bool}` |
+| `POST /auth/registro/` | `{username, password, nombre, apellidos, cedula, fecha_nacimiento (AAAA-MM-DD), provincia, ciudad, correo, invitacion?}`; todos obligatorios, mayor de 18 años, provincia de las 13 de Panamá, cédula con formato panameño (p. ej. `8-123-456`). `invitacion` (`XXXX-XXXX-XXXX`) solo cuando el registro es por invitación | `201`; `400 {codigo, errores[]}` (dice qué campo falla); `400 invitacion_invalida` (código malo, usado o vencido: misma respuesta); `403 registro_cerrado`; `409` genérico si el usuario, la cédula o el correo ya existen (no revela cuál) |
+
 | `POST /auth/registro/` | `{username, password, nombre, apellidos, cedula, fecha_nacimiento (AAAA-MM-DD), provincia, ciudad, correo, acepta_aviso}`; todos obligatorios, mayor de 18 años, provincia de las 13 de Panamá, cédula con formato panameño (p. ej. `8-123-456`). **`acepta_aviso` debe ser exactamente `true`** (confirma que leyó el aviso de privacidad; si falta o es otra cosa, `400` con el mensaje «debes leer el aviso de privacidad…»). Se guardan `aviso_version` y `aviso_leido_en` en el perfil, en la misma transacción | `201`; `400 {codigo, errores[]}` (dice qué campo falla); `409` genérico si el usuario, la cédula o el correo ya existen (no revela cuál) |
 | `GET /auth/aviso-privacidad/` | — (público) | `200` con `{version, vigente_desde, titulo, base_legal, plazo_respuesta_dias_habiles, secciones[{titulo, texto}], datos[{dato, para_que}], derechos[], texto}`: responsable, finalidad de cada dato, quién accede, cuánto tiempo, derechos ARCO y cómo ejercerlos. La interfaz lo muestra en `#/privacidad` |
 | `POST /auth/login/` | `{username, password, codigo?}` (`codigo` = 6 dígitos TOTP) | `200 {access_token, tipo, expira_en, scope, mfa_enrolamiento_requerido?}` + cookie; `401 {codigo: "mfa_requerido"\|"credenciales_invalidas"}` |
@@ -79,12 +82,15 @@ Solo el operador de identidades, con segundo factor reciente (acciones `consulta
 
 | Método y ruta | Cuerpo / parámetros | Respuesta |
 |---|---|---|
-| `GET /tramites/` | `?limite=1..100&desplazamiento=` | `{resultados: [Tramite], limite, desplazamiento}` — solo los que la persona puede ver |
+| `GET /tramites/` | `?limite=1..100&desplazamiento=&escalados=1` | `{resultados: [Tramite], limite, desplazamiento}` — solo los que la persona puede ver; `escalados=1` deja solo los escalados (otro valor: `400 filtro_invalido`) |
 | `POST /tramites/` | `{tipo_tramite: <id>}` | `201 Tramite`. El solicitante siempre es quien llama |
 | `GET /tramites/<id>/` | — | `Tramite` |
 | `POST /tramites/<id>/estado/` | `{estado}` | `200 Tramite`; `403`/`409` |
 | `POST /tramites/<id>/reasignar/` | `{funcionario_id: <id>\|null}` | `200 Tramite` (solo supervisión) |
 | `GET /tramites/<id>/historial/` | — | `{tramite, eventos: [Evento]}` |
+| `GET /tramites/<id>/documentos/` | — | `{tramite, documentos: [{id, nombre, tipo, tamano, creado_en}]}`; el personal ve además `subido_por` y `sha256` |
+| `POST /tramites/<id>/documentos/` | **multipart** con un solo campo `archivo` (la única ruta que no es JSON) | `201 Documento`. Solo quien pidió el trámite y mientras no tenga resolución final. `413 demasiado_grande` (más de 5 MB), `415` (`extension_no_permitida`, `contenido_no_permitido`, `extension_no_coincide`), `409 tramite_cerrado`, `409 demasiados_documentos` (20), `503 documentos_no_disponibles` (sin clave configurada) |
+| `GET /tramites/<id>/documentos/<doc>/` | — | El archivo, con `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff` y `Cache-Control: no-store`. Si el archivo no supera la verificación de integridad: `500 documento_no_disponible` y un evento de seguridad `documento_alterado` |
 
 Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) → Aprobado \| Rechazado`. Los estados finales no admiten cambios.
 
@@ -92,13 +98,15 @@ Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) �
 
 ```json
 { "id": 30, "tipo_tramite": {"id": 2, "nombre": "…"}, "institucion": {"id": 3, "nombre": "MOP"}, "estado": "Pendiente",
-  "fecha_limite": "…", "vencido": false, "creado_en": "…",
+  "fecha_limite": "…", "vencido": false, "escalado": false, "creado_en": "…",
   "asignado": false }                                              // ciudadanía
   // personal de la institución, en lugar de `asignado`:
-  // "solicitante_id": 5, "funcionario_asignado_id": 9, "sensibilidad": 2
+  // "solicitante_id": 5, "funcionario_asignado_id": 9, "sensibilidad": 2, "escalado_en": "…" | null
 ```
 
-**Evento** — `{id, accion, estado_anterior, estado_nuevo, institucion_id, creado_en}`; el personal ve además `actor_id` y `atributos`.
+**Plazos (migración 013):** `fecha_limite` se calcula en **días hábiles de Panamá** (lunes a viernes, sin los feriados de la tabla `siget.feriado`), a la misma hora del inicio. Los trámites anteriores conservan su plazo en días calendario. `escalado` es `true` cuando el temporizador de escalamiento detectó el plazo vencido sin resolución; desde ahí lo atiende la supervisión. Ver [`feriados-panama.md`](./feriados-panama.md).
+
+**Evento** — `{id, accion, estado_anterior, estado_nuevo, institucion_id, creado_en}`; el personal ve además `actor_id` y `atributos`. Acciones: `creacion`, `cambio_estado`, `reasignacion` y `escalamiento` (lo escribe el sistema: `actor_id` nulo, `atributos: {regla: "plazo_vencido", fecha_limite}`).
 
 ## Catálogo y equipo
 
@@ -174,6 +182,7 @@ Todas exigen acceso completo y que el rol de plataforma correspondiente tenga el
 | `GET /plataforma/personas/?q=` | identidades, seguridad | Cuentas: `id`, `usuario`, `estado_cuenta`, `rol_plataforma`, `mfa_activo`, `sesiones_activas`, `bloqueada_hasta` |
 | `POST /plataforma/personas/<id>/restablecer-contrasena/` | identidades | `201 {codigo_restablecimiento, vence_en}`: el código en claro **solo en esta respuesta** (`Cache-Control: no-store`) |
 | `POST /plataforma/personas/<id>/restablecer-mfa/` | identidades | Desactiva el segundo factor y cierra sus sesiones |
+| `GET/POST /plataforma/invitaciones/` `{nota?}` | identidades | Lista (`modo_registro`, `invitaciones: [{id, nota, emitida_por, creado_en, vence_en, usada, estado}]`, nunca el código) y emite: `201 {id, codigo_invitacion, vence_en}`, el código **solo en esta respuesta** (`Cache-Control: no-store`) |
 | `POST /plataforma/personas/<id>/bloquear/` `{motivo}` · `…/desbloquear/` · `…/revocar-sesiones/` | seguridad | Bloqueo de cuenta (motivo de 5 a 200 caracteres) y cierre de sesiones |
 | `GET /plataforma/eventos/` | seguridad | Últimos eventos de seguridad |
 | `GET/POST /plataforma/aprobaciones/` | identidades (altas de coordinadora), catálogo (altas de institución) | Lista y propone. El tipo sale del rol, nunca del cliente |

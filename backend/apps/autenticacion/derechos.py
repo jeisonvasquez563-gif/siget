@@ -9,7 +9,9 @@ sin costo. En SIGET:
 La Administración no necesita autorización para los datos que usa en el ejercicio de sus funciones (art. 8), pero sí debe informar:
 de ahí el aviso de privacidad, que se muestra antes del registro y del que queda constancia (versión y hora) en el perfil.
 """
-from datetime import datetime, timedelta
+from datetime import datetime
+
+from apps.tramites.serializacion import sumar_dias_habiles
 
 PLAZO_DIAS_HABILES = 10
 MAX_SOLICITUDES_ABIERTAS = 3
@@ -25,23 +27,9 @@ MENSAJE_ACEPTA_AVISO = "debes leer el aviso de privacidad y confirmarlo (acepta_
 
 # --------------------------------------------------------------------------- plazo en días hábiles
 
-def sumar_dias_habiles(desde: datetime, dias: int) -> datetime:
-    """Suma `dias` días hábiles (lunes a viernes) conservando la hora.
-
-    TODO(PT-3): al combinar esta rama con el calendario de feriados de PT-3, reemplazar por su `sumar_dias_habiles`: aquí solo se
-    excluyen sábados y domingos, y un feriado nacional haría que el plazo calculado fuera más corto que el legal."""
-    if dias < 0:
-        raise ValueError("los días hábiles no pueden ser negativos")
-    actual, faltan = desde, dias
-    while faltan > 0:
-        actual += timedelta(days=1)
-        if actual.weekday() < 5:
-            faltan -= 1
-    return actual
-
-
-def vence_en(ahora: datetime) -> datetime:
-    return sumar_dias_habiles(ahora, PLAZO_DIAS_HABILES)
+def vence_en(ahora: datetime, feriados=frozenset()) -> datetime:
+    """Plazo de respuesta: 10 días hábiles de Panamá (lunes a viernes que no son feriado), a la misma hora."""
+    return sumar_dias_habiles(ahora, PLAZO_DIAS_HABILES, feriados)
 
 
 # --------------------------------------------------------------------------- solicitudes

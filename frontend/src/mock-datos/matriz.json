@@ -44,7 +44,7 @@
                 }
             ],
             "acciones_permitidas": 5,
-            "acciones_totales": 21
+            "acciones_totales": 22
         },
         {
             "id": "funcionario",
@@ -96,7 +96,7 @@
                 }
             ],
             "acciones_permitidas": 5,
-            "acciones_totales": 21
+            "acciones_totales": 22
         },
         {
             "id": "supervisor",
@@ -160,7 +160,7 @@
                 }
             ],
             "acciones_permitidas": 7,
-            "acciones_totales": 21
+            "acciones_totales": 22
         },
         {
             "id": "coordinador_institucional",
@@ -212,7 +212,7 @@
                 }
             ],
             "acciones_permitidas": 4,
-            "acciones_totales": 21
+            "acciones_totales": 22
         },
         {
             "id": "operador_infraestructura",
@@ -252,7 +252,7 @@
                 }
             ],
             "acciones_permitidas": 1,
-            "acciones_totales": 21
+            "acciones_totales": 22
         },
         {
             "id": "operador_identidades",
@@ -291,8 +291,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 5,
-            "acciones_totales": 21
+            "acciones_permitidas": 6,
+            "acciones_totales": 22
         },
         {
             "id": "operador_catalogo",
@@ -332,7 +332,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 21
+            "acciones_totales": 22
         },
         {
             "id": "operador_seguridad",
@@ -372,7 +372,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 21
+            "acciones_totales": 22
         },
         {
             "id": "custodio_secretos",
@@ -412,7 +412,7 @@
                 }
             ],
             "acciones_permitidas": 1,
-            "acciones_totales": 21
+            "acciones_totales": 22
         },
         {
             "id": "auditor",
@@ -452,7 +452,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 21
+            "acciones_totales": 22
         }
     ],
     "acciones": [
@@ -564,6 +564,12 @@
         {
             "id": "restablecer_mfa",
             "nombre": "Restablecer el segundo factor de alguien",
+            "grupo": "Plataforma",
+            "casos": null
+        },
+        {
+            "id": "emitir_invitacion",
+            "nombre": "Emitir una invitación para crear cuenta",
             "grupo": "Plataforma",
             "casos": null
         },
@@ -754,6 +760,17 @@
                 "exige_segundo_factor": false
             },
             "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "emitir_invitacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -997,6 +1014,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -1220,6 +1248,17 @@
                 "exige_segundo_factor": false
             },
             "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "emitir_invitacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -1463,6 +1502,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -1686,6 +1736,17 @@
                 "exige_segundo_factor": true
             },
             "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "emitir_invitacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -1929,6 +1990,17 @@
                 },
                 "exige_segundo_factor": true
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_emitir_invitacion"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_identidades_emitir_invitacion"
+                },
+                "exige_segundo_factor": true
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -2152,6 +2224,17 @@
                 "exige_segundo_factor": false
             },
             "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "emitir_invitacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -2395,6 +2478,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": true,
@@ -2628,6 +2722,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "emitir_invitacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "bloquear_cuenta": {
                 "favorable": {
                     "permitido": false,
@@ -2851,6 +2956,17 @@
                 "exige_segundo_factor": false
             },
             "restablecer_mfa": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "emitir_invitacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"

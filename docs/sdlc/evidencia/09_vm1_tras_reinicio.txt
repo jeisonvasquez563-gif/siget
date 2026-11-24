@@ -1,0 +1,21 @@
+# Corrección — VM1 tras reiniciar: sistema, kernel, servicios de SIGET y avisos pendientes
+# 2026-11-16 22:49:04  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "cat /etc/rocky-release; echo \"kernel en uso: $(uname -r)\"; echo \"SELinux: $(getenforce)\"; echo \"Servicios de SIGET: $(sudo -u siget XDG_RUNTIME_DIR=/run/user/$(id -u siget) systemctl --user is-active siget-pod.service siget-backend.service siget-nginx.service siget-escalar.timer | tr \"\n\" \" \")\"; echo \"Apache / PHP: $(systemctl is-active httpd php-fpm | tr \"\n\" \" \")\"; echo \"Salud de la plataforma: $(curl -sk -o /dev/null -w %{http_code} https://127.0.0.1:8443/salud/ -H Host:localhost)\"; echo \"Avisos críticos pendientes: $(sudo dnf -q updateinfo list --security | grep -c Crít)\"; sudo dnf -q updateinfo summary"
+Rocky Linux release 9.9 (Blue Onyx)
+kernel en uso: 5.14.0-741.22.1.el9_9.x86_64
+SELinux: Enforcing
+Servicios de SIGET: active active active active 
+Apache / PHP: active active 
+Salud de la plataforma: 200
+Avisos críticos pendientes: 0
+¿Está de acuerdo [s/N]?: Importando llave GPG 0x08B40D20:
+ ID usuario: "PostgreSQL RPM Repository <pgsql-pkg-yum@lists.postgresql.org>"
+ Huella    : D4BF 08AE 67A0 B4C7 A1DB CCD2 40BC A2B4 08B4 0D20
+ Desde     : /etc/pki/rpm-gpg/PGDG-RPM-GPG-KEY-RHEL
+Error: Failed to download metadata for repo 'pgdg-common': repomd.xml GPG signature verification error: Bad GPG signature
+Importando llave GPG 0x08B40D20:
+ ID usuario: "PostgreSQL RPM Repository <pgsql-pkg-yum@lists.postgresql.org>"
+ Huella    : D4BF 08AE 67A0 B4C7 A1DB CCD2 40BC A2B4 08B4 0D20
+ Desde     : /etc/pki/rpm-gpg/PGDG-RPM-GPG-KEY-RHEL
+Error: Failed to download metadata for repo 'pgdg-common': repomd.xml GPG signature verification error: Bad GPG signature
+# código de salida: 1

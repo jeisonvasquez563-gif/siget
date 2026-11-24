@@ -1,0 +1,10 @@
+# Corrección — VM2 tras reiniciar: sistema, kernel, base de datos y avisos críticos
+# 2026-11-16 22:42:11  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm2 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.100.20 "cat /etc/rocky-release; echo \"kernel en uso: $(uname -r)\"; echo \"SELinux: $(getenforce)\"; for i in $(seq 1 12); do bash /tmp/psql-contenedor.sh -d tramites_demo -At -c \"select 1\" >/dev/null 2>&1 && break; sleep 5; done; echo \"PostgreSQL: $(bash /tmp/psql-contenedor.sh -d tramites_demo -At -c \"select version()\" 2>&1 | cut -c1-40)\"; echo \"Respaldo diario: $(systemctl is-enabled siget-respaldo.timer) / $(systemctl is-active siget-respaldo.timer)\"; echo \"Avisos críticos pendientes: $(sudo dnf -q updateinfo list --security | grep -c Crít)\"; sudo dnf -q updateinfo summary"
+Rocky Linux release 9.9 (Blue Onyx)
+kernel en uso: 5.14.0-741.22.1.el9_9.x86_64
+SELinux: Enforcing
+PostgreSQL: PostgreSQL 16.15 (Debian 16.15-1.pgdg13+
+Respaldo diario: enabled / active
+Avisos críticos pendientes: 0
+# código de salida: 0

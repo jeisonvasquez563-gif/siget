@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import DatabaseError, connection, transaction
 
 from apps.auditoria.models import EventoAuditoria
+from apps.autenticacion import contrasenas
 from apps.catalogo.models import Institucion, TipoTramite
 from apps.identidad.models import Usuario
 from apps.nucleo.contexto import fijar_contexto
@@ -62,10 +63,10 @@ class Command(BaseCommand):
 
         mop = Institucion.objects.create(nombre="MOP (integración)", tipo="demostracion")
         minsa = Institucion.objects.create(nombre="MINSA (integración)", tipo="demostracion")
-        ana = Usuario.objects.create(username="int_ana", password_hash="x")
-        beto = Usuario.objects.create(username="int_beto", password_hash="x")
-        func_mop = Usuario.objects.create(username="int_func_mop", password_hash="x")
-        func_minsa = Usuario.objects.create(username="int_func_minsa", password_hash="x")
+        ana = Usuario.objects.create(username="int_ana", password_hash=contrasenas.inutilizable())
+        beto = Usuario.objects.create(username="int_beto", password_hash=contrasenas.inutilizable())
+        func_mop = Usuario.objects.create(username="int_func_mop", password_hash=contrasenas.inutilizable())
+        func_minsa = Usuario.objects.create(username="int_func_minsa", password_hash=contrasenas.inutilizable())
         tipo_mop = TipoTramite.objects.create(institucion=mop, nombre="Trámite MOP", sla_dias=10)
         tipo_minsa = TipoTramite.objects.create(institucion=minsa, nombre="Trámite MINSA", sla_dias=10)
 

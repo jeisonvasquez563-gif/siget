@@ -97,6 +97,16 @@
 .plazo-texto { display: block; font-size: var(--t-xs); color: var(--tinta-suave); margin-top: 0.3rem; }
 .plazo-texto.atencion { color: var(--boya-texto); font-weight: 650; }
 .plazo-texto.vencido { color: var(--sello-rojo); font-weight: 650; }
+.etiqueta-escalado {
+  display: inline-block; margin-top: 0.35rem; padding: 0.1rem 0.5rem; border: 1px solid var(--sello-rojo);
+  border-radius: 999px; color: var(--sello-rojo); font-size: var(--t-xs); font-weight: 650;
+}
+
+.aviso-demostracion {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 1rem;
+  background: var(--boya-fondo); color: var(--boya-texto); border-bottom: 2px solid var(--boya); font-size: var(--t-s);
+}
+.aviso-demostracion .icono { flex: none; }
 
 /* ---------- estados vacíos, carga, alertas ---------- */
 .vacio { text-align: center; padding: 3rem 1.5rem; background: var(--superficie); border: 1px dashed var(--borde-fuerte); border-radius: var(--radio-l); }
@@ -182,3 +192,13 @@
 @keyframes onda { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(6px); } }
 .enlace-sutil { background: none; border: 0; padding: 0; color: var(--agua-media); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; font-size: inherit; }
 :root[data-tema='oscuro'] .modal { background: var(--superficie-2); border-color: var(--borde-fuerte); }
+
+/* Documentos adjuntos */
+.documentos { margin-top: 1rem; }
+.entrada-archivo { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.lista-documentos { list-style: none; margin: 0; padding: 0; }
+.lista-documentos li { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--borde); }
+.lista-documentos li:last-child { border-bottom: 0; }
+.lista-documentos li > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lista-documentos strong { overflow-wrap: anywhere; }
+.lista-documentos small { color: var(--tinta-suave); font-size: var(--t-xs); }

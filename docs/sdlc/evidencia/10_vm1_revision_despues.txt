@@ -1,0 +1,24 @@
+# Etapa 7 — VM1 después de corregir: revisión del entorno (solo lectura)
+# 2026-11-16 22:51:47  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 "echo \"== SELinux: $(getenforce)\"; echo \"== Sistema: $(cat /etc/rocky-release) · kernel $(uname -r)\"; echo \"== SSH:\"; sudo sshd -T | grep -E \"^(passwordauthentication|permitrootlogin|pubkeyauthentication) \"; echo \"== Cortafuegos (servicios / puertos / reglas):\"; sudo firewall-cmd --list-services; sudo firewall-cmd --list-ports; sudo firewall-cmd --list-rich-rules; echo \"== Puertos en escucha (TCP):\"; sudo ss -tlnH | awk \"{print \$4}\" | sort -u; echo \"== Avisos críticos pendientes: $(sudo dnf -q --disablerepo=\"pgdg*\" updateinfo list --security | grep -c Crít)\"; echo \"== Actualizaciones pendientes: $(sudo dnf -q --disablerepo=\"pgdg*\" check-update | grep -c \"^[a-zA-Z]\")\""
+== SELinux: Enforcing
+== Sistema: Rocky Linux release 9.9 (Blue Onyx) · kernel 5.14.0-741.22.1.el9_9.x86_64
+== SSH:
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+== Cortafuegos (servicios / puertos / reglas):
+dhcpv6-client http ssh
+8080/tcp 8443/tcp
+
+== Puertos en escucha (TCP):
+0.0.0.0:22
+100.104.206.118%tailscale0:60739
+[::]:22
+*:80
+*:8080
+*:8443
+[fd7a:115c:a1e0::738:ce77]%tailscale0:62309
+== Avisos críticos pendientes: 0
+== Actualizaciones pendientes: 0
+# código de salida: 0

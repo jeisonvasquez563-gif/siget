@@ -1,0 +1,14 @@
+# Tras reiniciar las VMs: Host falso, TRACE, cabeceras de PHP y cookie de sesión siguen corregidos
+# 2026-11-12 16:35:51  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ bash -c "for u in \"-H Host:sitio-malicioso.example http://192.168.159.137:8080/tramites/\" \"-k -H Host:sitio-malicioso.example https://192.168.159.137:8443/salud/\" \"-X TRACE http://192.168.159.137/\"; do echo \"== curl -sS -i $u\"; curl -sS -i $u | head -1; done; echo \"== curl -sS -I http://192.168.159.137/gestion/login.php\"; curl -sS -I http://192.168.159.137/gestion/login.php | grep -iE \"^HTTP|^Server|X-Powered|Set-Cookie\""
+== curl -sS -i -H Host:sitio-malicioso.example http://192.168.159.137:8080/tramites/
+HTTP/1.1 421 Misdirected Request
+== curl -sS -i -k -H Host:sitio-malicioso.example https://192.168.159.137:8443/salud/
+HTTP/1.1 421 Misdirected Request
+== curl -sS -i -X TRACE http://192.168.159.137/
+HTTP/1.1 405 Method Not Allowed
+== curl -sS -I http://192.168.159.137/gestion/login.php
+HTTP/1.1 200 OK
+Server: Apache
+Set-Cookie: PHPSESSID=0l602i547gssbc755cbj5b1d3i; path=/; HttpOnly; SameSite=Strict
+# código de salida: 0

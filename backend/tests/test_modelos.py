@@ -4,20 +4,23 @@ from datetime import datetime, timezone
 import pytest
 
 from apps.auditoria.models import DecisionPdp, EventoAuditoria
-from apps.autenticacion.models import EventoSeguridad, Restablecimiento, Sesion
+from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 from apps.plataforma.models import RotacionSecreto
-from apps.catalogo.models import Institucion, TipoTramite
+from apps.catalogo.models import Feriado, Institucion, TipoTramite
 from apps.identidad.models import Aprobacion, Membresia, Perfil, SolicitudDerecho, Usuario
 from apps.identidad.sujeto import construir_sujeto
 from apps.nucleo.esquema import columnas_del_modelo, diferencias, modelos_de_dominio
-from apps.tramites.models import Tramite, Transicion
+from apps.tramites.models import Documento, Tramite, Transicion
 
 TABLAS = {
     Institucion: "institucion", TipoTramite: "tipo_tramite", Usuario: "usuario", Membresia: "membresia",
     Aprobacion: "aprobacion", Tramite: "tramite", Transicion: "transicion",
     EventoAuditoria: "evento_auditoria", DecisionPdp: "decision_pdp",
     Sesion: "sesion", EventoSeguridad: "evento_seguridad", Perfil: "perfil",
-    Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto", SolicitudDerecho: "solicitud_derecho",
+    Restablecimiento: "restablecimiento", RotacionSecreto: "rotacion_secreto", Feriado: "feriado",
+    Invitacion: "invitacion",
+    Documento: "documento",
+    SolicitudDerecho: "solicitud_derecho",
 }
 
 
@@ -32,7 +35,8 @@ def test_estan_los_quince_modelos_del_esquema():
 
 
 def test_las_columnas_de_las_claves_foraneas_coinciden_con_la_base():
-    assert columnas_del_modelo(Tramite) >= {"tipo_tramite_id", "institucion_id", "solicitante_id", "funcionario_asignado_id", "estado"}
+    assert columnas_del_modelo(Tramite) >= {"tipo_tramite_id", "institucion_id", "solicitante_id", "funcionario_asignado_id", "estado",
+                                            "escalado_en"}
     assert columnas_del_modelo(Membresia) >= {"usuario_id", "institucion_id", "rol", "asignado_por"}
     assert "usuario_id" not in columnas_del_modelo(Usuario)
 

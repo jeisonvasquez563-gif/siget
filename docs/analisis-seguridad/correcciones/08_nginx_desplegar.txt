@@ -1,0 +1,11 @@
+# VM1 — respaldar, instalar el nginx.conf corregido y reiniciar nginx
+# 2026-11-08 14:07:35  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "set -e; D=/home/siget/config; sudo cp -p $D/nginx.conf $D/nginx.conf.respaldo-2026-11-08; sudo install -o siget -g siget -m 644 /tmp/nginx.conf.nuevo $D/nginx.conf; sudo rm -f $D/nginx.conf.nuevo /tmp/nginx.conf.nuevo; sudo ls -la $D; R(){ sudo -H -u siget bash -lc \"cd /tmp && export XDG_RUNTIME_DIR=/run/user/\$(id -u) && $1\"; }; R \"systemctl --user restart siget-nginx.service\"; sleep 5; E=$(R \"systemctl --user is-active siget-pod.service siget-backend.service siget-nginx.service\" | tr \"\n\" \" \"); echo \"estado: $E\"; if [ \"$E\" != \"active active active \" ]; then echo \"FALLO: se restaura el respaldo\"; sudo cp -p $D/nginx.conf.respaldo-2026-11-08 $D/nginx.conf; R \"systemctl --user restart siget-nginx.service\"; exit 1; fi; echo \"nginx desplegado\""
+total 16
+drwxr-xr-x. 2 siget siget   62 nov  8 14:07 .
+drwxr-x---. 6 siget siget  121 oct 22 18:20 ..
+-rw-r--r--. 1 siget siget 4955 nov  8 14:07 nginx.conf
+-rw-r--r--. 1 siget siget 4099 oct 22 18:20 nginx.conf.respaldo-2026-11-08
+estado: active active active 
+nginx desplegado
+# código de salida: 0

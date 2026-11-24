@@ -7,11 +7,14 @@ Reglas:
 - Cancelar no borra nada: los trámites son expediente público con conservación obligatoria (ver `derechos.py`).
 Los fallos esperados se devuelven en un `Resultado`, no se lanzan.
 """
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.auditoria.models import EventoAuditoria
+from apps.catalogo.models import feriados_entre
 from apps.identidad.models import Membresia, Perfil, SolicitudDerecho, Usuario
 from apps.tramites.models import Tramite
 from apps.tramites.serializacion import evento_a_dict, tramite_a_dict
@@ -84,6 +87,12 @@ def solicitudes_de(usuario, ahora=None):
     return [solicitud_a_dict(s, ahora) for s in SolicitudDerecho.objects.filter(usuario=usuario).order_by("-id")[:100]]
 
 
+def _feriados_desde(ahora):
+    """Feriados de la tabla `feriado` que pueden caer dentro de los 10 días hábiles (con margen de sobra)."""
+    inicio = timezone.localtime(ahora).date()
+    return feriados_entre(inicio, inicio + timedelta(days=45))
+
+
 def crear_solicitud(usuario, tipo, detalle, ip, ahora=None) -> Resultado:
     ahora = ahora or timezone.now()
     with transaction.atomic():
@@ -91,7 +100,7 @@ def crear_solicitud(usuario, tipo, detalle, ip, ahora=None) -> Resultado:
         abiertas = SolicitudDerecho.objects.filter(usuario=usuario, estado="recibida").count()
         if abiertas >= derechos.MAX_SOLICITUDES_ABIERTAS:
             return Resultado(False, "demasiadas_abiertas", detalle={"abiertas": abiertas, "maximo": derechos.MAX_SOLICITUDES_ABIERTAS})
-        fila = SolicitudDerecho.objects.create(usuario=usuario, tipo=tipo, detalle=detalle, vence_en=derechos.vence_en(ahora))
+        fila = SolicitudDerecho.objects.create(usuario=usuario, tipo=tipo, detalle=detalle, vence_en=derechos.vence_en(ahora, _feriados_desde(ahora)))
         registrar_evento(usuario.pk, "solicitud_derecho_creada", ip, {"solicitud": fila.pk, "tipo": tipo})  # sin el detalle: puede tener datos personales
     return Resultado(True, "solicitud_creada", detalle={"solicitud": solicitud_a_dict(fila, ahora)})
 

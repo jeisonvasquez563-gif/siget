@@ -12,7 +12,7 @@ from django.db import connections, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.autenticacion import tokens
+from apps.autenticacion import contrasenas, tokens
 from apps.autenticacion.models import EventoSeguridad, Sesion
 from apps.identidad.models import Usuario
 
@@ -55,7 +55,7 @@ class Command(BaseCommand):
             return c.fetchone()[0]
 
     def _persona(self, nombre, rol_plataforma="ninguno"):
-        return Usuario.objects.create(username=f"int_p_{nombre}", password_hash="x", rol_plataforma=rol_plataforma, mfa_activo=True,
+        return Usuario.objects.create(username=f"int_p_{nombre}", password_hash=contrasenas.inutilizable(), rol_plataforma=rol_plataforma, mfa_activo=True,
                                       mfa_verificado_en=timezone.now() - timedelta(minutes=1))
 
     def _token(self, usuario):
@@ -168,7 +168,7 @@ class Command(BaseCommand):
         r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "ver_tramite"}, t[ana.username], formato="multipart")
         self._paso("un cuerpo que no es JSON se rechaza (415)", r.status_code == 415, r.status_code)
         r = self._http("/politicas/simular/", t[ana.username])
-        self._paso("el formulario del simulador (GET) lista las variables de las 21 acciones", r.status_code == 200 and len(r.json()["variables"]) == 21)
+        self._paso("el formulario del simulador (GET) lista las variables de las 22 acciones", r.status_code == 200 and len(r.json()["variables"]) == 22)
         self._paso("el simulador no registró ninguna decisión: es hipotético y no ensucia la auditoría", self._decisiones_registradas() == antes, f"{antes} -> {self._decisiones_registradas()}")
 
         # ---------------------------------------------------------------- una sola fuente para la ventana del segundo factor
