@@ -266,15 +266,18 @@ const COLUMNAS = [
   { clave: 'Resueltos', titulo: 'Resueltos', estados: FINALES },
 ]
 
-function Tablero({ filas, yo, abrir, nombres }) {
+// `todas` es la lista completa (con los filtros activos): de ahí sale el número de cada columna. `filas` es solo la página actual: de ahí salen las fichas.
+function Tablero({ filas, todas, yo, abrir, nombres }) {
   return (
     <div className="tablero">
       {COLUMNAS.map((c) => {
         const items = filas.filter((t) => c.estados.includes(t.estado))
+        const cuenta = todas.filter((t) => c.estados.includes(t.estado)).length
         return (
           <section key={c.clave} className="columna" aria-label={c.titulo}>
-            <div className="columna-cabecera"><span>{c.titulo}</span><span className="cuenta">{items.length}</span></div>
-            {items.length === 0 && <p className="columna-vacia">Sin trámites</p>}
+            <div className="columna-cabecera"><span>{c.titulo}</span><span className="cuenta">{cuenta}</span></div>
+            {cuenta === 0 && <p className="columna-vacia">Sin trámites</p>}
+            {cuenta > 0 && items.length === 0 && <p className="columna-vacia">En otras páginas</p>}
             {items.map((t) => (
               <button key={t.id} className="ficha" onClick={() => abrir(t.id)}>
                 <span className="num">#{t.id} · {t.institucion.nombre}</span>
@@ -351,7 +354,7 @@ export function Bandeja({ yo, abrir, modo }) {
             ? <Vacio titulo={ajenos.length ? 'Nada coincide con este filtro' : 'No hay trámites en tu institución'} texto={ajenos.length ? 'Cambia el filtro o la búsqueda para ver más.' : 'Cuando la ciudadanía inicie trámites, aparecerán aquí.'} />
             : (
               <>
-                {vista === 'lista' ? <Tabla filas={visibles} yo={yo} abrir={abrir} nombres={nombres} /> : <Tablero filas={visibles} yo={yo} abrir={abrir} nombres={nombres} />}
+                {vista === 'lista' ? <Tabla filas={visibles} yo={yo} abrir={abrir} nombres={nombres} /> : <Tablero filas={visibles} todas={coinciden} yo={yo} abrir={abrir} nombres={nombres} />}
                 <Paginacion total={total} pagina={pagina} cambiar={setPagina} unidad="trámites" />
               </>
             )}

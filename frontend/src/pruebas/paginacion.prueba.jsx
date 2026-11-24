@@ -125,6 +125,42 @@ describe('la bandeja de la institución y la supervisión', () => {
     expect(estado()).toHaveTextContent('Página 2 de 3')
   })
 
+  it('en el tablero el número de cada columna es el total, no el de la página, y no cambia al pasar de página', async () => {
+    const { user } = await conTodos('fabio.mop', 'Bandeja de la institución')
+    await user.click(screen.getByRole('button', { name: /Tablero/ }))
+    const columnas = () => screen.getAllByRole('region').filter((r) => r.className.includes('columna'))
+    const cuentas = () => columnas().map((c) => Number(c.querySelector('.cuenta').textContent))
+    const fichas = () => columnas().map((c) => c.querySelectorAll('.ficha').length)
+    const primera = cuentas()
+    expect(primera.reduce((a, b) => a + b, 0)).toBe(41) // los 41 trámites, repartidos por columna
+    expect(fichas().reduce((a, b) => a + b, 0)).toBe(20) // pero solo 20 fichas en esta página
+    expect(primera.some((n, i) => n > fichas()[i])).toBe(true)
+    // el indicador de arriba coincide con la columna: ambos son del total
+    const pendientes = screen.getByText('Pendientes', { selector: '.indicador span' }).previousSibling
+    expect(Number(pendientes.textContent)).toBe(primera[0])
+    await user.click(boton(/Siguiente/))
+    expect(estado()).toHaveTextContent('Página 2 de 3')
+    expect(cuentas()).toEqual(primera)
+    expect(fichas().reduce((a, b) => a + b, 0)).toBe(20)
+    await user.click(boton(/Siguiente/))
+    expect(cuentas()).toEqual(primera)
+    expect(fichas().reduce((a, b) => a + b, 0)).toBe(1)
+  })
+
+  it('los indicadores de «Mis trámites» y de la bandeja no dependen de la página', async () => {
+    const mis = await abrirComo('ana.ciudadana', 'Mis trámites')
+    const valor = (texto) => Number(screen.getByText(texto, { selector: '.indicador span' }).previousSibling.textContent)
+    const enCurso = valor('En curso'), aprobados = valor('Aprobados')
+    await mis.user.click(boton(/Siguiente/))
+    expect([valor('En curso'), valor('Aprobados')]).toEqual([enCurso, aprobados])
+    mis.unmount()
+    const band = await abrirComo('fabio.mop', 'Bandeja de la institución')
+    await band.user.click(screen.getByRole('button', { name: 'Todos' }))
+    const antes = ['Pendientes', 'En tramitación', 'En subsanación', 'Con el plazo vencido'].map(valor)
+    await band.user.click(boton(/Siguiente/))
+    expect(['Pendientes', 'En tramitación', 'En subsanación', 'Con el plazo vencido'].map(valor)).toEqual(antes)
+  })
+
   it('la supervisión también pagina y el filtro «Escalados» se conserva sobre todos los trámites', async () => {
     const { user } = await conTodos('saul.mop', 'Supervisión')
     expect(estado()).toHaveTextContent('Página 1 de 3')

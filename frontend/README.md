@@ -56,7 +56,7 @@ npm run build    # genera dist/, que se copia a /home/siget/frontend en VM1 (run
 ## Pruebas
 
 ```bash
-npm test            # 287 pruebas (Vitest + Testing Library + axe), sin VM ni credenciales
+npm test            # 339 pruebas (Vitest + Testing Library + axe), sin VM ni credenciales
 npm run lint        # ESLint (hooks, `style=` prohibido por la CSP, sin eval)
 npm run verificar   # lint + pruebas + build
 ```
@@ -82,6 +82,10 @@ Con `npm run dev`, agrega `?mock` a la dirección y la interfaz usa datos de eje
 | Cualquier cuenta → «Roles y permisos» / «Segundo factor (MFA)» | Matriz de permisos, base de datos y prueba de MFA |
 
 Es un servidor de mentira: no valida nada. El único que decide es el backend. Al editar un archivo, el recarga en caliente reinicia la sesión de ejemplo.
+
+## Límite conocido de la paginación
+
+La paginación de «Mis trámites», la bandeja y la supervisión (20 por página) se hace en el navegador: la interfaz trae la lista completa del servidor (de a 100, con tope de 5000) porque el backend todavía no filtra ni busca. Los indicadores y los contadores del tablero se calculan sobre la lista completa (con los filtros activos); solo las filas y las fichas se paginan. Si el volumen crece, el paso siguiente es filtrar, buscar y paginar en el servidor.
 
 ## Por qué no está el checkpoint PHP acá
 

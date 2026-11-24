@@ -1955,3 +1955,7 @@ Si algún paso falla, **no desplegar**. Los pasos nuevos de `verificar_autentica
 ### 41.4 Si algo sale mal
 
 Sin migración, volver atrás es solo el código: `podman tag localhost/siget-backend:respaldo-AAAA-MM-DD localhost/siget-backend:dev`, reiniciar el backend (como `siget`) y restaurar la interfaz desde su respaldo. Una contraseña ya cambiada sigue siendo válida con el backend viejo (es el mismo hash Argon2).
+
+### 41.5 Riesgos aceptados
+
+**Límite conocido de la paginación.** La interfaz trae la lista completa de trámites del servidor (de a 100, con tope de 5000) y la pagina en el navegador, porque el backend todavía no filtra ni busca. Los indicadores y los contadores del tablero se calculan sobre la lista completa (con los filtros activos); solo las filas y las fichas se reparten de a 20. Si el volumen crece, el paso siguiente es filtrar, buscar y paginar en el servidor.
