@@ -1,0 +1,23 @@
+# PT-15: imagen nueva y verificaciones contra la base real (24-nov-2026)
+# 2026-11-24 11:29:56  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pt15/paso3.sh
+== 6. Respaldo para volver atras
+unidad: siget-backend.container.respaldo-2026-11-24
+== 7. Imagen con el codigo de develop y verificaciones contra la base real (todas se revierten)
+verificar_esquema: 
+verificar_autenticacion: FALLA de las columnas del perfil solo se pueden actualizar correo, provincia y ciudad
+167 de 169 pasos correctos; no quedó ningún dato (transacción revertida).
+CommandError: 2 paso(s) fallaron
+FALLA vence en 10 días hábiles (nunca en fin de semana) - Tue 24-11 -> Wed 09-12
+FALLA de las columnas del perfil solo se pueden actualizar correo, provincia y ciudad
+verificar_plataforma: 125 de 125 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_politicas: 41 de 41 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_tramites: 2026-11-24 11:30:33,009 ERROR django.request Internal Server Error: /tramites/162/documentos/5/
+77 de 77 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_equipo: 51 de 51 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_auditoria: 34 de 34 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_integracion: 15 de 15 pasos correctos; no quedó ningún dato (transacción revertida).
+HAY FALLAS: la etiqueta vuelve a la imagen anterior y no se despliega
+Failed to obtain podman configuration: lstat /run/user/197609: no such file or directory
+Failed to obtain podman configuration: lstat /run/user/197609: no such file or directory
+# código de salida: 1

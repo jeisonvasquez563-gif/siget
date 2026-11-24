@@ -1,0 +1,16 @@
+# PT-15: migracion 016 aplicada en produccion (24-nov-2026)
+# 2026-11-24 11:29:17  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pt15/paso2.sh
+== 4. Migracion 016 real (una sola transaccion)
+GRANT
+REVOKE
+COMMIT
+== 5. Las mismas comprobaciones sobre la base migrada
+PASA  app_role puede corregir correo, provincia y ciudad
+PASA  app_role NO puede tocar nombre, cedula ni la constancia del aviso, ni borrar perfiles
+PASA  app_role lee e inserta solicitudes, sin borrar ni cambiar detalle ni la hora de respuesta
+PASA  pgadmin_lectura, auditor_role, checkpoint_app y escalador_role no leen solicitudes
+PASA  solicitud_derecho tiene sus 2 triggers (alta y respuesta)
+PASA  perfil tiene los 2 triggers nuevos
+PASA  los perfiles existentes quedan sin constancia del aviso (no se inventa)
+# código de salida: 0

@@ -1,0 +1,9 @@
+# PT-15: verificaciones con las expectativas corregidas (24-nov-2026)
+# 2026-11-24 11:32:18  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pt15/paso4.sh
+== 8. Imagen candidata con el arreglo de las dos expectativas
+verificar_esquema: invitacion: OK rotacion_secreto: OK 
+verificar_autenticacion:  169 de 169 pasos correctos; no quedó ningún dato (transacción revertida). 
+candidata: 955dae6ec42e   dev vuelve a: cd6184f82fbf (la de ejecucion)
+verificaciones en verde
+# código de salida: 0
