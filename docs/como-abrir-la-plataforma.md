@@ -63,7 +63,7 @@ El certificado del servidor es válido para `192.168.159.137`, `192.168.100.10`,
 3. **Comprobación completa (opcional, ≈3 minutos):** el ensayo automático recorre todo el sistema con las cuentas reales.
 
    ```bash
-   backend/.venv/Scripts/python.exe demo/ensayo.py     # debe terminar en «55 de 55 comprobaciones correctas»
+   backend/.venv/Scripts/python.exe demo/ensayo.py     # debe terminar en «112 de 112 comprobaciones correctas» (cifra del 24-nov-2026; crece cuando se agregan pasos)
    ```
 4. Los servicios arrancan solos con la VM (Podman rootless + Quadlet con `linger`). Si algo no arrancó, ver la sección 7.
 
@@ -90,7 +90,7 @@ SIGET exige **usuario + contraseña + código del segundo factor (TOTP)** para t
 | `saul.mop` | Supervisor del MOP | Supervisión (reasignar) y equipo |
 | `carla.mop` | Coordinadora del MOP | Equipo y roles; **no** ve trámites |
 | `felix.minsa` | Funcionario del MINSA | Bandeja del MINSA |
-| `ines.infra`, `ivan.identidades`, `cata.catalogo`, `sergio.seguridad`, `silvia.secretos` | Los 5 roles de plataforma | Solo su consola («próximamente») y «Acceso a trámites» |
+| `ines.infra`, `ivan.identidades`, `cata.catalogo`, `sergio.seguridad`, `silvia.secretos` | Los 5 roles de plataforma | Su consola (identidades, catálogo, respuesta a incidentes, custodia de secretos o infraestructura), «Acceso a trámites» y la transparencia |
 | `aldo.auditor` | Auditor | Consola de auditoría (solo lectura) |
 
 Todas ven además **Mi seguridad**, **Segundo factor (MFA)** y **Roles y permisos** (con el simulador «¿qué pasaría si…?»).
@@ -171,8 +171,8 @@ Y abrir, por ejemplo: `http://localhost:5173/?mock=saul.mop` (supervisor), `?moc
 Pruebas automáticas:
 
 ```bash
-cd backend  && python -m pytest -q          # 354 pruebas, sin base de datos
-cd frontend && npm run verificar            # lint + 130 pruebas + build
+cd backend  && python -m pytest -q          # 1044 pruebas (24-nov), sin base de datos
+cd frontend && npm run verificar            # lint + 292 pruebas (24-nov) + build
 ```
 
 ## 9. Publicar una versión nueva (quien opera las VMs)

@@ -9,7 +9,7 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
    ```bash
    backend/.venv/Scripts/python.exe demo/ensayo.py
    ```
-   Debe terminar en **«97 de 97 comprobaciones correctas»** (tarda ~5 minutos: espera un minuto a propósito por el límite de inicios de sesión). Revisa la hora de las VMs, el certificado, TLS 1.3, las 13 cuentas, el segundo factor, la auditoría, el simulador y el cierre de sesión. Si algo falla, ver «Si algo falla en vivo».
+   Debe terminar en **«112 de 112 comprobaciones correctas»** (cifra del 24-nov-2026) (tarda ~5 minutos: espera un minuto a propósito por el límite de inicios de sesión). Revisa la hora de las VMs, el certificado, TLS 1.3, las 13 cuentas, el segundo factor, la auditoría, el simulador y el cierre de sesión. Si algo falla, ver «Si algo falla en vivo».
 3. **Confiar en la CA interna** para que el navegador no avise «conexión no privada» (PowerShell, usuario normal):
    ```powershell
    certutil -addstore -user Root infra\pki\siget-ca.crt
@@ -87,7 +87,7 @@ La sesión se cierra a los **10 minutos** sin actividad, con aviso un minuto ant
 - **Mínimo privilegio y separación de poderes:** 5 roles de plataforma + auditor, sin superusuario; el control dual para altas sensibles; nadie se asigna un rol a sí mismo (lo impone la base).
 - **Trazabilidad:** cada cambio de estado queda en el historial inalterable, escrito por la propia base en la misma transacción.
 - **Defensa en capas:** TLS 1.3 → nginx → Django/DRF → PDP → RLS en PostgreSQL → contenedores rootless sin privilegios.
-- **Verificable:** la matriz y el simulador salen del motor real; hay 415 pruebas del backend, 141 del frontend (con accesibilidad y seguridad del código) y pruebas contra la base real.
+- **Verificable:** la matriz y el simulador salen del motor real; hay 1044 pruebas del backend, 292 del frontend (cifras del 24-nov-2026) (con accesibilidad y seguridad del código) y pruebas contra la base real.
 
 ## Preguntas que puede hacer el profesor
 
@@ -98,7 +98,7 @@ La sesión se cierra a los **10 minutos** sin actividad, con aviso un minuto ant
 | ¿Dónde se guarda el secreto del segundo factor? | Cifrado (Fernet) en la base; solo se muestra una vez, al activarlo. |
 | ¿Y si me roban el token? | Dura 10 minutos; el de renovación es de un solo uso y su reuso revoca la sesión. |
 | ¿Se puede borrar o alterar la auditoría? | No: sin permisos para ningún rol que se conecta, y disparadores que lo rechazan incluso para el dueño de la tabla. |
-| ¿Por qué hay un checkpoint en PHP? | Es el entregable intermedio; se retira en la semana 6 cuando el frontend en React lo reemplaza. |
+| ¿Por qué hay un checkpoint en PHP? | Fue el entregable intermedio que pidió el profesor; **ya se retiró el 17-nov-2026** (junto con pgAdmin web y el puerto 80) porque Django y React lo reemplazan. |
 
 ## Si algo falla en vivo
 
