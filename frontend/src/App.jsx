@@ -9,6 +9,7 @@ import { etiquetaDeRol } from './comun.jsx'
 import { agrupar, iconoDe } from './modulos.js'
 import { Equipo } from './Equipo.jsx'
 import { LimiteDeError } from './ErrorBoundary.jsx'
+import { Campana } from './Notificaciones.jsx'
 import { Inicio, Proximamente, PruebaAcceso, Seguridad } from './Otras.jsx'
 import { MisDatos } from './MisDatos.jsx'
 import { Privacidad } from './Privacidad.jsx'
@@ -139,6 +140,7 @@ export default function App() {
             <strong>{titulo}</strong>
           </div>
           <div className="derecha">
+            <Campana clave={`${vista.modulo}-${vista.id ?? ''}`} abrir={abrir} />
             <button className="btn btn-fantasma btn-icono" onClick={alternarTema} aria-label={tema === 'oscuro' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'} title="Cambiar tema">
               <Icono nombre={tema === 'oscuro' ? 'sol' : 'luna'} />
             </button>

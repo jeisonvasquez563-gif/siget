@@ -32,6 +32,7 @@ const RUTAS = {
   llave: 'M14 10a4 4 0 11-4 4l-7 7v-3h3v-3h3l1-1 M16 8h.01',
   tabla: 'M4 5h16v14H4z M4 10h16 M10 5v14',
   flujo: 'M5 5h4v4H5z M15 5h4v4h-4z M10 17h4v4h-4z M7 9v3h10V9 M12 12v5',
+  campana: 'M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8 M13.7 20a2 2 0 01-3.4 0',
 }
 
 export function Icono({ nombre, className = '' }) {
