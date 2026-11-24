@@ -4,6 +4,7 @@ import { Estado, FINALES, Plazo, ROLES_INSTITUCION, ROLES_PLATAFORMA, etiquetaDe
 import { iconoDe } from './modulos.js'
 import { Alerta, Avatar, Esqueleto, Icono, Insignia, Vacio } from './ui.jsx'
 import { esMio } from './Tramites.jsx'
+import { CambiarContrasena } from './Contrasena.jsx'
 
 function saludoDeLaHora() {
   const h = new Date().getHours()
@@ -165,6 +166,7 @@ export function Seguridad({ yo }) {
             <VentanaMfa verificadoEn={yo.mfa_verificado_en} />
             <p className="nota">Tu sesión dura 8 horas. El token de acceso vive 10 minutos y se renueva solo; el de renovación es de un solo uso y va en una cookie que JavaScript no puede leer.</p>
           </section>
+          <CambiarContrasena yo={yo} />
         </div>
         <section className="panel permisos">
           <h3>Lo que tu rol puede y no puede</h3>

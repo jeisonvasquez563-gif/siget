@@ -3,6 +3,7 @@
 // Uso: http://localhost:5173/?mock            -> pantalla de acceso; entra con cualquier usuario de la lista y cualquier clave
 //      http://localhost:5173/?mock=fabio.mop  -> ya con la sesión iniciada como esa persona
 //      http://localhost:5173/?mock=enrolar    -> alta del segundo factor
+//      «Cambiar la contraseña» (Mi seguridad): la contraseña actual es CLAVE_DE_EJEMPLO; pide el segundo factor si no se verificó hace poco
 // Usuarios: ana.ciudadana beto.ciudadano fabio.mop flor.mop saul.mop carla.mop felix.minsa ines.infra ivan.identidades
 //           cata.catalogo sergio.seguridad silvia.secretos aldo.auditor
 
@@ -18,6 +19,8 @@ import {
   motivoParaLaPersona, respuestaDatosInvalidos, validarDatos, validarTextoLibre,
 } from './mock-contenido.js'
 
+// La contraseña actual que acepta el servidor de ejemplo al cambiarla (el acceso acepta cualquiera; esta se usa solo para «Cambiar la contraseña»)
+export const CLAVE_DE_EJEMPLO = 'clave-de-ejemplo-2026'
 const DIA = 86400000
 const hace = (ms) => new Date(Date.now() - ms).toISOString()
 
@@ -185,6 +188,9 @@ export function instalarMock(inicial, opciones = {}) {
   let enrolando = inicial === 'enrolar'
   let mfaFresco = false
   let ultimoCodigo = null // un código ya usado no se acepta otra vez, como en el servidor
+  let claveVigente = CLAVE_DE_EJEMPLO // la contraseña actual que acepta «Cambiar la contraseña»
+  let fallosDeClave = 0 // 3 fallos bloquean (como el bloqueo progresivo del login)
+  let otrasSesiones = 2 // las demás sesiones abiertas de la cuenta: el cambio las cierra
   const plataforma = plataformaMock({
     usuarios: USUARIOS, actual: () => actual, hace,
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
@@ -271,6 +277,26 @@ export function instalarMock(inicial, opciones = {}) {
       const caso = simuladorEjemplo.casos.find((c) => clave(c.entrada) === clave(cuerpo))
       if (caso) return resp(200, caso.respuesta)
       return resp(200, { entrada: cuerpo, decision: { permitido: false, politica: 'sin_regla_que_permita', motivo: 'ejemplo' }, traza: [], alternativas: [], hipotetico: true, ejemplo: true })
+    }
+    if (camino === '/auth/contrasena/' && metodo === 'POST') {
+      // Igual que el servidor: segundo factor reciente (PDP), contraseña actual (400 genérico; 3 fallos bloquean), política y cierre de las demás sesiones
+      if (!mfaFresco) return pideCodigo()
+      if (fallosDeClave >= 3 || cuerpo.actual !== claveVigente) {
+        fallosDeClave += 1
+        return resp(400, { codigo: 'credenciales_invalidas', detalle: 'La contraseña actual no es correcta o la cuenta está bloqueada temporalmente.' })
+      }
+      const nueva = typeof cuerpo.nueva === 'string' ? cuerpo.nueva : ''
+      const errores = []
+      if (nueva.length < 12) errores.push('debe tener al menos 12 caracteres')
+      else if (nueva.length > 128) errores.push('debe tener como máximo 128 caracteres')
+      else if (nueva.toLowerCase().includes(actual)) errores.push('no puede contener el nombre de usuario')
+      else if (nueva === claveVigente) errores.push('debe ser distinta de la actual')
+      if (errores.length) return resp(400, { codigo: 'datos_invalidos', errores })
+      claveVigente = nueva
+      fallosDeClave = 0
+      const cerradas = otrasSesiones
+      otrasSesiones = 0
+      return resp(200, { detalle: 'Contraseña cambiada. Cerramos las demás sesiones de tu cuenta; esta sigue abierta.', sesiones_cerradas: cerradas })
     }
     if (camino === '/auth/actividad/') {
       const eventos = [['mfa_verificado', 9], ['login_ok', 9], ['refresh_ok', 40], ['login_fallido', 300], ['login_ok', 1500], ['logout', 1620]]
