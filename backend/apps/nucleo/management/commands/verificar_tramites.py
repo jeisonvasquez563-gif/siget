@@ -556,6 +556,78 @@ class Command(BaseCommand):
         self._paso("una notificación nueva vuelve a contar como no leída", r.json()["no_leidas"] == 1 and r.json()["total"] == 9 and r.json()["resultados"][0]["leida"] is False, r.json()["no_leidas"])
         self._paso("las de nando no se tocaron por lo que hizo lola", h("get", "/notificaciones/", t_nando).json()["no_leidas"] == 1)
 
+        # ---------------------------------------------------------------- sin acceso o con la cuenta no activa no se avisa al personal; al solicitante sí
+        rita, sara = self._persona("nota_rita"), self._persona("nota_sara")
+        for p in (rita, sara):
+            Membresia.objects.create(usuario=p, institucion=mop, rol="funcionario", asignado_por=coord)
+
+        def subsanacion_para(asignado):
+            """Un trámite de lola en subsanación, reasignado a `asignado` por la supervisión (la reasignación no notifica)."""
+            pk = nueva_solicitud()
+            estado(pk, "En Tramitacion")
+            estado(pk, "En Subsanacion", MOTIVO)
+            return pk, h("post", f"/tramites/{pk}/reasignar/", t_super, {"funcionario_id": asignado.pk}).status_code
+
+        t_rita, reasignado = subsanacion_para(rita)
+        Membresia.objects.filter(usuario=rita, institucion=mop, rol="funcionario").update(revocada_en=timezone.now(), revocada_por=coord)
+        r = h("post", f"/tramites/{t_rita}/subsanacion/", t_lola, {"respuesta": RESPUESTA})
+        self._paso("a una funcionaria asignada a quien se le revocó el acceso NO le llega «subsanacion_respondida»",
+                   reasignado == 200 and r.status_code == 200 and tipos(rita) == [], (reasignado, r.status_code, tipos(rita)))
+        t_sara, reasignado = subsanacion_para(sara)
+        Usuario.objects.filter(pk=sara.pk).update(estado_cuenta="suspendida")
+        r = h("post", f"/tramites/{t_sara}/subsanacion/", t_lola, {"respuesta": RESPUESTA})
+        self._paso("ni a una asignada con la cuenta suspendida (aunque su membresía siga vigente)",
+                   reasignado == 200 and r.status_code == 200 and tipos(sara) == [], (reasignado, r.status_code, tipos(sara)))
+        self._paso("y sí sigue llegando a nando, asignado con acceso y cuenta activa (la regla no cambió para él)", tipos(nando) == ["subsanacion_respondida"])
+        # El aviso de escalamiento a la supervisión con la cuenta suspendida no se puede probar aquí (app_role no escribe escalado_en): lo cubre pruebas-notificaciones.sql
+        antes = len(tipos(lola))
+        Usuario.objects.filter(pk=lola.pk).update(estado_cuenta="bloqueada")
+        r = estado(t3, "Aprobado")  # t3 (de lola) sigue en trámite: lo aprueba nando mientras la cuenta de lola está bloqueada
+        Usuario.objects.filter(pk=lola.pk).update(estado_cuenta="activa")
+        self._paso("a la persona solicitante con la cuenta bloqueada SÍ se le avisa: lo encuentra al volver",
+                   r.status_code == 200 and len(tipos(lola)) == antes + 1 and tipos(lola)[-1] == "tramite_aprobado", (r.status_code, tipos(lola)[-2:]))
+
+        # ---------------------------------------------------------------- la consulta de fondo no deja decisiones «permitidas»; las escrituras sí
+        n0 = len(DECISIONES)
+        h("get", "/notificaciones/", t_lola)
+        self._paso("la consulta de la campana (GET) no registra decisiones permitidas en el PDP", DECISIONES[n0:] == [], DECISIONES[n0:])
+        h("post", "/notificaciones/leer-todas/", t_lola)
+        self._paso("pero marcar como leídas (escritura) sí registra la decisión, con su política",
+                   DECISIONES[n0:] == [(lola.pk, "ver_mis_notificaciones", True, "titular_ve_sus_notificaciones")], DECISIONES[n0:])
+
+    # ------------------------------------------------------------------ reasignar solo a personal con acceso vigente
+
+    def _reasignacion_a_revocado(self, mop, tipo_mop, coord, super_mop, ana, func_minsa):
+        """A quien se le quitó el acceso (membresía revocada) no se le puede asignar un trámite; el rechazo es el de cualquier destino inválido."""
+        rosa = self._persona("reasig_rosa")
+        Membresia.objects.create(usuario=rosa, institucion=mop, rol="funcionario", asignado_por=coord)
+        Usuario.objects.filter(pk=super_mop.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=1))
+        t_ana, t_super = self._token(ana), self._token(super_mop)
+        pk = self._http("post", "/tramites/", t_ana, {"tipo_tramite": tipo_mop.pk, "datos": datos_de_ejemplo(tipo_mop.formulario)}).json()["id"]
+
+        def reasignar(destino):
+            return self._http("post", f"/tramites/{pk}/reasignar/", t_super, {"funcionario_id": destino})
+
+        def asignado_y_eventos():
+            fijar_contexto(super_mop.pk, [mop.pk])
+            return (Tramite.objects.get(pk=pk).funcionario_asignado_id,
+                    EventoAuditoria.objects.filter(tramite_id=pk, accion="reasignacion").count())
+
+        r = reasignar(rosa.pk)
+        self._paso("la supervisión reasigna el trámite a personal con la membresía vigente", r.status_code == 200 and asignado_y_eventos() == (rosa.pk, 1), r.status_code)
+        r = reasignar(None)
+        self._paso("y lo deja en cola", r.status_code == 200 and asignado_y_eventos() == (None, 2), r.status_code)
+        Membresia.objects.filter(usuario=rosa, institucion=mop, rol="funcionario").update(revocada_en=timezone.now(), revocada_por=coord)
+        self._paso("la membresía de la funcionaria queda revocada", not Membresia.objects.filter(usuario=rosa, institucion=mop).exists()
+                   and Membresia.todas.filter(usuario=rosa, institucion=mop, revocada_en__isnull=False).exists())
+        r = reasignar(rosa.pk)
+        rechazo = r.json()
+        self._paso("reasignar el trámite a quien ya no tiene acceso se rechaza (400 destinatario_invalido)",
+                   r.status_code == 400 and rechazo["codigo"] == "destinatario_invalido", r.status_code)
+        self._paso("y no se asigna ni se audita nada: el trámite sigue en cola, sin una reasignación nueva", asignado_y_eventos() == (None, 2))
+        r = reasignar(func_minsa.pk)
+        self._paso("la respuesta es la misma que para cualquier destino inválido (personal de otra institución)", r.status_code == 400 and r.json() == rechazo, r.status_code)
+
     def _recorrer(self):
         mop = Institucion.objects.get(nombre="MOP")
         minsa = Institucion.objects.get(nombre="MINSA")
@@ -788,6 +860,9 @@ class Command(BaseCommand):
 
         # ---------------------------------------------------------------- notificaciones (migración 018)
         self._notificaciones(mop, tipo_mop, coord, super_mop, ana, operador)
+
+        # ---------------------------------------------------------------- reasignar a personal con la membresía revocada (se rechaza)
+        self._reasignacion_a_revocado(mop, tipo_mop, coord, super_mop, ana, func_minsa)
 
         # ---------------------------------------------------------------- decisiones registradas
         negadas = [d for d in DECISIONES if d[2] is False]
