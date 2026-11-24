@@ -26,6 +26,8 @@ El proyecto se divide en **dos frentes con una frontera clara**: el [contrato de
 
 ## Hoja de ruta del backend (sólido y seguro)
 
+> **Actualización (24-nov-2026):** de esta hoja de ruta ya están hechos y en producción las consolas de plataforma con control dual, los plazos en días hábiles con escalamiento, la recuperación de contraseña, los documentos adjuntos cifrados y los respaldos automáticos con restauración probada (runbook 33 a 37). Siguen pendientes las notificaciones, la rotación de claves, la reemisión de la CA, las alertas y la exportación firmada. La tabla conserva el texto original de octubre.
+
 | Prioridad | Tarea | Por qué |
 |---|---|---|
 | Alta | Consolas de los 5 roles de plataforma con **control dual real** (altas de instituciones y de coordinadores) | Son los módulos «próximamente»; materializan la separación de poderes |

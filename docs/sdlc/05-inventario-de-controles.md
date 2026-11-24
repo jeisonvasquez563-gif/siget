@@ -61,7 +61,7 @@
 | nginx solo acepta los nombres de host de la plataforma (421) | Redirecciones abiertas y abuso de la cabecera `Host` | `docs/analisis-seguridad/README.md`; `CHANGELOG.md` (Seguridad, 8 al 12-nov) | `docs/analisis-seguridad/despues/13_host_header_8080.txt` y `14_host_header_8443.txt` (un `Host` falso recibe `421 Misdirected Request`) | Jeison Vásquez |
 | Límite de tasa en el borde y en el login | Ráfagas de inicios de sesión y abuso de la API | `docs/runbook.md` §24 y §33.1 (caché compartida entre procesos) | `verificar_autenticacion`: «el límite de tasa corta una ráfaga de logins (429)» | Jeison Vásquez |
 | SSH solo por clave, firewall restrictivo y SELinux en Enforcing | El acceso administrativo a las VMs | `docs/endurecimiento-vms.md`; `docs/runbook.md` §14 y §33.5 | `sshd -t` y reconexión probada (runbook 33.5); `getenforce` devuelve `Enforcing` (runbook 14) | Jeison Vásquez |
-| Endurecimiento del checkpoint PHP heredado (Apache y cookie de sesión) | La aplicación antigua mientras no se retire | `docs/analisis-seguridad/README.md` (Aplicado en producción) | `docs/analisis-seguridad/despues/15_apache_trace.txt` (TRACE deshabilitado) y `16_php_cookie_sesion.txt` (cookie `HttpOnly` y `SameSite=Strict`) | Jeison Vásquez |
+| Endurecimiento del checkpoint PHP heredado (Apache y cookie de sesión) | La aplicación antigua mientras no se retire (se retiró el 17-nov-2026; el control queda como registro) | `docs/analisis-seguridad/README.md` (Aplicado en producción) | `docs/analisis-seguridad/despues/15_apache_trace.txt` (TRACE deshabilitado) y `16_php_cookie_sesion.txt` (cookie `HttpOnly` y `SameSite=Strict`) | Jeison Vásquez |
 
 ### Auditoría y supervisión
 
@@ -103,7 +103,7 @@
 | Revisión por CODEOWNERS | Confirmar que la protección de la rama la exige y agregar las cuentas de backend y frontend | Bradley Morales |
 | Bitácoras sin datos sensibles | Reunir la regla en un solo documento (hoy está en las pruebas y en la matriz de Zero Trust) | Andy Martínez |
 | Respaldos | Copia fuera de VM2 (runbook 33.4) y respaldo de la clave de documentos fuera de VM1, separada de los archivos (runbook 37.2) | Jeison Vásquez |
-| Controles todavía no implementados | Integridad de archivos con AIDE (ZT-7), alertas automáticas ante patrones anómalos (ZT-8) y retiro del checkpoint PHP, que sigue en HTTP (ZT-9) | Anyurie Sánchez (alertas) y Jeison Vásquez (AIDE y checkpoint) |
+| Controles todavía no implementados | Integridad de archivos con AIDE (ZT-7), y alertas automáticas ante patrones anómalos (ZT-8). El retiro del checkpoint PHP (ZT-9) se hizo el 17-nov-2026 (runbook 38) | Anyurie Sánchez (alertas) y Jeison Vásquez (AIDE) |
 
 ## Preguntas que puede hacer el profesor
 

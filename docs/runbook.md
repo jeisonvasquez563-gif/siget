@@ -1069,7 +1069,7 @@ PostgreSQL 16.15 corre en un contenedor rootless del usuario de servicio `siget`
 - **pgAdmin debe apuntar al puerto 5433** (con SSL); el 5432 ya no escucha.
 - Quitar del firewall la regla del puerto 5432 (hoy sin servicio detrás) y decidir si el contenedor pasa al 5432.
 - `app_role` con `LOGIN` y su contraseña como `podman secret`, cuando exista el backend.
-- La contraseña de `checkpoint_app` sigue en el `config.php` del PHP, no en un secreto; desaparece con el retiro del checkpoint (semana 6).
+- La contraseña de `checkpoint_app` sigue en el `config.php` del PHP, no en un secreto; desaparece con el retiro del checkpoint (semana 6) *(retirado el 17-nov-2026, sección 38; el rol quedó `NOLOGIN`)*.
 - Respaldo periódico del contenedor (`pg_dump` por un timer de systemd) y rotación del certificado (octubre de 2027).
 
 ### 21.8 Apagado de la base nativa
@@ -1236,7 +1236,7 @@ F4:F4:15:F6:E5:4F:93:A7:77:7B:83:16:E3:97:87:17:31:AB:3B:08:6B:88:B9:C4:AD:77:C7
 | Ráfaga de 150 peticiones simultáneas | 132 con 200 y **18 con 429** |
 | Puerto 8000 desde fuera | Sin conexión (el backend solo escucha dentro del pod) |
 | Denegaciones de SELinux | Ninguna |
-| Checkpoint PHP (Apache :80) | Sigue en 200 |
+| Checkpoint PHP (Apache :80) | Sigue en 200 *(retirado el 17-nov-2026, sección 38)* |
 | `podman kill siget-backend` | El servicio vuelve solo en segundos (`Restart=always`) |
 
 ### 24.5 Gotchas
@@ -1250,7 +1250,7 @@ F4:F4:15:F6:E5:4F:93:A7:77:7B:83:16:E3:97:87:17:31:AB:3B:08:6B:88:B9:C4:AD:77:C7
 ### 24.6 Pendiente
 
 - **Todavía no hay interfaz ni API de trámites detrás de nginx**: solo `/salud/`. Cuando existan las vistas, nginx servirá también el frontend (React).
-- El login del checkpoint PHP sigue por HTTP (Apache, puerto 80) hasta su retiro en la semana 6.
+- El login del checkpoint PHP sigue por HTTP (Apache, puerto 80) hasta su retiro en la semana 6 *(se retiró el 17-nov-2026, sección 38; el puerto 80 está cerrado)*.
 - Pasar a los puertos 80 y 443 cuando se retire Apache (por ejemplo, con `net.ipv4.ip_unprivileged_port_start` o una redirección de firewalld).
 - Renovar el certificado de nginx antes de octubre de 2027.
 - La imagen del backend se llama `:dev` y se construye a mano en VM1; falta fijarla por versión o resumen y automatizar la construcción.
@@ -1367,7 +1367,7 @@ El recorrido mostró que la coordinadora de una institución listaba sus trámit
 
 ### 27.5 Pendiente
 
-- Consolas de los operadores de plataforma y del auditor (hoy «próximamente»); registro de decisiones del PDP visible para el auditor.
+- Consolas de los operadores de plataforma y del auditor; registro de decisiones del PDP visible para el auditor. *(Actualización 24-nov-2026: las cinco consolas de plataforma y la del auditor ya existen, secciones 28 y 34.)*
 - Recuperación de contraseña, rotación de claves, reemisión de la CA, plazos en días hábiles y escalamiento automático.
 - Suspender las cuentas de demostración tras la presentación.
 
@@ -1592,7 +1592,7 @@ SSH en las dos VM (`/etc/ssh/sshd_config.d/00-siget-endurecimiento.conf`: sin ro
 - Los archivos del repositorio mezclan finales de línea (CRLF/LF): al editar con scripts hay que respetar el existente, o los reemplazos multilínea no coinciden.
 - Un `dnf updateinfo` sin `--assumeno` por SSH pide confirmación y se traga el resto del script.
 - `tar` en Git Bash interpreta `C:` como un host remoto: usar `--force-local`.
-- Ver la plataforma nueva en `https://…:8443`; el puerto 80 sigue siendo el checkpoint PHP antiguo.
+- Ver la plataforma nueva en `https://…:8443`; el puerto 80 sigue siendo el checkpoint PHP antiguo *(retirado el 17-nov-2026, sección 38)*.
 
 
 ## 34. Consolas de plataforma, control dual y recuperación de contraseña (22 de octubre de 2026)
@@ -1770,7 +1770,7 @@ Es una sola transacción: o queda todo o nada. Comprobar de inmediato, **con un 
 - `\dp siget.perfil`: el permiso `UPDATE` de `app_role` aparece solo para `correo`, `provincia` y `ciudad`.
 - `\dp siget.solicitud_derecho`: `app_role` con `r` (SELECT), `a` (INSERT) y `w` solo por columnas; ningún permiso para `pgadmin_lectura`, `auditor_role` ni `checkpoint_app`; ningún `d` (DELETE) para nadie.
 - `select count(*) from siget.perfil where aviso_version is not null;` debe dar `0`: los perfiles existentes quedan sin constancia del aviso (no se inventa).
-- El login del checkpoint y el de `app_role` siguen funcionando.
+- El login de `app_role` sigue funcionando (el checkpoint PHP y su rol `checkpoint_app` están retirados desde el 17-nov-2026, sección 38: no hay que comprobarlos).
 
 Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
 
@@ -1871,7 +1871,7 @@ Es una sola transacción: o queda todo o nada. Comprobar de inmediato, **con un 
 - `\dp siget.tramite`: `app_role` con `UPDATE` por columna que ahora incluye `datos`; ningún permiso nuevo para `pgadmin_lectura`, `auditor_role`, `escalador_role` ni `checkpoint_app`.
 - `\d siget.tramite`: triggers `tramite_valida_datos`, `tramite_valida_solicitante`, `tramite_limpia_motivo` (además de los de antes) y la política `tramite_responder_subsanacion` en `\dp`/`pg_policies`.
 - Con `app_role` en una transacción que se revierte: un `UPDATE` de estado a `Rechazado` **sin** `siget.motivo` debe fallar con «exige un motivo», y con `select set_config('siget.motivo', 'motivo de prueba largo', true)` antes, pasar.
-- El login del checkpoint y el de `app_role` siguen funcionando.
+- El login de `app_role` sigue funcionando (el checkpoint PHP y su rol `checkpoint_app` están retirados desde el 17-nov-2026, sección 38: no hay que comprobarlos).
 
 Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
 

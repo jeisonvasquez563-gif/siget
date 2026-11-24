@@ -1,6 +1,7 @@
 ==================================================================
  SIGET — Sistema de Gestión y Trazabilidad
  Guion de comandos para la demostración al profesor
+ (Actualización 24-nov-2026: guion del checkpoint inicial; pgAdmin web y el puerto 80 se retiraron el 17-nov-2026. Ver docs/demo-guion.md)
  Ciberseguridad 5, UTP — Jeison Vásquez, Grupo Ciber5
 ==================================================================
 

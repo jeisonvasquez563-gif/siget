@@ -60,7 +60,7 @@ flowchart LR
 | Base de datos | PostgreSQL 16 en contenedor rootless, esquema `siget`, RLS |
 | Plataforma | Rocky Linux 9.7, Podman rootless + Quadlet (systemd), nginx, SELinux enforcing, firewalld |
 | Acceso del equipo | SSH solo por clave sobre Tailscale (WireGuard) |
-| Calidad | pytest (354), Vitest + Testing Library + axe (130), ESLint, verificaciones contra la base real, GitHub Actions |
+| Calidad | pytest (1044), Vitest + Testing Library + axe (292), ESLint, verificaciones contra la base real, GitHub Actions |
 
 ## Estructura del repositorio (monorepo)
 
@@ -75,7 +75,7 @@ flowchart LR
 │   └── pki/              # CA pública del proyecto
 ├── demo/                 # Ensayo automático de la demo, generador de códigos TOTP, capturas
 ├── docs/                 # Toda la documentación (ver índice en docs/README.md)
-├── checkpoints/          # El PHP intermedio (se retira en la semana 6), separado a propósito
+├── checkpoints/          # El PHP intermedio (retirado el 17-nov-2026; queda como referencia), separado a propósito
 ├── .github/workflows/    # backend-ci y frontend-ci
 ├── CHANGELOG.md          # Cada cambio, con su motivo
 └── CONTRIBUTING.md       # Ramas, commits, documentación y seguridad
@@ -108,8 +108,8 @@ Todo está en [`docs/`](./docs/README.md). Lo esencial:
 Verificación local antes de un PR:
 
 ```bash
-cd backend  && python -m pytest -q          # 354 pruebas, sin base de datos
-cd frontend && npm run verificar            # lint + 130 pruebas + build
+cd backend  && python -m pytest -q          # 1044 pruebas, sin base de datos
+cd frontend && npm run verificar            # lint + 292 pruebas + build
 ```
 
 Las pruebas contra la base real (`verificar_*`) corren en VM1 dentro de una transacción que se revierte; ver el runbook.
