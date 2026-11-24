@@ -80,6 +80,9 @@ VARIABLES_POR_ACCION = {
     Accion.CONSULTAR_DECISIONES: (*_COMUN, "nivel"),
     Accion.CONSULTAR_SOLICITUDES_DATOS: _COMUN,
     Accion.RESPONDER_SOLICITUD_DATOS: _COMUN,
+    Accion.VER_MIS_DATOS: ("perfil_de", *_COMUN),
+    Accion.EXPORTAR_MIS_DATOS: ("perfil_de", *_COMUN),
+    Accion.CREAR_SOLICITUD_DATOS: ("perfil_de", *_COMUN),
     Accion.CORREGIR_MIS_DATOS: ("perfil_de", *_COMUN),
 }
 
@@ -91,7 +94,7 @@ REGLAS = {
     "_ciudadano": "Reglas de la ciudadanía",
     "_personal_de_tramites": "Reglas del personal de trámites (funcionario y supervisor)",
     "_coordinador": "Reglas de la coordinación de la institución",
-    "_titular_de_sus_datos": "Reglas de quien corrige sus propios datos de contacto",
+    "_titular_de_sus_datos": "Reglas de quien ejerce sus derechos sobre sus propios datos",
     "_operadores": "Reglas de los operadores de plataforma",
     "_auditor": "Reglas del auditor",
 }
@@ -168,7 +171,7 @@ def _recurso(entrada, accion, sujeto):
         return Recurso(tipo="tramite" if accion in matriz._TRAMITE else "documento", institucion_id=institucion, solicitante_id=solicitante,
                        funcionario_asignado_id=asignado, estado=None if accion == Accion.CREAR_TRAMITE else entrada.get("estado", "En Tramitacion"),
                        estado_destino=entrada.get("estado_destino") if cambia else None, audiencia=entrada.get("audiencia", "ciudadania"))
-    if accion == Accion.CORREGIR_MIS_DATOS:
+    if accion in matriz._PERFIL:
         return Recurso(tipo="perfil", solicitante_id=PERSONA if entrada.get("perfil_de", "yo") == "yo" else OTRA)
     if accion == Accion.GESTIONAR_USUARIOS_INSTITUCION:
         return Recurso(tipo="usuario", institucion_id=institucion)

@@ -165,6 +165,22 @@ def descifrar_cedula(clave_maestra: str, cifrada: str) -> Optional[str]:
         return None
 
 
+def enmascarar_cedula(cedula: Optional[str], visibles: int = 3) -> Optional[str]:
+    """Deja visibles solo los últimos `visibles` caracteres alfanuméricos y respeta los guiones: «8-123-456» → «*-***-456».
+    La cédula completa solo sale en la exportación (que exige segundo factor reciente)."""
+    if cedula is None:
+        return None
+    restantes = sum(c.isalnum() for c in cedula)
+    salida = []
+    for c in cedula:
+        if c.isalnum():
+            restantes -= 1
+            salida.append(c if restantes < visibles else "*")
+        else:
+            salida.append(c)
+    return "".join(salida)
+
+
 def huella_cedula(clave_maestra: str, cedula: str) -> str:
     """HMAC-SHA256 (hex, 64 caracteres): sirve para detectar una cédula repetida sin guardarla en claro."""
     return hmac.new(_clave_derivada(clave_maestra, b"siget/perfil/cedula/huella"), cedula.encode(), hashlib.sha256).hexdigest()

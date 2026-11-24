@@ -1,8 +1,8 @@
 """«Mis datos»: derechos de la persona sobre sus datos personales (PT-15, Ley 81 de 2019) y aviso de privacidad.
 
 - Todo es sobre la propia cuenta: ninguna ruta recibe el identificador de otra persona.
-- Ver y exportar no piden segundo factor reciente (es información propia y la persona ya inició sesión con él); corregir sí:
-  la decide el PDP con la acción `corregir_mis_datos`.
+- Cada método consulta al PDP (y deja la decisión registrada): solo quien tiene perfil de persona, sin rol de plataforma, y solo sobre el suyo.
+- Ver y pedir una solicitud no piden segundo factor reciente; corregir y exportar sí (exportar entrega la cédula completa; al ver sale enmascarada).
 - Los trámites que se cuentan o exportan son los que la persona ya puede ver por `/tramites/` (seguridad por filas, sin instituciones).
 """
 from datetime import date
@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.autenticacion.autenticacion import exige_scope
@@ -47,10 +47,20 @@ class AvisoPrivacidad(APIView):
         return Response(derechos.aviso_vigente())
 
 
+class TasaDeCorreccion(UserRateThrottle):
+    """Tope propio para corregir: el 409 por correo repetido sería un oráculo de «este correo ya está registrado» si se pudiera repetir sin límite."""
+
+    scope = "corregir"
+
+
 class _Propia(APIView):
     permission_classes = [exige_scope(SCOPE_COMPLETO)]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "api"
+
+    def _autorizar(self, request, accion):
+        """El PDP decide sobre el PROPIO perfil (el recurso nunca sale de la petición) y deja la decisión registrada."""
+        autorizar(request, accion, Recurso(tipo="perfil", solicitante_id=request.user.usuario.pk))
 
     def _puede_ver_tramites(self, request):
         """El PDP decide (los roles de plataforma no ven trámites) y la base filtra por filas: aquí solo los propios, sin instituciones."""
@@ -60,7 +70,14 @@ class _Propia(APIView):
 
 
 class MisDatos(_Propia):
+    def get_throttles(self):
+        throttles = super().get_throttles()
+        if self.request.method == "PATCH":
+            throttles.append(TasaDeCorreccion())
+        return throttles
+
     def get(self, request):
+        self._autorizar(request, Accion.VER_MIS_DATOS)
         usuario = request.user.usuario
         ahora = timezone.now()
         fila = Perfil.objects.filter(pk=usuario.pk).first()
@@ -76,13 +93,13 @@ class MisDatos(_Propia):
             "solicitudes_abiertas_maximo": derechos.MAX_SOLICITUDES_ABIERTAS,
             "plazo_respuesta_dias_habiles": derechos.PLAZO_DIAS_HABILES,
         })
-        respuesta["Cache-Control"] = "no-store"  # lleva la cédula descifrada: que ningún intermediario la guarde
+        respuesta["Cache-Control"] = "no-store"  # lleva datos personales: que ningún intermediario los guarde
         return respuesta
 
     def patch(self, request):
         usuario = request.user.usuario
         # El PDP exige segundo factor reciente y que el perfil sea el propio; el recurso nunca sale del cuerpo
-        autorizar(request, Accion.CORREGIR_MIS_DATOS, Recurso(tipo="perfil", solicitante_id=usuario.pk))
+        self._autorizar(request, Accion.CORREGIR_MIS_DATOS)
         campos, errores = lib_perfil.validar_correccion(request.data)
         if errores:
             return Response({"codigo": "datos_invalidos", "errores": errores}, status=status.HTTP_400_BAD_REQUEST)
@@ -98,11 +115,12 @@ class MisDatos(_Propia):
 
 
 class MisDatosExportar(_Propia):
-    """Portabilidad: un archivo JSON con todo lo propio."""
+    """Portabilidad: un archivo JSON con todo lo propio, con la cédula completa: por eso el PDP exige segundo factor reciente."""
 
     throttle_scope = "exportar"
 
     def get(self, request):
+        self._autorizar(request, Accion.EXPORTAR_MIS_DATOS)
         usuario = request.user.usuario
         ahora = timezone.now()
         documento = servicio.exportar(usuario, self._puede_ver_tramites(request), ahora)
@@ -120,12 +138,14 @@ MENSAJES_SOLICITUD = {
 
 class MisSolicitudes(_Propia):
     def get(self, request):
+        self._autorizar(request, Accion.VER_MIS_DATOS)
         respuesta = Response({"solicitudes": servicio.solicitudes_de(request.user.usuario), "plazo_respuesta_dias_habiles": derechos.PLAZO_DIAS_HABILES,
                               "abiertas_maximo": derechos.MAX_SOLICITUDES_ABIERTAS})
         respuesta["Cache-Control"] = "no-store"
         return respuesta
 
     def post(self, request):
+        self._autorizar(request, Accion.CREAR_SOLICITUD_DATOS)
         datos, errores = derechos.validar_solicitud(_datos(request))
         if errores:
             return Response({"codigo": "datos_invalidos", "errores": errores}, status=status.HTTP_400_BAD_REQUEST)

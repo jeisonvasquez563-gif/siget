@@ -274,10 +274,56 @@ def test_corregir_mis_datos_solo_aplica_a_recursos_de_tipo_perfil():
     assert not permite(sujeto(), Accion.CORREGIR_MIS_DATOS, Recurso(tipo="usuario", solicitante_id=10))
 
 
+ACCIONES_DEL_TITULAR = (Accion.VER_MIS_DATOS, Accion.EXPORTAR_MIS_DATOS, Accion.CREAR_SOLICITUD_DATOS, Accion.CORREGIR_MIS_DATOS)
+
+
 def test_otras_acciones_no_se_abren_por_el_perfil_propio():
     for accion in Accion:
-        if accion != Accion.CORREGIR_MIS_DATOS:
+        if accion not in ACCIONES_DEL_TITULAR:
             assert not permite(sujeto(), accion, propio()), accion
+
+
+@pytest.mark.parametrize("accion,politica", [(Accion.VER_MIS_DATOS, "titular_consulta_sus_datos"), (Accion.CREAR_SOLICITUD_DATOS, "titular_pide_sobre_sus_datos")])
+@pytest.mark.parametrize("minutos", [2, 60, None])
+def test_ver_y_pedir_sobre_lo_propio_no_exigen_segundo_factor_reciente(accion, politica, minutos):
+    d = decidir(sujeto(mfa_min=minutos), accion, propio(), entorno())
+    assert d.permitido and d.politica == politica
+
+
+@pytest.mark.parametrize("minutos", [2, 15])
+def test_exportar_lo_propio_con_segundo_factor_reciente(minutos):
+    d = decidir(sujeto(mfa_min=minutos), Accion.EXPORTAR_MIS_DATOS, propio(), entorno())
+    assert d.permitido and d.politica == "titular_exporta_sus_datos"
+
+
+@pytest.mark.parametrize("minutos", [16, 60, None])
+def test_exportar_sin_segundo_factor_reciente_se_niega(minutos):
+    assert not permite(sujeto(mfa_min=minutos), Accion.EXPORTAR_MIS_DATOS, propio())
+
+
+@pytest.mark.parametrize("accion", ACCIONES_DEL_TITULAR)
+def test_nadie_ve_exporta_ni_pide_sobre_el_perfil_de_otra_persona(accion):
+    assert not permite(sujeto(id=10), accion, propio(id=11))
+    assert not permite(sujeto(id=10), accion, Recurso(tipo="perfil"))
+    assert not permite(sujeto(id=10), accion, Recurso(tipo="tramite", solicitante_id=10))
+
+
+@pytest.mark.parametrize("accion", ACCIONES_DEL_TITULAR)
+@pytest.mark.parametrize("rol", sorted(pdp.ROLES_PLATAFORMA))
+def test_las_cuentas_de_plataforma_no_ven_exportan_ni_piden_sobre_datos_personales(rol, accion):
+    assert not permite(sujeto(rol_plataforma=rol, nivel_aseguramiento=3), accion, propio())
+
+
+@pytest.mark.parametrize("accion", ACCIONES_DEL_TITULAR)
+@pytest.mark.parametrize("estado", ["bloqueada", "suspendida"])
+def test_una_cuenta_no_activa_no_ejerce_derechos_sobre_sus_datos(accion, estado):
+    d = decidir(sujeto(estado_cuenta=estado), accion, propio(), entorno())
+    assert not d.permitido and d.politica == "cuenta_no_activa"
+
+
+@pytest.mark.parametrize("accion", ACCIONES_DEL_TITULAR)
+def test_el_personal_de_una_institucion_ejerce_sus_derechos_como_cualquiera(accion):
+    assert permite(sujeto(membresias=frozenset({(3, "funcionario")})), accion, propio())
 
 
 # --------------------------------------------------------------------------- PDP: la consola de solicitudes
@@ -331,7 +377,9 @@ def celda(rol, accion, caso="favorable"):
 
 def test_la_matriz_muestra_las_acciones_nuevas_calculadas_por_el_pdp():
     ids = {a["id"] for a in M["acciones"]}
-    assert {"corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"} <= ids
+    assert {"ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"} <= ids
+    assert len(M["acciones"]) == len(Accion) == 25
+    assert all(next(a for a in M["acciones"] if a["id"] == i)["grupo"] == "Datos personales" for i in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos"))
     assert next(a for a in M["acciones"] if a["id"] == "corregir_mis_datos")["grupo"] == "Datos personales"
 
 
@@ -349,9 +397,19 @@ def test_en_la_matriz_solo_identidades_atiende_solicitudes_y_con_segundo_factor(
         assert M["matriz"]["operador_identidades"][accion.value]["exige_segundo_factor"] is True
 
 
-def test_en_la_matriz_ninguna_cuenta_de_plataforma_corrige_perfiles():
+@pytest.mark.parametrize("rol", ["ciudadano", "funcionario", "supervisor", "coordinador_institucional"])
+def test_en_la_matriz_toda_persona_ve_y_pide_lo_propio_sin_segundo_factor_y_exporta_con_el(rol):
+    for accion in (Accion.VER_MIS_DATOS, Accion.CREAR_SOLICITUD_DATOS, Accion.EXPORTAR_MIS_DATOS):
+        assert celda(rol, accion)["permitido"] is True and celda(rol, accion, "desfavorable")["permitido"] is False, accion
+    assert M["matriz"][rol]["ver_mis_datos"]["exige_segundo_factor"] is False
+    assert M["matriz"][rol]["crear_solicitud_datos"]["exige_segundo_factor"] is False
+    assert M["matriz"][rol]["exportar_mis_datos"]["exige_segundo_factor"] is True
+
+
+def test_en_la_matriz_ninguna_cuenta_de_plataforma_ejerce_derechos_sobre_perfiles():
     for rol in (r[0] for r in matriz.ROLES[4:]):
-        assert celda(rol, Accion.CORREGIR_MIS_DATOS)["permitido"] is False
+        for accion in ACCIONES_DEL_TITULAR:
+            assert celda(rol, accion)["permitido"] is False, (rol, accion)
 
 
 def test_el_operador_de_identidades_sigue_sin_poder_todo_ni_ver_tramites_en_la_matriz():
@@ -362,8 +420,11 @@ def test_el_operador_de_identidades_sigue_sin_poder_todo_ni_ver_tramites_en_la_m
 
 def test_el_simulador_conoce_las_acciones_nuevas():
     meta = simulador.meta()
-    for accion in ("corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"):
+    for accion in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"):
         assert accion in meta["variables"]
+    assert len(meta["variables"]) == 25
+    for accion in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos"):
+        assert "perfil_de" in meta["variables"][accion]
     assert "perfil_de" in meta["variables"]["corregir_mis_datos"] and "perfil_de" in meta["valores"] and "perfil_de" in meta["defectos"]
 
 
@@ -381,6 +442,11 @@ def test_el_simulador_decide_con_el_mismo_pdp():
     assert simular(rol="operador_identidades", accion="responder_solicitud_datos")["permitido"] is True
     assert simular(rol="operador_catalogo", accion="responder_solicitud_datos")["permitido"] is False
     assert simular(rol="operador_identidades", accion="responder_solicitud_datos", segundo_factor="ninguno")["permitido"] is False
+    assert simular(rol="ciudadano", accion="ver_mis_datos", segundo_factor="ninguno")["permitido"] is True
+    assert simular(rol="ciudadano", accion="exportar_mis_datos", segundo_factor="vencido")["permitido"] is False
+    assert simular(rol="ciudadano", accion="exportar_mis_datos")["permitido"] is True
+    assert simular(rol="operador_identidades", accion="crear_solicitud_datos")["permitido"] is False
+    assert simular(rol="ciudadano", accion="crear_solicitud_datos", perfil_de="otra_persona")["permitido"] is False
 
 
 def test_el_simulador_rechaza_un_perfil_de_que_no_esta_en_la_lista():
@@ -425,6 +491,15 @@ def test_ninguna_ruta_de_mis_datos_recibe_el_identificador_de_otra_persona():
     from django.urls import get_resolver
     rutas = [str(p.pattern) for p in get_resolver().url_patterns[1].url_patterns if "mis-datos" in str(p.pattern)]
     assert rutas and not any("<" in r for r in rutas)
+
+
+@pytest.fixture(autouse=True)
+def tasa_aislada(monkeypatch):
+    """Los topes de tasa del PDP y de la corrección usan una memoria nueva por prueba (el caché real es de archivo y sobreviviría entre ejecuciones)."""
+    import uuid
+
+    from django.core.cache.backends.locmem import LocMemCache
+    monkeypatch.setattr(vistas_derechos.TasaDeCorreccion, "cache", LocMemCache(uuid.uuid4().hex, {}))
 
 
 def llamar(vista, metodo, cuerpo=None, usuario=None, scope="completo"):
@@ -486,18 +561,21 @@ def test_una_cuenta_sin_perfil_recibe_404_al_corregir(monkeypatch):
 
 @pytest.mark.parametrize("cuerpo", [None, {}, {"tipo": "acceso", "detalle": "x" * 20}, {"tipo": "cancelacion", "detalle": "corto"}])
 def test_una_solicitud_invalida_responde_400_sin_tocar_la_base(monkeypatch, cuerpo):
+    monkeypatch.setattr(vistas_derechos, "autorizar", lambda *a: None)
     monkeypatch.setattr(vistas_derechos.servicio, "crear_solicitud", lambda *a, **k: pytest.fail("no debe llegar a la base"))
     r = llamar(vistas_derechos.MisSolicitudes, "post", cuerpo)
     assert r.status_code == 400 and r.data["errores"]
 
 
 def test_pasado_el_tope_de_solicitudes_abiertas_responde_409_con_un_mensaje_claro(monkeypatch):
+    monkeypatch.setattr(vistas_derechos, "autorizar", lambda *a: None)
     monkeypatch.setattr(vistas_derechos.servicio, "crear_solicitud", lambda *a, **k: auth.Resultado(False, "demasiadas_abiertas", detalle={"abiertas": 3, "maximo": 3}))
     r = llamar(vistas_derechos.MisSolicitudes, "post", {"tipo": "cancelacion", "detalle": "Quiero cancelar mi cuenta."})
     assert r.status_code == 409 and r.data["codigo"] == "demasiadas_abiertas" and "3" in r.data["detalle"]
 
 
 def test_una_solicitud_valida_se_crea_con_el_usuario_que_llama_y_responde_201(monkeypatch):
+    monkeypatch.setattr(vistas_derechos, "autorizar", lambda *a: None)
     visto = {}
 
     def crear(usuario, tipo, detalle, ip):
@@ -509,8 +587,136 @@ def test_una_solicitud_valida_se_crea_con_el_usuario_que_llama_y_responde_201(mo
 
 
 def test_las_respuestas_con_datos_personales_no_se_guardan_en_cachés(monkeypatch):
+    monkeypatch.setattr(vistas_derechos, "autorizar", lambda *a: None)
     monkeypatch.setattr(vistas_derechos.servicio, "solicitudes_de", lambda *a, **k: [])
     assert llamar(vistas_derechos.MisSolicitudes, "get").headers["Cache-Control"] == "no-store"
+
+
+# --- B1: cada método consulta al PDP, sobre el PROPIO perfil, antes de hacer nada
+
+def _registrar_consultas(monkeypatch):
+    vistas = []
+    monkeypatch.setattr(vistas_derechos, "autorizar", lambda request, accion, recurso: vistas.append((accion, recurso)))
+    return vistas
+
+
+@pytest.mark.parametrize("vista,metodo,cuerpo,accion", [
+    (vistas_derechos.MisDatos, "get", None, Accion.VER_MIS_DATOS),
+    (vistas_derechos.MisDatos, "patch", {"ciudad": "David"}, Accion.CORREGIR_MIS_DATOS),
+    (vistas_derechos.MisDatosExportar, "get", None, Accion.EXPORTAR_MIS_DATOS),
+    (vistas_derechos.MisSolicitudes, "get", None, Accion.VER_MIS_DATOS),
+    (vistas_derechos.MisSolicitudes, "post", {"tipo": "cancelacion", "detalle": "Quiero cancelar mi cuenta."}, Accion.CREAR_SOLICITUD_DATOS),
+])
+def test_cada_metodo_consulta_al_pdp_sobre_el_propio_perfil_y_si_niega_no_hace_nada(monkeypatch, vista, metodo, cuerpo, accion):
+    consultas = []
+
+    def negar(request, accion_, recurso):
+        consultas.append((accion_, recurso))
+        raise AccesoDenegado({"codigo": "acceso_denegado", "detalle": "No tienes autorización para esta operación.", "reautenticacion_sugerida": False})
+    monkeypatch.setattr(vistas_derechos, "autorizar", negar)
+    for nombre in ("contar_tramites", "exportar", "solicitudes_de", "crear_solicitud", "corregir_datos"):
+        monkeypatch.setattr(vistas_derechos.servicio, nombre, lambda *a, **k: pytest.fail("la vista actuó sin autorización"))
+    r = llamar(vista, metodo, cuerpo)
+    assert r.status_code == 403
+    assert consultas == [(accion, Recurso(tipo="perfil", solicitante_id=7))]
+
+
+def test_ver_y_exportar_usan_acciones_distintas_porque_exportar_exige_segundo_factor():
+    assert Accion.VER_MIS_DATOS != Accion.EXPORTAR_MIS_DATOS
+    assert not permite(sujeto(mfa_min=60), Accion.EXPORTAR_MIS_DATOS, propio()) and permite(sujeto(mfa_min=60), Accion.VER_MIS_DATOS, propio())
+
+
+def test_exportar_sin_segundo_factor_reciente_responde_403_con_la_sugerencia(monkeypatch):
+    def negar(request, accion, recurso):
+        assert accion == Accion.EXPORTAR_MIS_DATOS and recurso.solicitante_id == 7
+        raise AccesoDenegado({"codigo": "acceso_denegado", "detalle": "No tienes autorización para esta operación.", "reautenticacion_sugerida": True})
+    monkeypatch.setattr(vistas_derechos, "autorizar", negar)
+    r = llamar(vistas_derechos.MisDatosExportar, "get")
+    assert r.status_code == 403 and r.data["reautenticacion_sugerida"] is True
+
+
+# --- B2: tope propio para corregir (10 por hora por persona)
+
+def test_el_tope_de_correcciones_es_de_10_por_hora():
+    from django.conf import settings
+    assert settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["corregir"] == "10/hour"
+    assert vistas_derechos.TasaDeCorreccion.scope == "corregir"
+    assert vistas_derechos.TasaDeCorreccion().parse_rate("10/hour") == (10, 3600)
+
+
+def test_solo_corregir_lleva_el_tope_de_correcciones():
+    peticion = APIRequestFactory().patch("/x/")
+    for metodo, esperado in (("PATCH", True), ("GET", False)):
+        vista = vistas_derechos.MisDatos()
+        vista.request = SimpleNamespace(method=metodo)
+        assert any(isinstance(t, vistas_derechos.TasaDeCorreccion) for t in vista.get_throttles()) is esperado, metodo
+    assert not any(isinstance(t, vistas_derechos.TasaDeCorreccion) for t in vistas_derechos.MisSolicitudes().get_throttles())
+    assert peticion is not None
+
+
+def test_la_correccion_11_en_una_hora_responde_429_y_ver_no_se_cuenta(monkeypatch):
+    monkeypatch.setattr(vistas_derechos, "autorizar", lambda *a: None)
+    monkeypatch.setattr(vistas_derechos.servicio, "corregir_datos", lambda *a: auth.Resultado(False, "usuario_existente"))
+    for _ in range(10):
+        assert llamar(vistas_derechos.MisDatos, "patch", {"correo": "ya.registrado@ejemplo.com"}).status_code == 409
+    r = llamar(vistas_derechos.MisDatos, "patch", {"correo": "ya.registrado@ejemplo.com"})
+    assert r.status_code == 429
+    # el tope es por persona: otra persona sigue pudiendo corregir
+    otra = SimpleNamespace(pk=8)
+    peticion = APIRequestFactory().patch("/x/", {"correo": "otro@ejemplo.com"}, format="json", secure=True, HTTP_X_REAL_IP="198.51.100.9")
+    force_authenticate(peticion, user=SimpleNamespace(usuario=otra, claims=SimpleNamespace(scope="completo"), is_authenticated=True, pk=8))
+    assert vistas_derechos.MisDatos.as_view()(peticion).status_code == 409
+
+
+# --- B3: la cédula sale enmascarada al ver y completa solo al exportar
+
+@pytest.mark.parametrize("cedula,esperada", [
+    ("8-123-456", "*-***-456"), ("8-765-4321", "*-***-*321"), ("PE-12-3456", "**-**-*456"), ("E-8-123456", "*-*-***456"), ("10-1-123", "**-*-123"), ("8-1-2", "8-1-2"), ("", ""),
+])
+def test_la_cedula_enmascarada_solo_deja_visibles_los_ultimos_3_caracteres_y_respeta_los_guiones(cedula, esperada):
+    assert perfil.enmascarar_cedula(cedula) == esperada
+    assert perfil.enmascarar_cedula(None) is None
+    assert [c for c in perfil.enmascarar_cedula(cedula) if c == "-"] == [c for c in cedula if c == "-"]
+    assert sum(c.isalnum() and c != "*" for c in perfil.enmascarar_cedula(cedula)) <= 3
+
+
+def _fila_de_perfil():
+    cifrada = perfil.cifrar_cedula(vistas_derechos.servicio.settings.SIGET_MFA_KEY, "8-123-456")
+    return SimpleNamespace(nombre="Ana", apellidos="Pérez", cedula_cifrada=cifrada, fecha_nacimiento=date(1990, 5, 20), provincia="Panamá", ciudad="David",
+                           correo="ana@ejemplo.com", creado_en=AHORA, actualizado_en=None, aviso_version=None, aviso_leido_en=None)
+
+
+def test_el_perfil_que_se_ve_lleva_la_cedula_enmascarada_y_el_de_la_exportacion_completa():
+    fila = _fila_de_perfil()
+    assert vistas_derechos.servicio.perfil_a_dict(fila)["cedula"] == "*-***-456"
+    assert vistas_derechos.servicio.perfil_a_dict(fila, cedula_completa=True)["cedula"] == "8-123-456"
+    assert "8-123" not in str(vistas_derechos.servicio.perfil_a_dict(fila))
+
+
+def test_la_vista_de_mis_datos_no_devuelve_la_cedula_completa_ni_al_corregir(monkeypatch):
+    fila = _fila_de_perfil()
+    monkeypatch.setattr(vistas_derechos, "autorizar", lambda *a: None)
+    monkeypatch.setattr(vistas_derechos.Perfil, "objects", SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: fila), get=lambda **k: fila))
+    monkeypatch.setattr(vistas_derechos.servicio, "contar_tramites", lambda u: 0)
+    monkeypatch.setattr(vistas_derechos.servicio, "cuenta_a_dict", lambda u: {})
+    monkeypatch.setattr(vistas_derechos.servicio, "solicitudes_de", lambda *a, **k: [])
+    monkeypatch.setattr(vistas_derechos, "fijar_contexto", lambda *a: None)
+    monkeypatch.setattr(vistas_derechos._Propia, "_puede_ver_tramites", lambda self, request: False)
+    r = llamar(vistas_derechos.MisDatos, "get")
+    assert r.status_code == 200 and r.data["perfil"]["cedula"] == "*-***-456" and "8-123-456" not in str(r.data)
+    monkeypatch.setattr(vistas_derechos.servicio, "corregir_datos", lambda *a: auth.Resultado(True, "datos_corregidos", detalle={"campos": ["ciudad"]}))
+    r = llamar(vistas_derechos.MisDatos, "patch", {"ciudad": "David"})
+    assert r.status_code == 200 and r.data["perfil"]["cedula"] == "*-***-456"
+
+
+def test_la_exportacion_si_lleva_la_cedula_completa(monkeypatch):
+    fila = _fila_de_perfil()
+    monkeypatch.setattr(vistas_derechos.servicio, "Perfil", SimpleNamespace(objects=SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: fila))))
+    monkeypatch.setattr(vistas_derechos.servicio, "cuenta_a_dict", lambda u: {})
+    monkeypatch.setattr(vistas_derechos.servicio, "solicitudes_de", lambda *a, **k: [])
+    monkeypatch.setattr(vistas_derechos.servicio, "EventoSeguridad", SimpleNamespace(objects=SimpleNamespace(filter=lambda **k: SimpleNamespace(order_by=lambda *a: SimpleNamespace(values=lambda *c: [])))))
+    documento = vistas_derechos.servicio.exportar(SimpleNamespace(pk=7), False, AHORA)
+    assert documento["perfil"]["cedula"] == "8-123-456"
 
 
 # --------------------------------------------------------------------------- consola de solicitudes (operador)
@@ -581,6 +787,7 @@ def test_nadie_recibe_delete_ni_truncate_en_nada():
 
 def test_las_solicitudes_solo_se_pueden_responder_en_sus_columnas_de_respuesta():
     updates = re.findall(r"GRANT\s+UPDATE\s*\(([^)]*)\)\s+ON\s+siget\.solicitud_derecho", SQL_SIN_COMENTARIOS)
+    # `respondida_en` NO se concede: la fija el trigger (D4)
     assert len(updates) == 1 and {c.strip() for c in updates[0].split(",")} == {"estado", "respondida_por", "respuesta"}
     assert re.search(r"GRANT\s+SELECT,\s*INSERT\s+ON\s+siget\.solicitud_derecho\s+TO\s+app_role", SQL_SIN_COMENTARIOS)
 

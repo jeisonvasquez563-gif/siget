@@ -39,6 +39,9 @@ class Accion(str, Enum):
     ROTAR_SECRETOS = "rotar_secretos"
     CONSULTAR_AUDITORIA = "consultar_auditoria"
     CONSULTAR_DECISIONES = "consultar_decisiones"
+    VER_MIS_DATOS = "ver_mis_datos"
+    EXPORTAR_MIS_DATOS = "exportar_mis_datos"
+    CREAR_SOLICITUD_DATOS = "crear_solicitud_datos"
     CORREGIR_MIS_DATOS = "corregir_mis_datos"
     CONSULTAR_SOLICITUDES_DATOS = "consultar_solicitudes_datos"
     RESPONDER_SOLICITUD_DATOS = "responder_solicitud_datos"
@@ -204,9 +207,18 @@ def _coordinador(s, a, r, e):
 
 
 def _titular_de_sus_datos(s, a, r, e):
-    """Corregir el correo, la provincia o la ciudad del propio perfil (Ley 81): solo quien tiene perfil de persona (sin rol de
-    plataforma), solo el suyo y con segundo factor reciente. Nombre, apellidos, cédula y nacimiento van por solicitud."""
-    if a == Accion.CORREGIR_MIS_DATOS and r.tipo == "perfil" and r.solicitante_id == s.id and s.rol_plataforma == "ninguno" and _mfa_reciente(s, e):
+    """Los derechos sobre los propios datos (Ley 81): solo quien tiene perfil de persona (sin rol de plataforma) y solo sobre el suyo.
+    Ver y pedir una solicitud no exigen segundo factor; exportar (lleva la cédula completa) y corregir, sí, reciente.
+    Nombre, apellidos, cédula y nacimiento no se corrigen: van por solicitud."""
+    if r.tipo != "perfil" or r.solicitante_id != s.id or s.rol_plataforma != "ninguno":
+        return None
+    if a == Accion.VER_MIS_DATOS:
+        return Decision(True, "titular_consulta_sus_datos")
+    if a == Accion.CREAR_SOLICITUD_DATOS:
+        return Decision(True, "titular_pide_sobre_sus_datos")
+    if a == Accion.EXPORTAR_MIS_DATOS and _mfa_reciente(s, e):
+        return Decision(True, "titular_exporta_sus_datos")
+    if a == Accion.CORREGIR_MIS_DATOS and _mfa_reciente(s, e):
         return Decision(True, "titular_corrige_sus_datos")
 
 

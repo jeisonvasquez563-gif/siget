@@ -34,9 +34,11 @@ def _iso(valor):
 
 # --------------------------------------------------------------------------- perfil
 
-def perfil_a_dict(fila):
-    """El perfil completo y descifrado: es SU dato, solo se devuelve a su titular."""
+def perfil_a_dict(fila, cedula_completa=False):
+    """El perfil de su titular. La cédula sale ENMASCARADA (solo los últimos 3 caracteres) salvo en la exportación, que exige segundo factor reciente."""
     cedula = lib_perfil.descifrar_cedula(settings.SIGET_MFA_KEY, fila.cedula_cifrada)
+    if not cedula_completa:
+        cedula = lib_perfil.enmascarar_cedula(cedula)
     return {"nombre": fila.nombre, "apellidos": fila.apellidos, "cedula": cedula, "fecha_nacimiento": fila.fecha_nacimiento.isoformat(),
             "provincia": fila.provincia, "ciudad": fila.ciudad, "correo": fila.correo, "creado_en": _iso(fila.creado_en),
             "actualizado_en": _iso(fila.actualizado_en)}
@@ -130,7 +132,7 @@ def exportar(usuario, con_tramites, ahora=None) -> dict:
         "formato": "siget-mis-datos/1", "generado_en": _iso(ahora),
         "aviso_privacidad": constancia_del_aviso(fila),
         "cuenta": cuenta_a_dict(usuario),
-        "perfil": perfil_a_dict(fila) if fila is not None else None,
+        "perfil": perfil_a_dict(fila, cedula_completa=True) if fila is not None else None,
         "tramites": tramites,
         "solicitudes": solicitudes_de(usuario, ahora),
         "actividad_de_seguridad": [{"evento": a["evento"], "creado_en": _iso(a["creado_en"]), "ip": a["ip"]} for a in actividad],

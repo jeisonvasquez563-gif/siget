@@ -48,6 +48,9 @@ ACCIONES = [
     (Accion.ROTAR_SECRETOS, "Rotar secretos y certificados", "Plataforma", None),
     (Accion.CONSULTAR_SOLICITUDES_DATOS, "Ver las solicitudes sobre datos personales", "Datos personales", None),
     (Accion.RESPONDER_SOLICITUD_DATOS, "Responder una solicitud sobre datos personales", "Datos personales", None),
+    (Accion.VER_MIS_DATOS, "Ver los propios datos personales", "Datos personales", ("Su propio perfil", "El perfil de otra persona")),
+    (Accion.EXPORTAR_MIS_DATOS, "Exportar los propios datos personales", "Datos personales", ("Su propio perfil", "El perfil de otra persona")),
+    (Accion.CREAR_SOLICITUD_DATOS, "Pedir rectificación, cancelación u oposición", "Datos personales", ("Sobre su propio perfil", "Sobre el perfil de otra persona")),
     (Accion.CORREGIR_MIS_DATOS, "Corregir los propios datos de contacto", "Datos personales", ("Su propio perfil", "El perfil de otra persona")),
     (Accion.CONSULTAR_AUDITORIA, "Consultar la auditoría", "Auditoría", None),
     (Accion.CONSULTAR_DECISIONES, "Consultar las decisiones de acceso", "Auditoría", None),
@@ -65,6 +68,7 @@ REGLAS_DE_DENEGACION = [
 
 _TRAMITE = {Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Accion.REASIGNAR_TRAMITE, Accion.ESCALAR_TRAMITE}
 _DOCUMENTO = {Accion.ADJUNTAR_DOCUMENTO, Accion.VER_DOCUMENTO}
+_PERFIL = {Accion.VER_MIS_DATOS, Accion.EXPORTAR_MIS_DATOS, Accion.CREAR_SOLICITUD_DATOS, Accion.CORREGIR_MIS_DATOS}
 _TIPO_DE_ALTA = {"operador_identidades": "alta_coordinador", "operador_catalogo": "alta_institucion"}
 
 
@@ -102,7 +106,7 @@ def _recursos(accion, rol, sujeto):
         if accion == Accion.PROPONER_ALTA:
             return Recurso(tipo=tipo, propuesto_por=sujeto.id), Recurso(tipo=otro, propuesto_por=sujeto.id)
         return Recurso(tipo=tipo, propuesto_por=OTRA_PERSONA), Recurso(tipo=tipo, propuesto_por=sujeto.id)
-    if accion == Accion.CORREGIR_MIS_DATOS:
+    if accion in _PERFIL:
         return Recurso(tipo="perfil", solicitante_id=sujeto.id), Recurso(tipo="perfil", solicitante_id=OTRA_PERSONA)
     recurso = Recurso(tipo="plataforma")
     return recurso, recurso
