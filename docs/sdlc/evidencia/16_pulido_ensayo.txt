@@ -1,0 +1,9 @@
+# Cambio de contrasena, pantalla de error y paginacion: ensayo contra produccion (24-nov-2026)
+# 2026-11-24 13:52:08  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pul/ensayo.sh
+== 10. Ensayo completo contra produccion
+ENSAYO: 112 de 112 comprobaciones correctas
+== 11. Desde el anfitrion (sin sesion, la ruta nueva debe responder 401)
+/salud/                405
+/auth/contrasena/      401
+# código de salida: 0

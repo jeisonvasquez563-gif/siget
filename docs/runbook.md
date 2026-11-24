@@ -1929,7 +1929,7 @@ Aplicado el **24 de noviembre de 2026**. Evidencia completa en `docs/sdlc/eviden
 
 ## 41. Cuenta y pulido: cambio de contraseña, pantalla de error y paginación (sin migración)
 
-**Estado: sin desplegar.** No hay migración: no toca la base (el cambio de contraseña usa el `UPDATE (password_hash, …)` que `app_role` ya tiene sobre `usuario`, el mismo del restablecimiento asistido, y los eventos nuevos `contrasena_cambiada`, `sesion_nueva_tras_cambio_contrasena`, `cambio_contrasena_fallido` y `cambio_contrasena_rechazado_bloqueada` entran en `evento_seguridad`, cuyo campo `evento` es texto libre; revocar la sesión actual y enlazarla con la nueva usa los mismos `UPDATE (revocada, reemplazada_por)` que ya hace el refresco). Por eso el orden es solo **imagen candidata verificada, despliegue, ensayo**.
+**Estado: desplegado en producción el 24 de noviembre de 2026** (registro en 41.6). No hay migración: no toca la base (el cambio de contraseña usa el `UPDATE (password_hash, …)` que `app_role` ya tenía).
 
 ### 41.1 Qué cambia
 
@@ -1961,3 +1961,16 @@ Sin migración, volver atrás es solo el código: `podman tag localhost/siget-ba
 **Límite conocido de la paginación.** La interfaz trae la lista completa de trámites del servidor (de a 100, con tope de 5000) y la pagina en el navegador, porque el backend todavía no filtra ni busca. Los indicadores y los contadores del tablero se calculan sobre la lista completa (con los filtros activos); solo las filas y las fichas se reparten de a 20. Si el volumen crece, el paso siguiente es filtrar, buscar y paginar en el servidor.
 
 **El «segundo factor reciente» es de la cuenta, no de la sesión.** `mfa_verificado_en` vive en `usuario`: si la persona verifica su código en su sesión legítima, una sesión robada de la misma cuenta también queda con el segundo factor reciente durante la ventana (15 minutos) y el PDP la deja intentar el cambio de contraseña. Se acepta porque el cambio exige además la **contraseña actual** (con su bloqueo progresivo y su límite de 5 por hora), y porque cambiarla revoca todas las sesiones, la robada incluida. Mejora pendiente: guardar la verificación del segundo factor en `Sesion` (columna nueva, **requiere migración**).
+
+### 41.6 Registro de la aplicación (24 de noviembre de 2026)
+
+Evidencia en `docs/sdlc/evidencia/16_pulido_*`. Sin migración, así que no hubo ventana con funciones caídas.
+
+1. **Imagen en uso guardada** como `siget-backend:respaldo-2026-11-24c`.
+2. **Imagen candidata** (`pulido-candidata`) con el código de `develop` y las 8 verificaciones contra la base real **antes** de reiniciar, todas a la primera: `verificar_esquema` OK, `verificar_tramites` 155/155, `verificar_autenticacion` **200/200** (incluye los pasos nuevos del cambio de contraseña que la revisión de seguridad había corregido antes de llegar acá), `verificar_plataforma` 125/125, `verificar_politicas` 41/41, `verificar_equipo` 51/51, `verificar_auditoria` 34/34 y `verificar_integracion` 15/15.
+3. **Despliegue** del backend (la unidad no cambió) y de la interfaz con respaldo en `/home/siget/frontend.respaldo-2026-11-24c`. Servicios activos y salud 200.
+4. **Ensayo completo contra producción: 112/112.** Sin sesión, `POST /auth/contrasena/` responde 401.
+
+**Volver atrás:** `podman tag localhost/siget-backend:respaldo-2026-11-24c localhost/siget-backend:dev` y reiniciar el backend (como `siget`), y restaurar la interfaz desde `frontend.respaldo-2026-11-24c`.
+
+**Gitleaks en el PR:** marcó un falso positivo en `frontend/src/pruebas/errores.prueba.jsx` (un dato personal inventado en una constante llamada `SECRETO`). Se renombró la constante y el hallazgo quedó en `.gitleaksignore` con su justificación, acotado a ese commit y esa línea.

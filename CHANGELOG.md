@@ -6,6 +6,10 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Despliegue (cambio de contraseña, pantalla de error y paginación en producción, 24-nov)
+- **Sin migración** (runbook 41.6, evidencia `docs/sdlc/evidencia/16_pulido_*`): imagen candidata verificada contra la base real **antes** de reiniciar, con las 8 verificaciones en verde a la primera (`verificar_autenticacion` **200/200**, `verificar_tramites` 155/155); despliegue de backend e interfaz con respaldo (`respaldo-2026-11-24c`) y **ensayo 112/112**.
+- La documentación desactualizada se corrigió en el PR #24 (consolas, respaldos, checkpoint retirado, cifras vigentes).
+
 ### Cuenta y pulido: cambio de contraseña desde la sesión, pantalla de error y paginación (sin migración; runbook 41)
 - **Cambio de contraseña (`POST /auth/contrasena/`, `{actual, nueva}`):**
   - **PDP:** acción nueva `cambiar_contrasena` para **cualquier cuenta autenticada** (incluidas las de plataforma: es la propia cuenta) y solo sobre la propia, con **segundo factor reciente**; la matriz y el simulador pasan de 26 a **27 acciones** (variable nueva `cuenta_de` en el simulador).
