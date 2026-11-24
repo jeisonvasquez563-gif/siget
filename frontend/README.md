@@ -24,23 +24,25 @@ src/
 ├── api.js              # cliente: token en memoria, renovación única, errores tipados
 ├── App.jsx             # sesión, armazón (menú lateral, barra superior) y navegación
 ├── Acceso.jsx          # login, registro y alta del segundo factor (QR)
-├── Tramites.jsx        # mis trámites, nuevo, bandeja (lista y tablero), detalle con esclusas e historial
+├── Tramites.jsx        # mis trámites, nuevo (con su formulario), bandeja (lista y tablero), detalle con esclusas e historial
 ├── Otras.jsx           # inicio, equipo, mi seguridad (credencial), acceso a trámites, «próximamente»
 ├── Auditoria.jsx       # resumen con gráfico, decisiones, eventos de seguridad, actuaciones
 ├── Permisos.jsx        # roles y módulos, matriz de permisos, simulador, permisos de la base de datos, capas de defensa
 ├── Simulador.jsx       # «qué pasaría si…»: veredicto, traza y alternativas del PDP real
 ├── escenarios.json     # los 12 escenarios del simulador (también los usa demo/capturar_simulador.py)
 ├── MisDatos.jsx        # «Mis datos» (Ley 81): ver, corregir correo/provincia/ciudad, descargar y pedir rectificación, cancelación u oposición
+├── Contenido.jsx       # contenido del trámite: formulario dinámico por tipo, datos de la solicitud, modal del motivo y respuesta a la subsanación
 ├── Privacidad.jsx      # aviso de privacidad público (#/privacidad), con el texto que manda el servidor
 ├── Mfa.jsx             # segundo factor: cómo funciona, prueba en vivo (incluye reuso) y actividad propia
 ├── ui.jsx              # iconos propios, logo, esclusas, insignias, avisos, confirmaciones, esqueletos, estados vacíos, tema
 ├── comun.jsx           # etiquetas, estados, plazos, reautenticación
 ├── modulos.js          # cómo se agrupan y dibujan los módulos que manda el servidor
 ├── mock.js             # servidor de mentira SOLO para desarrollo (no entra en producción)
+├── mock-contenido.js   # formularios del catálogo (migración 017) y su validación en el servidor de ejemplo
 ├── mock-derechos.js    # el mismo contrato de «Mis datos» y de la consola de solicitudes, con estado en memoria
 ├── mock-datos/         # capturas REALES de /politicas/* (matriz y base de datos) para el simulador
 ├── pruebas/            # Vitest: api, comun, ui, pantallas por rol, permisos/MFA y seguridad del código
-└── estilos/            # tokens.css, base.css, componentes.css, layout.css, pantallas.css, derechos.css
+└── estilos/            # tokens.css, base.css, componentes.css, layout.css, pantallas.css, derechos.css, contenido.css
 ```
 
 ## Desarrollo
@@ -54,7 +56,7 @@ npm run build    # genera dist/, que se copia a /home/siget/frontend en VM1 (run
 ## Pruebas
 
 ```bash
-npm test            # 130 pruebas (Vitest + Testing Library + axe), sin VM ni credenciales
+npm test            # 287 pruebas (Vitest + Testing Library + axe), sin VM ni credenciales
 npm run lint        # ESLint (hooks, `style=` prohibido por la CSP, sin eval)
 npm run verificar   # lint + pruebas + build
 ```
