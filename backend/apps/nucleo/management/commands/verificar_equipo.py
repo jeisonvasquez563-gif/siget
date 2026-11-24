@@ -19,6 +19,7 @@ from apps.autenticacion.models import EventoSeguridad, Sesion
 from apps.autorizacion import permisos
 from apps.catalogo.models import Institucion, TipoTramite
 from apps.identidad.models import Membresia, Usuario
+from apps.tramites.formulario import datos_de_ejemplo
 
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.31"}
 CLAVE = "una-frase-larga-y-poco-comun-8113"
@@ -137,7 +138,7 @@ class Command(BaseCommand):
         self._llamar(coord, "post", f"{base}{x.pk}/cambiar-rol/", {"rol": "funcionario"})
 
         # ------------------------------------------------------------ quitar, con trámites abiertos de por medio
-        r = self._llamar(ciud, "post", "/tramites/", {"tipo_tramite": tipo.pk})
+        r = self._llamar(ciud, "post", "/tramites/", {"tipo_tramite": tipo.pk, "datos": datos_de_ejemplo(tipo.formulario)})
         tramite = r.json()["id"]
         r = self._llamar(sup, "post", f"/tramites/{tramite}/reasignar/", {"funcionario_id": x.pk})
         self._paso("supervisión le asigna un trámite real a esa persona", r.status_code == 200, r.status_code)

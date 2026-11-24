@@ -21,6 +21,7 @@ from apps.autenticacion import contrasenas, derechos, mfa, perfil, tokens
 from apps.autenticacion.models import EventoSeguridad, Sesion
 from apps.catalogo.models import Institucion, TipoTramite, feriados_entre
 from apps.identidad.models import Membresia, Perfil, SolicitudDerecho, Usuario
+from apps.tramites.formulario import datos_de_ejemplo
 from apps.tramites.serializacion import sumar_dias_habiles
 
 CLAVE_BUENA = "una-frase-larga-y-poco-comun-7391"
@@ -473,7 +474,7 @@ class Command(BaseCommand):
 
         # ---------------------------------------------------------------- portabilidad: exportar
         tipo = TipoTramite.objects.filter(audiencia__in=("ciudadania", "ambas")).order_by("id").first()
-        r = self._http("post", "/tramites/", {"tipo_tramite": tipo.pk}, token=token_viejo)
+        r = self._http("post", "/tramites/", {"tipo_tramite": tipo.pk, "datos": datos_de_ejemplo(tipo.formulario)}, token=token_viejo)
         self._paso("(preparación) la persona inicia un trámite", r.status_code == 201, r.status_code)
         r = self._http("get", "/auth/mis-datos/exportar/", token=token_viejo)
         texto = r.content.decode()
