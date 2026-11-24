@@ -11,7 +11,7 @@ import { ProveedorUI } from '../ui.jsx'
 
 vi.mock('qrcode', () => ({ default: { toCanvas: vi.fn() } }))
 const AXE = { rules: { 'color-contrast': { enabled: false } } }
-const SECRETO = 'cedula-8-123-456-de-Maria-Perez' // lo que un error podría arrastrar: no debe verse jamás
+const DATO_PERSONAL_FALSO = 'cedula-8-123-456-de-Maria-Perez' // lo que un error podría arrastrar: no debe verse jamás
 
 let consola
 beforeEach(() => { consola = vi.spyOn(console, 'error').mockImplementation(() => {}) }) // React también registra los errores atrapados
@@ -20,7 +20,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs() })
 // React reintenta una vez, en el acto, el dibujo que falló: por eso el fallo se enciende y se apaga con un interruptor y no contando intentos
 function Falla() {
   Falla.intentos += 1
-  if (Falla.roto) throw new Error(`No se pudo dibujar ${SECRETO}`)
+  if (Falla.roto) throw new Error(`No se pudo dibujar ${DATO_PERSONAL_FALSO}`)
   return <p>Todo bien por aquí</p>
 }
 beforeEach(() => { Falla.intentos = 0; Falla.roto = true })
@@ -43,7 +43,7 @@ describe('el límite de error', () => {
 
   it('no muestra la traza, el mensaje del error ni datos de la persona', () => {
     const { container } = render(<LimiteDeError nivel="aplicacion"><Falla /></LimiteDeError>)
-    expect(container.textContent).not.toContain(SECRETO)
+    expect(container.textContent).not.toContain(DATO_PERSONAL_FALSO)
     expect(container.textContent).not.toMatch(/Error:|at Falla|\.jsx|componentStack/)
     expect(screen.getByRole('heading', { name: 'Algo salió mal' })).toHaveFocus()
   })
