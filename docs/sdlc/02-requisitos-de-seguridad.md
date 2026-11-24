@@ -95,7 +95,7 @@ Quedan dos requisitos sin cumplir: no hay alertas automáticas ante patrones sos
 Cada requisito tiene una evidencia que cualquiera puede revisar: un archivo de configuración, una prueba automática o una sección del runbook. Por ejemplo, el aislamiento entre instituciones lo comprueba la prueba `test_no_ve_tramites_de_otra_institucion`, y la cédula cifrada, un paso que revisa la base real. Si no encontramos la evidencia, no marcamos «Cumple».
 
 **6. ¿Por qué ponen «Parcial» en vez de «Cumple» si casi todo funciona?**
-Porque un requisito a medias puede ser justo por donde entra un atacante. Por ejemplo, la plataforma nueva usa TLS 1.3, pero el checkpoint PHP antiguo sigue con su login por HTTP en el puerto 80. Preferimos decirlo y tener un plan para retirarlo antes que aparentar un cumplimiento que no es real.
+Porque un requisito a medias puede ser justo por donde entra un atacante. Por ejemplo, la plataforma nueva usa TLS 1.3, pero el checkpoint PHP antiguo seguía con su login por HTTP en el puerto 80 (se retiró el 17-nov-2026). Preferimos decirlo y tener un plan para retirarlo antes que aparentar un cumplimiento que no es real.
 
 **7. Si SIGET es del Estado, ¿necesita el consentimiento de la persona para guardar sus datos?**
 El artículo 8 de la Ley 81 dice que no se requiere autorización para los datos que la Administración Pública recolecta en ejercicio de sus funciones. Pero eso no elimina el deber de informar: el principio de transparencia (art. 2) exige explicar en lenguaje sencillo para qué se usan los datos y cómo ejercer los derechos ARCO. Por eso al principio marcamos el aviso de privacidad como «No cumple», y desde el 24 de noviembre (PT-15) el registro muestra el aviso y guarda qué versión aceptó cada persona.
