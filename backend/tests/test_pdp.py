@@ -61,6 +61,31 @@ class TestCiudadano:
         doc = Recurso(tipo="documento", institucion_id=MOP, solicitante_id=5)
         assert permite(persona(id=5), Accion.ADJUNTAR_DOCUMENTO, doc)
 
+    def test_responde_la_subsanacion_de_su_tramite_sin_segundo_factor_reciente(self):
+        vencido = persona(id=5, mfa_verificado_en=mfa(600))
+        r = tramite(solicitante_id=5, estado="En Subsanacion")
+        assert permite(vencido, Accion.RESPONDER_SUBSANACION, r)
+        assert decidir(vencido, Accion.RESPONDER_SUBSANACION, r, entorno()).politica == "solicitante_responde_subsanacion"
+
+    def test_no_responde_la_subsanacion_de_otra_persona(self):
+        assert not permite(persona(id=5), Accion.RESPONDER_SUBSANACION, tramite(solicitante_id=6, estado="En Subsanacion"))
+
+    def test_no_responde_sin_haber_activado_el_segundo_factor(self):
+        assert not permite(persona(id=5, mfa_verificado_en=None), Accion.RESPONDER_SUBSANACION, tramite(solicitante_id=5, estado="En Subsanacion"))
+
+    def test_el_personal_no_responde_en_nombre_de_la_persona(self):
+        assert not permite(funcionario(), Accion.RESPONDER_SUBSANACION, tramite(solicitante_id=99, estado="En Subsanacion"))
+        assert not permite(supervisor(), Accion.RESPONDER_SUBSANACION, tramite(solicitante_id=99, estado="En Subsanacion"))
+
+    @pytest.mark.parametrize("rol", ["operador_infraestructura", "operador_identidades", "operador_catalogo", "operador_seguridad", "custodio_secretos", "auditor"])
+    def test_un_rol_de_plataforma_no_responde_subsanaciones_ni_siendo_el_solicitante(self, rol):
+        s = operador(rol, id=5, nivel_aseguramiento=3)
+        d = decidir(s, Accion.RESPONDER_SUBSANACION, tramite(solicitante_id=5, estado="En Subsanacion"), entorno())
+        assert not d.permitido and d.politica == "plataforma_sin_acceso_a_tramites"
+
+    def test_una_cuenta_bloqueada_no_responde(self):
+        assert not permite(persona(id=5, estado_cuenta="bloqueada"), Accion.RESPONDER_SUBSANACION, tramite(solicitante_id=5, estado="En Subsanacion"))
+
     def test_no_cambia_estados(self):
         assert not permite(persona(id=5), Accion.CAMBIAR_ESTADO, tramite(solicitante_id=5, estado_destino="Aprobado"))
 
@@ -260,7 +285,7 @@ class TestDenegarPorDefecto:
     def test_sin_membresias_ni_roles_no_puede_nada_ajeno(self):
         s = persona(id=5)
         for accion in Accion:
-            if accion in {Accion.CREAR_TRAMITE, Accion.VER_TRAMITE, Accion.ADJUNTAR_DOCUMENTO, Accion.VER_DOCUMENTO}:
+            if accion in {Accion.CREAR_TRAMITE, Accion.VER_TRAMITE, Accion.ADJUNTAR_DOCUMENTO, Accion.VER_DOCUMENTO, Accion.RESPONDER_SUBSANACION}:
                 continue
             assert not permite(s, accion, Recurso(tipo="tramite", institucion_id=MOP, solicitante_id=99, estado="Pendiente", estado_destino="En Tramitacion"))
 
