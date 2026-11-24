@@ -5,6 +5,7 @@ import pytest
 
 from apps.auditoria.models import DecisionPdp, EventoAuditoria
 from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
+from apps.notificaciones.models import Notificacion
 from apps.plataforma.models import RotacionSecreto
 from apps.catalogo.models import Feriado, Institucion, TipoTramite
 from apps.identidad.models import Aprobacion, Membresia, Perfil, SolicitudDerecho, Usuario
@@ -21,6 +22,7 @@ TABLAS = {
     Invitacion: "invitacion",
     Documento: "documento",
     SolicitudDerecho: "solicitud_derecho",
+    Notificacion: "notificacion",
 }
 
 

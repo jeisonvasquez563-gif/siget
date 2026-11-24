@@ -1,0 +1,20 @@
+# Notificaciones: imagen verificada contra la base migrada y despliegue (24-nov-2026)
+# 2026-11-24 15:18:18  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/n018/paso3.sh
+== 6. Imagen en uso guardada para volver atras
+respaldo-2026-11-24d -> 61a1eb9b2e11
+== 7. Imagen candidata con develop y verificaciones contra la base migrada (todas se revierten)
+verificar_esquema: rotacion_secreto: OK
+verificar_tramites: 214 de 214 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_autenticacion: 200 de 200 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_plataforma: 125 de 125 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_politicas: 41 de 41 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_equipo: 51 de 51 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_auditoria: 34 de 34 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_integracion: 15 de 15 pasos correctos; no quedó ningún dato (transacción revertida).
+== 8. Despliegue del backend (candidata f020bf1ec720; la unidad no cambia)
+servicios: active active active  salud: 200
+== 9. Interfaz con respaldo y vuelta atras automatica
+interfaz index-IcBifVXC.js -> 200
+todo desplegado
+# código de salida: 0

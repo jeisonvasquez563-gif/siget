@@ -1974,3 +1974,100 @@ Evidencia en `docs/sdlc/evidencia/16_pulido_*`. Sin migración, así que no hubo
 **Volver atrás:** `podman tag localhost/siget-backend:respaldo-2026-11-24c localhost/siget-backend:dev` y reiniciar el backend (como `siget`), y restaurar la interfaz desde `frontend.respaldo-2026-11-24c`.
 
 **Gitleaks en el PR:** marcó un falso positivo en `frontend/src/pruebas/errores.prueba.jsx` (un dato personal inventado en una constante llamada `SECRETO`). Se renombró la constante y el hallazgo quedó en `.gitleaksignore` con su justificación, acotado a ese commit y esa línea.
+
+
+## 42. Notificaciones dentro de la plataforma: aplicar la migración 018 (PT-9)
+
+**Estado: aplicado en producción el 24 de noviembre de 2026** (registro en 42.9).
+
+### 42.1 Qué cambia y en qué orden hay que aplicarlo
+
+La migración [`018-notificaciones.sql`](../database/migraciones/018-notificaciones.sql) crea la tabla `siget.notificacion` (tipo de una lista cerrada, trámite y fechas; **sin texto libre ni datos personales**), el disparador `tramite_genera_notificaciones` (`AFTER UPDATE OF estado, escalado_en` sobre `tramite`, función `SECURITY DEFINER` con ruta de búsqueda fija), el disparador `notificacion_valida_lectura` (solo se marca como leída, una vez, con la hora de la base) y la seguridad por filas (`app_role` ve y marca solo las suyas: `SELECT` y `UPDATE (leida_en)`, **sin `INSERT` ni `DELETE`**). No se concede nada a `auditor_role`, `pgadmin_lectura`, `checkpoint_app` ni `escalador_role`.
+
+**La base va primero, el código después.** El backend nuevo lee la tabla nueva (`/notificaciones/`): sin la migración, esas rutas darían error 500 (el resto sigue igual). El backend **viejo** funciona con la base ya migrada: nada lo obliga a leer la tabla nueva y el disparador inserta como dueño de la tabla (`SECURITY DEFINER`), así que no necesita ningún permiso ni cambio; los `UPDATE` de estado que hace siguen funcionando igual (solo se suman filas en `notificacion`). El `escalar_vencidos()` de la 013 también: corre como `escalador_role` sin contexto de usuario y el disparador, que corre como dueño, avisa a la supervisión sin que `escalador_role` toque la tabla. **Esto se razonó leyendo las migraciones 013, 015 y 017; no se ejecutó**: se comprueba en 42.4 y 42.5.
+
+### 42.2 Respaldo previo, verificado
+
+Igual que 40.2: `systemctl start siget-respaldo.service` en VM2 y comprobar que terminó bien, más un respaldo manual con sello `pre-018` que la retención de 14 días no borra:
+
+```bash
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/pre-018-tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+No seguir si el respaldo no se pudo restaurar. Los archivos tienen permisos 600 y **no van al repositorio**.
+
+### 42.3 Ensayo con `ROLLBACK`
+
+```bash
+sed '$d' database/migraciones/018-notificaciones.sql > /tmp/018-ensayo.sql   # sin el COMMIT; final
+echo 'ROLLBACK;' >> /tmp/018-ensayo.sql
+cat /tmp/018-ensayo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+```
+
+Debe terminar en `ROLLBACK` sin errores. Después, confirmar que no quedó nada: `\d siget.notificacion` debe decir que no existe la relación y `\df siget.generar_notificaciones` que no hay función.
+
+### 42.4 Migración real y pruebas de la base
+
+```bash
+cat database/migraciones/018-notificaciones.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+cat database/pruebas-notificaciones.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+```
+
+La migración es una sola transacción. El segundo archivo se ejecuta **después** y termina en `ROLLBACK` (no deja nada): cada prueba imprime `PASA` o `FALLA`; **todas deben decir `PASA`**. Prueba, entre otras cosas, cada transición con el destinatario correcto, que no se avise al actor, que no se avise a un asignado con la membresía revocada ni a personal con la cuenta suspendida (pruebas 26 a 30), que `siget.escalar_vencidos()` corrida **como `escalador_role`** (sin contexto de usuario) avise a la supervisión vigente y no a la revocada, y que `app_role` no inserte, borre, desmarque ni cambie otra columna. **Es la primera vez que corre contra la base real** (se escribió sin poder ejecutarla): si algo falla, revisar primero si es un error de la prueba y no de la migración. Comprobar además, **con un login real de `app_role`** (regla del README de migraciones):
+
+- `\dp siget.notificacion`: `app_role` con `r` (SELECT) y `w` solo en la columna `leida_en`; **ningún** permiso para los demás roles.
+- `select count(*) from siget.notificacion;` como `app_role` **sin contexto** debe dar `0` (la seguridad por filas no muestra nada sin `app.usuario_id`).
+- Las pruebas de la base que ya existían siguen en verde (`database/pruebas-escalamiento.sql`: 10 de 10).
+
+Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
+
+**Advertencias del script de pruebas** (están también en su encabezado): `escalar_vencidos()` corre sobre **toda** la base, así que mientras dura el script escala (y bloquea) también los trámites vencidos **reales**; el `ROLLBACK` final lo deshace. Conviene correrlo **fuera de la hora en punto**: el temporizador del escalador corre cada hora y, si coincide, uno espera al otro o escala primero. No se usa `psql -1` (el archivo ya trae su `BEGIN` y su `ROLLBACK`).
+
+### 42.5 Imagen candidata y verificaciones (VM1)
+
+Con la base ya migrada, en VM1: guardar la imagen en uso (`podman tag localhost/siget-backend:dev localhost/siget-backend:respaldo-AAAA-MM-DD`, ver 39.10), reconstruir con el código nuevo y correr cada comando contra la base real (todos se revierten) **antes de reiniciar**:
+
+1. `verificar_esquema`: el modelo `Notificacion` coincide con la tabla.
+2. `verificar_tramites`: trae el método nuevo `_notificaciones` (recorre cada transición por la API, el aislamiento entre personas, los permisos de `app_role` y la lectura). **Es la primera vez que corre contra la base real** (lección de 40.9): si falla, revisar primero si es un error del paso y no de la base. También trae pasos nuevos de acceso revocado y cuentas no activas, de la consulta de fondo sin decisiones permitidas y el método `_reasignacion_a_revocado` (reasignar a personal con la membresía revocada se rechaza). No prueba `escalar_vencidos()` ni el aviso de escalamiento a una supervisión suspendida (`app_role` no puede escribir `escalado_en`): eso lo cubre `pruebas-notificaciones.sql` (42.4).
+3. `verificar_politicas` (el simulador ahora lista **28** acciones), `verificar_autenticacion`, `verificar_equipo`, `verificar_plataforma`, `verificar_auditoria` e `verificar_integracion` como regresión.
+
+Si algún paso falla, **no desplegar**.
+
+### 42.6 Despliegue y ensayo
+
+`desplegar.sh` (backend e interfaz; devuelve la inactividad a 10 minutos, ver 34.2). Backend e interfaz pueden ir juntos o separados: la interfaz nueva sin el backend nuevo mostraría la campana sin número (las rutas no existen y la interfaz lo tolera); el backend nuevo con la interfaz vieja no se nota. Después, el ensayo (`demo/ensayo.py`).
+
+### 42.7 Qué hacer si algo sale mal
+
+- **La migración falla:** al ser una transacción no queda nada a medias; se corrige y se repite el ensayo.
+- **Hay que volver atrás el código:** `podman tag localhost/siget-backend:respaldo-AAAA-MM-DD localhost/siget-backend:dev`, reiniciar el backend (como `siget`) y restaurar la interfaz desde su respaldo. La base migrada funciona con el backend anterior (42.1).
+- **Si el disparador diera problemas** (no debería: solo inserta una fila), se corrige hacia adelante; revertir la base es la última opción (restaurar `pre-018`, **perdiendo todo lo posterior**: avisar antes). No se hace `DROP` a mano en producción.
+
+### 42.8 Gotchas y riesgos aceptados
+
+- **Las genera la base, no la aplicación.** Cualquier camino que cambie un trámite (la API, el escalador o un `UPDATE` a mano en `psql`) genera notificaciones. Un `UPDATE` de mantenimiento masivo de estados avisaría a todos los solicitantes: hacerlo con el disparador deshabilitado (`ALTER TABLE siget.tramite DISABLE TRIGGER tramite_genera_notificaciones`, dentro de una transacción, con respaldo y registro, y habilitarlo de nuevo).
+- **El actor sale de `siget.ctx_usuario()`**, el mismo contexto que fija la aplicación en cada transacción. Un `UPDATE` desde `psql` sin contexto (como `escalar_vencidos()`) no tiene actor: avisa a todos los destinatarios. Para el estado, el solicitante nunca es el actor salvo al responder una subsanación (el trigger de la 017 lo limita a ese paso), y ese paso no le genera aviso a él.
+- **`subsanacion_respondida` solo va al funcionario asignado.** Si el trámite no tiene a nadie asignado (está «en cola»), no se avisa a nadie del personal: lo verán al revisar la bandeja. Si el personal cierra la subsanación, tampoco se avisa al solicitante (no está en el diseño).
+- **`creada_en` es `now()` de la transacción:** varias notificaciones de una misma transacción tienen la misma hora; la API ordena por `creada_en` y luego por `id`.
+- **Quien pierde la membresía conserva sus notificaciones, pero no ve el trámite.** La API devuelve `tramite: null` para esas filas (el trámite se pide aparte de la lista justamente para no esconderlas) y la interfaz no ofrece abrirlo. No hay retención: `app_role` no puede borrar; una depuración se haría como dueño, con respaldo.
+- **Decisión (revisión de seguridad): la consulta de fondo de la campana NO registra decisiones permitidas.** Toda ruta autoriza y registra, pero `GET /notificaciones/` (una consulta por minuto por pestaña, solo con la pestaña visible) dejaría una fila «permitida» por minuto por persona en `decision_pdp`, sin valor de auditoría. Por eso `autorizar()` y `evaluar()` tienen un parámetro **explícito** `registrar_permitidas` (por omisión `True`; la lectura de notificaciones lo pone en `False`). Las **denegaciones se registran siempre** y las escrituras (marcar leída, leer todas) también. No es una excepción oculta: cualquier otra ruta que lo quiera usar debe justificarlo igual.
+- **Decisión: avisar al personal solo con cuenta activa y acceso vigente.** `subsanacion_respondida` solo llega al asignado si sigue con membresía vigente de funcionario o supervisor en la institución y su cuenta está `activa`; `tramite_escalado`, solo a la supervisión con cuenta `activa`. **Al solicitante se le avisa siempre**: una cuenta bloqueada por intentos fallidos (o suspendida) no puede ver nada mientras tanto (el PDP lo niega) y al volver debe encontrar lo que pasó con su trámite; la notificación no lleva datos.
+- **Reasignar un trámite exige membresía vigente** (endurecido junto con esta revisión): `POST /tramites/<id>/reasignar/` rechaza (`400 destinatario_invalido`) a quien tenga la membresía revocada. El manager `Membresia.objects` ya las excluía; ahora la vista además filtra `revocada_en IS NULL` de forma explícita y hay pruebas que lo fijan.
+- **Mejora pendiente: no hay política de retención de notificaciones.** La tabla solo crece (`app_role` no puede borrar). Habrá que definir cuánto se conservan (p. ej. borrar las leídas con más de N meses, como dueño y con respaldo) antes de que pese.
+- **Índices:** `notificacion (tramite_id)` (clave foránea) y `membresia (institucion_id) WHERE revocada_en IS NULL` (la supervisión se busca por institución; la clave primaria es `usuario, institucion, rol`).
+- **Una notificación no lleva el motivo ni datos.** Quien quiera el motivo lo lee en el detalle del trámite, con los controles de siempre; por eso una notificación nunca puede filtrar más que el trámite.
+
+### 42.9 Registro de la aplicación
+
+Aplicado el **24 de noviembre de 2026**, a las 15:17, lejos de la hora en punto del escalador. Evidencia en `docs/sdlc/evidencia/17_notificaciones_*`.
+
+1. **VM2, respaldo verificado:** `tramites_demo-20261124-151721.dump` (18 tablas, restauración probada), copiado como `pre-018-…` (SHA-256 `e49754db796d0b95…`).
+2. **Ensayo en una sola transacción revertida:** la migración 018 completa **y**, en la misma transacción, todo `pruebas-notificaciones.sql`, incluido `escalar_vencidos()` corriendo como `escalador_role`: **36 de 36 comprobaciones**. Después: la tabla `notificacion` no existía. (El control de «no quedó nada» encontró una función con «notific» en el nombre: era `pg_catalog.pg_notification_queue_usage`, propia de PostgreSQL, no de la migración.)
+3. **Migración real** y `pruebas-notificaciones.sql` otra vez sobre la base migrada: 36/36.
+4. **VM1, imagen candidata** (`notificaciones-candidata`) y las 8 verificaciones **antes** de reiniciar, todas a la primera: `verificar_tramites` **214/214** (notificaciones y reasignación), `verificar_autenticacion` 200/200, `verificar_plataforma` 125/125, `verificar_politicas` 41/41, `verificar_equipo` 51/51, `verificar_auditoria` 34/34, `verificar_integracion` 15/15 y `verificar_esquema` OK. Despliegue con respaldo (`respaldo-2026-11-24d`, `frontend.respaldo-2026-11-24d`).
+5. **El ensayo dio 112/112, pero desde afuera `/notificaciones/` respondía 404.** nginx solo pasa al backend una lista fija de rutas (`location ~ ^/(auth|tramites|…|plataforma|salud)`) y `notificaciones` no estaba. Ninguna prueba lo podía ver: las unitarias y las `verificar_*` hablan directo con Django, sin pasar por nginx. Se corrigió en producción con respaldo (`nginx.conf.respaldo-2026-11-24`), **escribiendo en el mismo inodo** (el archivo está montado en el contenedor; ver 35.3), `nginx -t` dentro del contenedor y `nginx -s reload` sin cortar conexiones. Después: `/notificaciones/` responde 401 sin sesión.
+6. **Ensayo con una comprobación nueva que atraviesa nginx** (`/notificaciones/` con la sesión de la persona → 200): **113/113**.
+
+**Volver atrás:** imagen `respaldo-2026-11-24d` como `dev` y reiniciar el backend; interfaz desde `frontend.respaldo-2026-11-24d`; nginx con `sudo sh -c 'cat /home/siget/config/nginx.conf.respaldo-2026-11-24 > /home/siget/config/nginx.conf'` y `nginx -s reload`. El backend anterior funciona con la base migrada.
+
+**Lección:** toda ruta nueva de primer nivel (`/algo/`) necesita tres cambios: la vista en Django, la lista de `location` de `infra/podman/vm1-app-backend/nginx.conf` y la lista `rutas` de `frontend/vite.config.js`. El ensayo ahora pide `/notificaciones/` con sesión real; las rutas nuevas futuras deberían sumar una comprobación igual.

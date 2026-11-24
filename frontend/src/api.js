@@ -51,9 +51,11 @@ export function renovar() {
   return refrescando
 }
 
+// `renovar: false` es para las consultas de fondo (la campana de notificaciones): si el acceso venció no lo renuevan, porque renovarlo
+// alargaría la sesión sin que la persona haga nada. La consulta falla con 401 y la interfaz la ignora hasta la próxima acción de la persona.
 export async function api(ruta, opciones = {}) {
   let r = await pedir(ruta, opciones)
-  if (r.estado === 401 && opciones.conToken !== false) {
+  if (r.estado === 401 && opciones.conToken !== false && opciones.renovar !== false) {
     const nuevo = await renovar()
     if (nuevo) r = await pedir(ruta, opciones)
     else alPerderSesion()

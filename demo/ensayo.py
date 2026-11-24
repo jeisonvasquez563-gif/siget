@@ -172,6 +172,9 @@ paso(isinstance(inactividad, int) and 1 <= inactividad <= 15, "el servidor infor
 ids = [m["id"] for m in yo["modulos"]]
 paso(ids == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa", "roles_permisos"], "su menú es el de la ciudadanía (con «Mis datos», PT-15)", ids)
 _, lista = ana.pedir("GET", "/tramites/?limite=100")
+# Pasa por nginx de verdad: el 24-nov la ruta nueva /notificaciones/ estaba lista en Django pero nginx no la dejaba pasar (404)
+e, d = ana.pedir("GET", "/notificaciones/?limite=5")
+paso(e == 200 and isinstance((d or {}).get("no_leidas"), int), "la campana: /notificaciones/ responde con la sesión de la persona (atraviesa nginx)", e)
 antes = len(lista["resultados"])
 paso(antes >= 3 and all("solicitante_id" not in t for t in lista["resultados"]), "ve sus trámites y ningún dato interno del personal", antes)
 _, instituciones = ana.pedir("GET", "/catalogo/instituciones/")

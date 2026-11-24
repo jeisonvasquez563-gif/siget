@@ -21,10 +21,11 @@ Cambios incrementales sobre el esquema `siget` que ya está aplicado. Se ejecuta
 
 | 016 | `016-derechos-datos.sql` | Derechos sobre los datos personales (Ley 81): la persona corrige solo correo, provincia y ciudad (`UPDATE` por columna en `perfil`), constancia del aviso de privacidad y tabla `solicitud_derecho` (rectificación, cancelación y oposición, respuesta en 10 días hábiles) | 24-nov-2026 |
 | 017 | `017-contenido-tramite.sql` | Contenido del trámite: `tipo_tramite.formulario` (definición de los datos que pide cada trámite, cargada para los 5 del catálogo) y `tramite.datos` (objeto de hasta 16 KB); motivo de 10 a 2000 caracteres obligatorio al rechazar, pedir subsanación o cerrarla (se fija con `siget.motivo` y queda en `evento_auditoria.atributos`); `datos` solo cambia cuando la persona solicitante responde una subsanación (política RLS y triggers propios) | 24-nov-2026 |
+| 018 | `018-notificaciones.sql` | Notificaciones dentro de la plataforma: tabla `notificacion` (tipo de una lista cerrada, trámite y fechas; sin texto libre ni datos personales) que genera un disparador `AFTER UPDATE` sobre `tramite` (al solicitante, al funcionario asignado cuando el solicitante responde una subsanación y a la supervisión vigente cuando `escalar_vencidos()` escala; nunca al propio actor). Seguridad por filas: `app_role` ve y marca solo las suyas (`SELECT` y `UPDATE (leida_en)`, sin `INSERT` ni `DELETE`); `leida_en` solo pasa de nulo a la hora de la base. Pruebas: [`../pruebas-notificaciones.sql`](../pruebas-notificaciones.sql) | 24-nov-2026 |
 
 ## Para una base nueva
 
-`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 009** (y las posteriores que ya estén en `main`, como la 016 y la 017 cuando se liberen).
+`database/diseno-roles-permisos.sql` ya incluye lo de la migración 002 (es el script de arranque consolidado). En una base nueva se ejecuta ese archivo y después **solo las migraciones 003 a 009** (y las posteriores que ya estén en `main`, como la 016, la 017 y la 018 cuando se liberen).
 
 ## Reglas
 

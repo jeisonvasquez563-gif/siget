@@ -252,10 +252,76 @@ def test_autorizar_niega_con_tipos_reales(monkeypatch):
     from apps.autorizacion.pdp import Accion, Decision, Recurso
     from apps.nucleo.errores import AccesoDenegado
     usuario = SimpleNamespace(pk=1, mfa_activo=True, mfa_verificado_en=None)
-    monkeypatch.setattr(permisos, "evaluar", lambda u, a, r: Decision(False, "x"))
+    monkeypatch.setattr(permisos, "evaluar", lambda u, a, r, **kw: Decision(False, "x"))
     with pytest.raises(AccesoDenegado) as error:
         permisos.autorizar(SimpleNamespace(user=SimpleNamespace(usuario=usuario)), Accion.VER_TRAMITE, Recurso(tipo="tramite"))
     assert error.value.cuerpo["reautenticacion_sugerida"] is True
+
+
+# --------------------------------------------------------------------------- reasignar: solo a personal con acceso vigente
+
+@pytest.fixture
+def reasignacion(monkeypatch):
+    """La vista de reasignar con una base simulada: membresías vigentes y revocadas de la institución 3 (y una de la 4)."""
+    from rest_framework.test import APIRequestFactory, force_authenticate
+    from apps.tramites import vistas
+    ahora = datetime(2026, 11, 24, 12, 0, tzinfo=timezone.utc)
+    filas = [dict(usuario_id=12, institucion_id=3, rol="funcionario", revocada_en=None),
+             dict(usuario_id=13, institucion_id=3, rol="funcionario", revocada_en=ahora),
+             dict(usuario_id=14, institucion_id=3, rol="supervisor", revocada_en=ahora),
+             dict(usuario_id=15, institucion_id=4, rol="funcionario", revocada_en=None),
+             dict(usuario_id=16, institucion_id=3, rol="coordinador_institucional", revocada_en=None),
+             dict(usuario_id=50, institucion_id=3, rol="funcionario", revocada_en=None)]
+
+    class Membresias:
+        def filter(self, usuario_id, institucion_id, rol__in, **resto):
+            vigentes = resto.pop("revocada_en__isnull", False)  # sin este filtro se verían también las revocadas
+            assert not resto
+            hallado = [f for f in filas if f["usuario_id"] == usuario_id and f["institucion_id"] == institucion_id and f["rol"] in rol__in
+                       and (not vigentes or f["revocada_en"] is None)]
+            return SimpleNamespace(exists=lambda: bool(hallado))
+
+    asignaciones, eventos = [], []
+    tramite = SimpleNamespace(pk=1, institucion_id=3, solicitante_id=50, funcionario_asignado_id=None, estado="En Tramitacion")
+    monkeypatch.setattr("rest_framework.throttling.ScopedRateThrottle.allow_request", lambda self, request, view: True)
+    monkeypatch.setattr(vistas, "Membresia", SimpleNamespace(objects=Membresias()))
+    monkeypatch.setattr(vistas, "_membresias", lambda usuario: [SimpleNamespace(institucion_id=3, rol="supervisor")])
+    monkeypatch.setattr(vistas, "fijar_contexto", lambda usuario_id, instituciones: None)
+    monkeypatch.setattr(vistas, "autorizar", lambda request, accion, recurso: None)
+    monkeypatch.setattr(vistas, "Tramite", SimpleNamespace(objects=SimpleNamespace(
+        filter=lambda pk: SimpleNamespace(update=lambda funcionario_asignado_id: asignaciones.append(funcionario_asignado_id)))))
+    monkeypatch.setattr(vistas, "EventoAuditoria", SimpleNamespace(objects=SimpleNamespace(create=lambda **kw: eventos.append(kw))))
+    monkeypatch.setattr(vistas.TramiteReasignar, "_tramite_visible", lambda self, pk: tramite)
+    monkeypatch.setattr(vistas.TramiteReasignar, "_respuesta", lambda self, pk, http=200: vistas.Response({"id": pk}, status=http))
+
+    def reasignar(destino):
+        peticion = APIRequestFactory().post("/x/", {"funcionario_id": destino}, format="json", secure=True, HTTP_X_REAL_IP="198.51.100.9")
+        force_authenticate(peticion, user=SimpleNamespace(usuario=SimpleNamespace(pk=9), claims=SimpleNamespace(scope="completo"), is_authenticated=True, pk=9))
+        return vistas.TramiteReasignar.as_view()(peticion, pk=1)
+    return SimpleNamespace(reasignar=reasignar, asignaciones=asignaciones, eventos=eventos)
+
+
+def test_se_reasigna_a_personal_con_la_membresia_vigente(reasignacion):
+    r = reasignacion.reasignar(12)
+    assert r.status_code == 200 and reasignacion.asignaciones == [12] and len(reasignacion.eventos) == 1
+
+
+@pytest.mark.parametrize("destino", [13, 14])  # funcionario y supervisor a quienes se les revocó el acceso
+def test_no_se_reasigna_a_quien_ya_no_tiene_acceso(reasignacion, destino):
+    r = reasignacion.reasignar(destino)
+    assert r.status_code == 400 and r.data["codigo"] == "destinatario_invalido"
+    assert reasignacion.asignaciones == [] and reasignacion.eventos == []  # ni se asignó ni se auditó
+
+
+@pytest.mark.parametrize("destino", [15, 16, 50, 99])  # otra institución, coordinación, el propio solicitante, desconocido
+def test_el_resto_de_destinos_invalidos_responde_igual(reasignacion, destino):
+    r = reasignacion.reasignar(destino)
+    assert r.status_code == 400 and r.data["codigo"] == "destinatario_invalido" and reasignacion.asignaciones == []
+
+
+def test_dejar_el_tramite_en_cola_no_consulta_membresias(reasignacion):
+    r = reasignacion.reasignar(None)
+    assert r.status_code == 200 and reasignacion.asignaciones == [None]
 
 
 def test_las_rutas_de_trámites_se_resuelven():

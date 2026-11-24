@@ -54,6 +54,7 @@ ACCIONES = [
     (Accion.CREAR_SOLICITUD_DATOS, "Pedir rectificación, cancelación u oposición", "Datos personales", ("Sobre su propio perfil", "Sobre el perfil de otra persona")),
     (Accion.CORREGIR_MIS_DATOS, "Corregir los propios datos de contacto", "Datos personales", ("Su propio perfil", "El perfil de otra persona")),
     (Accion.CAMBIAR_CONTRASENA, "Cambiar la propia contraseña", "Cuenta", ("Su propia cuenta", "La cuenta de otra persona")),
+    (Accion.VER_MIS_NOTIFICACIONES, "Ver las propias notificaciones", "Cuenta", ("Sus propias notificaciones", "Las notificaciones de otra persona")),
     (Accion.CONSULTAR_AUDITORIA, "Consultar la auditoría", "Auditoría", None),
     (Accion.CONSULTAR_DECISIONES, "Consultar las decisiones de acceso", "Auditoría", None),
 ]
@@ -72,6 +73,7 @@ _TRAMITE = {Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Acc
 _DOCUMENTO = {Accion.ADJUNTAR_DOCUMENTO, Accion.VER_DOCUMENTO}
 _PERFIL = {Accion.VER_MIS_DATOS, Accion.EXPORTAR_MIS_DATOS, Accion.CREAR_SOLICITUD_DATOS, Accion.CORREGIR_MIS_DATOS}
 _CUENTA = {Accion.CAMBIAR_CONTRASENA}
+_NOTIFICACION = {Accion.VER_MIS_NOTIFICACIONES}
 _TIPO_DE_ALTA = {"operador_identidades": "alta_coordinador", "operador_catalogo": "alta_institucion"}
 
 
@@ -117,6 +119,8 @@ def _recursos(accion, rol, sujeto):
         return Recurso(tipo="perfil", solicitante_id=sujeto.id), Recurso(tipo="perfil", solicitante_id=OTRA_PERSONA)
     if accion in _CUENTA:
         return Recurso(tipo="cuenta", solicitante_id=sujeto.id), Recurso(tipo="cuenta", solicitante_id=OTRA_PERSONA)
+    if accion in _NOTIFICACION:
+        return Recurso(tipo="notificacion", solicitante_id=sujeto.id), Recurso(tipo="notificacion", solicitante_id=OTRA_PERSONA)
     recurso = Recurso(tipo="plataforma")
     return recurso, recurso
 

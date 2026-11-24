@@ -10,6 +10,7 @@
 import matrizEjemplo from './mock-datos/matriz.json'
 import { derechosMock, MENSAJE_ACEPTA_AVISO } from './mock-derechos.js'
 import { equipoMock } from './mock-equipo.js'
+import { notificacionesMock } from './mock-notificaciones.js'
 import { plataformaMock } from './mock-plataforma.js'
 import { olvidarConfiguracion } from './api.js'
 import bdEjemplo from './mock-datos/base-de-datos.json'
@@ -214,6 +215,7 @@ export function instalarMock(inicial, opciones = {}) {
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
     negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
   })
+  const notificaciones = notificacionesMock({ tramites: () => TRAMITES, visibles, resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }), paginar, paginacionValida })
   const derechos = derechosMock({
     usuarios: USUARIOS, actual: () => actual, hace, mfaFresco: () => mfaFresco,
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
@@ -321,6 +323,8 @@ export function instalarMock(inicial, opciones = {}) {
     if (camino === '/catalogo/instituciones/') return resp(200, INSTITUCIONES)
     if (camino === '/catalogo/tipos-tramite/') return resp(200, TIPOS.filter((t) => !p.get('institucion') || String(t.institucion.id) === p.get('institucion')))
     if (camino === '/equipo/') return equipo.listar(u)
+    const deNotificaciones = notificaciones.manejar(u, camino, metodo, p)
+    if (deNotificaciones) return deNotificaciones
     const deEquipo = equipo.manejar(camino, metodo, cuerpo)
     if (deEquipo) return deEquipo
     if (camino === '/tramites/' && metodo === 'GET') {
@@ -384,6 +388,7 @@ export function instalarMock(inicial, opciones = {}) {
         if (Object.keys(errores).length) return resp(400, respuestaDatosInvalidos(errores))
         if (limpios) DATOS[t.id] = limpios
         t.estado = 'En Tramitacion'
+        notificaciones.avisar(t, 'En Subsanacion', u.id)
         EVENTOS[t.id].push(ev(Date.now(), t.id, 'cambio_estado', 'En Subsanacion', 'En Tramitacion', u.id, 500, cuerpo.respuesta.trim()))
         return resp(200, conContenido(dto(u, t), t))
       }
@@ -399,6 +404,7 @@ export function instalarMock(inicial, opciones = {}) {
         if (falla) return resp(400, respuestaDatosInvalidos({ motivo: falla }))
         t.estado = cuerpo.estado
         t.vencido = false
+        notificaciones.avisar(t, antes, u.id)
         EVENTOS[t.id].push(ev(Date.now(), t.id, 'cambio_estado', antes, t.estado, u.id, 500, sinMotivo ? null : cuerpo.motivo.trim()))
         return resp(200, conContenido(dto(u, t), t))
       }

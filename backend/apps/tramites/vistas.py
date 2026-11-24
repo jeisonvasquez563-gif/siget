@@ -240,8 +240,10 @@ class TramiteReasignar(_Base):
         nuevo = datos["funcionario_id"]
         autorizar(request, Accion.REASIGNAR_TRAMITE, _recurso(tramite))
         if nuevo is not None:
+            # Solo membresías VIGENTES: a quien se le quitó el acceso (revocada) no se le puede asignar un trámite. `Membresia.objects` ya
+            # excluye las revocadas; el filtro explícito es la segunda barrera por si algún día cambia el manager
             es_personal = Membresia.objects.filter(usuario_id=nuevo, institucion_id=tramite.institucion_id,
-                                                   rol__in=["funcionario", "supervisor"]).exists()
+                                                   rol__in=["funcionario", "supervisor"], revocada_en__isnull=True).exists()
             if not es_personal or nuevo == tramite.solicitante_id:
                 return _error("destinatario_invalido", "Solo se puede asignar a personal de la misma institución que no sea el solicitante.", status.HTTP_400_BAD_REQUEST)
         anterior = tramite.funcionario_asignado_id

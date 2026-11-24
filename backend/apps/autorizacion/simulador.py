@@ -27,13 +27,14 @@ VALORES = {
     "nivel": (1, 2, 3),
     "perfil_de": ("yo", "otra_persona"),
     "cuenta_de": ("yo", "otra_persona"),
+    "notificaciones_de": ("yo", "otra_persona"),
 }
 
 ETIQUETAS_VARIABLE = {
     "segundo_factor": "Segundo factor", "cuenta": "Estado de la cuenta", "institucion": "Institución del recurso", "audiencia": "Trámite para",
     "solicitante": "Quién pidió el trámite", "estado": "Estado actual del trámite", "estado_destino": "Estado al que se quiere pasar",
     "asignado": "Quién lo atiende", "tipo_alta": "Tipo de alta", "alta_propuesta_por": "Quién propuso el alta", "nivel": "Nivel de aseguramiento",
-    "perfil_de": "De quién es el perfil", "cuenta_de": "De quién es la cuenta",
+    "perfil_de": "De quién es el perfil", "cuenta_de": "De quién es la cuenta", "notificaciones_de": "De quién son las notificaciones",
 }
 
 ETIQUETAS_VALOR = {
@@ -48,6 +49,7 @@ ETIQUETAS_VALOR = {
     "nivel": {1: "Nivel 1", 2: "Nivel 2", 3: "Nivel 3"},
     "perfil_de": {"yo": "De la misma persona que actúa", "otra_persona": "De otra persona"},
     "cuenta_de": {"yo": "De la misma persona que actúa", "otra_persona": "De otra persona"},
+    "notificaciones_de": {"yo": "De la misma persona que actúa", "otra_persona": "De otra persona"},
     "estado": {"Pendiente": "Pendiente", "En Tramitacion": "En tramitación", "En Subsanacion": "En subsanación", "Aprobado": "Aprobado", "Rechazado": "Rechazado"},
     "estado_destino": {"Pendiente": "Pendiente", "En Tramitacion": "En tramitación", "En Subsanacion": "En subsanación", "Aprobado": "Aprobado", "Rechazado": "Rechazado"},
 }
@@ -55,7 +57,7 @@ ETIQUETAS_VALOR = {
 DEFECTOS = {
     "segundo_factor": "reciente", "cuenta": "activa", "institucion": "propia", "audiencia": "ciudadania", "solicitante": "otra_persona",
     "estado": "En Tramitacion", "estado_destino": "Aprobado", "asignado": "nadie", "tipo_alta": "alta_institucion",
-    "alta_propuesta_por": "otra_persona", "nivel": 2, "perfil_de": "yo", "cuenta_de": "yo",
+    "alta_propuesta_por": "otra_persona", "nivel": 2, "perfil_de": "yo", "cuenta_de": "yo", "notificaciones_de": "yo",
 }
 
 _COMUN = ("segundo_factor", "cuenta")
@@ -88,6 +90,7 @@ VARIABLES_POR_ACCION = {
     Accion.CREAR_SOLICITUD_DATOS: ("perfil_de", *_COMUN),
     Accion.CORREGIR_MIS_DATOS: ("perfil_de", *_COMUN),
     Accion.CAMBIAR_CONTRASENA: ("cuenta_de", *_COMUN),
+    Accion.VER_MIS_NOTIFICACIONES: ("notificaciones_de", *_COMUN),
 }
 
 REGLAS = {
@@ -100,6 +103,7 @@ REGLAS = {
     "_coordinador": "Reglas de la coordinación de la institución",
     "_titular_de_sus_datos": "Reglas de quien ejerce sus derechos sobre sus propios datos",
     "_titular_de_su_cuenta": "Reglas de quien cambia la contraseña de su propia cuenta",
+    "_titular_de_sus_notificaciones": "Reglas de quien lee sus propias notificaciones",
     "_operadores": "Reglas de los operadores de plataforma",
     "_auditor": "Reglas del auditor",
 }
@@ -180,6 +184,8 @@ def _recurso(entrada, accion, sujeto):
         return Recurso(tipo="perfil", solicitante_id=PERSONA if entrada.get("perfil_de", "yo") == "yo" else OTRA)
     if accion in matriz._CUENTA:
         return Recurso(tipo="cuenta", solicitante_id=PERSONA if entrada.get("cuenta_de", "yo") == "yo" else OTRA)
+    if accion in matriz._NOTIFICACION:
+        return Recurso(tipo="notificacion", solicitante_id=PERSONA if entrada.get("notificaciones_de", "yo") == "yo" else OTRA)
     if accion == Accion.GESTIONAR_USUARIOS_INSTITUCION:
         return Recurso(tipo="usuario", institucion_id=institucion)
     if accion == Accion.GESTIONAR_CATALOGO_INSTITUCION:

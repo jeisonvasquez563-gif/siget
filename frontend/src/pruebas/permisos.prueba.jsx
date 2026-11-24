@@ -24,7 +24,7 @@ async function abrirComo(usuario, modulo) {
 }
 
 describe('datos reales: lo que dice la política', () => {
-  it('ningún rol puede las 27 acciones (no hay superusuario)', () => {
+  it('ningún rol puede las 28 acciones (no hay superusuario)', () => {
     expect(matriz.ningun_rol_puede_todo).toBe(true)
     expect(matriz.roles).toHaveLength(10)
     for (const r of matriz.roles) expect(r.acciones_permitidas).toBeLessThan(r.acciones_totales)
@@ -68,8 +68,8 @@ describe('roles y módulos', () => {
     const auditor = await screen.findByRole('article', { name: 'Auditor' })
     expect(within(auditor).getByText('Auditoría')).toBeInTheDocument()
     expect(within(auditor).queryByText('Mis trámites')).not.toBeInTheDocument()
-    expect(within(auditor).getByRole('progressbar', { name: /3 de 27/ })).toBeInTheDocument()
-    expect(within(screen.getByRole('article', { name: 'Supervisor' })).getByRole('progressbar', { name: /12 de 27/ })).toBeInTheDocument()
+    expect(within(auditor).getByRole('progressbar', { name: /4 de 28/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: 'Supervisor' })).getByRole('progressbar', { name: /13 de 28/ })).toBeInTheDocument()
   })
 })
 
