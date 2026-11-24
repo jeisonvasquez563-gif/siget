@@ -26,6 +26,7 @@ class Accion(str, Enum):
     REASIGNAR_TRAMITE = "reasignar_tramite"
     ESCALAR_TRAMITE = "escalar_tramite"
     ADJUNTAR_DOCUMENTO = "adjuntar_documento"
+    RESPONDER_SUBSANACION = "responder_subsanacion"
     VER_DOCUMENTO = "ver_documento"
     GESTIONAR_USUARIOS_INSTITUCION = "gestionar_usuarios_institucion"
     GESTIONAR_CATALOGO_INSTITUCION = "gestionar_catalogo_institucion"
@@ -177,6 +178,10 @@ def _ciudadano(s, a, r, e):
         return Decision(True, "ciudadano_crea_su_tramite")
     if a in {Accion.VER_TRAMITE, Accion.ADJUNTAR_DOCUMENTO, Accion.VER_DOCUMENTO} and _sobre_su_tramite(s, r):
         return Decision(True, "ciudadano_sobre_lo_propio")
+    if a == Accion.RESPONDER_SUBSANACION and r.tipo == "tramite" and r.solicitante_id == s.id:
+        # Solo quien pidió el trámite, y sin segundo factor reciente (igual que adjuntar documentos): es la persona respondiendo
+        # a la administración. Que el trámite esté «En Subsanacion» lo comprueba la vista (409) y la base lo impone (RLS y trigger).
+        return Decision(True, "solicitante_responde_subsanacion")
 
 
 def _personal_de_tramites(s, a, r, e):

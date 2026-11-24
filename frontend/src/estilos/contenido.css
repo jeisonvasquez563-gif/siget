@@ -1,0 +1,31 @@
+/* Contenido del trámite: formulario dinámico, datos de la solicitud, motivo de las decisiones y respuesta a la subsanación */
+
+.marca-requerido { color: var(--sello-rojo); font-weight: 700; }
+.campo small.contador { text-align: right; color: var(--tinta-suave); font-variant-numeric: tabular-nums; }
+.campo textarea.entrada { resize: vertical; min-height: 5rem; font: inherit; }
+.campo.con-error .entrada, .campo.con-error .seleccion { border-color: var(--sello-rojo); }
+.campo small.error-campo { color: var(--sello-rojo); font-weight: 600; }
+.campo > small:not(.contador):not(.error-campo) { color: var(--tinta-suave); margin: -0.15rem 0 0.35rem; }
+
+.resumen-errores { margin-bottom: 1rem; border-radius: var(--radio); }
+.resumen-errores:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+.resumen-errores ul { margin: 0.35rem 0 0; padding-left: 1.2rem; }
+
+/* Datos de la solicitud: los textos largos conservan sus saltos de línea */
+.datos .texto-largo { white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 450; }
+.datos-solicitud dd { overflow-wrap: anywhere; }
+
+/* El motivo de una decisión, como cita (texto plano) */
+.cita-motivo { margin: 0.4rem 0 0; padding: 0.55rem 0.85rem; border-left: 3px solid var(--agua-media); background: var(--superficie-3); border-radius: 0 var(--radio) var(--radio) 0; white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 450; }
+.cita-motivo .etiqueta-cita { display: block; font-size: var(--t-xs); font-weight: 650; color: var(--tinta-suave); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Subsanación pedida a la persona: se destaca sobre el resto del detalle */
+.panel-subsanacion { border-color: var(--boya); border-width: 2px; }
+.motivo-destacado { padding: 0.85rem 1rem; margin-bottom: 0.5rem; border-radius: var(--radio); background: var(--boya-fondo); color: var(--tinta); }
+.motivo-destacado > strong { color: var(--boya-texto); }
+.motivo-destacado .cita-motivo { background: var(--superficie); border-left-color: var(--boya); font-size: var(--t-m); }
+:root[data-tema='oscuro'] .motivo-destacado { background: color-mix(in srgb, var(--boya) 14%, var(--superficie)); }
+:root[data-tema='oscuro'] .motivo-destacado > strong { color: var(--boya); }
+.panel-subsanacion .casilla { margin: 0.25rem 0 1rem; }
+.datos-corregir { border: 1px solid var(--borde); border-radius: var(--radio); padding: 0.9rem 1rem 0.2rem; margin: 0 0 1rem; }
+.datos-corregir legend { font-size: var(--t-s); font-weight: 650; padding: 0 0.3rem; }

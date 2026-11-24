@@ -1825,3 +1825,91 @@ Evidencia completa en `docs/sdlc/evidencia/14_pt15_*` (salida en texto y captura
 - `ejecutar-comando.sh` reconstruye la imagen con la **misma etiqueta** que usa el backend en ejecución: el servicio no cambia hasta reiniciarlo, pero hay que guardar antes la imagen anterior y devolver la etiqueta si algo falla.
 - Correr el ensayo varias veces seguidas choca con el límite de 10 inicios de sesión por minuto (429): esperar un minuto entre corridas.
 - El ensayo lee las credenciales de la siembra de `demo-local/siembra.local.txt`, que está fuera de git: se corre desde la carpeta que lo tiene.
+
+## 40. Contenido del trámite: aplicar la migración 017 (formulario, motivo y respuesta a la subsanación)
+
+**Estado: pendiente de aplicar.** Rama `feature/contenido-tramite`. Cuando se aplique, agregar el registro en 40.9 (como en 39.10).
+
+### 40.1 Qué cambia y en qué orden hay que aplicarlo
+
+La migración [`017-contenido-tramite.sql`](../database/migraciones/017-contenido-tramite.sql) agrega `tipo_tramite.formulario` (cargada para los cinco trámites del catálogo) y `tramite.datos` (con `CHECK` de objeto y de 16 KB), el `UPDATE (datos)` de `app_role`, los triggers del motivo (`validar_transicion` y `registrar_cambio_estado` reemplazados, más `limpiar_motivo`), el trigger de `datos` (`validar_cambio_de_datos`), la política RLS `tramite_responder_subsanacion` y el trigger `validar_respuesta_solicitante`. No toca a `escalador_role`, `auditor_role`, `pgadmin_lectura` ni `checkpoint_app`.
+
+**La base va primero, el código después**, con una salvedad que hay que conocer. El backend nuevo lee columnas nuevas (`datos`, `formulario`): sin la migración, falla. El backend **viejo** sigue funcionando con la base ya migrada para crear y atender trámites, **pero** la base ahora exige un motivo al rechazar, pedir subsanación o cerrarla y el backend viejo no lo manda: esas operaciones darían `409 transicion_rechazada` hasta desplegar el código nuevo. Por eso: migrar, verificar y desplegar sin demora en la misma ventana. Los números 013 a 016 existen en otras ramas: no se renumera la 017 salvo que dos migraciones choquen.
+
+### 40.2 Respaldo previo, verificado
+
+En VM2: `systemctl start siget-respaldo.service` (hace `pg_dump` + roles, restaura en una base desechable y compara con la viva, ver 33.4) y comprobar que terminó bien (`systemctl is-failed siget-respaldo.service` no debe decir `failed`; mirar el último archivo en `/var/backups/siget/` y su huella SHA-256). Además, un respaldo manual con sello `pre-017`, que la retención de 14 días no borra:
+
+```bash
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/pre-017-tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+No seguir si el respaldo no se pudo restaurar. Los archivos tienen permisos 600 y **no van al repositorio**.
+
+### 40.3 Ensayo con `ROLLBACK`
+
+Se ejecuta la migración completa dentro de una transacción que se revierte. La migración trae su propio `COMMIT;`, así que el ensayo la envuelve sin él:
+
+```bash
+sed '$d' database/migraciones/017-contenido-tramite.sql > /tmp/017-ensayo.sql   # sin el COMMIT; final
+echo 'ROLLBACK;' >> /tmp/017-ensayo.sql
+cat /tmp/017-ensayo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+```
+
+Debe terminar en `ROLLBACK` sin errores. Después, confirmar que no quedó nada: `\d siget.tramite` no debe mostrar `datos` ni `\d siget.tipo_tramite` la columna `formulario`, y `\df siget.limpiar_motivo` debe decir que no hay función.
+
+### 40.4 Migración real
+
+```bash
+cat database/migraciones/017-contenido-tramite.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+```
+
+Es una sola transacción: o queda todo o nada. Comprobar de inmediato, **con un login real de `app_role`** (regla del README de migraciones) y no solo como superusuario:
+
+- `select nombre from siget.tipo_tramite where formulario = '[]'::jsonb;` debe devolver **0 filas**. Si devuelve alguna, su nombre no coincidió con la carga (la migración busca el nombre exacto): corregir antes de seguir, porque ese trámite aceptaría solo `{}`.
+- `select count(*) from siget.tramite where datos <> '{}'::jsonb;` debe dar `0`: los trámites existentes quedan sin contenido (no se inventa).
+- `\dp siget.tramite`: `app_role` con `UPDATE` por columna que ahora incluye `datos`; ningún permiso nuevo para `pgadmin_lectura`, `auditor_role`, `escalador_role` ni `checkpoint_app`.
+- `\d siget.tramite`: triggers `tramite_valida_datos`, `tramite_valida_solicitante`, `tramite_limpia_motivo` (además de los de antes) y la política `tramite_responder_subsanacion` en `\dp`/`pg_policies`.
+- Con `app_role` en una transacción que se revierte: un `UPDATE` de estado a `Rechazado` **sin** `siget.motivo` debe fallar con «exige un motivo», y con `select set_config('siget.motivo', 'motivo de prueba largo', true)` antes, pasar.
+- El login del checkpoint y el de `app_role` siguen funcionando.
+
+Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
+
+### 40.5 Imagen candidata y verificaciones (VM1)
+
+Con la base ya migrada, en VM1: `ejecutar-comando.sh` reconstruye la imagen con el código nuevo y corre cada comando contra la base real (todos se revierten y no dejan datos). **Antes**, guardar la imagen en uso: `podman tag localhost/siget-backend:dev localhost/siget-backend:respaldo-AAAA-MM-DD` (ver los gotchas de 39.10).
+
+1. `verificar_esquema`: los modelos `Tramite` (con `datos`) y `TipoTramite` (con `formulario`) coinciden con la base.
+2. `verificar_tramites`: es la verificación principal de esta migración (contenido, motivo por la API y por UPDATE directo, `datos` fuera de subsanación, respuesta de la persona, otra persona 404, cierre por el personal).
+3. `verificar_politicas` (el simulador ahora lista 26 acciones), `verificar_autenticacion`, `verificar_equipo`, `verificar_plataforma`, `verificar_auditoria` e `verificar_integracion` como regresión.
+
+Si algún paso falla, **no desplegar**: revisar primero si es de la verificación o de un permiso en la base.
+
+### 40.6 Despliegue y ensayo
+
+`desplegar.sh` (interfaz y reinicio ordenado del pod; ojo: devuelve la inactividad a 10 minutos, ver 34.2). La interfaz actual todavía **no** manda `datos` ni `motivo`: hasta que se despliegue el frontend nuevo, crear un trámite desde la pantalla fallará con 400 y rechazar, pedir subsanación o cerrarla también. Si el frontend nuevo no va en la misma ventana, **no desplegar el backend**. Después, el ensayo (`demo/ensayo.py`), que ya recorre crear con datos, pedir subsanación con motivo, responder y aprobar.
+
+### 40.7 Qué hacer si algo sale mal
+
+- **La migración falla:** al ser una transacción no queda nada a medias; se corrige el motivo y se repite el ensayo.
+- **Ya se aplicó pero hay que volver atrás:** el backend viejo funciona con la base nueva salvo rechazar y pedir subsanación (40.1), así que lo razonable es corregir hacia adelante. Revertir la base es la última opción y se hace restaurando el respaldo `pre-017`, **perdiendo todo lo posterior**: avisar antes. No se hace `DROP` a mano en producción.
+
+### 40.8 Gotchas
+
+- **`siget.motivo` es local a la transacción** (`set_config(..., true)`) y lo limpia un trigger **por sentencia** al terminar **cualquier** `UPDATE` de `tramite` (sin lista de columnas: una reasignación que no toca `estado` tampoco deja el motivo puesto para el cambio de estado siguiente de la transacción). Un `UPDATE` a mano en `psql` que pase a Rechazado o a En Subsanación necesita fijarlo antes **en la misma transacción** (de 10 a 2000 caracteres, con al menos un carácter alfanumérico y sin caracteres de control C0/C1: se admiten el salto de línea y la tabulación porque el texto es libre y de varias líneas; diez espacios duros U+00A0, U+3000 o U+200B no valen) (`BEGIN; select set_config('siget.motivo', '…', true); UPDATE …; COMMIT;`). Con `psql` en modo autocommit cada sentencia es su propia transacción y falla con «exige un motivo». Así debe ser: lo contrario sería saltarse la auditoría.
+- **La RLS no avisa cuando una fila no se ve.** Si la persona solicitante intenta cambiar el estado de un trámite que **no** está en subsanación, el `UPDATE` afecta 0 filas **sin error** (la política `USING` no se la muestra). El backend ya filtra por estado y trata 0 filas como conflicto (409); quien pruebe a mano no debe esperar un error.
+- **Quien pidió un trámite solo puede responder su subsanación, tenga o no membresía en la institución.** La 012 impide que el personal inicie trámites en su propia institución, pero no que alguien con un trámite abierto reciba membresía después; el trigger `validar_respuesta_solicitante` aplica las reglas del solicitante (solo `En Subsanacion` → `En Tramitacion`, sin cambiar `funcionario_asignado_id`) siempre que `OLD.solicitante_id = siget.ctx_usuario()`, y el PDP ya niega `conflicto_de_interes` en la API. Para el resto del personal nada cambia (reasignar y el escalamiento de la 013, que solo toca `escalado_en`, no pasan por ese trigger).
+- **`datos` lo escribe solo la persona solicitante** y solo al responder una subsanación; el trigger compara con `siget.ctx_usuario()`. Un `UPDATE ... SET datos` como `siget_owner`, `postgres` o desde `psql` sin contexto falla; para una corrección de datos de mantenimiento hay que deshabilitar el trigger `tramite_valida_datos` dentro de una transacción, con respaldo y registro, y volver a habilitarlo.
+- Pedir una subsanación y responderla no cambia el plazo (`fecha_limite`): la reanudación sigue corriendo el reloj del trámite. Es una decisión pendiente, no un olvido.
+- Hay **dos validaciones del contenido** a propósito: la fina está en el backend (`apps/tramites/formulario.py`: tipos, largos, rangos, fechas, opciones) y la base solo impone la forma (objeto) y el tope de 16 KB. Si se edita un formulario en la base, probarlo con `apps/tramites/formulario.py` (`definicion_valida`): una definición incoherente hace que crear trámites de ese tipo responda `503 formulario_no_disponible` (y deja un evento de seguridad con el mismo nombre, solo con el id del tipo): ya no es un 500, pero el tipo queda sin poder usarse hasta corregirlo. Python acepta hasta 15 000 bytes de contenido para dejar margen bajo el CHECK de 16 KB de la base (jsonb pesa distinto que el JSON de texto); si aun así el CHECK salta, la API responde `400 datos_invalidos`.
+- `evento_auditoria.atributos` ahora puede llevar texto libre (el motivo). `auditor_role` lo puede leer en la base, pero la API de auditoría no lo expone; `pgadmin_lectura` no ve ninguna fila de `tramite` ni de `evento_auditoria` (la seguridad por filas solo abre filas a `app_role` y al auditor).
+- Los formularios no se versionan: si se cambia un formulario, los trámites ya creados conservan los datos con el formato anterior y, al responder una subsanación con `datos`, se validan contra el formulario **vigente**.
+
+**Riesgos aceptados de la migración 017**
+
+- **`auditor_role` puede leer `evento_auditoria.atributos->>'motivo'`.** Es texto libre escrito por el personal y puede llevar datos personales (de la persona o de terceros). El rol del auditor lee la tabla completa por diseño (control de supervisión) y la API de auditoría no expone `atributos`, así que el riesgo queda en quien tenga acceso a la base con ese rol: tratarlo como dato personal en los respaldos y en cualquier extracción de auditoría. La interfaz avisa al personal que la persona lee los motivos de rechazo y de subsanación y que el resto de los comentarios son internos.
+- **La ciudadanía solo lee los motivos que le conciernen** (rechazo, petición de subsanación y su cierre, sea su respuesta o el cierre del personal). Los comentarios de otras transiciones quedan visibles solo para el personal de la institución.
+
+### 40.9 Registro de la aplicación
+
+_Pendiente._ Anotar fecha, respaldo `pre-017` (archivo y huella), resultado del ensayo con `ROLLBACK`, resultados de cada verificación (números), imagen de respaldo y resultado del ensayo.

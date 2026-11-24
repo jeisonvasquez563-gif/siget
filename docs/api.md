@@ -57,7 +57,7 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 
 ## Derechos sobre los datos personales (`/auth/mis-datos/…`) — scope `completo` (PT-15, Ley 81 de 2019)
 
-Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (25 acciones en total en la matriz). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
+Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (26 acciones en total en la matriz, con `responder_subsanacion`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
@@ -83,9 +83,10 @@ Solo el operador de identidades, con segundo factor reciente (acciones `consulta
 | Método y ruta | Cuerpo / parámetros | Respuesta |
 |---|---|---|
 | `GET /tramites/` | `?limite=1..100&desplazamiento=&escalados=1` | `{resultados: [Tramite], limite, desplazamiento}` — solo los que la persona puede ver; `escalados=1` deja solo los escalados (otro valor: `400 filtro_invalido`) |
-| `POST /tramites/` | `{tipo_tramite: <id>}` | `201 Tramite`. El solicitante siempre es quien llama |
-| `GET /tramites/<id>/` | — | `Tramite` |
-| `POST /tramites/<id>/estado/` | `{estado}` | `200 Tramite`; `403`/`409` |
+| `POST /tramites/` | `{tipo_tramite: <id>, datos: {…}}` | `201 Tramite` (con `datos` y `formulario`). El solicitante siempre es quien llama. `datos` se valida contra el `formulario` del tipo (ver abajo): `400 {codigo: "datos_invalidos", detalle, errores: {<id_del_campo>: <mensaje>}}`; los errores que no son de un campo concreto van bajo la clave `datos`. Si el tipo no tiene campos obligatorios, `datos` puede omitirse. La consulta al PDP va antes de validar. Si el contenido supera lo que admite la base (el CHECK de 16 KB, que Python anticipa con un tope de 15 000 bytes), responde `400 datos_invalidos` con `errores.datos`, no 500. Si el formulario del tipo está mal definido (problema del catálogo, no de quien envía): `503 {codigo: "formulario_no_disponible"}`, sin repetir la definición ni lo recibido, y queda un evento de seguridad `formulario_no_disponible` con solo el id del tipo |
+| `GET /tramites/<id>/` | — | `Tramite` con `datos` y `formulario` (se ve igual para quien lo pidió y para el personal de la institución). El listado `GET /tramites/` **no** lleva `datos` ni `formulario` |
+| `POST /tramites/<id>/estado/` | `{estado, motivo?}` | `200 Tramite`; `403` (el PDP decide **antes** de mirar el motivo: quien no puede cambiar el estado recibe 403 aunque falte o sobre el motivo, nunca 400); `400` (`motivo_obligatorio` o `datos_invalidos` con `errores.motivo`); `409`. **`motivo` es obligatorio** (texto de 10 a 2000 caracteres, con al menos una letra o un número; el mínimo no cuenta los invisibles) al pasar a `Rechazado`, al pasar a `En Subsanacion` y al cerrar una subsanación (`En Subsanacion` → `En Tramitacion`); en las demás transiciones es opcional (si viene, también se valida). La base lo exige de nuevo y lo guarda en el historial |
+| `POST /tramites/<id>/subsanacion/` | `{respuesta, datos?}` | La persona que pidió el trámite responde la subsanación: `200 Tramite` (vuelve a `En Tramitacion`; `respuesta` queda como `motivo` del evento). `respuesta`: texto de 10 a 2000 caracteres con al menos una letra o un número, obligatorio (`400 datos_invalidos`, `errores.respuesta`). `datos` es opcional: si viene, se valida completo contra el formulario y **reemplaza** al contenido anterior (`400` con `errores` por campo); si no viene, no se toca. `404` si el trámite no es de quien llama (como el resto de las rutas); `403` para el personal, la supervisión y las cuentas de plataforma sobre trámites que no pidieron (quien es personal y pidió su propio trámite sí responde, solo como solicitante); `503 formulario_no_disponible` si manda `datos` y el formulario está mal definido; `409 no_en_subsanacion` si el trámite no está en subsanación; `409 conflicto` si cambió mientras se procesaba (concurrencia optimista). Acción `responder_subsanacion` del PDP: solo el solicitante, **sin exigir segundo factor reciente** (igual que adjuntar documentos) |
 | `POST /tramites/<id>/reasignar/` | `{funcionario_id: <id>\|null}` | `200 Tramite` (solo supervisión) |
 | `GET /tramites/<id>/historial/` | — | `{tramite, eventos: [Evento]}` |
 | `GET /tramites/<id>/documentos/` | — | `{tramite, documentos: [{id, nombre, tipo, tamano, creado_en}]}`; el personal ve además `subido_por` y `sha256` |
@@ -93,6 +94,22 @@ Solo el operador de identidades, con segundo factor reciente (acciones `consulta
 | `GET /tramites/<id>/documentos/<doc>/` | — | El archivo, con `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff` y `Cache-Control: no-store`. Si el archivo no supera la verificación de integridad: `500 documento_no_disponible` y un evento de seguridad `documento_alterado` |
 
 Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) → Aprobado \| Rechazado`. Los estados finales no admiten cambios.
+
+**Contenido del trámite (migración 017).** Cada tipo de trámite trae su `formulario` (en `GET /catalogo/tipos-tramite/` y en el detalle del trámite): una lista de campos `{id, etiqueta, tipo, obligatorio, max?, opciones?, ayuda?, entero?}`.
+
+| `tipo` | Qué acepta | Notas |
+|---|---|---|
+| `texto` | Texto de una línea de hasta `max` caracteres | Se quitan los espacios de los bordes; no admite saltos de línea ni caracteres de control |
+| `texto_largo` | Texto de hasta `max` caracteres | Admite saltos de línea; sin caracteres de control |
+| `numero` | Número JSON (no booleano, no texto) de 0 a `max` | Con `entero: true` rechaza decimales |
+| `fecha` | Texto `AAAA-MM-DD` | Fecha real, desde 1900 y **no futura** (hora de Panamá) |
+| `seleccion` | Exactamente una de `opciones` | |
+
+Un campo de texto **obligatorio** (y el `motivo` y la `respuesta`) debe tener al menos una letra o un número (categorías Unicode L y N): un texto de solo espacios, signos o caracteres invisibles (U+200C, U+200D) no vale. En `motivo` y `respuesta` el mínimo de largo se cuenta sin los invisibles. La base lo exige de nuevo para el `motivo` (`[[:alnum:]]`, y sin caracteres de control salvo salto de línea y tabulación).
+
+Un campo `obligatorio` ausente, nulo o en blanco se rechaza; uno opcional vacío no se guarda. Un campo que el formulario no tiene se rechaza (`errores.datos`, sin repetir lo recibido). Los textos se normalizan (NFC). Tope de contenido: 15 000 bytes de JSON en Python, con margen bajo el CHECK de 16 KB de la base. `datos` solo se escribe al crear y al responder una subsanación; ningún formulario pide cédula, nombre ni correo (minimización de datos, Ley 81). Los trámites anteriores a la migración tienen `datos: {}`.
+
+Los `Tramite` de detalle incluyen además `"datos": {…}` y `"formulario": […]`. La exportación de «Mis datos» también los lleva.
 
 **Tramite** — lo que se ve depende de quién mira:
 
@@ -106,14 +123,14 @@ Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) �
 
 **Plazos (migración 013):** `fecha_limite` se calcula en **días hábiles de Panamá** (lunes a viernes, sin los feriados de la tabla `siget.feriado`), a la misma hora del inicio. Los trámites anteriores conservan su plazo en días calendario. `escalado` es `true` cuando el temporizador de escalamiento detectó el plazo vencido sin resolución; desde ahí lo atiende la supervisión. Ver [`feriados-panama.md`](./feriados-panama.md).
 
-**Evento** — `{id, accion, estado_anterior, estado_nuevo, institucion_id, creado_en}`; el personal ve además `actor_id` y `atributos`. Acciones: `creacion`, `cambio_estado`, `reasignacion` y `escalamiento` (lo escribe el sistema: `actor_id` nulo, `atributos: {regla: "plazo_vencido", fecha_limite}`).
+**Evento** — `{id, accion, estado_anterior, estado_nuevo, institucion_id, creado_en, motivo}`; el personal ve además `actor_id` y `atributos`. `motivo` (texto o `null`): el personal ve el de todos los eventos; la ciudadanía **solo** el de los eventos `cambio_estado` hacia `Rechazado`, hacia `En Subsanacion` y de `En Subsanacion` a `En Tramitacion` (el cierre por el personal o su propia respuesta). En los demás cambios de estado el motivo es un comentario interno y le llega `null`. Del resto de `atributos` no ve nada. En los eventos de personal `atributos` puede traer `{motivo}` y `{datos_actualizados: true}` (la respuesta cambió el contenido). Acciones: `creacion`, `cambio_estado`, `reasignacion` y `escalamiento` (lo escribe el sistema: `actor_id` nulo, `atributos: {regla: "plazo_vencido", fecha_limite}`).
 
 ## Catálogo y equipo
 
 | Ruta | Respuesta |
 |---|---|
 | `GET /catalogo/instituciones/` | `[{id, nombre, tipo}]` |
-| `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, audiencia, institucion: {id, nombre}}]` (`audiencia`: `ciudadania`, `institucion` o `ambas`; quién puede iniciarlo) |
+| `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, audiencia, formulario: [Campo], institucion: {id, nombre}}]` (`audiencia`: `ciudadania`, `institucion` o `ambas`; quién puede iniciarlo) |
 | `GET /equipo/` | `{equipos: [{institucion: {id, nombre}, personal: [{usuario_id, usuario, rol}]}]}` — coordinación y supervisión de esa institución |
 
 ## Auditoría (`/auditoria/`) — solo rol `auditor`, nivel 3 y segundo factor reciente

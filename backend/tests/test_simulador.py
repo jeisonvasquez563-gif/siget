@@ -235,3 +235,12 @@ def test_la_etiqueta_del_factor_vencido_dice_cuantos_minutos_son_con_cada_ventan
         meta = simulador.meta(ventana)
         etiquetas = {o["valor"]: o["etiqueta"] for o in meta["valores"]["segundo_factor"]}
         assert meta["ventana_minutos"] == ventana and str(minutos) in etiquetas["vencido"]
+
+
+def test_responder_una_subsanacion_solo_lo_permite_la_ciudadania_sobre_lo_propio():
+    assert decision(rol="ciudadano", accion="responder_subsanacion", solicitante="yo", segundo_factor="vencido") == (True, "solicitante_responde_subsanacion")
+    assert decision(rol="ciudadano", accion="responder_subsanacion", solicitante="otra_persona")[0] is False
+    # el personal no responde por la persona; solo lo haría como solicitante de una solicitud interinstitucional a otra institución
+    assert decision(rol="funcionario", accion="responder_subsanacion", solicitante="otra_persona")[0] is False
+    assert decision(rol="funcionario", accion="responder_subsanacion", solicitante="yo", institucion="ajena")[0] is True
+    assert decision(rol="operador_seguridad", accion="responder_subsanacion", solicitante="yo") == (False, "plataforma_sin_acceso_a_tramites")

@@ -35,6 +35,7 @@ ACCIONES = [
     (Accion.REASIGNAR_TRAMITE, "Reasignar un trámite", "Trámites", ("De su institución", "De otra institución")),
     (Accion.ESCALAR_TRAMITE, "Atender un trámite escalado", "Trámites", ("De su institución", "De otra institución")),
     (Accion.ADJUNTAR_DOCUMENTO, "Adjuntar un documento", "Trámites", ("A un trámite propio o de su institución", "A un trámite ajeno")),
+    (Accion.RESPONDER_SUBSANACION, "Responder una subsanación", "Trámites", ("En un trámite propio (el personal, en otra institución)", "En un trámite ajeno")),
     (Accion.VER_DOCUMENTO, "Ver un documento", "Trámites", ("De un trámite propio o de su institución", "De un trámite ajeno")),
     (Accion.GESTIONAR_USUARIOS_INSTITUCION, "Gestionar al equipo de la institución", "Instituciones", ("De su institución", "De otra institución")),
     (Accion.GESTIONAR_CATALOGO_INSTITUCION, "Gestionar los trámites de la institución", "Instituciones", ("De su institución", "De otra institución")),
@@ -66,7 +67,7 @@ REGLAS_DE_DENEGACION = [
     ("sin_regla_que_permita", "Si ninguna política lo permite explícitamente, se niega (denegar por defecto)."),
 ]
 
-_TRAMITE = {Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Accion.REASIGNAR_TRAMITE, Accion.ESCALAR_TRAMITE}
+_TRAMITE = {Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Accion.REASIGNAR_TRAMITE, Accion.ESCALAR_TRAMITE, Accion.RESPONDER_SUBSANACION}
 _DOCUMENTO = {Accion.ADJUNTAR_DOCUMENTO, Accion.VER_DOCUMENTO}
 _PERFIL = {Accion.VER_MIS_DATOS, Accion.EXPORTAR_MIS_DATOS, Accion.CREAR_SOLICITUD_DATOS, Accion.CORREGIR_MIS_DATOS}
 _TIPO_DE_ALTA = {"operador_identidades": "alta_coordinador", "operador_catalogo": "alta_institucion"}
@@ -94,6 +95,10 @@ def _recursos(accion, rol, sujeto):
                         Recurso(**comunes, institucion_id=PROPIA, solicitante_id=sujeto.id, audiencia="institucion"))
             return (Recurso(**comunes, institucion_id=PROPIA, solicitante_id=sujeto.id),
                     Recurso(**comunes, institucion_id=PROPIA, solicitante_id=OTRA_PERSONA))
+        if accion == Accion.RESPONDER_SUBSANACION and es_personal:
+            # El personal responde por la vía de la ciudadanía: un trámite PROPIO en OTRA institución (en la suya no atiende lo que pidió)
+            return (Recurso(**comunes, institucion_id=AJENA, solicitante_id=sujeto.id),
+                    Recurso(**comunes, institucion_id=AJENA, solicitante_id=OTRA_PERSONA))
         return (Recurso(**comunes, institucion_id=PROPIA, solicitante_id=solicitante),
                 Recurso(**comunes, institucion_id=AJENA, solicitante_id=OTRA_PERSONA))
     if accion == Accion.GESTIONAR_USUARIOS_INSTITUCION:
