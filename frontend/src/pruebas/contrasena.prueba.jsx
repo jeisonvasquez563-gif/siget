@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { axe } from 'jest-axe'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
+import { api } from '../api.js'
 import { CLAVE_DE_EJEMPLO, instalarMock } from '../mock.js'
 import { ProveedorUI } from '../ui.jsx'
 
@@ -115,6 +116,21 @@ describe('cambiar la contraseña en «Mi seguridad»', () => {
       expect(within(formulario).getByLabelText(nombre)).toHaveValue('')
     }
     expect(screen.getByRole('navigation', { name: 'Módulos' })).toBeInTheDocument() // la sesión sigue abierta
+  })
+
+  it('tras cambiarla la interfaz usa el acceso nuevo en la siguiente llamada, sin volver a entrar', async () => {
+    const { user, formulario } = await abrir()
+    await llenar(user, formulario)
+    await enviar(user, formulario)
+    await reautenticar(user)
+    await screen.findByText(/Tu contraseña se cambió/)
+    const espia = vi.fn((...a) => original(...a))
+    const original = window.fetch
+    window.fetch = espia
+    await api('/auth/yo/')
+    const [, opciones] = espia.mock.calls.find(([ruta]) => ruta === '/auth/yo/')
+    expect(opciones.headers.Authorization).toBe('Bearer mock-sesion-2') // el que devolvió el cambio, no el del inicio de sesión
+    expect(espia.mock.calls.some(([ruta]) => ruta === '/auth/refresh/')).toBe(false)
   })
 
   it('con una contraseña actual incorrecta muestra el mensaje genérico', async () => {

@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { api, ApiError } from './api.js'
+import { ApiError, cambiarContrasena } from './api.js'
 import { mensajeDe, useReautenticacion } from './comun.jsx'
 import { Alerta, Insignia } from './ui.jsx'
 
 // «Cambiar la contraseña» dentro de «Mi seguridad». La contraseña nunca se guarda en el navegador: vive en el estado del formulario
 // y se borra al terminar. El servidor es quien decide: exige un segundo factor reciente (el modal de siempre lo pide) y la contraseña
-// actual; al cambiarla cierra las demás sesiones de la cuenta y esta sigue abierta.
+// actual; al cambiarla cierra las demás sesiones de la cuenta y renueva esta (acceso y refresco nuevos, sin volver a entrar).
 
 const MINIMO = 12
 const MAXIMO = 128
@@ -53,7 +53,7 @@ export function CambiarContrasena({ yo }) {
     try {
       await ejecutar(async () => {
         try {
-          const r = await api('/auth/contrasena/', { metodo: 'POST', cuerpo })
+          const r = await cambiarContrasena(cuerpo.actual, cuerpo.nueva) // guarda el acceso nuevo: la sesión se renovó
           setHecho({ cerradas: r.sesiones_cerradas ?? 0 })
           setForm({ actual: '', nueva: '', repetida: '' }) // ninguna contraseña queda en pantalla
         } catch (e) {

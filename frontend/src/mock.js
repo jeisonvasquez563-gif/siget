@@ -202,6 +202,7 @@ export function instalarMock(inicial, opciones = {}) {
   let ultimoCodigo = null // un código ya usado no se acepta otra vez, como en el servidor
   let claveVigente = CLAVE_DE_EJEMPLO // la contraseña actual que acepta «Cambiar la contraseña»
   let fallosDeClave = 0 // 3 fallos bloquean (como el bloqueo progresivo del login)
+  let sesionesAbiertas = 1 // cuántas sesiones ha abierto el cambio de contraseña (da un acceso nuevo distinto cada vez)
   let otrasSesiones = 2 // las demás sesiones abiertas de la cuenta: el cambio las cierra
   const plataforma = plataformaMock({
     usuarios: USUARIOS, actual: () => actual, hace,
@@ -308,7 +309,10 @@ export function instalarMock(inicial, opciones = {}) {
       fallosDeClave = 0
       const cerradas = otrasSesiones
       otrasSesiones = 0
-      return resp(200, { detalle: 'Contraseña cambiada. Cerramos las demás sesiones de tu cuenta; esta sigue abierta.', sesiones_cerradas: cerradas })
+      // Como el servidor: la sesión actual también se revoca y se abre una nueva, así que responde con tokens nuevos
+      sesionesAbiertas += 1
+      return resp(200, { access_token: `mock-sesion-${sesionesAbiertas}`, tipo: 'Bearer', expira_en: 600, scope: 'completo',
+        detalle: 'Contraseña cambiada. Cerramos las demás sesiones de tu cuenta y renovamos esta.', sesiones_cerradas: cerradas })
     }
     if (camino === '/auth/actividad/') {
       const eventos = [['mfa_verificado', 9], ['login_ok', 9], ['refresh_ok', 40], ['login_fallido', 300], ['login_ok', 1500], ['logout', 1620]]
