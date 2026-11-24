@@ -17,11 +17,13 @@ Lo que sigue en «Orden de trabajo original» conserva el texto del 11 de octubr
 | 5 | Conectividad app↔BD por TLS | ✅ TLS 1.3 con `verify-full` (runbook 18) |
 | 6 | Catálogo e instituciones | ✅ 6 instituciones y 6 trámites con SLA (migración 005) |
 | 7 | Validación del flujo completo | 🔄 El flujo (crear → cambiar estado → auditoría) está verificado contra la base real y ensayado (55 comprobaciones); falta el vencimiento de SLA con **escalamiento automático** (depende del módulo de plazos) |
-| 11 | Retirar el checkpoint PHP | ⏳ Semana 6; la plataforma nueva ya cubre registro, login, segundo factor y bloqueo |
+| 11 | Retirar el checkpoint PHP | ✅ Retirado el 17-nov-2026 junto con pgAdmin web; puerto 80 cerrado (PT-13, runbook 38). *(Al 21-oct figuraba como «Semana 6».)* |
 | — | Frontend React | ✅ 10 módulos completos (runbook 27–31) |
 | — | Pruebas y CI | ✅ 354 + 130 pruebas, 6 verificaciones contra la base real, CI en GitHub (runbook 30, 32) |
 
-**Lo que falta:** consolas de los operadores de plataforma con control dual real, plazos en días hábiles con escalamiento, documentos, notificaciones, recuperación de contraseña, rotación de claves, respaldos automáticos con restauración probada y el retiro del PHP. Ver [`../organizacion-backend-frontend.md`](../organizacion-backend-frontend.md).
+> **Actualización del 24 de noviembre de 2026:** de la lista de abajo ya están hechos y en producción las cinco consolas de plataforma con control dual y la recuperación de contraseña asistida (PT-4 y PT-5, 22-oct, runbook 34), los respaldos automáticos con restauración probada (PT-1, runbook 33), los plazos en días hábiles con escalamiento (PT-3, runbook 35), el registro por invitación (PT-2, runbook 36), los documentos adjuntos cifrados (PT-8, runbook 37), el retiro del checkpoint PHP (PT-13, runbook 38) y los derechos sobre los datos personales (PT-15, runbook 39), además del contenido del trámite (runbook 40). Las VMs pasaron a Rocky Linux 9.9 (16-nov) y el ensayo contra producción está en **112 de 112** (24-nov); las pruebas son 1044 del backend y 292 del frontend. **Siguen pendientes:** notificaciones, rotación de claves JWT y Fernet, reemisión de la CA con `keyUsage`, alertas y exportación firmada, inventario de recursos y AIDE (ZT-1, ZT-7, ZT-8), pruebas de recorrido (Playwright) y copia de los respaldos fuera de VM2.
+
+**Lo que faltaba al 21-oct:** consolas de los operadores de plataforma con control dual real, plazos en días hábiles con escalamiento, documentos, notificaciones, recuperación de contraseña, rotación de claves, respaldos automáticos con restauración probada y el retiro del PHP. Ver [`../organizacion-backend-frontend.md`](../organizacion-backend-frontend.md).
 
 ## Orden de trabajo original (texto del 11 de octubre; el estado actual está arriba)
 
@@ -86,15 +88,15 @@ Estos no estaban en el plan original — se insertaron para cumplir avances de e
 
 Los pasos 1 a 10 de la lista original (Podman, migración de PostgreSQL, secretos, ABAC, backend, TLS, frontend, catálogo y validación) **están hechos**; ver el estado actual arriba. Lo que sigue:
 
-1. **Respaldos automáticos** de la base con retención, copia fuera de la VM y prueba de restauración.
+1. ✅ *(hecho: PT-1, runbook 33; falta la copia fuera de VM2)* **Respaldos automáticos** de la base con retención, copia fuera de la VM y prueba de restauración.
    - *Aplazado, por decidir:* **abrir la plataforma a internet** (Tailscale Funnel). Ver [`../abrir-a-internet.md`](../abrir-a-internet.md).
-2. **Consolas de los operadores de plataforma** con control dual real.
-3. **Plazos en días hábiles y escalamiento automático** (systemd timer).
-4. **Documentos adjuntos y notificaciones.**
-5. Recuperación de contraseña, rotación de claves JWT y Fernet, reemisión de la CA con `keyUsage`.
+2. ✅ *(hecho el 22-oct, runbook 34)* **Consolas de los operadores de plataforma** con control dual real.
+3. ✅ *(hecho el 12-nov, PT-3, runbook 35)* **Plazos en días hábiles y escalamiento automático** (systemd timer).
+4. **Documentos adjuntos** ✅ *(hecho el 12-nov, PT-8, runbook 37)* y **notificaciones** ⏳.
+5. Recuperación de contraseña ✅ *(hecha el 22-oct, PT-5)*; rotación de claves JWT y Fernet ⏳, reemisión de la CA con `keyUsage`.
 6. Pruebas de recorrido completo (Playwright) y revisión de contraste.
-7. **Retirar el checkpoint PHP** (semana 6), apagar el PostgreSQL nativo y cerrar el puerto 5432.
-8. Aplicar las actualizaciones pendientes de las VMs y reiniciarlas (después de la presentación).
+7. ✅ *(hecho el 17-nov, PT-13, runbook 38)* **Retirar el checkpoint PHP**, apagar el PostgreSQL nativo y cerrar el puerto 5432.
+8. ✅ *(hecho el 16-nov: Rocky Linux 9.9)* Aplicar las actualizaciones pendientes de las VMs y reiniciarlas (después de la presentación).
 9. Fusionar el PR 6 (`develop → main`) y regenerar los entregables `.docx`.
 
 ### Lista original (histórica)
