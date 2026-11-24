@@ -384,7 +384,7 @@ class Command(BaseCommand):
                    falsa.estado == "recibida" and falsa.respondida_en is None and falsa.respondida_por_id is None and falsa.respuesta is None
                    and abs((falsa.creada_en - timezone.now()).total_seconds()) < 600)
         self._paso("tampoco nace con un plazo a 10 años, ya vencido o de 5 días (debe vencer entre 10 y 30 días)",
-                   all(rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con un plazo fuera de rango.', " + plazo + ")", [fer.pk])
+                   all(rechazada_por_la_base("insert into siget.solicitud_derecho (usuario_id, tipo, detalle, vence_en) values (%s, 'oposicion', 'Con un plazo fuera de rango.', " + plazo + ")", [fer.pk])  # nosec B608 - plazos fijos de la verificacion
                        for plazo in ("now() + interval '3650 days'", "now() - interval '1 day'", "now() + interval '5 days'")))
         r = self._llamar(ida, "get", "/plataforma/solicitudes-datos/?estado=rechazada")
         self._paso("en el filtro de cerradas aparece quién respondió", r.status_code == 200 and any(x["id"] == sol_ana and x["respondida_por"]["usuario"] == "vp_ident_a" for x in r.json()["solicitudes"]))

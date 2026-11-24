@@ -349,7 +349,7 @@ class Command(BaseCommand):
         for columna in ("nombre", "apellidos", "cedula_cifrada", "cedula_huella", "fecha_nacimiento", "creado_en", "aviso_version", "aviso_leido_en", "actualizado_en", "usuario_id"):
             try:
                 with transaction.atomic(), connection.cursor() as c:
-                    c.execute(f"update siget.perfil set {columna} = {columna}")
+                    c.execute(f"update siget.perfil set {columna} = {columna}")  # nosec B608 - nombres de columna fijos de la propia verificacion
                 self._paso(f"la base no deja modificar «{columna}» de un perfil (ni a la propia aplicación)", False)
             except DatabaseError:
                 self._paso(f"la base no deja modificar «{columna}» de un perfil (ni a la propia aplicación)", True)
@@ -362,7 +362,7 @@ class Command(BaseCommand):
         for columna in ("correo", "provincia", "ciudad"):
             try:
                 with transaction.atomic(), connection.cursor() as c:
-                    c.execute(f"update siget.perfil set {columna} = {columna} where usuario_id = %s", [ana.pk])
+                    c.execute(f"update siget.perfil set {columna} = {columna} where usuario_id = %s", [ana.pk])  # nosec B608 - columnas fijas de la verificacion
                     self._paso(f"en cambio sí deja modificar «{columna}» (la única corrección permitida)", c.rowcount == 1)
             except DatabaseError as error:
                 self._paso(f"en cambio sí deja modificar «{columna}» (la única corrección permitida)", False, error)
@@ -527,7 +527,7 @@ class Command(BaseCommand):
 
         self._paso("la aplicación no puede borrar solicitudes", rechazada_por_la_base("delete from siget.solicitud_derecho"))
         for columna in ("detalle", "tipo", "usuario_id", "vence_en", "creada_en"):
-            self._paso(f"ni modificar «{columna}» de una solicitud", rechazada_por_la_base(f"update siget.solicitud_derecho set {columna} = {columna}"))
+            self._paso(f"ni modificar «{columna}» de una solicitud", rechazada_por_la_base(f"update siget.solicitud_derecho set {columna} = {columna}"))  # nosec B608 - columnas fijas de la verificacion
         self._paso("una respuesta necesita quien responde y el texto (la base lo exige)",
                    rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida' where id = %s", [abierta.pk])
                    and rechazada_por_la_base("update siget.solicitud_derecho set estado = 'atendida', respondida_por = %s where id = %s", [operador.pk, abierta.pk]))
