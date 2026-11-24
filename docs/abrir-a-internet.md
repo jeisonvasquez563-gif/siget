@@ -42,7 +42,7 @@ Abrir SIGET a internet cambia el modelo de amenazas. Estos puntos son específic
 | 9 | Probar desde un celular con datos móviles: abre, TLS válido, login con segundo factor, límites de tasa por IP real, bloqueo de una cuenta que no afecte a otras | Equipo |
 | 10 | Documentar en el runbook y apagar al terminar (`tailscale funnel` en modo apagado) | Operador de las VMs |
 
-**Criterios de «listo»:** desde internet se abre sin advertencias; un intento de fuerza bruta desde una IP no bloquea a las demás; con el registro cerrado no se crean cuentas; el ensayo (`demo/ensayo.py`) sigue en 55 de 55; y se puede apagar en un solo comando.
+**Criterios de «listo»:** desde internet se abre sin advertencias; un intento de fuerza bruta desde una IP no bloquea a las demás; con el registro cerrado no se crean cuentas; el ensayo (`demo/ensayo.py`) sigue en el número vigente (112 de 112 al 24-nov-2026); y se puede apagar en un solo comando.
 
 ## 4. Decisiones pendientes
 

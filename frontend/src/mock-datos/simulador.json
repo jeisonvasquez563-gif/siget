@@ -137,6 +137,11 @@
     "perfil_de",
     "segundo_factor",
     "cuenta"
+   ],
+   "cambiar_contrasena": [
+    "cuenta_de",
+    "segundo_factor",
+    "cuenta"
    ]
   },
   "etiquetas": {
@@ -151,7 +156,8 @@
    "tipo_alta": "Tipo de alta",
    "alta_propuesta_por": "Quién propuso el alta",
    "nivel": "Nivel de aseguramiento",
-   "perfil_de": "De quién es el perfil"
+   "perfil_de": "De quién es el perfil",
+   "cuenta_de": "De quién es la cuenta"
   },
   "valores": {
    "segundo_factor": [
@@ -313,6 +319,16 @@
      "valor": "otra_persona",
      "etiqueta": "De otra persona"
     }
+   ],
+   "cuenta_de": [
+    {
+     "valor": "yo",
+     "etiqueta": "De la misma persona que actúa"
+    },
+    {
+     "valor": "otra_persona",
+     "etiqueta": "De otra persona"
+    }
    ]
   },
   "defectos": {
@@ -327,7 +343,8 @@
    "tipo_alta": "alta_institucion",
    "alta_propuesta_por": "otra_persona",
    "nivel": 2,
-   "perfil_de": "yo"
+   "perfil_de": "yo",
+   "cuenta_de": "yo"
   }
  },
  "casos": [
@@ -630,6 +647,13 @@
      },
      {
       "fase": "permiso",
+      "regla": "Reglas de quien cambia la contraseña de su propia cuenta",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
       "regla": "Reglas de los operadores de plataforma",
       "resultado": "no_aplica",
       "politica": null,
@@ -832,6 +856,13 @@
      },
      {
       "fase": "permiso",
+      "regla": "Reglas de quien cambia la contraseña de su propia cuenta",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
       "regla": "Reglas de los operadores de plataforma",
       "resultado": "no_aplica",
       "politica": null,
@@ -962,6 +993,13 @@
      {
       "fase": "permiso",
       "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de quien cambia la contraseña de su propia cuenta",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1112,6 +1150,13 @@
      },
      {
       "fase": "permiso",
+      "regla": "Reglas de quien cambia la contraseña de su propia cuenta",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
       "regla": "Reglas de los operadores de plataforma",
       "resultado": "no_aplica",
       "politica": null,
@@ -1214,9 +1259,9 @@
      "accion": "crear_tramite",
      "institucion": "propia",
      "solicitante": "yo",
+     "audiencia": "ciudadania",
      "segundo_factor": "reciente",
-     "cuenta": "bloqueada",
-     "audiencia": "ciudadania"
+     "cuenta": "bloqueada"
     },
     "decision": {
      "permitido": false,
@@ -1409,6 +1454,13 @@
      },
      {
       "fase": "permiso",
+      "regla": "Reglas de quien cambia la contraseña de su propia cuenta",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
       "regla": "Reglas de los operadores de plataforma",
       "resultado": "no_aplica",
       "politica": null,
@@ -1531,6 +1583,13 @@
      {
       "fase": "permiso",
       "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de quien cambia la contraseña de su propia cuenta",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null
@@ -1661,6 +1720,13 @@
      {
       "fase": "permiso",
       "regla": "Reglas de quien ejerce sus derechos sobre sus propios datos",
+      "resultado": "no_aplica",
+      "politica": null,
+      "motivo": null
+     },
+     {
+      "fase": "permiso",
+      "regla": "Reglas de quien cambia la contraseña de su propia cuenta",
       "resultado": "no_aplica",
       "politica": null,
       "motivo": null

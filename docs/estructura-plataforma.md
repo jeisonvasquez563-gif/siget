@@ -37,7 +37,7 @@ Hay **dos barreras independientes**: el decisor de la aplicación y la base de d
 | Base de datos (VM2) | ✅ Existe | Esquema `siget`, roles sin superusuario, RLS, auditoría de solo inserción, TLS con la aplicación. **Corre en un contenedor Podman rootless** (desde el 20-oct); la instalación nativa antigua está apagada y deshabilitada desde el 20-oct (sus datos se conservan) |
 | Aislamiento y acceso (las dos VMs) | ✅ Existe | Red interna, firewall, SELinux, SSH solo por clave, Tailscale, registro persistente |
 | Podman rootless | ✅ En uso en las dos VMs | Usuario de servicio `siget`: en VM2 ejecuta PostgreSQL; en VM1, el pod con `nginx` y Django |
-| `nginx` y el pod de VM1 | ✅ Existe | TLS 1.3, cabeceras de seguridad, límite de tasa; sirve la interfaz y reenvía solo las rutas de la API. Apache + PHP (el checkpoint, que se retira en la semana 6) sigue en el puerto 80 |
+| `nginx` y el pod de VM1 | ✅ Existe | TLS 1.3, cabeceras de seguridad, límite de tasa; sirve la interfaz y reenvía solo las rutas de la API. Apache + PHP (el checkpoint) se retiró el 17-nov-2026 y el puerto 80 está cerrado |
 | Backend (Django + DRF) | ✅ Existe | Autenticación con segundo factor, decisor de acceso (ABAC), trámites, catálogo, equipo, auditoría, transparencia de roles y simulador |
 | Frontend (React) | ✅ Existe | 10 módulos completos por rol, sistema de diseño propio, claro/oscuro, accesible |
 | Plazos con escalamiento automático, documentos y notificaciones | ⏳ No existen | Pendientes (ver [`modulos.md`](./modulos.md)) |
@@ -53,7 +53,7 @@ Las dos mitades del diagrama existen; lo pendiente es lo que aparece como ⏳.
 | `infra/` | Unidades de Podman/Quadlet, `nginx.conf` y la CA pública de las VMs |
 | `database/` | Esquema, roles, migraciones 002–007, pruebas y demo |
 | `demo/` | Ensayo automático de la demostración y herramientas de apoyo |
-| `checkpoints/` | El PHP intermedio, que se retira en la semana 6 |
+| `checkpoints/` | El PHP intermedio, **retirado el 17-nov-2026** (el código queda como referencia histórica) |
 | `docs/` | Toda la documentación |
 
 ## 6. Lo que sostiene todo
@@ -62,5 +62,5 @@ Franja inferior del diagrama: SELinux y firewall en las dos máquinas, secretos 
 
 ## 7. Qué decir al profesor
 
-- **Se puede afirmar con evidencia:** la plataforma funciona de punta a punta (interfaz, API, decisor de acceso, base de datos, auditoría) con 354 pruebas del backend, 130 del frontend, 6 verificaciones contra la base real y un ensayo de la demostración de 55 comprobaciones. Cómo abrirla: [`como-abrir-la-plataforma.md`](./como-abrir-la-plataforma.md).
+- **Se puede afirmar con evidencia:** la plataforma funciona de punta a punta (interfaz, API, decisor de acceso, base de datos, auditoría) con 1044 pruebas del backend, 292 del frontend, las verificaciones contra la base real y un ensayo de la demostración de 112 comprobaciones contra producción (cifras del 24-nov-2026). Cómo abrirla: [`como-abrir-la-plataforma.md`](./como-abrir-la-plataforma.md).
 - **No se debe afirmar:** que existan los plazos con escalamiento automático, los documentos adjuntos, las notificaciones ni las consolas de los operadores de plataforma (ver [`modulos.md`](./modulos.md)).

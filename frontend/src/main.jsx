@@ -16,6 +16,7 @@ import './estilos/mapa.css'
 import './estilos/derechos.css'
 import './estilos/contenido.css'
 import App from './App.jsx'
+import { LimiteDeError } from './ErrorBoundary.jsx'
 import { ProveedorUI } from './ui.jsx'
 
 async function arrancar() {
@@ -28,7 +29,7 @@ async function arrancar() {
     }
   }
   // Sin StrictMode a propósito: duplica los efectos y el refresco de sesión es de un solo uso.
-  createRoot(document.getElementById('raiz')).render(<ProveedorUI><App /></ProveedorUI>)
+  createRoot(document.getElementById('raiz')).render(<ProveedorUI><LimiteDeError nivel="aplicacion"><App /></LimiteDeError></ProveedorUI>)
 }
 
 arrancar()

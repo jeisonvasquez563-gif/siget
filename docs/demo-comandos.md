@@ -4,6 +4,8 @@ Ciberseguridad 5, UTP — Jeison Vásquez, Grupo Ciber5
 
 Este documento trae, en orden, todo lo necesario para mostrar en vivo la infraestructura, la seguridad configurada y la aplicación SIGET funcionando de punta a punta.
 
+> **Actualización (24-nov-2026):** este guion es del checkpoint inicial. El checkpoint PHP, pgAdmin web (`/pgadmin4/`) y el puerto 80 se retiraron el 17-nov-2026 (runbook 38), así que el paso 4 («ver la base desde pgAdmin») y las pruebas del puerto 80 ya no funcionan. Para la demostración actual, usar [`demo-guion.md`](./demo-guion.md).
+
 ## Paso 0 — Abrir el túnel SSH
 
 En una ventana de terminal aparte, dejarla abierta durante **toda** la demo:

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { alPerderLaSesion, api, ApiError, hayToken, iniciarSesion, olvidarToken } from '../api.js'
+import { alPerderLaSesion, api, ApiError, cambiarContrasena, hayToken, iniciarSesion, olvidarToken } from '../api.js'
 
 const respuesta = (estado, cuerpo) => new Response(cuerpo === null ? null : JSON.stringify(cuerpo), { status: estado, headers: { 'Content-Type': 'application/json' } })
 
@@ -23,6 +23,30 @@ describe('manejo de la sesión', () => {
     expect(JSON.stringify({ ...localStorage })).not.toContain('TOKEN-SECRETO')
     expect(JSON.stringify({ ...sessionStorage })).not.toContain('TOKEN-SECRETO')
     expect(document.cookie).not.toContain('TOKEN-SECRETO')
+  })
+
+  it('tras cambiar la contraseña usa el acceso nuevo que trae la respuesta (el viejo ya no sirve)', async () => {
+    simular((ruta, o) => {
+      if (ruta === '/auth/login/') return respuesta(200, { access_token: 'viejo', scope: 'completo' })
+      if (ruta === '/auth/contrasena/') return respuesta(200, { access_token: 'nuevo', tipo: 'Bearer', scope: 'completo', sesiones_cerradas: 1 })
+      return o.headers.Authorization === 'Bearer nuevo' ? respuesta(200, { ok: true }) : respuesta(401, {})
+    })
+    await iniciarSesion('ana', 'clave', '123456')
+    expect((await cambiarContrasena('actual', 'nueva')).sesiones_cerradas).toBe(1)
+    await api('/auth/yo/')
+    expect(llamadas.map((l) => l.opciones.headers.Authorization)).toEqual([undefined, 'Bearer viejo', 'Bearer nuevo'])
+    expect(llamadas.some((l) => l.ruta === '/auth/refresh/')).toBe(false) // no hizo falta renovar ni volver a entrar
+  })
+
+  it('si el cambio de contraseña falla, conserva el acceso que tenía', async () => {
+    simular((ruta, o) => {
+      if (ruta === '/auth/login/') return respuesta(200, { access_token: 'viejo', scope: 'completo' })
+      if (ruta === '/auth/contrasena/') return respuesta(400, { codigo: 'credenciales_invalidas' })
+      return respuesta(200, { ok: true, token: o.headers.Authorization })
+    })
+    await iniciarSesion('ana', 'clave', '123456')
+    await expect(cambiarContrasena('mala', 'nueva')).rejects.toBeInstanceOf(ApiError)
+    expect((await api('/auth/yo/')).token).toBe('Bearer viejo')
   })
 
   it('envía el token como Bearer y no lo manda al login', async () => {

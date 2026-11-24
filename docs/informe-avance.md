@@ -127,7 +127,7 @@ Todo lo descrito arriba corresponde al primer avance (24 de septiembre). Desde e
 | Transparencia: matriz de permisos calculada por el PDP, permisos reales de la base y simulador de «qué pasaría si…» | Completo: 39 pasos contra la base real |
 | Interfaz React: 10 módulos por rol, sistema de diseño propio, accesible, claro/oscuro | Completo |
 | Pruebas automáticas y CI | 354 (backend) + 130 (frontend); CI en GitHub en verde |
-| Ensayo de la demostración con las 13 cuentas | 55 de 55 comprobaciones correctas |
+| Ensayo de la demostración con las 13 cuentas | 55 de 55 comprobaciones correctas *(cifra de octubre; ver la actualización del 24-nov al final)* |
 | Documentación | Runbook de 32 secciones, contrato de la API, guía para abrir la plataforma y guion de la demo |
 | Plazos con escalamiento automático, documentos, notificaciones, consolas de los operadores | Pendiente |
 | Respaldos automáticos de la base | Pendiente (hay respaldos manuales verificados) |
@@ -147,3 +147,4 @@ Todo lo descrito arriba corresponde al primer avance (24 de septiembre). Desde e
 - **Checkpoint PHP:** sigue sirviendo por HTTP en el puerto 80 hasta su retiro (semana 6); el sistema nuevo no tiene ese desvío.
 - **Actualizaciones pendientes** de las VMs: se aplican y se reinicia después de la presentación.
 
+> **Actualización (24-nov-2026):** este informe es el registro del avance de octubre y su contenido no se reescribió. Hoy la plataforma está en producción con las cinco consolas de plataforma, respaldos automáticos diarios con restauración probada, plazos en días hábiles con escalamiento, documentos adjuntos cifrados, derechos sobre los datos personales (Ley 81), y el checkpoint PHP, pgAdmin web y el puerto 80 retirados el 17-nov. Quedan pendientes las notificaciones. Las pruebas son 1044 del backend y 292 del frontend, y el ensayo contra producción está en **112 de 112**. Las filas «Pendiente» de la tabla de arriba están resueltas salvo las notificaciones; el detalle está en el [CHANGELOG](../CHANGELOG.md) y en las secciones 33 a 40 del [runbook](./runbook.md).

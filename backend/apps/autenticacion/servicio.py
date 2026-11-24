@@ -81,11 +81,13 @@ def _bloqueos_recientes(usuario_id, ahora) -> int:
     return EventoSeguridad.objects.filter(actor_id=usuario_id, evento="cuenta_bloqueada", creado_en__gt=desde).count()
 
 
-def _registrar_fallo(usuario, ip, ahora, motivo) -> Resultado:
+def _registrar_fallo(usuario, ip, ahora, motivo, evento="login_fallido") -> Resultado:
+    """Cuenta el fallo para el bloqueo progresivo. `evento` solo cambia cómo se llama en la bitácora (el cambio de contraseña
+    desde la sesión usa `cambio_contrasena_fallido`); el conteo y el bloqueo son los mismos."""
     previos = _bloqueos_recientes(usuario.pk, ahora) if usuario.intentos_fallidos + 1 >= bloqueo.MAX_INTENTOS else 0
     intentos, hasta = bloqueo.tras_fallo(usuario.intentos_fallidos, ahora, previos)
     Usuario.objects.filter(pk=usuario.pk).update(intentos_fallidos=intentos, bloqueado_hasta=hasta)
-    registrar_evento(usuario.pk, "login_fallido", ip, {"motivo": motivo, "bloqueada": hasta is not None})
+    registrar_evento(usuario.pk, evento, ip, {"motivo": motivo, "bloqueada": hasta is not None})
     if hasta is not None:
         registrar_evento(usuario.pk, "cuenta_bloqueada", ip, {"hasta": hasta.isoformat(), "minutos": int((hasta - ahora).total_seconds() // 60), "bloqueos_previos": previos})
     return Resultado(False, "credenciales_invalidas")
@@ -369,3 +371,47 @@ def restablecer_contrasena(username, codigo, nueva, ip, ahora=None) -> Resultado
         _revocar_todas(usuario.pk)
         registrar_evento(usuario.pk, "contrasena_restablecida", ip, {"emitido_por": fila.emitido_por_id})
     return Resultado(True, "contrasena_restablecida")
+
+
+# --------------------------------------------------------------------------- cambio de contraseña desde la sesión
+
+def cambiar_contrasena(usuario_id, sesion_id, actual, nueva, ip, ahora=None) -> Resultado:
+    """La propia persona cambia su contraseña con la sesión abierta (el PDP ya exigió el segundo factor reciente).
+
+    La contraseña actual se verifica con la misma función que el inicio de sesión y un error cuenta como intento fallido para el
+    mismo bloqueo progresivo (si bloquea, se cierran TODAS las sesiones, como un código malo dentro de la sesión); en la bitácora
+    queda como `cambio_contrasena_fallido`. Al cambiarla se revocan TODAS las sesiones, también la actual (si alguien tenía robado su
+    refresco o su acceso, deja de servir), y en la misma transacción se abre una sesión nueva con refresco y acceso nuevos: la persona
+    sigue sin volver a entrar. La actual queda como reemplazada, así que reusar su refresco viejo dispara la revocación por reuso.
+    El evento no lleva contraseñas, solo cuántas otras sesiones se cerraron."""
+    ahora = ahora or timezone.now()
+    # Una contraseña actual más larga que el tope de la política nunca puede ser la correcta: no se hashea
+    actual = actual if isinstance(actual, str) and len(actual) <= contrasenas.MAXIMO else ""
+    with transaction.atomic():
+        usuario = Usuario.objects.select_for_update().filter(pk=usuario_id).first()
+        if usuario is None:
+            return Resultado(False, "credenciales_invalidas")
+        if bloqueo.esta_bloqueado(usuario.bloqueado_hasta, ahora):
+            contrasenas.verificacion_falsa(actual)
+            registrar_evento(usuario.pk, "cambio_contrasena_rechazado_bloqueada", ip)
+            return Resultado(False, "credenciales_invalidas")
+        if not contrasenas.verificar(actual, usuario.password_hash):
+            fallo = _registrar_fallo(usuario, ip, ahora, "contrasena_actual_incorrecta", evento="cambio_contrasena_fallido")
+            if Usuario.objects.filter(pk=usuario.pk, bloqueado_hasta__isnull=False).exists():
+                _revocar_todas(usuario.pk)
+            return fallo
+        errores = contrasenas.errores_de_contrasena(nueva, usuario.username)
+        if not errores and nueva == actual:
+            errores = ["debe ser distinta de la actual"]
+        if errores:
+            return Resultado(False, "datos_invalidos", detalle={"errores": errores})
+        Usuario.objects.filter(pk=usuario.pk).update(password_hash=contrasenas.hashear(nueva), intentos_fallidos=0, bloqueado_hasta=None)
+        vencimiento = Sesion.objects.filter(pk=sesion_id, usuario_id=usuario.pk).values_list("expira_en", flat=True).first()
+        cerradas = Sesion.objects.filter(usuario_id=usuario.pk, revocada=False).exclude(pk=sesion_id).update(revocada=True)
+        Sesion.objects.filter(pk=sesion_id, usuario_id=usuario.pk).update(revocada=True)
+        nuevo = _crear_sesion(usuario, _scope_para(usuario), ip, ahora, "sesion_nueva_tras_cambio_contrasena", vencimiento_anterior=vencimiento)
+        Sesion.objects.filter(pk=sesion_id, usuario_id=usuario.pk).update(
+            reemplazada_por=Sesion.objects.get(refresh_hash=tokens.hash_refresh(nuevo.refresh)))
+        registrar_evento(usuario.pk, "contrasena_cambiada", ip, {"sesiones_cerradas": cerradas})
+    return Resultado(True, "contrasena_cambiada", access=nuevo.access, refresh=nuevo.refresh, scope=nuevo.scope, expira_en=nuevo.expira_en,
+                     detalle={"sesiones_cerradas": cerradas})

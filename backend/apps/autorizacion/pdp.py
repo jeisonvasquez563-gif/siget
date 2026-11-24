@@ -46,6 +46,7 @@ class Accion(str, Enum):
     CORREGIR_MIS_DATOS = "corregir_mis_datos"
     CONSULTAR_SOLICITUDES_DATOS = "consultar_solicitudes_datos"
     RESPONDER_SOLICITUD_DATOS = "responder_solicitud_datos"
+    CAMBIAR_CONTRASENA = "cambiar_contrasena"
 
 
 # Transiciones válidas de un trámite (espejo de siget.transicion en la base, que es la autoridad).
@@ -227,6 +228,13 @@ def _titular_de_sus_datos(s, a, r, e):
         return Decision(True, "titular_corrige_sus_datos")
 
 
+def _titular_de_su_cuenta(s, a, r, e):
+    """Cambiar la propia contraseña: cualquier cuenta autenticada (incluidas las de plataforma, que es SU cuenta) y solo la suya,
+    con segundo factor reciente: una sesión robada no alcanza para quedarse con la cuenta."""
+    if a == Accion.CAMBIAR_CONTRASENA and r.tipo == "cuenta" and r.solicitante_id == s.id and _mfa_reciente(s, e):
+        return Decision(True, "titular_cambia_su_contrasena")
+
+
 _ACCIONES_POR_ROL_PLATAFORMA = {
     "operador_infraestructura": {Accion.ADMINISTRAR_INFRAESTRUCTURA},
     "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA, Accion.EMITIR_INVITACION,
@@ -253,7 +261,7 @@ def _auditor(s, a, r, e):
         return Decision(True, "auditor_consulta")
 
 
-PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _titular_de_sus_datos, _operadores, _auditor]
+PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _titular_de_sus_datos, _titular_de_su_cuenta, _operadores, _auditor]
 
 
 # ----------------------------------------------------------------------------- decisión

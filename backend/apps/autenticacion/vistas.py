@@ -10,15 +10,17 @@ from django.utils.decorators import method_decorator
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.autorizacion.modulos import modulos_para
+from apps.autorizacion.pdp import Accion, Recurso
+from apps.autorizacion.permisos import autorizar
 from apps.autenticacion.models import EventoSeguridad
 from apps.catalogo.models import Institucion
 from apps.identidad.models import Membresia
 
-from . import canales, servicio, tokens
+from . import canales, contrasenas, servicio, tokens
 from .autenticacion import exige_scope
 
 ENCABEZADO_CSRF = "HTTP_X_SIGET_CSRF"
@@ -247,3 +249,39 @@ class MfaVerificar(_Autenticada):
         if not r.ok:
             return _denegado(r.codigo, "Código inválido o ya usado.", status.HTTP_400_BAD_REQUEST)
         return Response({"detalle": "Segundo factor verificado."})
+
+
+class TasaDeCambioDeContrasena(UserRateThrottle):
+    """Tope propio por persona: cada intento (también el fallido) cuenta, así no sirve para adivinar la contraseña actual."""
+
+    scope = "contrasena"
+
+
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
+class CambiarContrasena(_Autenticada):
+    """La propia persona cambia su contraseña. Exige segundo factor reciente (PDP) y la contraseña actual; cierra TODAS las sesiones
+    (también esta) y abre una nueva: responde con el acceso nuevo en el cuerpo y el refresco nuevo en la cookie, igual que el login."""
+
+    permission_classes = [exige_scope(tokens.SCOPE_COMPLETO)]
+    throttle_classes = [TasaDeCambioDeContrasena]
+
+    def post(self, request):
+        p = request.user
+        autorizar(request, Accion.CAMBIAR_CONTRASENA, Recurso(tipo="cuenta", solicitante_id=p.usuario.pk))  # siempre la propia: el id no sale de la petición
+        actual, nueva = _campo(request, "actual"), _campo(request, "nueva")
+        # Topes ANTES de cualquier hash: Argon2 sobre un cuerpo de megabytes sería una forma barata de agotar el servidor
+        if nueva is not None and len(nueva) > contrasenas.MAXIMO:
+            return Response({"codigo": "datos_invalidos", "errores": [f"debe tener como máximo {contrasenas.MAXIMO} caracteres"]},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if actual is not None and len(actual) > contrasenas.MAXIMO:
+            actual = None  # una actual tan larga no puede ser la correcta: se trata como incorrecta (cuenta como intento) sin hashearla
+        r = servicio.cambiar_contrasena(p.usuario.pk, p.claims.sesion_id, actual, nueva, _ip(request))
+        if r.ok:
+            respuesta = _tokens_en_respuesta(r)
+            respuesta.data.update({"detalle": "Contraseña cambiada. Cerramos las demás sesiones de tu cuenta y renovamos esta.",
+                                   "sesiones_cerradas": r.detalle["sesiones_cerradas"]})
+            return respuesta
+        if r.codigo == "datos_invalidos":
+            return Response({"codigo": r.codigo, "errores": r.detalle["errores"]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"codigo": "credenciales_invalidas", "detalle": "La contraseña actual no es correcta o la cuenta está bloqueada temporalmente."},
+                        status=status.HTTP_400_BAD_REQUEST)

@@ -3,7 +3,8 @@ import { api, ApiError } from './api.js'
 import { Estado, FINALES, Plazo, ROLES_INSTITUCION, ROLES_PLATAFORMA, etiquetaDeRol, hace, mensajeDe } from './comun.jsx'
 import { iconoDe } from './modulos.js'
 import { Alerta, Avatar, Esqueleto, Icono, Insignia, Vacio } from './ui.jsx'
-import { esMio } from './Tramites.jsx'
+import { esMio, traerTramites } from './Tramites.jsx'
+import { CambiarContrasena } from './Contrasena.jsx'
 
 function saludoDeLaHora() {
   const h = new Date().getHours()
@@ -16,7 +17,7 @@ export function Inicio({ yo, ir, abrir }) {
   const veTramites = yo.modulos.some((m) => ['mis_tramites', 'bandeja'].includes(m.id))
   const [filas, setFilas] = useState(veTramites ? null : [])
   useEffect(() => {
-    if (veTramites) api('/tramites/?limite=100').then((d) => setFilas(d.resultados)).catch(() => setFilas([]))
+    if (veTramites) traerTramites().then((d) => setFilas(d.filas)).catch(() => setFilas([]))
   }, [veTramites])
 
   const mios = (filas || []).filter((t) => esMio(t, yo))
@@ -165,6 +166,7 @@ export function Seguridad({ yo }) {
             <VentanaMfa verificadoEn={yo.mfa_verificado_en} />
             <p className="nota">Tu sesión dura 8 horas. El token de acceso vive 10 minutos y se renueva solo; el de renovación es de un solo uso y va en una cookie que JavaScript no puede leer.</p>
           </section>
+          <CambiarContrasena yo={yo} />
         </div>
         <section className="panel permisos">
           <h3>Lo que tu rol puede y no puede</h3>

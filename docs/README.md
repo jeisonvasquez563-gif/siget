@@ -45,7 +45,7 @@ La documentación "viva" del proyecto vive acá en Markdown, versionada junto co
 
 | Documento | Contenido |
 |---|---|
-| [`runbook.md`](./runbook.md) | **Paso a paso técnico de todo lo ejecutado** (34 secciones): VMs, red, SSH, firewall, checkpoint PHP, Podman, roles de base de datos, TLS, PostgreSQL y backend en contenedor, nginx, autenticación, API, interfaz, auditoría, pruebas, simulador, ensayo, sesiones, registro, respaldos, consolas de plataforma y recuperación de contraseña |
+| [`runbook.md`](./runbook.md) | **Paso a paso técnico de todo lo ejecutado** (40 secciones): VMs, red, SSH, firewall, checkpoint PHP, Podman, roles de base de datos, TLS, PostgreSQL y backend en contenedor, nginx, autenticación, API, interfaz, auditoría, pruebas, simulador, ensayo, sesiones, registro, respaldos, consolas de plataforma y recuperación de contraseña |
 | [`acceso-equipo.md`](./acceso-equipo.md) | Cuentas de Linux del equipo en las VMs, cómo cargar claves SSH y reglas de acceso |
 | [`endurecimiento-vms.md`](./endurecimiento-vms.md) | Desvíos de seguridad hallados en la auditoría de las VMs, cambios aplicados y reversión |
 | [`revisiones/2026-10-15-revision-prs-3-y-4.md`](./revisiones/2026-10-15-revision-prs-3-y-4.md) | Revisión de los PRs de Podman y Zero Trust contra el estado real de las VMs |
@@ -61,7 +61,7 @@ La documentación "viva" del proyecto vive acá en Markdown, versionada junto co
 | [`informe-avance.md`](./informe-avance.md) | Resumen ejecutivo: qué se hizo, decisiones, estado, pendientes y riesgos (con la actualización al 21 de octubre) |
 | [`documento-introductorio.md`](./documento-introductorio.md) | Documento introductorio del proyecto |
 | [`antecedentes.md`](./antecedentes.md) · [`datos-clave-investigacion.md`](./datos-clave-investigacion.md) | Antecedentes (trámites en Panamá, marco normativo, brechas) y datos clave de la investigación |
-| [`demo-comandos.md`](./demo-comandos.md) | Guion de comandos del checkpoint inicial (túnel SSH, verificación de infraestructura, pgAdmin) |
+| [`demo-comandos.md`](./demo-comandos.md) | Guion de comandos del checkpoint inicial (túnel SSH, verificación de infraestructura, pgAdmin). **Registro histórico:** pgAdmin web se retiró el 17-nov-2026 |
 | [`capturas-evidencia.md`](./capturas-evidencia.md) | Comandos para que cada integrante tome su captura de la configuración |
 | `Runbook_SIGET.docx` · `Informe_Avance_SIGET.docx` · `SIGET_Documento_Introductorio.docx` · `Antecedentes_SIGET.docx` · `SIGET_Arquitectura_Zero_Trust.docx` | Versiones formales en Word para entrega |
 | `Comandos_Demo_SIGET.txt` | Versión en texto plano del guion de comandos del checkpoint (previa a la conversión a Markdown) |

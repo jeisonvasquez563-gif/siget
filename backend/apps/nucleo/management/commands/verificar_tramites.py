@@ -480,6 +480,13 @@ class Command(BaseCommand):
         self._paso("el personal de la institución lo ve", self._http("get", f"/tramites/{tramite_ana}/", tok(func_mop)).status_code == 200)
         self._paso("un id enorme no rompe nada (404)", self._http("get", f"/tramites/{10**30}/", tok(ana)).status_code == 404)
         self._paso("una paginación inválida se rechaza", self._http("get", "/tramites/?limite=0", tok(ana)).status_code == 400 and self._http("get", "/tramites/?limite=1", tok(ana)).json()["limite"] == 1)
+        for nombre_persona, persona_listada in (("la ciudadana", ana), ("otra ciudadana", beto), ("el personal de otra institución", func_minsa)):
+            pagina_uno = self._http("get", "/tramites/?limite=1", tok(persona_listada)).json()
+            todos = self._http("get", "/tramites/?limite=100", tok(persona_listada)).json()
+            fuera = self._http("get", f"/tramites/?limite=1&desplazamiento={todos['total']}", tok(persona_listada)).json()
+            self._paso(f"el listado de {nombre_persona} trae `total` (lo que ve, no solo la página) y paginar no lo cambia",
+                       pagina_uno["total"] == todos["total"] == len(todos["resultados"]) and len(pagina_uno["resultados"]) == min(1, todos["total"])
+                       and fuera["resultados"] == [] and fuera["total"] == todos["total"], (pagina_uno["total"], todos["total"]))
         r = self._http("get", "/tramites/?escalados=1&limite=100", tok(ana))
         self._paso("el filtro de escalados solo devuelve trámites escalados", r.status_code == 200 and all(t["escalado"] for t in r.json()["resultados"]))
         self._paso("un valor inválido del filtro de escalados se rechaza", self._http("get", "/tramites/?escalados=si", tok(ana)).status_code == 400)

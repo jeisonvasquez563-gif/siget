@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api.js'
-import { ACCIONES_EVENTO, ESTADOS, fecha, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { ACCIONES_EVENTO, ESTADOS, Paginacion, fecha, hace, mensajeDe, useReautenticacion } from './comun.jsx'
 import { Alerta, Avatar, BloquesEsqueleto, Esqueleto, Icono, Insignia, Vacio } from './ui.jsx'
 
 const PESTANAS = [
@@ -18,8 +18,10 @@ export const NOMBRES_EVENTO = {
   mfa_confirmacion_fallida: 'Alta del segundo factor fallida', mfa_verificacion_fallida: 'Verificación del segundo factor fallida',
   refresh_ok: 'Sesión renovada', refresh_invalido: 'Renovación inválida', refresh_reuso: 'Reuso de token de sesión (posible robo)',
   logout: 'Cierre de sesión',
+  contrasena_cambiada: 'Contraseña cambiada', sesion_nueva_tras_cambio_contrasena: 'Sesión renovada tras cambiar la contraseña',
+  cambio_contrasena_fallido: 'Cambio de contraseña fallido', cambio_contrasena_rechazado_bloqueada: 'Cambio de contraseña con cuenta bloqueada',
 }
-export const EVENTOS_ALERTA = ['login_fallido', 'cuenta_bloqueada', 'refresh_reuso', 'login_rechazado_bloqueada', 'mfa_verificacion_fallida', 'mfa_confirmacion_fallida', 'refresh_invalido']
+export const EVENTOS_ALERTA = ['login_fallido', 'cuenta_bloqueada', 'refresh_reuso', 'login_rechazado_bloqueada', 'mfa_verificacion_fallida', 'mfa_confirmacion_fallida', 'refresh_invalido', 'cambio_contrasena_fallido', 'cambio_contrasena_rechazado_bloqueada']
 
 const Quien = ({ actor }) => (actor
   ? <span className="quien-fila"><Avatar nombre={actor.usuario} /><span>{actor.usuario}</span></span>
@@ -242,15 +244,4 @@ function Listado({ ruta, columnas, filtro: [clave, etiqueta, ejemplo], vacio }) 
   )
 }
 
-function Paginador({ datos, pagina, cambiar }) {
-  const paginas = Math.max(1, Math.ceil(datos.total / datos.limite))
-  return (
-    <div className="paginador">
-      <span>{datos.total} registros · página {pagina + 1} de {paginas}</span>
-      <div className="fila-botones">
-        <button className="btn btn-sec btn-s" disabled={pagina === 0} onClick={() => cambiar(pagina - 1)}><Icono nombre="izquierda" />Anterior</button>
-        <button className="btn btn-sec btn-s" disabled={pagina + 1 >= paginas} onClick={() => cambiar(pagina + 1)}>Siguiente<Icono nombre="derecha" /></button>
-      </div>
-    </div>
-  )
-}
+const Paginador = ({ datos, pagina, cambiar }) => <Paginacion total={datos.total} tamano={datos.limite} pagina={pagina} cambiar={cambiar} unidad="registros" />

@@ -35,6 +35,18 @@ def test_paginacion_valida(params, esperado):
     assert ser.paginacion(params) == esperado
 
 
+def test_la_pagina_lleva_el_total_de_lo_que_la_persona_ve_y_no_solo_el_de_la_pagina():
+    cuerpo = ser.pagina_de([{"id": 3}, {"id": 2}], 45, 2, 40)
+    assert cuerpo == {"resultados": [{"id": 3}, {"id": 2}], "total": 45, "limite": 2, "desplazamiento": 40}
+    assert ser.pagina_de([], 0, 20, 0)["total"] == 0
+
+
+def test_con_el_total_la_interfaz_calcula_cuantas_paginas_hay():
+    cuerpo = ser.pagina_de([], 45, 20, 40)
+    paginas = max(1, -(-cuerpo["total"] // cuerpo["limite"]))
+    assert paginas == 3 and cuerpo["desplazamiento"] // cuerpo["limite"] + 1 == 3  # «Página 3 de 3»
+
+
 @pytest.mark.parametrize("params", [
     {"limite": "0"}, {"limite": "101"}, {"limite": "-1"}, {"limite": "abc"}, {"limite": "1.5"}, {"limite": "１"},
     {"desplazamiento": "-5"}, {"desplazamiento": "99999999"}, {"limite": ""},

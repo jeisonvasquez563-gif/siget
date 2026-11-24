@@ -1,5 +1,7 @@
 # Estado de la base de datos — 22 de octubre de 2026
 
+> **Actualización (24-nov-2026):** esta es la fotografía del 22 de octubre y no se reescribió. Desde entonces hay migraciones hasta la 017 (tablas `feriado`, `invitacion`, `documento` y `solicitud_derecho` además de las citadas), el checkpoint PHP y pgAdmin web se retiraron el 17-nov (`checkpoint_app` quedó sin inicio de sesión; runbook 38) y los respaldos automáticos siguen activos. Los números de filas y tamaños de abajo son los de octubre.
+
 Fotografía **en vivo** de `tramites_demo` (PostgreSQL 16.15 en contenedor rootless, VM2), tomada con [`database/estado-bd.sql`](../database/estado-bd.sql), que es de **solo lectura**. Para repetirla:
 
 ```bash

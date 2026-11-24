@@ -3,6 +3,7 @@
 // Uso: http://localhost:5173/?mock            -> pantalla de acceso; entra con cualquier usuario de la lista y cualquier clave
 //      http://localhost:5173/?mock=fabio.mop  -> ya con la sesión iniciada como esa persona
 //      http://localhost:5173/?mock=enrolar    -> alta del segundo factor
+//      «Cambiar la contraseña» (Mi seguridad): la contraseña actual es CLAVE_DE_EJEMPLO; pide el segundo factor si no se verificó hace poco
 // Usuarios: ana.ciudadana beto.ciudadano fabio.mop flor.mop saul.mop carla.mop felix.minsa ines.infra ivan.identidades
 //           cata.catalogo sergio.seguridad silvia.secretos aldo.auditor
 
@@ -18,6 +19,8 @@ import {
   motivoParaLaPersona, respuestaDatosInvalidos, validarDatos, validarTextoLibre,
 } from './mock-contenido.js'
 
+// La contraseña actual que acepta el servidor de ejemplo al cambiarla (el acceso acepta cualquiera; esta se usa solo para «Cambiar la contraseña»)
+export const CLAVE_DE_EJEMPLO = 'clave-de-ejemplo-2026'
 const DIA = 86400000
 const hace = (ms) => new Date(Date.now() - ms).toISOString()
 
@@ -116,6 +119,12 @@ const TRAMITES_BASE = [
   T(38, 3, 'Pendiente', 102, null, 1, 10), T(39, 1, 'Pendiente', 101, null, 2, 15), T(41, 3, 'En Tramitacion', 102, 201, 12, 10),
   T(42, 3, 'Pendiente', 101, null, 7, 10), T(43, 3, 'Rechazado', 102, 203, 14, 10), T(44, 3, 'En Tramitacion', 101, 202, 4, 10),
 ]
+// Trámites antiguos, ya resueltos (ids 1 a 34): hacen falta más de 20 por lista para probar la paginación. Quedan debajo de los demás (se
+// ordena del id más alto al más bajo) y, al estar resueltos, no cambian los indicadores de lo vencido ni lo escalado.
+// Ana (101) queda con 28 trámites propios y la bandeja del MOP con 41 de otras personas: dos y tres páginas de 20.
+for (let id = 1; id <= 34; id++) {
+  TRAMITES_BASE.push(T(id, 3, id % 3 === 0 ? 'Rechazado' : 'Aprobado', id % 3 === 2 ? 102 : 101, id % 2 ? 201 : 202, 30 + id, 10))
+}
 // Contenido de los trámites de ejemplo (lo que se respondió al iniciar). Los demás son «anteriores a la función»: datos vacíos
 const DATOS_BASE = {
   35: { asunto: 'Corte de calle por la fiesta patronal', descripcion: 'Se pide cerrar la calle principal el sábado de 8 a 18 h.' },
@@ -169,8 +178,14 @@ const ACTUACIONES = Object.values(EVENTOS_BASE).flat().sort((a, b) => b.id - a.i
 function paginar(lista, p) {
   const limite = Number(p.get('limite') || 20)
   const desde = Number(p.get('desplazamiento') || 0)
-  return { total: lista.length, limite, desplazamiento: desde, resultados: lista.slice(desde, desde + limite) }
+  return { resultados: lista.slice(desde, desde + limite), total: lista.length, limite, desplazamiento: desde }
 }
+
+// Como el servidor: `limite` de 1 a 100 y `desplazamiento` entero no negativo; otra cosa es `paginacion_invalida`
+const paginacionValida = (p) => ['limite', 'desplazamiento'].every((k) => {
+  const v = p.get(k)
+  return v === null || (/^\d+$/.test(v) && (k === 'desplazamiento' || (Number(v) >= 1 && Number(v) <= 100)))
+})
 
 export function instalarMock(inicial, opciones = {}) {
   const ajustes = opciones // dentro de fetch, «opciones» es la de cada petición
@@ -185,6 +200,10 @@ export function instalarMock(inicial, opciones = {}) {
   let enrolando = inicial === 'enrolar'
   let mfaFresco = false
   let ultimoCodigo = null // un código ya usado no se acepta otra vez, como en el servidor
+  let claveVigente = CLAVE_DE_EJEMPLO // la contraseña actual que acepta «Cambiar la contraseña»
+  let fallosDeClave = 0 // 3 fallos bloquean (como el bloqueo progresivo del login)
+  let sesionesAbiertas = 1 // cuántas sesiones ha abierto el cambio de contraseña (da un acceso nuevo distinto cada vez)
+  let otrasSesiones = 2 // las demás sesiones abiertas de la cuenta: el cambio las cierra
   const plataforma = plataformaMock({
     usuarios: USUARIOS, actual: () => actual, hace,
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
@@ -272,6 +291,29 @@ export function instalarMock(inicial, opciones = {}) {
       if (caso) return resp(200, caso.respuesta)
       return resp(200, { entrada: cuerpo, decision: { permitido: false, politica: 'sin_regla_que_permita', motivo: 'ejemplo' }, traza: [], alternativas: [], hipotetico: true, ejemplo: true })
     }
+    if (camino === '/auth/contrasena/' && metodo === 'POST') {
+      // Igual que el servidor: segundo factor reciente (PDP), contraseña actual (400 genérico; 3 fallos bloquean), política y cierre de las demás sesiones
+      if (!mfaFresco) return pideCodigo()
+      if (fallosDeClave >= 3 || cuerpo.actual !== claveVigente) {
+        fallosDeClave += 1
+        return resp(400, { codigo: 'credenciales_invalidas', detalle: 'La contraseña actual no es correcta o la cuenta está bloqueada temporalmente.' })
+      }
+      const nueva = typeof cuerpo.nueva === 'string' ? cuerpo.nueva : ''
+      const errores = []
+      if (nueva.length < 12) errores.push('debe tener al menos 12 caracteres')
+      else if (nueva.length > 128) errores.push('debe tener como máximo 128 caracteres')
+      else if (nueva.toLowerCase().includes(actual)) errores.push('no puede contener el nombre de usuario')
+      else if (nueva === claveVigente) errores.push('debe ser distinta de la actual')
+      if (errores.length) return resp(400, { codigo: 'datos_invalidos', errores })
+      claveVigente = nueva
+      fallosDeClave = 0
+      const cerradas = otrasSesiones
+      otrasSesiones = 0
+      // Como el servidor: la sesión actual también se revoca y se abre una nueva, así que responde con tokens nuevos
+      sesionesAbiertas += 1
+      return resp(200, { access_token: `mock-sesion-${sesionesAbiertas}`, tipo: 'Bearer', expira_en: 600, scope: 'completo',
+        detalle: 'Contraseña cambiada. Cerramos las demás sesiones de tu cuenta y renovamos esta.', sesiones_cerradas: cerradas })
+    }
     if (camino === '/auth/actividad/') {
       const eventos = [['mfa_verificado', 9], ['login_ok', 9], ['refresh_ok', 40], ['login_fallido', 300], ['login_ok', 1500], ['logout', 1620]]
       return resp(200, { eventos: eventos.map(([evento, min], i) => ({ id: 100 - i, evento, creado_en: hace(min * 60000), ip: '192.168.100.10' })) })
@@ -283,7 +325,9 @@ export function instalarMock(inicial, opciones = {}) {
     if (deEquipo) return deEquipo
     if (camino === '/tramites/' && metodo === 'GET') {
       if (u.plataforma !== 'ninguno') return negado()
-      return resp(200, { resultados: TRAMITES.filter((t) => visibles(u, t)).sort((a, b) => b.id - a.id).map((t) => dto(u, t)), limite: 100, desplazamiento: 0 })
+      if (!paginacionValida(p)) return resp(400, { codigo: 'paginacion_invalida', detalle: 'limite (1 a 100) y desplazamiento deben ser enteros válidos.' })
+      const lista = TRAMITES.filter((t) => visibles(u, t) && (p.get('escalados') !== '1' || t.escalado)).sort((a, b) => b.id - a.id).map((t) => dto(u, t))
+      return resp(200, paginar(lista, p))
     }
     if (camino === '/tramites/' && metodo === 'POST') {
       const tipo = TIPOS.find((t) => t.id === cuerpo.tipo_tramite)
