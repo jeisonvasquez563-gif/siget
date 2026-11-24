@@ -1828,7 +1828,7 @@ Evidencia completa en `docs/sdlc/evidencia/14_pt15_*` (salida en texto y captura
 
 ## 40. Contenido del trámite: aplicar la migración 017 (formulario, motivo y respuesta a la subsanación)
 
-**Estado: pendiente de aplicar.** Rama `feature/contenido-tramite`. Cuando se aplique, agregar el registro en 40.9 (como en 39.10).
+**Estado: aplicado en producción el 24 de noviembre de 2026** (registro en 40.9).
 
 ### 40.1 Qué cambia y en qué orden hay que aplicarlo
 
@@ -1912,4 +1912,16 @@ Si algún paso falla, **no desplegar**: revisar primero si es de la verificació
 
 ### 40.9 Registro de la aplicación
 
-_Pendiente._ Anotar fecha, respaldo `pre-017` (archivo y huella), resultado del ensayo con `ROLLBACK`, resultados de cada verificación (números), imagen de respaldo y resultado del ensayo.
+Aplicado el **24 de noviembre de 2026**. Evidencia completa en `docs/sdlc/evidencia/15_contenido_*`.
+
+1. **VM2, respaldo verificado:** `tramites_demo-20261124-125326.dump` (18 tablas, restauración probada y comparada con la base viva), copiado como `pre-017-tramites_demo-20261124-125326.dump` (SHA-256 `db5d53171ab9e1da…`), fuera de la rotación.
+2. **Ensayo de la 017** dentro de una transacción terminada en `ROLLBACK`, con 8 comprobaciones: 8/8. Entre ellas, la base rechazó un rechazo sin motivo y un motivo de solo espacios. Después: sin rastro (`datos`, `formulario` y `limpiar_motivo` no existían).
+3. **Todo preparado antes de migrar** (backend empaquetado, interfaz compilada, archivos ya en VM1), para acortar la ventana en la que el backend viejo no puede rechazar ni pedir subsanación.
+4. **Migración real** a las 12:54:32 y las mismas 8 comprobaciones dentro de una transacción revertida: 8/8.
+5. **VM1, imagen candidata** y verificaciones contra la base migrada, antes de reiniciar. Primera corrida: `verificar_tramites` se cayó con `Key (username)=(int_t_super_mop) already exists`. El commit de correcciones de la revisión había reemplazado las 6 apariciones de `func2_mop` por `super_mop` en pasos que ya existían, así que la cuenta de prueba se creaba dos veces. **No se desplegó** (la etiqueta volvió a la imagen en uso) y se restauraron esas 6 líneas a como estaban en `develop`. Segunda corrida: `verificar_esquema` OK, `verificar_tramites` **152/152**, `verificar_autenticacion` 169/169, `verificar_plataforma` 125/125, `verificar_politicas` 41/41, `verificar_equipo` 51/51, `verificar_auditoria` 34/34 y `verificar_integracion` 15/15.
+6. **Despliegue** a las 12:56:20: imagen `contenido-candidata` como `siget-backend:dev`, backend reiniciado (la unidad no cambió), interfaz nueva con respaldo en `/home/siget/frontend.respaldo-2026-11-24b`. Servicios activos y salud 200. **La ventana entre migración y despliegue duró unos 2 minutos.**
+7. **Ensayo completo contra producción: 112/112**, con el recorrido nuevo (crear con datos, pedir subsanación con motivo, la persona responde, aprobar).
+
+**Volver atrás:** `podman tag localhost/siget-backend:respaldo-2026-11-24b localhost/siget-backend:dev` y reiniciar el backend (como `siget`), y restaurar la interfaz desde `frontend.respaldo-2026-11-24b`. Con la 017 aplicada, el backend anterior no puede rechazar ni pedir subsanación: lo razonable es corregir hacia adelante (40.7).
+
+**Lección de esta aplicación:** un reemplazo de texto en un archivo de verificación puede romper pasos que ya existían sin que ninguna prueba unitaria lo note, porque los `verificar_*` solo corren contra la base real. Por eso la imagen se verifica **antes** de reiniciar: el error quedó atrapado sin tocar producción.

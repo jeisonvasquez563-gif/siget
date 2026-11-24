@@ -388,11 +388,11 @@ class Command(BaseCommand):
 
         coord = self._persona("coord")
         ana, beto = self._persona("ana"), self._persona("beto")
-        func_mop, super_mop, super_mop, func_minsa = (self._persona(n) for n in ("func_mop", "super_mop", "super_mop", "func_minsa"))
+        func_mop, func2_mop, super_mop, func_minsa = (self._persona(n) for n in ("func_mop", "func2_mop", "super_mop", "func_minsa"))
         operador = self._persona("operador", rol_plataforma="operador_infraestructura")
-        for u, inst, rol in ((func_mop, mop, "funcionario"), (super_mop, mop, "funcionario"), (super_mop, mop, "supervisor"), (func_minsa, minsa, "funcionario")):
+        for u, inst, rol in ((func_mop, mop, "funcionario"), (func2_mop, mop, "funcionario"), (super_mop, mop, "supervisor"), (func_minsa, minsa, "funcionario")):
             Membresia.objects.create(usuario=u, institucion=inst, rol=rol, asignado_por=coord)
-        t = {u.username: self._token(u) for u in (ana, beto, func_mop, super_mop, super_mop, func_minsa, operador)}
+        t = {u.username: self._token(u) for u in (ana, beto, func_mop, func2_mop, super_mop, func_minsa, operador)}
         tok = lambda u: t[u.username]  # noqa: E731
 
         def cuantos(persona):
@@ -568,7 +568,7 @@ class Command(BaseCommand):
         self._paso("la ciudadanía no inicia solicitudes interinstitucionales", r.status_code == 403)
 
         # ---------------------------------------------------------------- reasignación
-        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(func_mop), {"funcionario_id": super_mop.pk})
+        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(func_mop), {"funcionario_id": func2_mop.pk})
         self._paso("un funcionario no puede reasignar (solo el supervisor)", r.status_code == 403)
         for malo in ({"funcionario_id": func_minsa.pk}, {"funcionario_id": ana.pk}, {"funcionario_id": "x"}, {}):
             if self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(super_mop), malo).status_code != 400:
@@ -576,8 +576,8 @@ class Command(BaseCommand):
                 break
         else:
             self._paso("reasignar a otra institución, al solicitante o con datos inválidos se rechaza con 400", True)
-        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(super_mop), {"funcionario_id": super_mop.pk})
-        self._paso("el supervisor reasigna a personal de su institución", r.status_code == 200 and r.json()["funcionario_asignado_id"] == super_mop.pk, r.status_code)
+        r = self._http("post", f"/tramites/{tramite_ana}/reasignar/", tok(super_mop), {"funcionario_id": func2_mop.pk})
+        self._paso("el supervisor reasigna a personal de su institución", r.status_code == 200 and r.json()["funcionario_asignado_id"] == func2_mop.pk, r.status_code)
         r = self._http("post", f"/tramites/{tramite_ana}/estado/", tok(func_mop), {"estado": "Aprobado"})
         self._paso("un funcionario no mueve un trámite asignado a otro", r.status_code == 403)
         Usuario.objects.filter(pk=super_mop.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=1))

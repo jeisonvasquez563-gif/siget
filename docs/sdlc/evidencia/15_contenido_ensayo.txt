@@ -1,0 +1,11 @@
+# Contenido del tramite: ensayo completo contra produccion (24-nov-2026)
+# 2026-11-24 12:56:45  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/c017/paso4.sh
+== 10. Ensayo completo contra produccion (incluye crear con datos, pedir subsanacion con motivo, responder y aprobar)
+ENSAYO: 112 de 112 comprobaciones correctas
+== 11. Desde el anfitrion
+/salud/                      200
+/catalogo/tipos-tramite/     401
+/auth/aviso-privacidad/      200
+(sin sesion el catalogo responde 401)
+# código de salida: 0

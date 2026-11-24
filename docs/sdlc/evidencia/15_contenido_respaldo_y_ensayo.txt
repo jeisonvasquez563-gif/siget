@@ -1,0 +1,20 @@
+# Contenido del tramite: respaldo verificado y ensayo de la migracion 017 con ROLLBACK (24-nov-2026)
+# 2026-11-24 12:53:25  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/c017/paso1.sh
+== 1. Respaldo verificado (pg_dump, restauracion de prueba y comparacion con la base viva)
+OK: tramites_demo-20261124-125326.dump (182069 bytes, 18 tablas), restauración probada y verificada contra la base viva
+copia fuera de la rotacion: pre-017-tramites_demo-20261124-125326.dump  sha256 db5d53171ab9e1da
+== 2. Ensayo de la migracion 017 dentro de una transaccion que termina en ROLLBACK
+PASA  todos los tipos de tramite tienen su formulario cargado
+PASA  los tramites existentes quedan sin contenido (no se inventa)
+PASA  app_role actualiza datos y estado, no el solicitante, y no borra
+PASA  ningun otro rol puede cambiar el contenido
+PASA  estan los 3 triggers nuevos
+PASA  esta la politica para responder la subsanacion
+PASA  la base rechaza un rechazo sin motivo (La transicion En Tramitacion -> Rechazado exige un motivo de)
+PASA  la base rechaza un motivo de solo espacios
+== 3. El ensayo no dejo nada (debe decir 0|0|0)
+columna_datos|columna_formulario|funcion_limpiar
+0|0|0
+(1 row)
+# código de salida: 0

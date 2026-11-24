@@ -6,6 +6,17 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Despliegue (contenido del trámite aplicado en producción, 24-nov)
+- **Formulario por tipo, motivo obligatorio y respuesta a la subsanación en producción** (runbook 40.9, evidencia `docs/sdlc/evidencia/15_contenido_*`).
+- **VM2:**
+  - respaldo verificado con copia `pre-017`;
+  - ensayo de la 017 con `ROLLBACK` (8/8, incluida la base rechazando un rechazo sin motivo, y sin rastro);
+  - migración real (8/8).
+- **VM1:** imagen nueva verificada antes de reiniciar, con `verificar_tramites` **152/152** y las otras 7 verificaciones en verde, y despliegue de backend e interfaz con respaldo.
+  - La ventana entre migración y despliegue fue de unos 2 minutos: se preparó todo antes de migrar.
+  - **Ensayo 112/112.**
+- **Una falla atrapada antes de desplegar:** un reemplazo de texto de las correcciones había cambiado `func2_mop` por `super_mop` en 6 líneas de `verificar_tramites`, y la cuenta de prueba se creaba dos veces. Se restauraron esas líneas; producción no se tocó hasta tener las 8 verificaciones en verde.
+
 ### Contenido del trámite: datos del formulario, motivo de las decisiones y respuesta a la subsanación (backend, migración 017, e interfaz)
 - **Qué cambia para la persona:** un trámite ya no es solo «un tipo y un estado»: lleva los **datos** que pide el formulario de su tipo (dirección y número de finca de un permiso, asunto y hechos de una denuncia, etc.), cada rechazo o petición de subsanación lleva un **motivo** que la persona ve en su historial, y la persona **responde la subsanación** ella misma (con su respuesta y, si quiere, los datos corregidos) en lugar de depender de que el personal cierre el paso. Ningún formulario pide cédula, nombre ni correo (minimización de datos, Ley 81).
 - **Base de datos (`database/migraciones/017-contenido-tramite.sql`, pendiente de aplicar: runbook §40):**
