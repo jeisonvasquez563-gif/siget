@@ -43,6 +43,12 @@
     "segundo_factor",
     "cuenta"
    ],
+   "responder_subsanacion": [
+    "institucion",
+    "solicitante",
+    "segundo_factor",
+    "cuenta"
+   ],
    "ver_documento": [
     "institucion",
     "solicitante",

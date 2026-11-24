@@ -43,8 +43,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 8,
-            "acciones_totales": 25
+            "acciones_permitidas": 9,
+            "acciones_totales": 26
         },
         {
             "id": "funcionario",
@@ -96,7 +96,7 @@
                 }
             ],
             "acciones_permitidas": 8,
-            "acciones_totales": 25
+            "acciones_totales": 26
         },
         {
             "id": "supervisor",
@@ -160,7 +160,7 @@
                 }
             ],
             "acciones_permitidas": 10,
-            "acciones_totales": 25
+            "acciones_totales": 26
         },
         {
             "id": "coordinador_institucional",
@@ -212,7 +212,7 @@
                 }
             ],
             "acciones_permitidas": 7,
-            "acciones_totales": 25
+            "acciones_totales": 26
         },
         {
             "id": "operador_infraestructura",
@@ -252,7 +252,7 @@
                 }
             ],
             "acciones_permitidas": 1,
-            "acciones_totales": 25
+            "acciones_totales": 26
         },
         {
             "id": "operador_identidades",
@@ -292,7 +292,7 @@
                 }
             ],
             "acciones_permitidas": 6,
-            "acciones_totales": 25
+            "acciones_totales": 26
         },
         {
             "id": "operador_catalogo",
@@ -332,7 +332,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 25
+            "acciones_totales": 26
         },
         {
             "id": "operador_seguridad",
@@ -372,7 +372,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 25
+            "acciones_totales": 26
         },
         {
             "id": "custodio_secretos",
@@ -412,7 +412,7 @@
                 }
             ],
             "acciones_permitidas": 1,
-            "acciones_totales": 25
+            "acciones_totales": 26
         },
         {
             "id": "auditor",
@@ -452,7 +452,7 @@
                 }
             ],
             "acciones_permitidas": 2,
-            "acciones_totales": 25
+            "acciones_totales": 26
         }
     ],
     "acciones": [
@@ -508,6 +508,15 @@
             "casos": [
                 "A un trámite propio o de su institución",
                 "A un trámite ajeno"
+            ]
+        },
+        {
+            "id": "responder_subsanacion",
+            "nombre": "Responder una subsanación",
+            "grupo": "Trámites",
+            "casos": [
+                "En un trámite propio",
+                "En un trámite ajeno"
             ]
         },
         {
@@ -713,6 +722,17 @@
                 "favorable": {
                     "permitido": true,
                     "politica": "ciudadano_sobre_lo_propio"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_subsanacion": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "solicitante_responde_subsanacion"
                 },
                 "desfavorable": {
                     "permitido": false,
@@ -987,6 +1007,17 @@
                 "exige_segundo_factor": false
             },
             "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_subsanacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -1274,6 +1305,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "responder_subsanacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "ver_documento": {
                 "favorable": {
                     "permitido": true,
@@ -1541,6 +1583,17 @@
                 "exige_segundo_factor": false
             },
             "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_subsanacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "sin_regla_que_permita"
@@ -1828,6 +1881,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "responder_subsanacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
             "ver_documento": {
                 "favorable": {
                     "permitido": false,
@@ -2095,6 +2159,17 @@
                 "exige_segundo_factor": false
             },
             "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_subsanacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "plataforma_sin_acceso_a_tramites"
@@ -2382,6 +2457,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "responder_subsanacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
             "ver_documento": {
                 "favorable": {
                     "permitido": false,
@@ -2649,6 +2735,17 @@
                 "exige_segundo_factor": false
             },
             "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_subsanacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "plataforma_sin_acceso_a_tramites"
@@ -2936,6 +3033,17 @@
                 },
                 "exige_segundo_factor": false
             },
+            "responder_subsanacion": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
             "ver_documento": {
                 "favorable": {
                     "permitido": false,
@@ -3203,6 +3311,17 @@
                 "exige_segundo_factor": false
             },
             "adjuntar_documento": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "plataforma_sin_acceso_a_tramites"
+                },
+                "exige_segundo_factor": false
+            },
+            "responder_subsanacion": {
                 "favorable": {
                     "permitido": false,
                     "politica": "plataforma_sin_acceso_a_tramites"
