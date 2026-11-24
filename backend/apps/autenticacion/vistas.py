@@ -10,10 +10,12 @@ from django.utils.decorators import method_decorator
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.throttling import ScopedRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.autorizacion.modulos import modulos_para
+from apps.autorizacion.pdp import Accion, Recurso
+from apps.autorizacion.permisos import autorizar
 from apps.autenticacion.models import EventoSeguridad
 from apps.catalogo.models import Institucion
 from apps.identidad.models import Membresia
@@ -247,3 +249,29 @@ class MfaVerificar(_Autenticada):
         if not r.ok:
             return _denegado(r.codigo, "Código inválido o ya usado.", status.HTTP_400_BAD_REQUEST)
         return Response({"detalle": "Segundo factor verificado."})
+
+
+class TasaDeCambioDeContrasena(UserRateThrottle):
+    """Tope propio por persona: cada intento (también el fallido) cuenta, así no sirve para adivinar la contraseña actual."""
+
+    scope = "contrasena"
+
+
+@method_decorator(transaction.non_atomic_requests, name="dispatch")
+class CambiarContrasena(_Autenticada):
+    """La propia persona cambia su contraseña. Exige segundo factor reciente (PDP) y la contraseña actual; cierra las demás sesiones."""
+
+    permission_classes = [exige_scope(tokens.SCOPE_COMPLETO)]
+    throttle_classes = [TasaDeCambioDeContrasena]
+
+    def post(self, request):
+        p = request.user
+        autorizar(request, Accion.CAMBIAR_CONTRASENA, Recurso(tipo="cuenta", solicitante_id=p.usuario.pk))  # siempre la propia: el id no sale de la petición
+        r = servicio.cambiar_contrasena(p.usuario.pk, p.claims.sesion_id, _campo(request, "actual"), _campo(request, "nueva"), _ip(request))
+        if r.ok:
+            n = r.detalle["sesiones_cerradas"]
+            return Response({"detalle": "Contraseña cambiada. Cerramos las demás sesiones de tu cuenta; esta sigue abierta.", "sesiones_cerradas": n})
+        if r.codigo == "datos_invalidos":
+            return Response({"codigo": r.codigo, "errores": r.detalle["errores"]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"codigo": "credenciales_invalidas", "detalle": "La contraseña actual no es correcta o la cuenta está bloqueada temporalmente."},
+                        status=status.HTTP_400_BAD_REQUEST)

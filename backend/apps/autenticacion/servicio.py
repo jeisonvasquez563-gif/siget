@@ -369,3 +369,37 @@ def restablecer_contrasena(username, codigo, nueva, ip, ahora=None) -> Resultado
         _revocar_todas(usuario.pk)
         registrar_evento(usuario.pk, "contrasena_restablecida", ip, {"emitido_por": fila.emitido_por_id})
     return Resultado(True, "contrasena_restablecida")
+
+
+# --------------------------------------------------------------------------- cambio de contraseña desde la sesión
+
+def cambiar_contrasena(usuario_id, sesion_id, actual, nueva, ip, ahora=None) -> Resultado:
+    """La propia persona cambia su contraseña con la sesión abierta (el PDP ya exigió el segundo factor reciente).
+
+    La contraseña actual se verifica con la misma función que el inicio de sesión y un error cuenta como intento fallido para el
+    mismo bloqueo progresivo (si bloquea, se cierran TODAS las sesiones, como un código malo dentro de la sesión). Al cambiarla se
+    cierran todas las demás sesiones de la cuenta; la actual sigue válida. El evento no lleva contraseñas, solo cuántas sesiones se cerraron."""
+    ahora = ahora or timezone.now()
+    actual = actual if isinstance(actual, str) else ""
+    with transaction.atomic():
+        usuario = Usuario.objects.select_for_update().filter(pk=usuario_id).first()
+        if usuario is None:
+            return Resultado(False, "credenciales_invalidas")
+        if bloqueo.esta_bloqueado(usuario.bloqueado_hasta, ahora):
+            contrasenas.verificacion_falsa(actual)
+            registrar_evento(usuario.pk, "cambio_contrasena_rechazado_bloqueada", ip)
+            return Resultado(False, "credenciales_invalidas")
+        if not contrasenas.verificar(actual, usuario.password_hash):
+            fallo = _registrar_fallo(usuario, ip, ahora, "contrasena_actual_incorrecta")
+            if Usuario.objects.filter(pk=usuario.pk, bloqueado_hasta__isnull=False).exists():
+                _revocar_todas(usuario.pk)
+            return fallo
+        errores = contrasenas.errores_de_contrasena(nueva, usuario.username)
+        if not errores and nueva == actual:
+            errores = ["debe ser distinta de la actual"]
+        if errores:
+            return Resultado(False, "datos_invalidos", detalle={"errores": errores})
+        Usuario.objects.filter(pk=usuario.pk).update(password_hash=contrasenas.hashear(nueva), intentos_fallidos=0, bloqueado_hasta=None)
+        cerradas = Sesion.objects.filter(usuario_id=usuario.pk, revocada=False).exclude(pk=sesion_id).update(revocada=True)
+        registrar_evento(usuario.pk, "contrasena_cambiada", ip, {"sesiones_cerradas": cerradas})
+    return Resultado(True, "contrasena_cambiada", detalle={"sesiones_cerradas": cerradas})

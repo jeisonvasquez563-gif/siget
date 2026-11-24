@@ -378,7 +378,7 @@ def celda(rol, accion, caso="favorable"):
 def test_la_matriz_muestra_las_acciones_nuevas_calculadas_por_el_pdp():
     ids = {a["id"] for a in M["acciones"]}
     assert {"ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"} <= ids
-    assert len(M["acciones"]) == len(Accion) == 26
+    assert len(M["acciones"]) == len(Accion) == 27
     assert all(next(a for a in M["acciones"] if a["id"] == i)["grupo"] == "Datos personales" for i in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos"))
     assert next(a for a in M["acciones"] if a["id"] == "corregir_mis_datos")["grupo"] == "Datos personales"
 
@@ -413,7 +413,7 @@ def test_en_la_matriz_ninguna_cuenta_de_plataforma_ejerce_derechos_sobre_perfile
 
 
 def test_el_operador_de_identidades_sigue_sin_poder_todo_ni_ver_tramites_en_la_matriz():
-    assert next(r for r in M["roles"] if r["id"] == "operador_identidades")["acciones_permitidas"] == 6  # alta, aprobación, restablecer MFA, invitar (PT-2) y las dos de solicitudes
+    assert next(r for r in M["roles"] if r["id"] == "operador_identidades")["acciones_permitidas"] == 7  # alta, aprobación, restablecer MFA, invitar (PT-2), las dos de solicitudes y cambiar su contraseña
     assert celda("operador_identidades", Accion.VER_TRAMITE)["politica"] == "plataforma_sin_acceso_a_tramites"
     assert M["ningun_rol_puede_todo"] is True
 
@@ -422,7 +422,7 @@ def test_el_simulador_conoce_las_acciones_nuevas():
     meta = simulador.meta()
     for accion in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"):
         assert accion in meta["variables"]
-    assert len(meta["variables"]) == 26
+    assert len(meta["variables"]) == 27
     for accion in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos"):
         assert "perfil_de" in meta["variables"][accion]
     assert "perfil_de" in meta["variables"]["corregir_mis_datos"] and "perfil_de" in meta["valores"] and "perfil_de" in meta["defectos"]

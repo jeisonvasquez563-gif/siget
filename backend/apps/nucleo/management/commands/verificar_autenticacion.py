@@ -331,6 +331,7 @@ class Command(BaseCommand):
         self._paso("el límite de tasa corta una ráfaga de logins (429)", 429 in codigos and codigos[:10].count(429) == 0, f"{codigos.count(401)}x401, {codigos.count(429)}x429")
 
         self._derechos(ahora)
+        self._cambio_de_contrasena()
 
         # ---------------------------------------------------------------- registro de seguridad inalterable y datos
         n = EventoSeguridad.objects.count()
@@ -377,6 +378,89 @@ class Command(BaseCommand):
             c.execute("select current_user, (select rolsuper from pg_roles where rolname = current_user)")
             usuario_bd, es_super = c.fetchone()
         self._paso("todo se ejecutó como app_role, sin superusuario", usuario_bd == "app_role" and not es_super)
+
+    # ------------------------------------------------------------------ cambio de contraseña desde la sesión
+    def _cambio_de_contrasena(self):
+        nueva = "otra-frase-larga-y-poco-comun-5528"
+        mala = "mala-mala-mala-1"
+        ruta = "/auth/contrasena/"
+        eva, _, _ = self._ciudadana(40, "int_eva")
+
+        def cambiar(token, actual, nueva_clave):
+            return self._http("post", ruta, {"actual": actual, "nueva": nueva_clave}, token=token)
+
+        self._paso("cambiar la contraseña sin sesión se responde 401", self._http("post", ruta, {"actual": CLAVE_BUENA, "nueva": nueva}).status_code == 401)
+        enrolar = self._entrar(eva, scope=tokens.SCOPE_ENROLAR_MFA)
+        self._paso("un token de enrolamiento (acceso limitado) no sirve para cambiarla", cambiar(enrolar, CLAVE_BUENA, nueva).status_code == 403)
+        token_eva = self._entrar(eva, minutos_mfa=60)
+        r = cambiar(token_eva, CLAVE_BUENA, nueva)
+        self._paso("con el segundo factor vencido se niega y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
+        self._paso("y no se cambió nada", contrasenas.verificar(CLAVE_BUENA, Usuario.objects.get(pk=eva.pk).password_hash))
+
+        # Con el segundo factor reciente de nuevo: dos sesiones más de la misma cuenta (la de enrolamiento y esta) se cerrarán al cambiarla
+        token_otra_sesion = self._entrar(eva)
+        sesion_actual = str(tokens.decodificar_access(settings.SIGET_JWT_KEY, token_eva, timezone.now(), settings.SIGET_EMISOR).sesion_id)
+        for cuerpo, nombre in (({"actual": CLAVE_BUENA, "nueva": "corta"}, "demasiado corta"),
+                               ({"actual": CLAVE_BUENA, "nueva": "passwordpassword"}, "común"),
+                               ({"actual": CLAVE_BUENA, "nueva": "xx-int_eva-xx-1234"}, "con el nombre de usuario"),
+                               ({"actual": CLAVE_BUENA, "nueva": CLAVE_BUENA}, "igual a la actual")):
+            r = self._http("post", ruta, cuerpo, token=token_eva)
+            self._paso(f"una contraseña nueva {nombre} se rechaza con el detalle", r.status_code == 400 and bool(r.json().get("errores")), r.status_code)
+        self._paso("un cuerpo con tipos inesperados no provoca un 500", self._http("post", ruta, {"actual": ["x"], "nueva": 123}, token=token_eva).status_code == 400)
+        eva.refresh_from_db()
+        Usuario.objects.filter(pk=eva.pk).update(intentos_fallidos=0)  # el último cuerpo (actual de tipo inválido) sí cuenta como fallo: se limpia
+        self._paso("las nuevas rechazadas no tocaron la contraseña actual", contrasenas.verificar(CLAVE_BUENA, eva.password_hash))
+
+        r = cambiar(token_eva, CLAVE_BUENA, nueva)
+        self._paso("con el segundo factor reciente y la contraseña actual correcta se cambia, y cierra las otras 2 sesiones",
+                   r.status_code == 200 and r.json().get("sesiones_cerradas") == 2, r.json())
+        eva.refresh_from_db()
+        self._paso("la base guarda el hash Argon2 de la nueva (no la clave) y la anterior deja de servir",
+                   eva.password_hash.startswith("argon2$") and nueva not in eva.password_hash and contrasenas.verificar(nueva, eva.password_hash)
+                   and not contrasenas.verificar(CLAVE_BUENA, eva.password_hash))
+        self._paso("la sesión desde la que se cambió sigue válida", self._http("get", "/auth/yo/", token=token_eva).status_code == 200)
+        self._paso("las demás sesiones de la cuenta se cerraron de inmediato", self._http("get", "/auth/yo/", token=token_otra_sesion).status_code == 401)
+        self._paso("en la base solo la sesión actual quedó sin revocar",
+                   [str(p) for p in Sesion.objects.filter(usuario=eva, revocada=False).values_list("pk", flat=True)] == [sesion_actual])
+        evento = EventoSeguridad.objects.filter(actor=eva, evento="contrasena_cambiada").order_by("-id").first()
+        self._paso("quedó el evento de seguridad `contrasena_cambiada`, solo con el número de sesiones cerradas",
+                   evento is not None and evento.detalle == {"sesiones_cerradas": 2})
+
+        # La contraseña actual incorrecta: 400 genérico y cuenta para el bloqueo progresivo, como un login fallido
+        r = cambiar(token_eva, mala, "una-tercera-frase-9183-larga")
+        self._paso("con la contraseña actual incorrecta se responde 400 genérico, sin detalle de la política",
+                   r.status_code == 400 and r.json()["codigo"] == "credenciales_invalidas" and "errores" not in r.json(), r.status_code)
+        eva.refresh_from_db()
+        self._paso("y cuenta como intento fallido, registrado como un login fallido con su motivo",
+                   eva.intentos_fallidos == 1 and EventoSeguridad.objects.filter(actor=eva, evento="login_fallido", detalle__motivo="contrasena_actual_incorrecta").count() == 1)
+        cambiar(token_eva, mala, "una-tercera-frase-9183-larga")
+        cambiar(token_eva, mala, "una-tercera-frase-9183-larga")
+        eva.refresh_from_db()
+        self._paso("el tercer fallo bloquea la cuenta con el mismo bloqueo progresivo que el login",
+                   eva.bloqueado_hasta is not None and eva.intentos_fallidos == 0 and EventoSeguridad.objects.filter(actor=eva, evento="cuenta_bloqueada").count() == 1)
+        self._paso("al bloquearla se cierran todas las sesiones (también esa)", self._http("get", "/auth/yo/", token=token_eva).status_code == 401)
+        r = cambiar(self._entrar(eva), nueva, CLAVE_BUENA)
+        eva.refresh_from_db()
+        self._paso("bloqueada, ni la contraseña actual correcta cambia nada (misma respuesta genérica)",
+                   r.status_code == 400 and r.json()["codigo"] == "credenciales_invalidas" and contrasenas.verificar(nueva, eva.password_hash))
+        Usuario.objects.filter(pk=eva.pk).update(bloqueado_hasta=None)
+        r = cambiar(self._entrar(eva), nueva, CLAVE_BUENA)
+        self._paso("pasado el bloqueo, con la contraseña actual correcta se vuelve a cambiar", r.status_code == 200, r.status_code)
+
+        # Una cuenta de plataforma también cambia la suya (es su propia cuenta)
+        r = cambiar(self._entrar(Usuario.objects.get(username="int_ident")), CLAVE_BUENA, nueva)
+        self._paso("una cuenta de plataforma cambia la suya", r.status_code == 200, r.status_code)
+
+        # Límite de tasa propio: 5 por hora por persona (cada intento cuenta, también el que se rechaza)
+        token_mario = self._entrar(Usuario.objects.get(username="int_mario"))
+        self._limpiar()
+        codigos = [self.cliente.post(ruta, {"actual": CLAVE_BUENA, "nueva": "corta"}, format="json", secure=True,
+                                     HTTP_AUTHORIZATION=f"Bearer {token_mario}", **HOST).status_code for _ in range(7)]
+        self._limpiar()
+        self._paso("el límite de tasa corta el sexto intento en una hora (429)", codigos == [400] * 5 + [429, 429], codigos)
+
+        crudos = " ".join(str(v) for v in EventoSeguridad.objects.filter(actor__in=[eva]).values_list("detalle", flat=True))
+        self._paso("ningún evento del cambio guarda las contraseñas", nueva not in crudos and CLAVE_BUENA not in crudos and mala not in crudos)
 
     # ------------------------------------------------------------------ derechos sobre los datos personales (PT-15, Ley 81)
     def _entrar(self, usuario, minutos_mfa=1, scope=tokens.SCOPE_COMPLETO):

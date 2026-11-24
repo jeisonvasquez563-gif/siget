@@ -41,6 +41,7 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 | `POST /auth/mfa/enrolar/` | `{}` | `201 {secreto, uri}`; el secreto se muestra **una sola vez** (la `uri` se dibuja como QR) |
 | `POST /auth/mfa/confirmar/` | `{codigo}` | `200` con tokens de scope `completo` |
 | `POST /auth/mfa/verificar/` | `{codigo}` | `200`; renueva la vigencia del segundo factor (15 min) |
+| `POST /auth/contrasena/` | `{actual, nueva}` (sesión completa) | **Cambio de contraseña desde la sesión.** Exige **segundo factor reciente** (acción `cambiar_contrasena` del PDP, para toda cuenta autenticada, incluidas las de plataforma, y solo sobre la propia; `403` con `reautenticacion_sugerida` si falta). `200 {detalle, sesiones_cerradas}`: la contraseña nueva queda con hash Argon2, se **cierran todas las demás sesiones** de la cuenta y la actual sigue abierta (evento de seguridad `contrasena_cambiada`, solo con `sesiones_cerradas`). `400 {codigo: "credenciales_invalidas", detalle}` si la contraseña actual es incorrecta o la cuenta está bloqueada (respuesta genérica); un error de la actual cuenta como intento fallido del **bloqueo progresivo del login** (3 fallos bloquean 5, 15 y 60 min; al bloquear se cierran todas las sesiones). `400 {codigo: "datos_invalidos", errores[]}` si la nueva incumple la política del registro (12 a 128 caracteres, sin el usuario, ni común) o es igual a la actual (esto no cuenta como fallo). `429` pasados **5 intentos por hora** por persona (también cuentan los rechazados) |
 
 `GET /auth/yo/`:
 
@@ -57,7 +58,7 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 
 ## Derechos sobre los datos personales (`/auth/mis-datos/…`) — scope `completo` (PT-15, Ley 81 de 2019)
 
-Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (26 acciones en total en la matriz, con `responder_subsanacion`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
+Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (27 acciones en total en la matriz, con `responder_subsanacion` y `cambiar_contrasena`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
