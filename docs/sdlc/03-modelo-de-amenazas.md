@@ -9,14 +9,14 @@
 1. STRIDE son seis tipos de amenaza. Para cada pieza de SIGET nos preguntamos si puede pasar cada una:
    **S**uplantación (alguien se hace pasar por otro) · **T**ampering, alteración (alguien modifica datos) · **R**epudio (alguien niega haber hecho algo) · **I**nformación divulgada (alguien ve lo que no debe) · **D**enegación de servicio (alguien tumba el sistema) · **E**levación de privilegios (alguien obtiene más permisos de los que tiene).
 2. Partimos del diseño Zero Trust (`docs/superpowers/specs/2026-10-08-arquitectura-zero-trust-design.md`, sección 7) y de la matriz `docs/zero-trust-cobertura.md`, y dibujamos el diagrama de flujo de datos con sus **límites de confianza** (ver abajo).
-3. Cada control que figura en las tablas se comprobó en el código o la configuración y se nombra el archivo donde está. Leímos la rama con las correcciones del análisis estático y dinámico (`fix/analisis-estatico-dinamico`) y las ramas ya desplegadas en producción: `feature/backend-plazos` (temporizador de escalamiento), `feature/backend-registro-configurable` y `feature/backend-documentos` (documentos adjuntos).
+3. Cada control que figura en las tablas se comprobó en el código o la configuración y se nombra el archivo donde está. Leímos la rama con las correcciones del análisis estático y dinámico (`fix/analisis-estatico-dinamico`) y las ramas ya desplegadas en producción: `feature/backend-plazos` (temporizador de escalamiento), `feature/backend-registro-configurable` y `feature/backend-documentos` (documentos adjuntos). Las piezas agregadas desde el 24-nov-2026 (contenido del trámite, notificaciones, alertas y catálogo) se leyeron en `develop`, con sus migraciones 017 a 020 y sus pruebas de base.
 4. También usamos los hallazgos ya medidos: la revisión de seguridad del 22-oct (`docs/revision-seguridad-2026-10-22.md`), el informe de análisis (`docs/analisis-seguridad/README.md`), el runbook (`docs/runbook.md`) y el [registro de riesgos](./01-registro-de-riesgos.md) de la etapa 1 (los códigos R1, R2… remiten a él).
 5. Estado: **Mitigada** (hay un control que la cubre y está comprobado) · **Parcial** (hay controles, pero queda un hueco concreto que se nombra) · **Abierta** (no hay control todavía). Cuando una pieza tiene dos amenazas distintas de la misma letra, se listan en dos filas.
 6. La tabla del backend es el ejemplo original y se conserva tal cual.
 
 ## Componentes de SIGET
 
-Navegador (interfaz React) → nginx (TLS 1.3, VM1) → backend Django (VM1) → PostgreSQL (VM2). Además: temporizador de escalamiento (VM1) y volumen de documentos cifrados (VM1). El checkpoint PHP antiguo (Apache, puerto 80) se retiró el 17-nov-2026 con ZT-9 y el puerto está cerrado.
+Navegador (interfaz React) → nginx (TLS 1.3, VM1) → backend Django (VM1) → PostgreSQL (VM2). Además: temporizador de escalamiento (VM1), temporizador del detector de alertas (VM1, cada 5 minutos con su propio rol `detector_role`) y volumen de documentos cifrados (VM1). Las notificaciones y el catálogo de cada institución viven dentro del backend y la base, sin componentes nuevos. El checkpoint PHP antiguo (Apache, puerto 80) se retiró el 17-nov-2026 con ZT-9 y el puerto está cerrado.
 
 ## Diagrama de flujo de datos y límites de confianza
 
@@ -33,6 +33,7 @@ flowchart LR
     ADM1["sshd y sudo<br/>administración"]
     AP["Apache + PHP<br/>checkpoint antiguo, retirado el 17-nov"]
     TMR["Temporizador de escalamiento<br/>systemd + contenedor desechable"]
+    DET["Temporizador del detector de alertas<br/>cada 5 minutos, contenedor desechable"]
     SEC[["podman secret<br/>claves y contraseñas"]]
     VOL[("Volumen siget-documentos<br/>archivos cifrados AES-256-GCM")]
     subgraph POD["Límite 3: pod siget (contenedores rootless, solo lectura)"]
@@ -54,9 +55,11 @@ flowchart LR
   NG -->|"HTTP interno del pod, solo prefijos de la API"| BE
   SEC -.->|"montados al arrancar"| BE
   SEC -.->|"solo 2 secretos"| TMR
+  SEC -.->|"solo 2 secretos"| DET
   BE -->|"cifra y descifra"| VOL
   BE -->|"TLS 1.3 verify-full, red interna, app_role"| PG
   TMR -->|"TLS 1.3, escalador_role, solo EXECUTE"| PG
+  DET -->|"TLS 1.3, detector_role, solo EXECUTE"| PG
   AP -->|"TLS, checkpoint_app"| PG
   PG -->|"pg_dump"| RES
 ```
@@ -97,7 +100,7 @@ flowchart LR
 |---|---|---|---|
 | S | Un intermediario en la red se hace pasar por SIGET con un certificado falso | Solo TLS 1.3 y HSTS de un año (`nginx.conf`); la clave TLS es un `podman secret` que solo lee el usuario de nginx (`siget-nginx.container`); la huella de la CA se publica para verificarla antes de confiar (`infra/pki/README.md`). **Queda:** la CA es interna; si la persona no la instaló, el navegador avisa «la conexión no es privada» y permite continuar, que es justo lo que aprovecharía un intermediario | Parcial |
 | T | Alguien envía una cabecera `Host` o `X-Forwarded-For` falsa para desviar redirecciones o engañar el registro de direcciones | `map $host $host_permitido`: los nombres que no son de la plataforma reciben 421, en 8080 y en 8443 (`nginx.conf`, commit `a91c0ea`, evidencia `docs/analisis-seguridad/despues/14_host_header_8443.txt`); nginx **reemplaza** `X-Forwarded-For` por la dirección real (`$remote_addr`) | Mitigada |
-| R | Alguien hace peticiones maliciosas y después lo niega | nginx registra cada petición (`access_log /dev/stdout`) y el journal de las VMs es persistente (runbook 14.6). **Queda:** los registros viven en la misma VM, no hay bitácora central ni alertas (hallazgo H-7; R22) | Parcial |
+| R | Alguien hace peticiones maliciosas y después lo niega | nginx registra cada petición (`access_log /dev/stdout`) y el journal de las VMs es persistente (runbook 14.6). Desde el 26-nov-2026 un detector revisa esos registros y abre alertas (PT-10, sección «Alertas de seguridad»). **Queda:** los registros viven en la misma VM y no hay bitácora central ni exportación firmada (hallazgo H-7; R22) | Parcial |
 | I | El servidor revela versiones, rutas internas o archivos que no debería servir | `server_tokens off`, `proxy_hide_header X-Powered-By`, solo los prefijos de la API llegan al backend y todo lo demás responde 404 (`nginx.conf`); Apache con `ServerTokens Prod` y `TraceEnable Off` (`docs/analisis-seguridad/README.md`, «Aplicado en producción»); OWASP ZAP sin alertas de riesgo después de corregir (`docs/analisis-seguridad/despues/11_zap_escaneo.txt`) | Mitigada |
 | I | Alguien en la misma red lee usuario y contraseña del checkpoint PHP antiguo, que se sirve por HTTP en el puerto 80 de VM1 | La plataforma nueva no tiene este problema (todo por TLS 1.3 y el puerto 8080 solo redirige con 301). El checkpoint tiene la cookie `HttpOnly` y `SameSite=Strict` (`docs/analisis-seguridad/README.md`), pero sin TLS su contraseña viaja en claro y la cookie no puede llevar `Secure`. Nmap lo confirma (`despues/10_nmap_puertos_tls.txt`). Plan: retirarlo y cerrar el puerto 80 (ZT-9 / PT-13; R8) | **Mitigada el 17-nov-2026** (retirado y puerto 80 cerrado; ver A3) |
 | D | Una ráfaga de peticiones desde una dirección satura el servicio | `limit_req` de 20 peticiones por segundo por dirección con respuesta 429, cuerpo máximo de 10 MB y tiempos de espera de 15 segundos (`nginx.conf`); además, límites por tipo de petición en Django con caché compartida entre procesos (`config/settings.py`, hallazgo H-4 corregido). Si se abre a internet detrás de un proxy, primero hay que leer la IP real (R19) | Mitigada |
@@ -139,9 +142,58 @@ flowchart LR
 | D | Se pierde la clave de documentos o el volumen, y los archivos quedan ilegibles para siempre | La clave existe solo como `podman secret` en VM1 y no tiene respaldo fuera de ella (runbook 37.2, punto 2); el volumen `siget-documentos` no tiene un respaldo automático implementado (el respaldo diario es solo de la base, en VM2) (R6) | Abierta |
 | E | Un ciudadano sube un archivo malicioso (ejecutable disfrazado, PDF con código) para tomar el equipo del funcionario que lo abre | Lista cerrada de tipos (PDF, PNG, JPEG) detectados por los bytes mágicos y con la extensión obligada a coincidir; nada de SVG ni HTML (`documentos.py`); la descarga sale siempre como adjunto, con `nosniff` y `Content-Security-Policy: default-src 'none'; sandbox` (`vistas.py`). **Queda:** un PDF real con contenido malicioso pasa la validación porque no hay antivirus (ClamAV quedó como opcional y no se implementó; R4) | Parcial |
 
+## Alertas de seguridad (detector, PT-10)
+
+Pieza nueva del 26-nov-2026: la función `siget.detectar_anomalias()`, su temporizador y la consola donde el operador de seguridad revisa las alertas (migración 019, runbook 43).
+
+| STRIDE | Amenaza | Control en SIGET | Estado |
+|---|---|---|---|
+| S | Alguien ejecuta la función de detección haciéndose pasar por el temporizador, o la aplicación inserta alertas por su cuenta | `siget.detectar_anomalias()` sin `EXECUTE` para `PUBLIC` y solo `detector_role` la ejecuta; ese rol entra con TLS desde VM1 y SCRAM (`pg_hba.conf`) y su contraseña es el `podman secret` `siget-db-detector-password`; `app_role` no tiene `INSERT` sobre las alertas (solo las inserta la función) (migración 019) | Mitigada |
+| T | Un operador, o quien use su cuenta, edita o borra alertas para esconder un patrón (cambiar el conteo, la regla o el detalle, reabrir una revisada) | `app_role` solo actualiza `estado, revisada_por, revisada_en, nota`; un disparador deja pasar únicamente el cambio de abierta a revisada o descartada, una vez, con nota, por un operador de seguridad que además tenga el contexto de la sesión; nadie borra una alerta (disparador, también para el dueño) (`verificar_plataforma`: «ni borrarlas ni vaciar la tabla», «ni cambiar el conteo, el detalle o la regla»; `pruebas-alertas.sql`) | Mitigada |
+| R | Quien revisa una alerta niega haberlo hecho, o quien provocó el patrón niega su actividad | La alerta guarda `revisada_por` y `revisada_en` (la hora la fija la base) y la revisión deja el evento de seguridad `alerta_revisada` sin la nota; el patrón queda en `evento_seguridad` y `decision_pdp`, de solo inserción. Es la mejora del repudio que la tabla de nginx dejaba abierta: además de registrar, ahora se detecta | Mitigada |
+| I | Una alerta o su consola muestran datos personales o secretos | El `detalle` lleva solo contadores y nombres de usuario, nunca cédula, correo ni credenciales (paso de `verificar_plataforma`: «cada alerta trae la persona por su usuario, la IP y contadores, y nunca cédula, correo ni credenciales»); seguridad por filas: `app_role` solo ve y revisa si la sesión es de un operador de seguridad activo y `auditor_role` solo lee; nada para `pgadmin_lectura`, `escalador_role` ni `checkpoint_app`; la respuesta sale con `Cache-Control: no-store` | Mitigada |
+| D | Una ráfaga llena la tabla de alertas, o el temporizador se detiene unas horas y un patrón pasa sin verse | Una sola alerta abierta por regla, persona e IP (índice único parcial): una ráfaga sube el conteo en vez de crear miles; las ventanas son deslizantes y se revisa la última hora (el último día para las de 24 horas), así que lo ocurrido con el temporizador detenido se detecta al volver (`Persistent=true`); la función es idempotente | Mitigada |
+| E | Quien obtiene la contraseña de `detector_role` la usa para leer o cambiar otra cosa | Rol `LOGIN` sin superusuario ni `BYPASSRLS`, solo `EXECUTE` sobre esa función; `config/settings_detector.py` se niega a arrancar si le llegan las claves de Django, de los JWT o del segundo factor; el contenedor recibe solo la contraseña del rol y la CA (`siget-detectar.service`) | Mitigada |
+| R | Quien controla VM1 o la base apaga el detector o desactiva sus disparadores, o el temporizador se cae sin que nadie lo note | El dueño puede deshabilitar disparadores y el superusuario saltarlos con `session_replication_role` (runbook 44.8); el temporizador no avisa si falla. Lo cubren el control de quién tiene esos roles (R9), el journal y los respaldos. **Queda:** no hay exportación firmada de la auditoría ni un aviso si el detector se detiene (R22, R12) | Parcial |
+
+## Notificaciones
+
+Pieza nueva del 24-nov-2026 (PT-9, migración 018, runbook 42): la campana de la barra superior y la tabla que la alimenta.
+
+| STRIDE | Amenaza | Control en SIGET | Estado |
+|---|---|---|---|
+| I | Una notificación revela datos personales o el motivo de una decisión a quien no debe | La tabla `notificacion` no tiene texto libre ni datos personales: solo el tipo (lista cerrada de seis), el trámite y las fechas; el texto lo arma la interfaz y el motivo se lee en el detalle del trámite, con sus controles de siempre. Del trámite se devuelve solo lo que la persona ya ve y lo ajeno responde 404 (`verificar_tramites` 214/214) | Mitigada |
+| I | Una persona lee o marca las notificaciones de otra | Seguridad por filas (`usuario_id = ctx_usuario()`) y la API filtra además por `usuario_id`: dos barreras; `app_role` tiene `SELECT` y `UPDATE (leida_en)`, sin `INSERT` ni `DELETE`; nada para el auditor, pgAdmin, el checkpoint ni el escalador | Mitigada |
+| T | Alguien fabrica avisos falsos o desmarca lo ya leído | Las genera la base con un disparador `AFTER UPDATE` sobre `tramite`, en la misma transacción del cambio y nunca al propio actor; la aplicación no puede insertar; `leida_en` solo pasa de nulo a un valor que fija la base y no se puede cambiar otra columna (`pruebas-notificaciones.sql`, 36/36) | Mitigada |
+| D | La consulta de la campana cada 60 segundos alarga una sesión inactiva o llena el registro de decisiones | La consulta de fondo no renueva un acceso vencido (`renovar: false` en `api.js`), solo corre con la pestaña visible y no deja decisiones «permitidas» en `decision_pdp` (parámetro `registrar_permitidas`); las denegaciones y las escrituras se registran siempre | Mitigada |
+| D | Las notificaciones se acumulan sin límite | La lista se pide paginada y con tope. **Queda:** no hay política de retención (runbook 42.8, mejora pendiente) | Parcial |
+
+## Catálogo de la institución
+
+Pieza nueva del 26-nov-2026 (migración 020, runbook 44): la coordinación de cada institución crea, edita y desactiva los tipos de trámite y su formulario.
+
+| STRIDE | Amenaza | Control en SIGET | Estado |
+|---|---|---|---|
+| E | Alguien sin coordinación vigente en esa institución (funcionario, supervisión, operador de plataforma, coordinación revocada, otra institución) crea o edita tipos de trámite | Dos barreras: el PDP (`gestionar_catalogo_institucion`: coordinación de esa institución con segundo factor reciente, consultado antes de buscar nada) y un disparador de la base que exige coordinación vigente y cuenta activa; `app_role` solo actualiza cinco columnas (nunca `id` ni `institucion_id`) y no borra. Con la credencial de la aplicación y sin contexto de usuario la base rechaza (`session_user`). Es la separación de funciones aplicada al catálogo (`pruebas-catalogo.sql` 82/82; `verificar_equipo` 133/133) | Mitigada |
+| T | Alguien manipula el formulario de un tipo: campos mal formados, formularios enormes o que prometen más texto del que un trámite guarda | La estructura se valida dos veces, en la API y en la base: hasta 30 campos con `id` único y de forma fija, tipos de una lista, opciones y ayudas con tope de largo y un formulario de a lo sumo 16 KB; la API además calcula el peor caso de texto contra el tope de `datos` | Mitigada |
+| T | Cambiar el formulario de un tipo altera o hace perder datos de los trámites ya iniciados | Cada trámite guarda una copia del formulario con el que nació (`tramite.formulario`): la pone la base e ignora lo que mande la aplicación, y es inmutable, también para el dueño; el detalle y la subsanación usan esa copia | Mitigada |
+| R | La coordinación niega haber cambiado un trámite del catálogo, o alguien lo cambia y lo oculta | `catalogo_cambio` registra cada alta y cambio con quién, cuándo y solo lo que cambió (`antes` y `despues`); no admite `UPDATE`, `DELETE` ni `TRUNCATE`, tampoco para el dueño, y `app_role` solo la ve en las instituciones que coordina | Mitigada |
+| D | Dos personas editan a la vez y se pisan, o se desactiva un tipo y se corta el seguimiento de lo ya iniciado | El `PATCH` exige la `version` y responde 409 si cambió; desactivar es reversible (nunca se borra), no toca los trámites existentes y deja su registro | Mitigada |
+| T | «Inalterable» solo vale contra instrucciones de datos: el dueño puede deshabilitar disparadores, el superusuario saltarlos con `session_replication_role`, y sin contexto de usuario el dueño pasa (migraciones, mantenimiento) | Documentado en el runbook 44.8; lo cubren el control de quién tiene esos roles, los respaldos y la auditoría del servidor. **Queda:** la base no tiene barrera contra el dueño | Parcial |
+
+## Contenido del trámite
+
+Pieza nueva del 24-nov-2026 (migración 017, runbook 40): datos del formulario, motivo de las decisiones y respuesta de la ciudadanía a la subsanación.
+
+| STRIDE | Amenaza | Control en SIGET | Estado |
+|---|---|---|---|
+| T | El personal reescribe lo que la persona declaró en su formulario al cerrar una subsanación | `datos` solo cambia cuando quien responde la subsanación es la persona solicitante y solo en el paso de En Subsanación a En Tramitación (disparador de la 017), aunque después reciba membresía en la institución (`verificar_tramites`) | Mitigada |
+| R | El personal rechaza o pide una subsanación sin explicarlo, y después nadie sabe por qué | La base exige un motivo de 10 a 2000 caracteres, con al menos una letra o un número, para rechazar, pedir y cerrar una subsanación, y lo guarda en el historial inalterable (`verificar_tramites`: «la base rechaza «Rechazado» sin motivo, aunque la API fallara») | Mitigada |
+| I | Un motivo en texto libre lleva datos personales y lo lee quien no debe (el auditor lee `atributos.motivo`) | Ningún formulario pide cédula, nombre ni correo, la interfaz avisa quién va a leer el motivo y a la ciudadanía el historial le muestra el motivo solo de los cambios que la afectan. **Queda:** riesgo aceptado, escrito en el runbook 40.9 (R26) | Parcial |
+
 ## Amenazas abiertas
 
-Incluye las **abiertas** y las **parciales**, ordenadas de la más grave a la menos grave. Las abiertas van primero. La antigua A1 (VMs sin parches) pasó a **Mitigada** el 16-nov-2026 y queda al final como registro.
+Incluye las **abiertas** y las **parciales**, ordenadas de la más grave a la menos grave. Las abiertas van primero. Desde el 26-nov-2026 suman P15 a P18, de las piezas nuevas (alertas, catálogo, notificaciones y contenido del trámite). La antigua A1 (VMs sin parches) pasó a **Mitigada** el 16-nov-2026 y queda al final como registro.
 
 | # | Pieza | STRIDE | Amenaza | Estado | Qué falta | Riesgo |
 |---|---|---|---|---|---|---|
@@ -158,20 +210,26 @@ Incluye las **abiertas** y las **parciales**, ordenadas de la más grave a la me
 | P8 | Temporizador | T | El reloj depende del PC anfitrión | Parcial | Volver a `chrony` con NTS cuando la red lo permita | Runbook 22.4 |
 | P9 | nginx | S | CA interna: si no se instala, el navegador avisa y deja continuar | Parcial | Certificado de una CA pública si se abre a internet | — |
 | P10 | Navegador | D | Bloqueo de cuentas usable como ataque | Parcial | Bloqueo también por dirección de origen y restablecimiento asistido | R11, H-3 |
-| P11 | nginx | R | Sin bitácora central ni alertas | Parcial | Alertas ante patrones y exportación firmada | R22 |
+| P11 | nginx | R | Sin bitácora central ni exportación firmada (las alertas existen desde el 26-nov-2026) | Parcial | Exportación firmada de la auditoría y bitácora fuera de la VM | R22 |
 | P12 | Navegador | I | Un XSS podría usar el token en memoria | Parcial | Mantener la CSP estricta y la prueba de seguridad del frontend | — |
 | P13 | Documentos | R | La descarga no registra qué documento se bajó | Parcial | Registrar el número de documento en la decisión o en la auditoría | — |
 | P14 | Documentos | D | Sin cuota total del volumen | Parcial | Cuota o aviso de disco lleno | — |
+| P15 | Alertas | R | El detector puede apagarse (o sus disparadores deshabilitarse) sin aviso | Parcial | Aviso si el detector deja de correr y exportación firmada | R22, R12 |
+| P16 | Catálogo | T | «Inalterable» vale contra instrucciones de datos, no contra quien tiene el rol dueño o superusuario | Parcial | Repartir quién tiene esos roles y enviar los registros fuera de la VM | R9, R27 |
+| P17 | Notificaciones | D | Sin política de retención | Parcial | Definir cuánto tiempo se conservan | — |
+| P18 | Contenido del trámite | I | El texto libre de un motivo puede llevar datos personales que lee el auditor | Parcial | Política de conservación y revisión del texto libre | R26 |
 | A1 | VM1 y VM2 (fila en la tabla de la base) | E | Vulnerabilidades sin parchar en el sistema operativo | **Mitigada** (16-nov-2026) | Hecho: actualización a Rocky 9.9, 0 críticos y 0 pendientes (`docs/sdlc/evidencia/10_parches_despues.txt`). Resta mantener la bitácora semanal y resolver los repositorios con firma inválida | R5, R10, R24 |
 
 ### Resumen por estado
 
 | Estado | Ejemplo del backend | Piezas completadas | Total |
 |---|---|---|---|
-| Mitigada | 6 | 19 | 25 |
-| Parcial | 0 | 15 | 15 |
+| Mitigada | 6 | 36 | 42 |
+| Parcial | 0 | 19 | 19 |
 | Abierta | 0 | 1 | 1 |
-| **Total** | **6** | **35** | **41** |
+| **Total** | **6** | **56** | **62** |
+
+Las 21 amenazas nuevas son de las piezas agregadas desde el 24-nov-2026 (alertas 7, notificaciones 5, catálogo 6 y contenido del trámite 3): 17 mitigadas y 4 parciales, ninguna abierta.
 
 **La amenaza abierta** que queda es A4 (una sola persona con sudo en VM2). A2, la pérdida de la clave de documentos, pasó a Parcial el 17-nov-2026 con la copia fuera de VM1, y A3 (checkpoint PHP en HTTP) quedó mitigada ese mismo día. La que lo era, A1 (los parches), se mitigó el 16-nov-2026: afectaba a las dos máquinas a la vez y una vulnerabilidad del sistema operativo podía saltarse todas las barreras de la aplicación.
 
@@ -202,7 +260,16 @@ El token de acceso dura solo 10 minutos y vive en la memoria de la página, no g
 Por mínimo privilegio: el temporizador solo necesita marcar los trámites vencidos. Su rol no puede leer ninguna tabla, solo ejecutar una función, y el contenedor no recibe las claves de la aplicación. Si alguien robara esa contraseña, lo único que podría hacer es escalar trámites que ya vencieron, y eso queda en la auditoría.
 
 **9. ¿Por qué marcaron amenazas como «parcial» o «abierta» en vez de decir que todo está cubierto?**
-Porque un modelo de amenazas que solo dice «mitigada» no sirve para decidir nada. Preferimos ser honestos: hoy son 25 mitigadas, 15 parciales y 1 abierta, cada una con lo que falta y su riesgo en el registro de la etapa 1. Así el equipo sabe exactamente qué arreglar primero.
+Porque un modelo de amenazas que solo dice «mitigada» no sirve para decidir nada. Preferimos ser honestos: hoy son 42 mitigadas, 19 parciales y 1 abierta, cada una con lo que falta y su riesgo en el registro de la etapa 1. Así el equipo sabe exactamente qué arreglar primero.
 
 **10. ¿Cómo saben que los controles que nombran existen de verdad?**
 Cada control de las tablas está en un archivo concreto del repositorio que nombramos, y muchos tienen pruebas automáticas o evidencia: por ejemplo, la prueba de que la auditoría no se puede borrar, el escaneo de ZAP y Nmap después de corregir, y la prueba de cabecera `Host` falsa que responde 421.
+
+**11. ¿Qué amenazas cubren las alertas automáticas (PT-10) y cuáles quedan?**
+Las alertas mejoran sobre todo el repudio y la detección: antes un ataque en curso solo se veía si alguien abría la consola de auditoría; ahora un detector corre cada 5 minutos y abre una alerta por ráfagas de inicios fallidos, denegaciones repetidas del PDP, reuso de un token de refresco y bloqueos repetidos. El detector tiene su propio rol, que solo puede ejecutar esa función, y la revisión por un operador de seguridad deja nota, autor y hora que fija la base. Lo que queda parcial es que nadie avisa si el detector mismo se detiene y que la auditoría no se exporta firmada fuera de la VM.
+
+**12. ¿Cómo se aplica la separación de funciones al catálogo de trámites?**
+Solo la coordinación de cada institución gestiona su catálogo, y lo hace dos veces: el PDP exige coordinación de esa institución con segundo factor reciente y la base vuelve a exigirlo con un disparador, de modo que ni la supervisión, ni un operador de plataforma, ni la coordinación de otra institución pueden hacerlo, aunque alguien se salte la API. Además cada cambio queda en un registro que nadie puede editar ni borrar.
+
+**13. ¿Por qué cada trámite guarda una copia de su formulario?**
+Porque si la coordinación cambia el formulario de un tipo, los trámites que ya estaban en curso no deben perder ni reinterpretar lo que la persona declaró. Al crear el trámite la base copia el formulario vigente y esa copia no se puede modificar, ni siquiera por el dueño; el detalle y la corrección en la subsanación usan siempre esa copia. Es una amenaza de alteración cerrada en la base, no en el código.

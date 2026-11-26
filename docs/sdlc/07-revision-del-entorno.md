@@ -9,7 +9,8 @@
 1. La revisión inicial fue de solo lectura, el 16-nov-2026, por SSH con llave desde el equipo del desarrollador hacia las dos máquinas virtuales (VM1 con la aplicación y VM2 con la base de datos). En ese momento no se cambió nada.
 2. Cada resultado se copió tal cual de la salida del comando y se marcó con ✅ (cumple lo esperado) o ⚠️ (hay algo que atender).
 3. Lo que no dio lo esperado se pasó a «Hallazgos de la revisión». Nada se corrige sin respaldo.
-4. Ese mismo día, con respaldo e instantáneas previas, se corrigieron los hallazgos 2, 3 y 4 y se repitió la revisión en solo lectura. Los resultados están en «Después de la corrección» y el procedimiento en «Registro de la actualización».
+4. Ese mismo día, con respaldo e instantáneas previas, se corrigieron los hallazgos 2, 3 y 4 y se repitió la revisión en solo lectura. Los resultados están en «Después de la corrección» y el procedimiento en «Registro de la actualización». Los hallazgos 1 y 5 se cerraron el 17-nov-2026.
+5. Desde el 24-nov-2026 cada cambio que toca las VMs (migraciones 016 a 020, el rol del detector, la configuración de nginx) se aplicó con el procedimiento de la sección «Cambios del entorno desde el 17 de noviembre», a partir de los registros del runbook (secciones 39 a 44). **La revisión de solo lectura completa no se repitió después del 17-nov**: lo de esa sección sale de los registros de cada aplicación y de su evidencia (`evidencia/14_*` a `19_*`).
 
 ## Comprobaciones (antes de corregir)
 
@@ -78,7 +79,7 @@ Las salidas en texto tienen los mismos nombres con extensión `.txt`, en `eviden
 
 Lo que sí cumple: SELinux activo, acceso por SSH solo con llave y sin entrada directa del administrador del sistema, TLS 1.3 con cabeceras completas, contenedor sin privilegios y con disco de solo lectura, y un único administrador con sudo completo.
 
-Resumen: de 5 hallazgos, **3 corregidos** (2, 3 y 4) y **2 abiertos** (1 y 5).
+Resumen: de 5 hallazgos, **los 5 corregidos**: 2, 3 y 4 el 16-nov-2026, y 1 y 5 el 17-nov-2026.
 
 ## Registro de la actualización a Rocky 9.9
 
@@ -102,6 +103,23 @@ Resumen: de 5 hallazgos, **3 corregidos** (2, 3 y 4) y **2 abiertos** (1 y 5).
 | Reinicio y verificaciones | Todo arrancó solo; 0 avisos críticos y 0 actualizaciones pendientes en las dos VMs; 77/77, 91/91 y 84/84 |
 | Ensayo posterior | 101/101 contra producción |
 
+## Cambios del entorno desde el 17 de noviembre
+
+Entre el 24 y el 26 de noviembre se aplicaron seis cambios en producción (migraciones 016 a 020 y el cambio de contraseña, sin migración). Todos siguieron el mismo procedimiento y dejaron su registro en el runbook y su evidencia en `evidencia/14_*` a `19_*`.
+
+| Cambio del entorno | Qué se hizo | Cómo se cuidó | Registro |
+|---|---|---|---|
+| Rol `detector_role` en la base (26-nov) | Línea nueva en `pg_hba.conf` de VM2 (solo desde VM1, con TLS y SCRAM, como `escalador_role`) y rol con `LOGIN`, sin superusuario ni `BYPASSRLS`, solo `EXECUTE` sobre `siget.detectar_anomalias()` | El archivo se editó con `tee -a` **en el mismo inodo** (está montado en el contenedor de PostgreSQL), con respaldo `pg_hba.conf.respaldo-2026-11-26`, permisos 644 y `pg_reload_conf()` sin error; `log_statement` estaba en `none` | Runbook 43.10, punto 4; `evidencia/18_alertas_migracion` |
+| Contraseña de `detector_role` (26-nov) | Generada en VM2 (40 caracteres), fijada por la entrada estándar de `psql` y pasada por una tubería SSH directo a `podman secret create siget-db-detector-password -` | **Nunca se mostró ni se guardó en un archivo**; el contenedor del detector recibe solo ese secreto y la CA | Runbook 43.10, punto 5 |
+| Temporizador `siget-detectar.timer` (26-nov) | Unidad de systemd de usuario en VM1, cada 5 minutos con `Persistent=true`, que corre `manage.py detectar_anomalias` en un contenedor desechable con `config/settings_detector.py` (se niega a arrancar si le llegan las claves de Django, JWT o segundo factor) | Es idéntica a la del escalador salvo los nombres; primera corrida a mano: 0 alertas; `systemctl --user disable --now siget-detectar.timer` lo detiene sin tocar datos | Runbook 43.10, punto 7; `evidencia/18_alertas_verificaciones_despliegue_y_temporizador` |
+| Lista de rutas de nginx (24-nov) | Se agregó `notificaciones` a la lista de `location` de `nginx.conf`: el ensayo daba 112/112 pero desde afuera `/notificaciones/` respondía 404 | Respaldo `nginx.conf.respaldo-2026-11-24`, escritura **en el mismo inodo** (el archivo está montado en el contenedor), `nginx -t` dentro del contenedor y `nginx -s reload` sin cortar conexiones; luego 401 sin sesión | Runbook 42.9, punto 5; `evidencia/17_notificaciones_nginx` |
+| Cada migración (24 y 26-nov) | Migraciones 016, 017, 018, 019 y 020 en VM2, como `siget_owner`, en una sola transacción | Respaldo verificado con copia `pre-0NN` fuera de la rotación de 14 días; ensayo con `ROLLBACK` junto con sus pruebas; migración real y las mismas pruebas sobre la base migrada | Runbook 39 a 44 |
+| Cada despliegue de la aplicación (24 y 26-nov) | Imagen nueva y interfaz nueva en VM1 | La imagen anterior se guarda como `siget-backend:respaldo-AAAA-MM-DD` y la interfaz en `frontend.respaldo-…`; las **ocho verificaciones se corren contra la base real antes de reiniciar**; ensayo completo al final | Runbook 39.10 a 44.9 |
+
+**Dos lecciones del entorno.** La primera: un archivo montado en un contenedor (`pg_hba.conf`, `nginx.conf`) se edita en el mismo inodo; si se reemplaza el archivo, el contenedor sigue viendo el viejo. La segunda: ninguna prueba que hable directo con Django ve lo que nginx deja pasar, por eso el ensayo atraviesa nginx con una sesión real.
+
+**Lo que sigue pendiente en el entorno** (no son hallazgos nuevos): la unidad del backend de VM1 conserva la inactividad de 2 minutos de la demostración y hay que volverla a 10 (R21); la copia de los respaldos fuera de VM2 (R7); una segunda persona con sudo (R9); y la segunda copia de la clave de documentos fuera del PC anfitrión (R6).
+
 ## Preguntas que puede hacer el profesor
 
 **1. ¿Qué es el entorno de despliegue y por qué se revisa su seguridad?**
@@ -111,7 +129,7 @@ Es el lugar donde corre el sistema de verdad: las dos máquinas virtuales, su si
 Es un guardia dentro del sistema operativo que decide qué puede hacer cada programa, aunque el programa se vea comprometido. En «Enforcing» el guardia bloquea de verdad lo no permitido; en otros modos solo avisa. Lo tenemos así en las dos máquinas, y por eso, si un servicio fuera atacado, no podría tocar archivos ajenos.
 
 **3. ¿Para qué sirve el cortafuegos y qué encontramos?**
-Decide qué puertas de la máquina están abiertas a la red; lo correcto es abrir solo las necesarias. Encontramos dos sobrantes: el puerto 80 abierto en la máquina de la aplicación (un servidor del checkpoint antiguo) y una regla de la base de datos hacia un puerto que ya no se usa. La regla sobrante ya se quitó; el puerto 80 sigue abierto hasta retirar el checkpoint. No eran graves, pero cada puerta de más es una puerta que alguien podría probar.
+Decide qué puertas de la máquina están abiertas a la red; lo correcto es abrir solo las necesarias. Encontramos dos sobrantes: el puerto 80 abierto en la máquina de la aplicación (un servidor del checkpoint antiguo) y una regla de la base de datos hacia un puerto que ya no se usa. Las dos se resolvieron: la regla sobrante se quitó el 16 de noviembre y el puerto 80 se cerró el 17, al retirar el checkpoint. No eran graves, pero cada puerta de más es una puerta que alguien podría probar.
 
 **4. ¿Por qué se prohíbe entrar por SSH con contraseña?**
 Porque una contraseña se puede adivinar o probar miles de veces. Con llave, solo entra quien tiene el archivo de la llave. Lo comprobamos: en las dos máquinas la contraseña está desactivada y el administrador del sistema no puede entrar directamente.
@@ -139,3 +157,12 @@ Con cinco cuidados. (1) Respaldo verificado de la base antes de empezar. (2) Una
 
 **12. ¿Qué les queda pendiente en el entorno?**
 Ninguno de los cinco hallazgos. El último, el puerto 80 con el checkpoint PHP, lo cerramos el 17 de noviembre: se decidió aparte porque retirar el checkpoint no tiene vuelta atrás para quien lo usaba. De paso se retiró pgAdmin web, que compartía ese puerto sin cifrar y que SIGET no usa. El otro hallazgo de la actualización, seis repositorios externos de PostgreSQL con firma inválida en VM1, lo corregimos el 17 de noviembre deshabilitándolos, con respaldo de su configuración.
+
+**13. ¿Qué cambió en el entorno cuando se agregaron las alertas?**
+Tres cosas: un rol nuevo en la base, `detector_role`, que solo puede ejecutar una función y entra únicamente desde VM1 con TLS y contraseña; una línea nueva en `pg_hba.conf` de VM2, editada en el mismo archivo con respaldo y recarga sin cortar nada; y un temporizador de systemd en VM1 que corre cada 5 minutos en un contenedor desechable. Su contraseña se generó en VM2 y viajó por una tubería directo a un secreto de Podman, sin mostrarse ni guardarse en ningún archivo.
+
+**14. ¿Por qué importa editar `pg_hba.conf` o `nginx.conf` «en el mismo inodo»?**
+Porque esos archivos están montados dentro de un contenedor. Si un editor crea un archivo nuevo y reemplaza al anterior, el contenedor sigue apuntando al archivo viejo y el cambio parece aplicado pero no lo está. Por eso agregamos la línea con `tee -a` o escribimos sobre el mismo archivo, comprobamos que el inodo es el mismo antes y después, validamos con `nginx -t` y recargamos sin cortar conexiones.
+
+**15. ¿Cómo evitan que un cambio defectuoso llegue a producción?**
+Con un procedimiento fijo en cada cambio: respaldo verificado de la base con una copia que la rotación no borra, ensayo de la migración con sus pruebas en una transacción que se revierte, migración real, la imagen nueva construida con otra etiqueta y verificada con las ocho verificaciones contra la base real antes de reiniciar, despliegue con respaldo de la imagen anterior y ensayo completo al final. Si algo falla antes de reiniciar, producción no se tocó, y siempre está escrito cómo volver atrás.

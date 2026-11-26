@@ -78,9 +78,9 @@ const PERSONAS = [
   { nombre: "Bradley Morales", etapa: "6. Pruebas", archivos: ["06-plan-de-pruebas.md"],
     resumen: "Reunimos todas las pruebas de SIGET (unitarias, contra la base real, de extremo a extremo, estáticas y dinámicas), las corrimos y definimos una lista de revisión de código que se aplicó a PR reales." },
   { nombre: "Jeison Vásquez", etapa: "7. Implementación y coordinación", archivos: ["07-revision-del-entorno.md"],
-    resumen: "Revisamos la seguridad del entorno donde corre SIGET: SELinux, SSH, cortafuegos, puertos, TLS, contenedores sin privilegios, y planificamos la actualización a Rocky 9.8." },
+    resumen: "Revisamos la seguridad del entorno donde corre SIGET: SELinux, SSH, cortafuegos, puertos, TLS, contenedores sin privilegios; actualizamos las dos máquinas a Rocky 9.9 y documentamos cada cambio del entorno desde el 24 de noviembre (el rol y el temporizador del detector de alertas, nginx, la base)." },
   { nombre: "Anyurie Sánchez", etapa: "8. Mantenimiento: supervisión", archivos: ["08-bitacora-supervision.md"],
-    resumen: "Cada semana revisamos los eventos de seguridad de la plataforma y tenemos un procedimiento escrito para responder a una intrusión." },
+    resumen: "Cada semana revisamos los eventos de seguridad de la plataforma, desde el 26 de noviembre empezando por la consola de alertas que abre un detector automático, y tenemos un procedimiento escrito para responder a una intrusión." },
   { nombre: "Walter Sanjur", etapa: "8. Mantenimiento: parches", archivos: ["08-bitacora-parches.md"],
     resumen: "Cada semana revisamos los avisos de seguridad pendientes y las actualizaciones de dependencias, y vigilamos las fechas de fin de soporte de cada componente." },
 ];
@@ -88,7 +88,7 @@ const PERSONAS = [
 const comun = [
   h1("1. Lo que todos tienen que saber explicar"),
   h2("1.1 Qué es SIGET"),
-  p("SIGET (Sistema de Gestión y Trazabilidad) es una plataforma para que la ciudadanía siga sus trámites ante instituciones del Estado panameño y para que cada actuación quede registrada en una auditoría que no se puede alterar. Tiene una interfaz web (React), un backend (Django) y una base de datos (PostgreSQL), en dos máquinas virtuales con Rocky Linux 9 y contenedores Podman."),
+  p("SIGET (Sistema de Gestión y Trazabilidad) es una plataforma para que la ciudadanía siga sus trámites ante instituciones del Estado panameño y para que cada actuación quede registrada en una auditoría que no se puede alterar. Tiene una interfaz web (React), un backend (Django) y una base de datos (PostgreSQL), en dos máquinas virtuales con Rocky Linux 9 y contenedores Podman. Además del seguimiento y la auditoría, incluye plazos con escalamiento automático, documentos cifrados, derechos de la persona sobre sus datos (Ley 81), notificaciones, alertas ante patrones sospechosos y la gestión del catálogo de trámites por cada institución."),
   h2("1.2 Qué es el SDLC seguro (según Red Hat)"),
   p("El ciclo de vida de desarrollo de software (SDLC) es el marco que sigue un software desde que se planifica hasta que se mantiene. El **SDLC seguro** agrega medidas de seguridad **en cada una de sus etapas**, en lugar de dejar la seguridad para el final. Red Hat lo describe en ocho etapas:"),
   ...tabla(["Etapa", "Qué pide Red Hat", "Responsable"], [
@@ -108,9 +108,11 @@ const comun = [
   h2("1.4 Preguntas generales que puede hacer el profesor"),
   ...[
     ["¿Por qué eligieron las ocho etapas de Red Hat?", "Porque cubren todo el ciclo, desde planificar hasta mantener, y para cada etapa dicen qué medida de seguridad aplicar. Nos permitió revisar SIGET de punta a punta y repartir el trabajo: cada integrante es responsable de una etapa."],
-    ["¿Qué etapa les costó más y por qué?", "El mantenimiento: al revisar encontramos que las máquinas nunca se habían actualizado y que la versión de Rocky Linux ya no tenía soporte. Lo documentamos y hay un plan con fechas para corregirlo."],
+    ["¿Qué etapa les costó más y por qué?", "El mantenimiento: al revisar encontramos que las máquinas nunca se habían actualizado y que la versión de Rocky Linux ya no tenía soporte. Lo documentamos y el 16 de noviembre lo corregimos: actualizamos las dos máquinas a Rocky 9.9 con respaldo, instantáneas y verificaciones, y quedaron en cero avisos críticos."],
     ["¿Cómo saben que lo que dicen es verdad?", "Todo tiene evidencia en el repositorio: capturas y salidas completas de cada comando en `docs/sdlc/evidencia/`, pruebas automáticas que cualquiera puede correr y el historial de cambios en GitHub con quién hizo y quién revisó cada cosa."],
-    ["¿Qué es lo más importante que falta?", "Respaldar la clave que cifra los documentos fuera de la máquina, retirar el checkpoint PHP que sigue en HTTP y darle a la persona la forma de ver, corregir y eliminar sus datos personales (Ley 81 de 2019). Los parches ya se aplicaron: el 16 de noviembre las dos máquinas pasaron a Rocky 9.9 sin avisos críticos pendientes."],
+    ["¿Qué es lo más importante que falta?", "Lo que depende de infraestructura que el laboratorio no tiene: una copia de los respaldos fuera de la VM de la base, una segunda persona con sudo y una segunda copia de la clave de los documentos fuera del PC anfitrión. También falta la exportación firmada de la auditoría, las pruebas de punta a punta de la interfaz con Playwright, la política de conservación de datos de la Ley 81, volver la inactividad a 10 minutos después de la demostración y, como límite declarado, verificar la identidad de quien se registra, que depende del Registro Civil y de un servidor de correo. Ya están hechos los parches (Rocky 9.9), el retiro del checkpoint PHP, los derechos sobre los datos personales y las alertas automáticas."],
+    ["¿Qué hicieron después del 17 de noviembre?", "Seis cambios en producción, del 24 al 26 de noviembre: derechos sobre los datos personales y aviso de privacidad (PT-15), el contenido del trámite con motivo obligatorio, el cambio de contraseña con cierre de sesiones, las notificaciones, las alertas ante patrones sospechosos (PT-10) y la gestión del catálogo por cada institución. Cada uno con respaldo verificado, ensayo de la migración y sus pruebas en una transacción revertida, la imagen verificada antes de reiniciar y un ensayo final que pasó de 101 a 119 comprobaciones."],
+    ["¿Cómo despliegan un cambio sin riesgo?", "Con un procedimiento fijo: respaldo verificado de la base, ensayo de la migración con sus pruebas en una transacción que se revierte, migración real, imagen nueva verificada contra la base real antes de reiniciar, despliegue con respaldo de la imagen anterior y ensayo completo al final. Dos lecciones quedaron escritas: un reemplazo de texto rompió seis pasos de una verificación y se atrapó antes de desplegar, y una ruta que nginx no dejaba pasar solo se vio comprobando desde afuera."],
     ["¿Qué harían distinto?", "Haber empezado la supervisión y los parches desde el primer día: las máquinas estuvieron meses sin actualizarse hasta que la revisión de mantenimiento lo descubrió. El SDLC seguro dice justamente eso: la seguridad no es una etapa final, va en todas."],
   ].flatMap(([q, a]) => [new Paragraph({ children: runs("**" + q + "**"), spacing: { before: 160, after: 60 }, keepNext: true }), p(a)]),
   h2("1.5 Glosario rápido"),
@@ -119,7 +121,7 @@ const comun = [
     ["Riesgo", "La combinación de qué tan probable es y qué tan grave sería"], ["Control", "Lo que reduce un riesgo (una regla, una configuración, una prueba)"],
     ["SAST", "Análisis estático: revisar el código sin ejecutarlo (Bandit, Semgrep)"], ["DAST", "Análisis dinámico: atacar la aplicación funcionando (OWASP ZAP)"],
     ["SCA", "Revisar las librerías de terceros por vulnerabilidades conocidas (pip-audit, npm audit)"], ["CVE / RLSA", "Identificador público de una vulnerabilidad / aviso de seguridad de Rocky Linux"],
-    ["PDP", "El decisor de acceso de SIGET: dice si una persona puede hacer algo"], ["RLS", "Seguridad por filas: la base de datos solo devuelve las filas que esa persona puede ver"],
+    ["PDP", "El decisor de acceso de SIGET: dice si una persona puede hacer algo"], ["Detector de alertas", "Función de la base que corre cada 5 minutos y abre una alerta ante un patrón sospechoso; la revisa una persona"], ["ARCO", "Derechos de acceso, rectificación, cancelación y oposición sobre los datos personales (Ley 81 de 2019)"], ["RLS", "Seguridad por filas: la base de datos solo devuelve las filas que esa persona puede ver"],
     ["Segundo factor (MFA)", "Un código del teléfono además de la contraseña"], ["PR (pull request)", "Pedido para incorporar un cambio, que otra persona revisa antes"],
   ], [2600, 6760]),
   salto(),
