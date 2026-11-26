@@ -18,7 +18,8 @@
 | Línea base: 16-nov-2026 (antes de actualizar) | 2 / 2 | 112 / 103 | — | — | Plan de actualización, con respaldo e instantáneas previas |
 | 16-nov-2026 (después de actualizar) | 0 / 0 | 0 / 0 | — | — | `dnf update` en VM2 y luego en VM1, reinicio y verificaciones; las dos VMs quedaron en Rocky Linux 9.9 |
 | 17-nov-2026 | 0 / 0 | 0 / 0 | — | — | Se deshabilitaron los repositorios pgdg con firma inválida en VM1 y se borraron las instantáneas «antes-de-rocky-9.8-2026-11-16» de las dos VMs (`evidencia/11_vm1_repos_pgdg`, `evidencia/12_instantaneas_borradas`). Se retiraron Apache, PHP y pgAdmin web (paquetes apagados: ya no hay que vigilar sus avisos mientras sigan así) |
-| 23-nov-2026 | A completar en la próxima revisión |  |  |  |  |
+| 17 al 26-nov-2026 | Sin medir esta semana (la última medición es la del 17-nov: 0 / 0) | Sin medir | — | Sin dato | Los despliegues del 24 y 26-nov (migraciones 016 a 020) fueron de la aplicación y de la base y no figuran actualizaciones del sistema en sus registros del runbook; cada uno se hizo con la imagen anterior guardada y la nueva verificada antes de reiniciar. La medición con `dnf updateinfo summary` queda para la próxima revisión |
+| 30-nov-2026 | A completar en la próxima revisión |  |  |  |  |
 
 Totales de la línea base: VM1 tiene 203 avisos de seguridad (2 críticos, 112 importantes, 83 moderados y 6 bajos) y VM2 tiene 192 (2 críticos, 103 importantes, 82 moderados y 5 bajos). Hay además 5 avisos de errores corregidos en cada una. Los dos críticos son los mismos en ambas (RLSA-2026:25049 y RLSA-2026:88459). Ese día seguían sin aplicarse, así que se incumplía la regla de 7 días. Se resolvieron la misma noche con la actualización completa del sistema (`dnf update`).
 
@@ -33,6 +34,15 @@ Después de actualizar y reiniciar, las dos VMs tienen **0 avisos críticos, 0 i
 ![Avisos pendientes después de actualizar](evidencia/10_parches_despues.png)
 
 Salida en texto: `evidencia/10_parches_despues.txt`. El detalle de la actualización (respaldo, instantáneas, VM2 primero, reinicios y verificaciones) está en `07-revision-del-entorno.md`, con las capturas `evidencia/09_*.png`.
+
+### Dependencias de la semana del 24 al 26-nov-2026
+
+Según el CHANGELOG y el runbook (no es una medición nueva de parches del sistema):
+
+- **Frontend:** `npm audit --omit=dev` en 0 al integrar el contenido del trámite (24-nov).
+- **Backend:** Bandit sin hallazgos en el mismo cambio.
+- **Gitleaks:** marcó un falso positivo en una prueba del frontend (un dato inventado en una constante llamada `SECRETO`); se renombró la constante y el hallazgo quedó en `.gitleaksignore`, acotado a ese commit y esa línea, con su justificación (runbook 41.6).
+- **Excepción conocida desde el 17-nov:** picomatch hasta la 4.0.7 (ReDoS, GHSA-fc5q-39xc-vjpf) afecta solo a las dependencias de desarrollo (vite y vitest) y no tiene versión corregida; el CI no deja pasar ninguna vulnerabilidad de producción y falla ante lo crítico en desarrollo. Se retira la excepción cuando salga el parche (CHANGELOG, 17-nov). No se volvió a comprobar si ya salió.
 
 ## Calendario de fin de soporte (del informe de mantenimiento)
 
@@ -82,3 +92,6 @@ Con una medición semanal: corremos `dnf updateinfo summary` en las dos máquina
 
 **11. ¿Cómo hicieron la actualización sin riesgo?**
 Con cinco cuidados. (1) Respaldo verificado de la base antes de empezar. (2) Una instantánea de VMware de cada máquina, para volver atrás si algo fallaba. (3) Una máquina por vez: primero VM2 (la base) y, cuando quedó bien, VM1. (4) Reinicio y comprobación de que todo arranca solo: servicios de SIGET, Apache y PHP, PostgreSQL y el respaldo diario. (5) Verificaciones contra la base real (77/77, 91/91 y 84/84) y el ensayo completo contra producción (101/101). Resultado: 0 avisos críticos y 0 actualizaciones pendientes en las dos máquinas.
+
+**12. ¿Qué pasó con los parches y las dependencias después del 17 de noviembre?**
+Los parches del sistema operativo no se midieron esa semana: la última medición, del 17 de noviembre, dio 0 críticos y 0 pendientes, y no mentimos con una cifra nueva que no tenemos. Lo que sí hubo fueron despliegues de la aplicación y la base con la imagen verificada antes de reiniciar. En dependencias, `npm audit` de producción siguió en 0 y Bandit sin hallazgos, hay una excepción conocida en herramientas de desarrollo (picomatch, sin versión corregida) y un falso positivo de Gitleaks que se justificó por escrito.
