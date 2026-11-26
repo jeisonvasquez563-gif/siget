@@ -1,6 +1,7 @@
 """Gestión del equipo de una institución contra la base real, en una transacción que se revierte.
 
-Los trámites se crean y se reasignan POR LA API (PDP, RLS y auditoría reales). Las decisiones del PDP se capturan en memoria (la tabla es
+Los trámites se crean y se reasignan POR LA API (PDP, RLS y auditoría reales). También cubre la gestión del catálogo de la institución
+(migración 020), por la API y con sondeos directos a la base como app_role. Las decisiones del PDP se capturan en memoria (la tabla es
 inalterable y esto no debe dejar nada). No deja ningún dato.
 """
 import json
@@ -20,6 +21,9 @@ from apps.autorizacion import permisos
 from apps.catalogo.models import Institucion, TipoTramite
 from apps.identidad.models import Membresia, Usuario
 from apps.tramites.formulario import datos_de_ejemplo
+from apps.catalogo.models import CatalogoCambio
+from apps.nucleo.contexto import fijar_contexto
+from apps.tramites.models import Tramite
 
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.31"}
 CLAVE = "una-frase-larga-y-poco-comun-8113"
@@ -66,6 +70,45 @@ class Command(BaseCommand):
         cache.clear()
         transaction.set_rollback(False)  # DRF marca la transacción al rechazar; en producción cada petición tiene la suya
         return r
+
+    def _http(self, usuario, metodo, ruta, datos=None, factor_reciente=True):
+        """Como `_llamar`, pero admite también PATCH (la gestión del catálogo)."""
+        ahora = timezone.now()
+        sesion = Sesion.objects.create(usuario=usuario, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=ahora + timedelta(minutes=10))
+        token = tokens.emitir_access(settings.SIGET_JWT_KEY, usuario.pk, sesion.pk, tokens.SCOPE_COMPLETO, ahora, 300, settings.SIGET_EMISOR)
+        Usuario.objects.filter(pk=usuario.pk).update(mfa_verificado_en=ahora if factor_reciente else ahora - timedelta(hours=3))
+        cab = dict(HOST, HTTP_AUTHORIZATION=f"Bearer {token}")
+        cliente = APIClient()
+        if metodo == "get":
+            r = cliente.get(ruta, secure=True, **cab)
+        else:
+            r = getattr(cliente, metodo)(ruta, datos or {}, format="json", secure=True, **cab)
+        cache.clear()
+        transaction.set_rollback(False)  # DRF marca la transacción al rechazar; en producción cada petición tiene la suya
+        return r
+
+    @staticmethod
+    def _sondeo(usuario, accion):
+        """Ejecuta `accion` como app_role con el contexto de `usuario` (None: sin contexto), en su PROPIO atomic(): un error de la base no estropea
+        la transacción de la prueba. Devuelve el SQLSTATE con el que falló la base, o None si no falló."""
+        try:
+            with transaction.atomic():
+                if usuario is None:
+                    with connection.cursor() as c:
+                        c.execute("select set_config('app.usuario_id', '', true), set_config('app.instituciones', '', true)")
+                else:
+                    fijar_contexto(usuario.pk)
+                accion()
+            return None
+        except DatabaseError as error:
+            return getattr(error.__cause__, "sqlstate", None) or "desconocido"
+
+    @staticmethod
+    def _sql(texto, parametros=()):
+        def ejecutar():
+            with connection.cursor() as c:
+                c.execute(texto, list(parametros))
+        return ejecutar
 
     @staticmethod
     def _roles(r, institucion, persona_id):
@@ -205,3 +248,178 @@ class Command(BaseCommand):
             c.execute("select current_user, (select rolsuper from pg_roles where rolname = current_user)")
             usuario_bd, es_super = c.fetchone()
         self._paso("todo se ejecutó como app_role, sin superusuario", usuario_bd == "app_role" and es_super is False, usuario_bd)
+
+        self._catalogo(inst, otra, coord, coord_b, sup, f1, ciud, op, asignador)
+
+    # ------------------------------------------------------------------ catálogo de la institución (migración 020)
+    def _catalogo(self, inst, otra, coord, coord_b, sup, f1, ciud, op, asignador):
+        base, cambios = f"/catalogo/institucion/{inst.pk}/tipos/", f"/catalogo/institucion/{inst.pk}/cambios/"
+        formulario = [{"id": "asunto", "etiqueta": "Asunto", "tipo": "texto", "obligatorio": True, "max": 100},
+                      {"id": "motivo", "etiqueta": "Motivo", "tipo": "seleccion", "obligatorio": False, "opciones": ["Uno", "Dos"]}]
+        cuerpo = {"nombre": "Prueba del catalogo", "sla_dias": 7, "audiencia": "ambas", "formulario": formulario}
+        rev = self._persona("cat_coord_rev")
+        susp = self._persona("cat_coord_susp")
+        for persona in (rev, susp):
+            Membresia.todas.create(usuario=persona, institucion=inst, rol="coordinador_institucional", asignado_por=asignador)
+        Membresia.todas.filter(usuario=rev, institucion=inst).update(revocada_en=timezone.now(), revocada_por=asignador)
+        Usuario.objects.filter(pk=susp.pk).update(estado_cuenta="suspendida")
+        tipo_otra = TipoTramite.objects.filter(institucion=otra).order_by("id").first()
+
+        # ------------------------------------------------------------ listar
+        r = self._http(coord, "get", base)
+        existentes = {t["id"] for t in r.json().get("tipos", [])}
+        self._paso("la coordinación lista el catálogo de SU institución (200)", r.status_code == 200 and r.json()["institucion"]["id"] == inst.pk, r.status_code)
+        self._paso("el listado trae los tipos de su institución y de ninguna otra",
+                   existentes == set(TipoTramite.objects.filter(institucion=inst).values_list("pk", flat=True)) and tipo_otra.pk not in existentes)
+        r = self._http(coord, "get", f"/catalogo/institucion/{otra.pk}/tipos/")
+        self._paso("la coordinación NO lista el catálogo de otra institución (403)", r.status_code == 403, r.status_code)
+        for nombre, persona in (("la supervisión", sup), ("el funcionario", f1), ("la ciudadanía", ciud), ("un operador de plataforma", op),
+                                ("la coordinación de OTRA institución", coord_b), ("una coordinación revocada", rev)):
+            self._paso(f"{nombre} no lista ni crea en el catálogo (403)",
+                       self._http(persona, "get", base).status_code == 403 and self._http(persona, "post", base, cuerpo).status_code == 403)
+        self._paso("una cuenta suspendida no entra (401)", self._http(susp, "get", base).status_code == 401)
+        r = self._http(coord, "post", base, cuerpo, factor_reciente=False)
+        self._paso("sin segundo factor reciente se niega y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
+        self._paso("nada de lo anterior creó un tipo", not TipoTramite.objects.filter(nombre=cuerpo["nombre"]).exists())
+
+        # ------------------------------------------------------------ crear
+        r = self._http(coord, "post", base, cuerpo)
+        creado = r.json()
+        self._paso("la coordinación crea un tipo (201), activo y de su institución",
+                   r.status_code == 201 and creado.get("activo") is True and creado.get("institucion_id") == inst.pk, r.status_code)
+        tipo = TipoTramite.objects.get(pk=creado["id"])
+        self._paso("queda guardado como se envió (formulario limpio, plazo y audiencia)",
+                   tipo.formulario == formulario and tipo.sla_dias == 7 and tipo.audiencia == "ambas" and tipo.institucion_id == inst.pk)
+        total = TipoTramite.objects.count()
+        malos = {
+            "un nombre muy corto": {**cuerpo, "nombre": "ab"}, "un nombre repetido (sin importar mayúsculas)": {**cuerpo, "nombre": "PRUEBA DEL CATALOGO"},
+            "un plazo de 0 días": {**cuerpo, "nombre": "Otro 1", "sla_dias": 0}, "un plazo de 366 días": {**cuerpo, "nombre": "Otro 2", "sla_dias": 366},
+            "una audiencia inventada": {**cuerpo, "nombre": "Otro 3", "audiencia": "todos"},
+            "un id de campo con mayúsculas": {**cuerpo, "nombre": "Otro 4", "formulario": [{**formulario[0], "id": "Asunto"}]},
+            "dos campos con el mismo id": {**cuerpo, "nombre": "Otro 5", "formulario": [formulario[0], formulario[0]]},
+            "una selección sin opciones": {**cuerpo, "nombre": "Otro 6", "formulario": [{"id": "s", "etiqueta": "S", "tipo": "seleccion"}]},
+            "una etiqueta de 121 caracteres": {**cuerpo, "nombre": "Otro 7", "formulario": [{**formulario[0], "etiqueta": "e" * 121}]},
+            "31 campos": {**cuerpo, "nombre": "Otro 8", "formulario": [{**formulario[0], "id": f"c{i}"} for i in range(31)]},
+            "un tipo de campo inventado": {**cuerpo, "nombre": "Otro 9", "formulario": [{**formulario[0], "tipo": "archivo"}]},
+            "otra institución en el cuerpo": {**cuerpo, "nombre": "Otro 10", "institucion_id": otra.pk},
+            "un cuerpo que no es un objeto": [1, 2], "tipos de datos inesperados": {"nombre": ["x"], "sla_dias": "7", "formulario": "no"},
+        }
+        fallos = []
+        for nombre, malo in malos.items():
+            r = self._http(coord, "post", base, malo)
+            if r.status_code != 400 or r.json().get("codigo") != "datos_invalidos" or not r.json().get("errores"):
+                fallos.append(nombre)
+        self._paso("datos inválidos se rechazan con 400 y el error por campo, sin llegar a la base", not fallos, fallos)
+        r = self._http(coord, "post", base, {**cuerpo, "nombre": "Otro 11", "formulario": [{**formulario[0], "id": "Asunto"}]})
+        self._paso("el error del formulario dice en qué campo y atributo está", "formulario.0.id" in r.json().get("errores", {}), r.json())
+        self._paso("ninguno de los rechazados dejó un tipo", TipoTramite.objects.count() == total)
+
+        # ------------------------------------------------------------ editar
+        ruta = f"{base}{tipo.pk}/"
+        r = self._http(coord, "patch", ruta, {"nombre": "Prueba del catalogo (editada)", "sla_dias": 9})
+        tipo.refresh_from_db()
+        self._paso("la coordinación edita nombre y plazo (200)", r.status_code == 200 and tipo.nombre == "Prueba del catalogo (editada)" and tipo.sla_dias == 9, r.status_code)
+        for nombre, persona in (("la supervisión", sup), ("el funcionario", f1), ("la ciudadanía", ciud), ("la coordinación de OTRA institución", coord_b),
+                                ("una coordinación revocada", rev)):
+            self._paso(f"{nombre} no edita tipos de esta institución (403)", self._http(persona, "patch", ruta, {"sla_dias": 1}).status_code == 403)
+        self._paso("un tipo de otra institución, por la ruta de la propia, no existe (404)",
+                   self._http(coord, "patch", f"{base}{tipo_otra.pk}/", {"sla_dias": 1}).status_code == 404)
+        self._paso("la coordinación de otra institución tampoco lo alcanza por la ruta de la suya (404)",
+                   self._http(coord_b, "patch", f"/catalogo/institucion/{otra.pk}/tipos/{tipo.pk}/", {"sla_dias": 1}).status_code == 404)
+        self._paso("un tipo que no existe da 404", self._http(coord, "patch", f"{base}999999999/", {"sla_dias": 1}).status_code == 404)
+        otro_nombre = TipoTramite.objects.filter(institucion=inst).exclude(pk=tipo.pk).order_by("id").first().nombre
+        for nombre, c in (("cambiar su institución", {"institucion_id": otra.pk}), ("cambiar su id", {"id": 1}), ("un cuerpo vacío", {}),
+                          ("un plazo fuera de rango", {"sla_dias": 400}), ("un nombre que ya tiene otro tipo", {"nombre": otro_nombre})):
+            self._paso(f"{nombre} se rechaza (400)", self._http(coord, "patch", ruta, c).status_code == 400)
+        tipo.refresh_from_db()
+        self._paso("y el tipo sigue igual", tipo.institucion_id == inst.pk and tipo.sla_dias == 9 and tipo.nombre == "Prueba del catalogo (editada)")
+
+        # ------------------------------------------------------------ desactivar: no admite trámites nuevos, los existentes siguen
+        r = self._http(ciud, "post", "/tramites/", {"tipo_tramite": tipo.pk, "datos": {"asunto": "Antes de desactivar"}})
+        existente = r.json().get("id")
+        self._paso("mientras está activo, la ciudadanía inicia un trámite de ese tipo (201)", r.status_code == 201, r.status_code)
+        r = self._http(coord, "patch", ruta, {"activo": False})
+        self._paso("la coordinación lo desactiva (200)", r.status_code == 200 and r.json()["activo"] is False, r.status_code)
+        r = self._http(ciud, "get", f"/catalogo/tipos-tramite/?institucion={inst.pk}")
+        self._paso("el catálogo público ya no lo muestra", r.status_code == 200 and tipo.pk not in {t["id"] for t in r.json()})
+        r = self._http(coord, "get", base)
+        self._paso("la coordinación sí lo ve en su listado, marcado como inactivo", any(t["id"] == tipo.pk and t["activo"] is False for t in r.json().get("tipos", [])))
+        r = self._http(ciud, "post", "/tramites/", {"tipo_tramite": tipo.pk, "datos": {"asunto": "Después de desactivar"}})
+        self._paso("iniciar un trámite de un tipo inactivo da 400 claro", r.status_code == 400 and r.json().get("codigo") == "tipo_tramite_inactivo", r.json())
+        error = self._sondeo(ciud, lambda: Tramite.objects.create(tipo_tramite=tipo, institucion=inst, solicitante=ciud))
+        self._paso("aunque se salte la API, la base rechaza un trámite nuevo de un tipo inactivo", error == "P0001", error)
+        r = self._http(sup, "post", f"/tramites/{existente}/estado/", {"estado": "En Tramitacion"})
+        self._paso("el trámite que ya existía sigue su curso (200)", r.status_code == 200 and r.json()["estado"] == "En Tramitacion", r.status_code)
+        r = self._http(coord, "patch", ruta, {"activo": True})
+        self._paso("la coordinación lo reactiva (200)", r.status_code == 200 and r.json()["activo"] is True, r.status_code)
+        r = self._http(ciud, "post", "/tramites/", {"tipo_tramite": tipo.pk, "datos": {"asunto": "Después de reactivar"}})
+        self._paso("reactivado, vuelve a admitir trámites nuevos (201)", r.status_code == 201, r.status_code)
+
+        # ------------------------------------------------------------ historial
+        r = self._http(coord, "get", cambios)
+        filas = [c for c in r.json().get("resultados", []) if c["tipo_tramite"]["id"] == tipo.pk]
+        self._paso("el historial de la institución lo ve su coordinación (200)", r.status_code == 200 and r.json()["total"] >= 4, r.status_code)
+        cronologico = list(reversed(filas))
+        acciones = [c["accion"] for c in cronologico]
+        self._paso("lo hecho queda en orden: alta, cambio, desactivado, activado", acciones == ["alta", "cambio", "desactivado", "activado"], acciones)
+        self._paso("cada fila dice quién lo hizo (la coordinación) y cuándo",
+                   bool(cronologico) and all(c["actor"] == {"id": coord.pk, "usuario": "eq_coord"} and c["creado_en"] for c in cronologico))
+        self._paso("el cambio guarda solo lo que cambió, antes y después",
+                   len(cronologico) == 4 and cronologico[1]["antes"] == {"nombre": "Prueba del catalogo", "sla_dias": 7}
+                   and cronologico[1]["despues"] == {"nombre": "Prueba del catalogo (editada)", "sla_dias": 9})
+        self._paso("el alta guarda la foto de lo creado",
+                   len(cronologico) == 4 and cronologico[0]["antes"] is None and cronologico[0]["despues"]["formulario"] == formulario and cronologico[0]["despues"]["activo"] is True)
+        self._paso("lo rechazado (los 400 y los 403) no dejó registro", len(filas) == 4, len(filas))
+        r = self._http(coord, "get", cambios + "?limite=2")
+        self._paso("el historial se pagina", r.status_code == 200 and len(r.json()["resultados"]) == 2 and r.json()["limite"] == 2 and r.json()["total"] >= 4)
+        self._paso("una paginación inválida da 400", self._http(coord, "get", cambios + "?limite=0").status_code == 400)
+        for nombre, persona in (("la supervisión", sup), ("la ciudadanía", ciud), ("la coordinación de OTRA institución", coord_b), ("una coordinación revocada", rev)):
+            self._paso(f"{nombre} no ve el historial de esta institución (403)", self._http(persona, "get", cambios).status_code == 403)
+        r = self._http(coord_b, "get", f"/catalogo/institucion/{otra.pk}/cambios/")
+        self._paso("la coordinación de otra institución ve solo el historial de la suya",
+                   r.status_code == 200 and all(c["tipo_tramite"]["id"] != tipo.pk for c in r.json()["resultados"]))
+
+        # ------------------------------------------------------------ lo que impone la base (como app_role, saltándose la API)
+        def historial_visto(persona):
+            visto = []
+            error = self._sondeo(persona, lambda: visto.append(CatalogoCambio.objects.filter(institucion=inst).count()))
+            return error, (visto[0] if visto else None)
+
+        error, n = historial_visto(coord)
+        self._paso("seguridad por filas del historial: la coordinación de la institución ve el suyo", error is None and n >= 4, (error, n))
+        for nombre, persona in (("la coordinación de otra institución", coord_b), ("el funcionario", f1), ("una coordinación revocada", rev),
+                                ("una coordinación con la cuenta suspendida", susp), ("quien no tiene contexto de sesión", None)):
+            error, n = historial_visto(persona)
+            self._paso(f"seguridad por filas del historial: {nombre} no ve nada de esa institución", error is None and n == 0, (error, n))
+        edicion = lambda: TipoTramite.objects.filter(pk=tipo.pk).update(nombre="Secuestrado")  # noqa: E731
+        creacion = lambda: TipoTramite.objects.create(institucion=inst, nombre="Intruso", sla_dias=5)  # noqa: E731
+        for nombre, persona in (("la coordinación de otra institución", coord_b), ("el funcionario", f1), ("la supervisión", sup), ("la ciudadanía", ciud),
+                                ("una coordinación revocada", rev), ("una coordinación con la cuenta suspendida", susp)):
+            self._paso(f"la base no deja que {nombre} edite ni cree tipos (42501)", self._sondeo(persona, edicion) == "42501" and self._sondeo(persona, creacion) == "42501")
+        self._paso("la base no deja cambiar la institución de un tipo (permiso por columna, 42501)",
+                   self._sondeo(coord, lambda: TipoTramite.objects.filter(pk=tipo.pk).update(institucion=otra)) == "42501")
+        self._paso("ni su id (42501)", self._sondeo(coord, self._sql("update siget.tipo_tramite set id = id + 1000000 where id = %s", [tipo.pk])) == "42501")
+        self._paso("ni borrarlo (42501)", self._sondeo(coord, self._sql("delete from siget.tipo_tramite where id = %s", [tipo.pk])) == "42501")
+        self._paso("ni vaciar el catálogo (42501)", self._sondeo(coord, self._sql("truncate siget.tipo_tramite")) == "42501")
+        self._paso("un formulario mal formado se rechaza en la base (regla del disparador)",
+                   self._sondeo(coord, lambda: TipoTramite.objects.filter(pk=tipo.pk).update(formulario=[{"id": "MAL", "etiqueta": "x", "tipo": "texto"}])) == "P0001")
+        self._paso("un plazo de 366 días y un nombre de 2 letras se rechazan en la base (CHECK)",
+                   self._sondeo(coord, lambda: TipoTramite.objects.filter(pk=tipo.pk).update(sla_dias=366)) == "23514"
+                   and self._sondeo(coord, lambda: TipoTramite.objects.filter(pk=tipo.pk).update(nombre="ab")) == "23514")
+        tipo.refresh_from_db()
+        self._paso("y nada de lo anterior cambió el tipo",
+                   tipo.nombre == "Prueba del catalogo (editada)" and tipo.sla_dias == 9 and tipo.institucion_id == inst.pk and tipo.formulario == formulario)
+        for nombre, sql in (("actualizar", "update siget.catalogo_cambio set accion = 'cambio'"), ("borrar", "delete from siget.catalogo_cambio"),
+                            ("vaciar", "truncate siget.catalogo_cambio"),
+                            ("insertar en", "insert into siget.catalogo_cambio (tipo_tramite_id, institucion_id, accion) select id, institucion_id, 'cambio' from siget.tipo_tramite limit 1")):
+            self._paso(f"app_role no puede {nombre} el historial del catálogo (42501)", self._sondeo(coord, self._sql(sql)) == "42501")
+        with connection.cursor() as c:
+            c.execute("select r.rolname, has_table_privilege(r.rolname, 'siget.catalogo_cambio', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') from pg_roles r "
+                      "where r.rolname in ('pgadmin_lectura', 'escalador_role', 'detector_role', 'checkpoint_app')")
+            sin_acceso = dict(c.fetchall())
+            c.execute("select has_table_privilege('app_role', 'siget.catalogo_cambio', 'SELECT') and not has_table_privilege('app_role', 'siget.catalogo_cambio', 'INSERT,UPDATE,DELETE,TRUNCATE'), "
+                      "has_column_privilege('app_role', 'siget.tipo_tramite', 'activo', 'UPDATE') and not has_column_privilege('app_role', 'siget.tipo_tramite', 'institucion_id', 'UPDATE')")
+            permisos_app = c.fetchone()
+        self._paso("pgadmin_lectura, escalador_role, detector_role y checkpoint_app no tienen ningún permiso sobre el historial",
+                   len(sin_acceso) == 4 and not any(sin_acceso.values()), sin_acceso)
+        self._paso("app_role solo lee el historial y puede cambiar `activo` pero no `institucion_id`", permisos_app == (True, True), permisos_app)
