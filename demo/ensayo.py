@@ -398,6 +398,14 @@ e, _ = ivan.pedir("POST", f"/plataforma/personas/{next(p['id'] for p in pers['pe
 paso(e == 403, "identidades no bloquea cuentas (403)", e)
 e, _ = sergio.pedir("GET", "/plataforma/infraestructura/")
 paso(e == 403, "seguridad no ve la infraestructura (403)", e)
+# Alertas ante patrones sospechosos (PT-10). Solo se lee: el ensayo no revisa alertas reales. Pasa por nginx de verdad (/plataforma/ ya estaba en su lista)
+e, alertas = sergio.pedir("GET", "/plataforma/alertas/?limite=5")
+paso(e == 200 and {"resultados", "total", "abiertas"} <= set(alertas or {}) and isinstance((alertas or {}).get("abiertas"), int),
+     "la consola de alertas responde al operador de seguridad: /plataforma/alertas/ atraviesa nginx", e)
+e, _ = Sesion("sergio.seguridad").pedir("GET", "/plataforma/alertas/")
+paso(e == 401, "sin sesión la consola de alertas responde 401", e)
+e, _ = ivan.pedir("GET", "/plataforma/alertas/")
+paso(e == 403, "identidades no ve las alertas (403)", e)
 
 e, sec = silvia.pedir("GET", "/plataforma/secretos/")
 paso(e == 200 and len(sec["secretos"]) == 8 and "valor" not in json.dumps(sec), "el custodio ve el estado de sus 8 secretos, sin valores", e)
