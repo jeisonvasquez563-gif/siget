@@ -86,7 +86,7 @@ describe('módulos del menú', () => {
 
   it('agrupa en espacio personal, institución, plataforma y cuenta, y descarta los grupos vacíos', () => {
     const grupos = agrupar(modulos('mis_tramites', 'bandeja', 'auditoria', 'seguridad'))
-    expect(grupos.map((g) => g.titulo)).toEqual(['Mi espacio', 'Mi institución', 'Plataforma', 'Seguridad y permisos'])
+    expect(grupos.map((g) => g.titulo)).toEqual(['Mi espacio', 'Mi institución', 'Plataforma', 'Seguridad'])
     expect(agrupar(modulos('mis_tramites')).map((g) => g.titulo)).toEqual(['Mi espacio'])
   })
 

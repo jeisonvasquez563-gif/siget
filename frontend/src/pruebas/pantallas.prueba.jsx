@@ -27,7 +27,7 @@ const irA = async (user, nombre) => user.click(entradaMenu(nombre))
 
 describe('el menú cambia según el rol', () => {
   const casos = [
-    ['ana.ciudadana', ['Mis trámites', 'Iniciar un trámite', 'Mi seguridad', 'Segundo factor', 'Roles y permisos'], ['Bandeja de la institución', 'Supervisión', 'Equipo de la institución', 'Auditoría', 'Acceso a trámites', 'Infraestructura']],
+    ['ana.ciudadana', ['Mis trámites', 'Iniciar un trámite', 'Mi seguridad', 'Segundo factor'], ['Bandeja de la institución', 'Supervisión', 'Equipo de la institución', 'Auditoría', 'Acceso a trámites', 'Infraestructura', 'Roles y permisos']],
     ['fabio.mop', ['Mis trámites', 'Bandeja de la institución', 'Mi seguridad'], ['Supervisión', 'Equipo de la institución', 'Auditoría']],
     ['saul.mop', ['Bandeja de la institución', 'Supervisión', 'Equipo de la institución'], ['Auditoría', 'Acceso a trámites']],
     ['carla.mop', ['Equipo de la institución', 'Mis trámites'], ['Bandeja de la institución', 'Supervisión', 'Auditoría']],
