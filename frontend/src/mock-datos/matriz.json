@@ -44,7 +44,7 @@
                 }
             ],
             "acciones_permitidas": 11,
-            "acciones_totales": 28
+            "acciones_totales": 30
         },
         {
             "id": "funcionario",
@@ -96,7 +96,7 @@
                 }
             ],
             "acciones_permitidas": 11,
-            "acciones_totales": 28
+            "acciones_totales": 30
         },
         {
             "id": "supervisor",
@@ -160,7 +160,7 @@
                 }
             ],
             "acciones_permitidas": 13,
-            "acciones_totales": 28
+            "acciones_totales": 30
         },
         {
             "id": "coordinador_institucional",
@@ -212,7 +212,7 @@
                 }
             ],
             "acciones_permitidas": 10,
-            "acciones_totales": 28
+            "acciones_totales": 30
         },
         {
             "id": "operador_infraestructura",
@@ -252,7 +252,7 @@
                 }
             ],
             "acciones_permitidas": 3,
-            "acciones_totales": 28
+            "acciones_totales": 30
         },
         {
             "id": "operador_identidades",
@@ -292,7 +292,7 @@
                 }
             ],
             "acciones_permitidas": 8,
-            "acciones_totales": 28
+            "acciones_totales": 30
         },
         {
             "id": "operador_catalogo",
@@ -332,18 +332,18 @@
                 }
             ],
             "acciones_permitidas": 4,
-            "acciones_totales": 28
+            "acciones_totales": 30
         },
         {
             "id": "operador_seguridad",
             "nombre": "Operador de seguridad",
             "ambito": "plataforma",
-            "descripcion": "Bloquea cuentas y revoca sesiones ante un incidente.",
+            "descripcion": "Bloquea cuentas, revoca sesiones ante un incidente y revisa las alertas de seguridad.",
             "modulos": [
                 {
                     "id": "consola_seguridad",
                     "nombre": "Respuesta a incidentes",
-                    "descripcion": "Bloquea cuentas, revoca sesiones y mira los eventos de seguridad.",
+                    "descripcion": "Bloquea cuentas, revoca sesiones, mira los eventos de seguridad y revisa las alertas.",
                     "estado": "disponible"
                 },
                 {
@@ -371,8 +371,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 4,
-            "acciones_totales": 28
+            "acciones_permitidas": 6,
+            "acciones_totales": 30
         },
         {
             "id": "custodio_secretos",
@@ -412,18 +412,18 @@
                 }
             ],
             "acciones_permitidas": 3,
-            "acciones_totales": 28
+            "acciones_totales": 30
         },
         {
             "id": "auditor",
             "nombre": "Auditor",
             "ambito": "plataforma",
-            "descripcion": "Lee el registro inalterable. No puede escribir ni ver trámites.",
+            "descripcion": "Lee el registro inalterable y las alertas de seguridad. No puede escribir ni ver trámites.",
             "modulos": [
                 {
                     "id": "auditoria",
                     "nombre": "Auditoría",
-                    "descripcion": "Consulta del registro inalterable de eventos y de decisiones de acceso.",
+                    "descripcion": "Consulta del registro inalterable de eventos y de decisiones de acceso, y de las alertas de seguridad.",
                     "estado": "disponible"
                 },
                 {
@@ -451,8 +451,8 @@
                     "estado": "disponible"
                 }
             ],
-            "acciones_permitidas": 4,
-            "acciones_totales": 28
+            "acciones_permitidas": 5,
+            "acciones_totales": 30
         }
     ],
     "acciones": [
@@ -665,6 +665,18 @@
                 "Sus propias notificaciones",
                 "Las notificaciones de otra persona"
             ]
+        },
+        {
+            "id": "ver_alertas",
+            "nombre": "Ver las alertas de seguridad",
+            "grupo": "Alertas",
+            "casos": null
+        },
+        {
+            "id": "revisar_alerta",
+            "nombre": "Revisar o descartar una alerta de seguridad",
+            "grupo": "Alertas",
+            "casos": null
         },
         {
             "id": "consultar_auditoria",
@@ -960,6 +972,28 @@
                 "favorable": {
                     "permitido": true,
                     "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
                 },
                 "desfavorable": {
                     "permitido": false,
@@ -1277,6 +1311,28 @@
                 },
                 "exige_segundo_factor": false
             },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -1580,6 +1636,28 @@
                 "favorable": {
                     "permitido": true,
                     "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
                 },
                 "desfavorable": {
                     "permitido": false,
@@ -1897,6 +1975,28 @@
                 },
                 "exige_segundo_factor": false
             },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -2200,6 +2300,28 @@
                 "favorable": {
                     "permitido": true,
                     "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
                 },
                 "desfavorable": {
                     "permitido": false,
@@ -2517,6 +2639,28 @@
                 },
                 "exige_segundo_factor": false
             },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -2820,6 +2964,28 @@
                 "favorable": {
                     "permitido": true,
                     "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
                 },
                 "desfavorable": {
                     "permitido": false,
@@ -3137,6 +3303,28 @@
                 },
                 "exige_segundo_factor": false
             },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_seguridad_ver_alertas"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_seguridad_ver_alertas"
+                },
+                "exige_segundo_factor": true
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "operador_seguridad_revisar_alerta"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "operador_seguridad_revisar_alerta"
+                },
+                "exige_segundo_factor": true
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": false,
@@ -3440,6 +3628,28 @@
                 "favorable": {
                     "permitido": true,
                     "politica": "titular_ve_sus_notificaciones"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
                 },
                 "desfavorable": {
                     "permitido": false,
@@ -3757,6 +3967,28 @@
                 },
                 "exige_segundo_factor": false
             },
+            "ver_alertas": {
+                "favorable": {
+                    "permitido": true,
+                    "politica": "auditor_consulta"
+                },
+                "desfavorable": {
+                    "permitido": true,
+                    "politica": "auditor_consulta"
+                },
+                "exige_segundo_factor": true
+            },
+            "revisar_alerta": {
+                "favorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "desfavorable": {
+                    "permitido": false,
+                    "politica": "sin_regla_que_permita"
+                },
+                "exige_segundo_factor": false
+            },
             "consultar_auditoria": {
                 "favorable": {
                     "permitido": true,
@@ -3945,7 +4177,7 @@
         {
             "id": "consola_seguridad",
             "nombre": "Respuesta a incidentes",
-            "descripcion": "Bloquea cuentas, revoca sesiones y mira los eventos de seguridad.",
+            "descripcion": "Bloquea cuentas, revoca sesiones, mira los eventos de seguridad y revisa las alertas.",
             "estado": "disponible",
             "roles": [
                 "operador_seguridad"
@@ -3963,7 +4195,7 @@
         {
             "id": "auditoria",
             "nombre": "Auditoría",
-            "descripcion": "Consulta del registro inalterable de eventos y de decisiones de acceso.",
+            "descripcion": "Consulta del registro inalterable de eventos y de decisiones de acceso, y de las alertas de seguridad.",
             "estado": "disponible",
             "roles": [
                 "auditor"

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from './api.js'
-import { fecha, fechaCorta, hace, mensajeDe, useModal, useReautenticacion } from './comun.jsx'
+import { Paginacion, fecha, fechaCorta, hace, mensajeDe, useModal, useReautenticacion } from './comun.jsx'
 import { Alerta, BloquesEsqueleto, Icono, Insignia, Vacio, useUI } from './ui.jsx'
 
 // Consolas de los operadores de plataforma. Ninguna muestra datos de trámites ni datos personales: una persona es su usuario,
@@ -437,6 +437,143 @@ export function ConsolaCatalogo({ yo }) {
   )
 }
 
+/* ---------------------------------------------------------------- alertas de seguridad (PT-10) */
+
+// Lo que significa cada regla, en lenguaje llano. El detector (base de datos) cuenta eventos; aquí solo se explica lo que respondió.
+const REGLA_ALERTA = {
+  rafaga_login_fallido_ip: ['Ráfaga de inicios de sesión fallidos', 'Muchos intentos fallidos de entrar o de cambiar la contraseña desde una misma dirección.'],
+  denegaciones_persona: ['Muchas denegaciones de acceso a una persona', 'El sistema negó varias veces el acceso a la misma persona en pocos minutos.'],
+  reuso_token_refresco: ['Reuso de un token de sesión', 'Alguien volvió a usar un token de sesión ya gastado: puede ser un robo de sesión.'],
+  bloqueos_repetidos: ['Cuenta bloqueada varias veces', 'La misma cuenta se bloqueó por intentos fallidos más de una vez en un día.'],
+}
+const SEVERIDAD_ALERTA = { alta: ['e-rechazado', 'Alta'], media: ['e-pendiente', 'Media'] }
+const ESTADO_ALERTA = { abierta: ['e-pendiente', 'Abierta'], revisada: ['e-aprobado', 'Revisada'], descartada: ['', 'Descartada'] }
+const TAM_ALERTAS = 10
+
+function ventanaDe(minutos) {
+  if (minutos % 1440 === 0) return minutos === 1440 ? '24 horas' : `${minutos / 1440} días`
+  return `${minutos} minutos`
+}
+
+function ModalRevision({ alerta, error, alCancelar, alEnviar }) {
+  useModal(alCancelar)
+  const [estado, setEstado] = useState('revisada')
+  const [nota, setNota] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  async function enviar(e) {
+    e.preventDefault()
+    setEnviando(true)
+    try { await alEnviar(estado, nota.trim()) } finally { setEnviando(false) } // el modal sigue abierto (con la nota) hasta que el servidor responda 2xx
+  }
+  const [titulo] = REGLA_ALERTA[alerta.regla] ?? [alerta.regla]
+  return (
+    <div className="fondo-modal">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-revision">
+        <form onSubmit={enviar}>
+        <h2 id="titulo-revision"><span className="icono-grande"><Icono nombre="escudo" /></span>Revisar la alerta</h2>
+        <p className="suave"><strong>{titulo}.</strong> {alerta.persona ? `Persona: ${alerta.persona.usuario}. ` : ''}{alerta.ip ? `Dirección: ${alerta.ip}. ` : ''}{alerta.conteo} {alerta.conteo === 1 ? 'evento' : 'eventos'}.</p>
+        <p className="suave">La revisión queda registrada a tu nombre y <strong>no se puede cambiar después</strong>. Escribe qué comprobaste y qué hiciste (por ejemplo, bloquear la cuenta o descartar un falso positivo).</p>
+        <Alerta>{error}</Alerta>
+        <fieldset className="campo opciones">
+          <legend>Resultado</legend>
+          <label className="casilla"><input type="radio" name="resultado-alerta" value="revisada" checked={estado === 'revisada'} onChange={() => setEstado('revisada')} /><span>Revisada: era real o merecía atención</span></label>
+          <label className="casilla"><input type="radio" name="resultado-alerta" value="descartada" checked={estado === 'descartada'} onChange={() => setEstado('descartada')} /><span>Descartada: falso positivo</span></label>
+        </fieldset>
+        <label className="campo"><span>Nota</span>
+          <textarea className="entrada" value={nota} onChange={(e) => setNota(e.target.value)} rows={4} minLength={3} maxLength={1000} required autoFocus />
+          <small>Entre 3 y 1000 caracteres ({nota.trim().length}/1000). No escribas contraseñas ni datos personales.</small>
+        </label>
+        <div className="fila-botones">
+          <button type="button" className="btn btn-sec" onClick={alCancelar}>Cancelar</button>
+          <button type="submit" className="btn" disabled={nota.trim().length < 3 || enviando}>Guardar revisión</button>
+        </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// `soloLectura`: el auditor ve las alertas pero no las revisa (el servidor tampoco se lo permitiría)
+export function PanelAlertas({ soloLectura = false }) {
+  const [filtro, setFiltro] = useState('abierta')
+  const [pagina, setPagina] = useState(0)
+  const ruta = `/plataforma/alertas/?limite=${TAM_ALERTAS}&desplazamiento=${pagina * TAM_ALERTAS}${filtro ? `&estado=${filtro}` : ''}`
+  const { datos, error, recargar, pideCodigo } = useCarga(ruta)
+  const { correr, modal, error: errorAccion, limpiar } = useAccion(recargar)
+  const [objetivo, setObjetivo] = useState(null)
+
+  // Si al revisar se vació la última página, se vuelve a la anterior
+  useEffect(() => { if (datos && datos.resultados.length === 0 && pagina > 0) setPagina(pagina - 1) }, [datos, pagina])
+
+  return (
+    <section className="panel" aria-labelledby="titulo-alertas">
+      {objetivo && <ModalRevision alerta={objetivo} error={errorAccion} alCancelar={() => { limpiar(); setObjetivo(null) }}
+        alEnviar={(estado, nota) => correr(async () => {
+          const r = await api(`/plataforma/alertas/${objetivo.id}/revisar/`, { metodo: 'POST', cuerpo: { estado, nota } })
+          setObjetivo(null) // solo se cierra con un 2xx: si falla, la nota escrita sigue ahí
+          return r
+        }, estado === 'revisada' ? 'Alerta revisada.' : 'Alerta descartada.')} />}
+      {modal}
+      <div className="panel-cabecera">
+        <h3 id="titulo-alertas">Alertas de seguridad</h3>
+        <label className="campo filtro-estado"><span className="solo-lector">Filtrar alertas por estado</span>
+          <select className="entrada" value={filtro} onChange={(e) => { setFiltro(e.target.value); setPagina(0) }}>
+            <option value="abierta">Abiertas</option><option value="revisada">Revisadas</option><option value="descartada">Descartadas</option><option value="">Todas</option>
+          </select>
+        </label>
+      </div>
+      <p className="suave">Cada 5 minutos el sistema busca patrones sospechosos en los eventos de seguridad y deja una alerta. Solo muestra contadores y nombres de eventos: nunca contraseñas ni datos personales.{soloLectura && ' Aquí solo puedes leerlas: las revisa el operador de seguridad.'}</p>
+      {!pideCodigo && <Alerta>{error}</Alerta>}
+      {!objetivo && <Alerta>{errorAccion}</Alerta>}
+      {pideCodigo ? (
+        <Alerta tipo="info">
+          Las alertas piden que hayas verificado tu segundo factor hace poco.{' '}
+          <button className="btn btn-sec" type="button" onClick={() => correr(() => api(ruta))}>Verificar segundo factor</button>
+        </Alerta>
+      ) : !datos ? <BloquesEsqueleto n={2} /> : (
+        <>
+          <p className="resumen-solicitudes" role="status">{datos.abiertas} {datos.abiertas === 1 ? 'alerta abierta' : 'alertas abiertas'}</p>
+          {datos.resultados.length === 0 ? <Vacio titulo="Sin alertas" texto={filtro === 'abierta' ? 'No hay alertas abiertas. Si aparece un patrón sospechoso, lo verás aquí.' : 'Ninguna alerta coincide con ese estado.'} /> : (
+            <>
+              <div className="tabla-caja">
+                <table className="tabla apilada">
+                  <caption className="solo-lector">Alertas de seguridad</caption>
+                  <thead><tr><th scope="col">Alerta</th><th scope="col">Persona o dirección</th><th scope="col">Eventos</th><th scope="col">Primera vez</th><th scope="col">Última vez</th><th scope="col">Estado</th>{!soloLectura && <th scope="col">Acciones</th>}</tr></thead>
+                  <tbody>
+                    {datos.resultados.map((a) => {
+                      const [titulo, explicacion] = REGLA_ALERTA[a.regla] ?? [a.regla, '']
+                      const [claseSeveridad, textoSeveridad] = SEVERIDAD_ALERTA[a.severidad] ?? ['', a.severidad]
+                      const [claseEstado, textoEstado] = ESTADO_ALERTA[a.estado] ?? ['', a.estado]
+                      const porNombre = Object.entries(a.detalle?.por_nombre ?? {})
+                      return (
+                        <tr key={a.id}>
+                          <th scope="row">{titulo}<Insignia clase={claseSeveridad} punto={false}>{textoSeveridad}</Insignia><small>{explicacion}</small>
+                            {a.detalle?.umbral && <small>Se avisa con {a.detalle.umbral} o más en {ventanaDe(a.detalle.ventana_minutos)}{porNombre.length > 0 && <>: {porNombre.map(([nombre, n]) => `${nombre} ×${n}`).join(', ')}</>}.</small>}
+                          </th>
+                          <td data-etiqueta="Persona o dirección">{a.persona ? a.persona.usuario : null}{a.persona && a.ip ? ' · ' : null}{a.ip ? <code>{a.ip}</code> : null}{!a.persona && !a.ip ? '—' : null}</td>
+                          <td data-etiqueta="Eventos">{a.conteo}</td>
+                          <td data-etiqueta="Primera vez" title={fecha(a.primera_vez)}>{hace(a.primera_vez)}</td>
+                          <td data-etiqueta="Última vez" title={fecha(a.ultima_vez)}>{hace(a.ultima_vez)}</td>
+                          <td data-etiqueta="Estado"><Insignia clase={claseEstado}>{textoEstado}</Insignia>
+                            {a.revisada_por && <small>Por {a.revisada_por.usuario} · {hace(a.revisada_en)}</small>}
+                            {a.nota && <small>Nota: {a.nota}</small>}
+                          </td>
+                          {!soloLectura && <td data-etiqueta="Acciones"><div className="acciones-fila">{a.estado === 'abierta' ? <button className="btn btn-sec" onClick={() => setObjetivo(a)}>Revisar</button> : <span className="suave">—</span>}</div></td>}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <Paginacion total={datos.total} tamano={TAM_ALERTAS} pagina={pagina} cambiar={setPagina} unidad="alertas" />
+            </>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 /* ---------------------------------------------------------------- seguridad */
 
 function ModalMotivo({ persona, alCancelar, alEnviar }) {
@@ -469,11 +606,12 @@ export function ConsolaSeguridad({ yo }) {
 
   return (
     <>
-      <Encabezado titulo="Respuesta a incidentes" texto="Bloquea cuentas, cierra sesiones y mira los eventos de seguridad recientes. No puedes ver trámites ni cambiar contraseñas." />
+      <Encabezado titulo="Respuesta a incidentes" texto="Bloquea cuentas, cierra sesiones, revisa las alertas y mira los eventos de seguridad recientes. No puedes ver trámites ni cambiar contraseñas." />
       {modal}
       {objetivo && <ModalMotivo persona={objetivo.p} alCancelar={() => setObjetivo(null)}
         alEnviar={async (motivo) => { const { p, recargar } = objetivo; setObjetivo(null); await hacer(p, 'bloquear', { motivo }, `${p.usuario} quedó bloqueada.`, recargar) }} />}
       <Alerta>{error}</Alerta>
+      <PanelAlertas />
       <TablaPersonas yo={yo} acciones={(p, recargar) => (
         <>
           {p.estado_cuenta === 'bloqueada'

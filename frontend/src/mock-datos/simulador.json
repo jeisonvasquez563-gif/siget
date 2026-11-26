@@ -100,6 +100,15 @@
     "segundo_factor",
     "cuenta"
    ],
+   "ver_alertas": [
+    "segundo_factor",
+    "cuenta",
+    "nivel"
+   ],
+   "revisar_alerta": [
+    "segundo_factor",
+    "cuenta"
+   ],
    "consultar_auditoria": [
     "segundo_factor",
     "cuenta",
