@@ -155,7 +155,7 @@ const visibles = (u, t) => t.solicitante_id === u.id || u.membresias.some((m) =>
 const esPersonal = (u, t) => u.membresias.some((m) => m.institucion_id === t.institucion.id && ['funcionario', 'supervisor'].includes(m.rol))
 const paraCiudadania = (t) => { const { solicitante_id: _s, funcionario_asignado_id, sensibilidad: _n, ...resto } = t; return { ...resto, asignado: funcionario_asignado_id !== null } }
 const dto = (u, t) => (esPersonal(u, t) ? t : paraCiudadania(t))
-const formularioDe = (t) => TIPOS.find((x) => x.id === t.tipo_tramite.id).formulario
+const copiaDe = (formulario) => JSON.parse(JSON.stringify(formulario))
 
 // ---- auditoría
 const POLITICAS = [['ciudadano_sobre_lo_propio', true, 14], ['personal_ve_su_institucion', true, 22], ['funcionario_cambia_estado', true, 9], ['supervisor_reasigna_o_atiende_escalados', true, 4],
@@ -198,6 +198,9 @@ export function instalarMock(inicial, opciones = {}) {
   const TRAMITES = structuredClone(TRAMITES_BASE)
   const EVENTOS = structuredClone(EVENTOS_BASE)
   const DATOS = structuredClone(DATOS_BASE)
+  // Como en la base (migración 020): cada trámite guarda una COPIA del formulario de su tipo al crearse; cambiar el tipo después no la altera
+  const FORMULARIOS = Object.fromEntries(TRAMITES.map((t) => [t.id, copiaDe(TIPOS.find((x) => x.id === t.tipo_tramite.id).formulario)]))
+  const formularioDe = (t) => FORMULARIOS[t.id]
   let siguiente = 100 // cada instalación numera desde cero, sin chocar con los trámites de ejemplo (35 a 44)
   const DOCUMENTOS = { 36: [{ id: 1, nombre: 'plano-del-local.pdf', tipo: 'application/pdf', tamano: 482133, creado_en: hace(3600000 * 30) }] }
   let actual = USUARIOS[inicial] ? inicial : null
@@ -357,6 +360,7 @@ export function instalarMock(inicial, opciones = {}) {
       const t = T(siguiente++, tipo.id, 'Pendiente', u.id, null, 0, tipo.sla_dias)
       TRAMITES.push(t)
       DATOS[t.id] = limpios
+      FORMULARIOS[t.id] = copiaDe(tipo.formulario)
       EVENTOS[t.id] = [ev(Date.now(), t.id, 'creacion', null, 'Pendiente', u.id, 1000)]
       return resp(201, conContenido(dto(u, t), t))
     }
