@@ -450,6 +450,18 @@ paso(e == 200 and {"resultados", "total", "limite", "desplazamiento"} <= set(his
 e, _ = saul2.pedir("GET", f"/catalogo/institucion/{mop}/tipos/")  # la única negación nueva de esta sección: saul pasa de 2 a 3 (< 5 en 10 minutos)
 paso(e == 403, "la supervisión no gestiona el catálogo (403)", e)
 
+# --- mis documentos e indicadores de la institución (solo lectura, sin crear nada: la semántica completa la prueban verificar_tramites y verificar_equipo).
+# Todo es 200: no suma ninguna negación del PDP a ninguna cuenta (el detector abre una alerta con 5 en 10 minutos)
+e, mis = ana.pedir("GET", "/tramites/mis-documentos/?limite=5")
+paso(e == 200 and {"resultados", "total", "limite", "desplazamiento"} <= set(mis or {}) and isinstance((mis or {}).get("total"), int)
+     and all(set(d) == {"id", "nombre", "tipo", "tamano", "creado_en", "tramite"} for d in (mis or {}).get("resultados", [])),
+     "Ana ve «Mis documentos»: /tramites/mis-documentos/ atraviesa nginx (solo lo suyo, sin datos del personal)", e)
+CLAVES_INDICADORES = {"institucion", "generado_en", "por_estado", "abiertos", "vencidos", "escalados_abiertos", "sin_asignar", "resueltos_90_dias", "dias_promedio_resolucion", "por_funcionario"}
+for quien, sesion in (("la coordinadora", carla), ("el supervisor", saul2)):
+    e, ind = sesion.pedir("GET", f"/equipo/{mop}/indicadores/")
+    paso(e == 200 and set(ind or {}) == CLAVES_INDICADORES and ind["institucion"] == mop and isinstance(ind["abiertos"], int) and "solicitante" not in json.dumps(ind),
+         f"{quien} ve los indicadores de su institución: /equipo/<id>/indicadores/ atraviesa nginx (solo agregados)", e)
+
 # --- las tres puertas (la semántica completa la prueba verificar_autenticacion; aquí lo observable desde fuera)
 e, lista = ana.pedir("GET", "/auth/instituciones/")
 paso(e == 200 and len(lista) >= 6 and all(set(i) == {"id", "nombre"} for i in lista), "la lista de instituciones de la puerta del personal es pública y solo trae id y nombre", e)
