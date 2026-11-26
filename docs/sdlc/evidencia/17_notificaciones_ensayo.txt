@@ -1,0 +1,10 @@
+# Notificaciones: ensayo completo contra produccion, con la campana atravesando nginx (24-nov-2026)
+# 2026-11-24 15:22:24  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/n018/ensayo.sh
+== 10. Ensayo completo contra produccion
+  OK    la campana: /notificaciones/ responde con la sesión de la persona (atraviesa nginx)  [200]
+ENSAYO: 113 de 113 comprobaciones correctas
+== 11. Desde el anfitrion (sin sesion, las rutas nuevas deben responder 401)
+GET /salud/                  200
+GET /notificaciones/         401
+# código de salida: 0

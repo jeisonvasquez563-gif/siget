@@ -1,0 +1,71 @@
+{
+ "version": "2026-11-17",
+ "vigente_desde": "2026-11-17",
+ "titulo": "Aviso de privacidad",
+ "base_legal": "Ley 81 de 2019, de Protección de Datos Personales (Panamá)",
+ "plazo_respuesta_dias_habiles": 10,
+ "secciones": [
+  {
+   "titulo": "Quién trata tus datos",
+   "texto": "SIGET es la plataforma de trámites con la que las instituciones del Estado atienden a la ciudadanía. Los datos los trata SIGET y, para cada trámite, la institución a la que lo diriges. Para cualquier asunto sobre tus datos, escribe una solicitud desde «Mis datos»: la atiende el operador de identidades de la plataforma."
+  },
+  {
+   "titulo": "Por qué podemos usarlos",
+   "texto": "Una institución pública no necesita tu autorización para usar los datos que requiere para cumplir sus funciones (Ley 81 de 2019, art. 8), pero sí debe informarte con claridad. Este aviso es esa información: marcar que lo leíste no es una autorización adicional."
+  },
+  {
+   "titulo": "Quién puede verlos",
+   "texto": "Tú ves todo lo tuyo desde «Mis datos». El personal de una institución ve solo los trámites de su institución, no tu perfil completo. Las cuentas de la plataforma (operadores, custodio de secretos, auditoría) no ven trámites. La auditoría lee acciones, no identidades civiles: ni ella ni la consulta técnica de la base leen tu cédula, tu correo ni tus solicitudes."
+  },
+  {
+   "titulo": "Cuánto tiempo los conservamos",
+   "texto": "Tu perfil se conserva mientras tu cuenta exista. Los trámites son expediente público y tienen conservación obligatoria: no se borran, ni a pedido tuyo. El registro de seguridad y el de auditoría son inalterables por diseño; por eso no llevan cédula, correo ni nombre."
+  },
+  {
+   "titulo": "Tus derechos (Ley 81 de 2019)",
+   "texto": "Acceso: ves tu perfil completo en «Mis datos». Portabilidad: lo descargas en un archivo JSON. Rectificación: corriges tú mismo tu correo, tu provincia y tu ciudad (se pide el segundo factor); nombre, apellidos, cédula y fecha de nacimiento se corrigen con una solicitud. Cancelación y oposición: las pides con una solicitud; la respuesta explica qué datos se pueden borrar y cuáles no deben borrarse por ley. Ejercer tus derechos no cuesta nada."
+  },
+  {
+   "titulo": "Cómo ejercerlos y en cuánto tiempo",
+   "texto": "Entra a «Mis datos» y usa «Solicitudes sobre mis datos personales». Respondemos en no más de 10 días hábiles. Si no te responden a tiempo, la solicitud aparece como vencida para el operador."
+  }
+ ],
+ "datos": [
+  {
+   "dato": "Nombre y apellidos",
+   "para_que": "Identificarte como la persona que presenta cada trámite ante las instituciones."
+  },
+  {
+   "dato": "Número de cédula",
+   "para_que": "Identidad única: evitar que una misma persona tenga dos cuentas y que alguien se haga pasar por otra. Se guarda cifrada."
+  },
+  {
+   "dato": "Fecha de nacimiento",
+   "para_que": "Comprobar que eres mayor de edad para crear una cuenta. No se usa para nada más."
+  },
+  {
+   "dato": "Provincia y ciudad",
+   "para_que": "Saber de dónde presentas los trámites y orientar a la institución que te atiende."
+  },
+  {
+   "dato": "Correo electrónico",
+   "para_que": "Dato de contacto de tu cuenta. Todavía no se verifica ni se envían correos desde SIGET."
+  },
+  {
+   "dato": "Usuario y contraseña",
+   "para_que": "Entrar a tu cuenta. La contraseña nunca se guarda: solo una huella irreversible."
+  },
+  {
+   "dato": "Actividad de seguridad (inicios de sesión, segundo factor, bloqueos)",
+   "para_que": "Proteger tu cuenta y detectar accesos extraños. Tú también la ves en «Mi seguridad». No lleva tu cédula ni tu correo."
+  }
+ ],
+ "derechos": [
+  "acceso",
+  "rectificacion",
+  "cancelacion",
+  "oposicion",
+  "portabilidad"
+ ],
+ "texto": "Aviso de privacidad de SIGET (versión 2026-11-17)\n\nQuién trata tus datos\nSIGET es la plataforma de trámites con la que las instituciones del Estado atienden a la ciudadanía. Los datos los trata SIGET y, para cada trámite, la institución a la que lo diriges. Para cualquier asunto sobre tus datos, escribe una solicitud desde «Mis datos»: la atiende el operador de identidades de la plataforma.\n\nPor qué podemos usarlos\nUna institución pública no necesita tu autorización para usar los datos que requiere para cumplir sus funciones (Ley 81 de 2019, art. 8), pero sí debe informarte con claridad. Este aviso es esa información: marcar que lo leíste no es una autorización adicional.\n\nQuién puede verlos\nTú ves todo lo tuyo desde «Mis datos». El personal de una institución ve solo los trámites de su institución, no tu perfil completo. Las cuentas de la plataforma (operadores, custodio de secretos, auditoría) no ven trámites. La auditoría lee acciones, no identidades civiles: ni ella ni la consulta técnica de la base leen tu cédula, tu correo ni tus solicitudes.\n\nCuánto tiempo los conservamos\nTu perfil se conserva mientras tu cuenta exista. Los trámites son expediente público y tienen conservación obligatoria: no se borran, ni a pedido tuyo. El registro de seguridad y el de auditoría son inalterables por diseño; por eso no llevan cédula, correo ni nombre.\n\nTus derechos (Ley 81 de 2019)\nAcceso: ves tu perfil completo en «Mis datos». Portabilidad: lo descargas en un archivo JSON. Rectificación: corriges tú mismo tu correo, tu provincia y tu ciudad (se pide el segundo factor); nombre, apellidos, cédula y fecha de nacimiento se corrigen con una solicitud. Cancelación y oposición: las pides con una solicitud; la respuesta explica qué datos se pueden borrar y cuáles no deben borrarse por ley. Ejercer tus derechos no cuesta nada.\n\nCómo ejercerlos y en cuánto tiempo\nEntra a «Mis datos» y usa «Solicitudes sobre mis datos personales». Respondemos en no más de 10 días hábiles. Si no te responden a tiempo, la solicitud aparece como vencida para el operador.\n\nDatos que pedimos y para qué\n- Nombre y apellidos: Identificarte como la persona que presenta cada trámite ante las instituciones.\n- Número de cédula: Identidad única: evitar que una misma persona tenga dos cuentas y que alguien se haga pasar por otra. Se guarda cifrada.\n- Fecha de nacimiento: Comprobar que eres mayor de edad para crear una cuenta. No se usa para nada más.\n- Provincia y ciudad: Saber de dónde presentas los trámites y orientar a la institución que te atiende.\n- Correo electrónico: Dato de contacto de tu cuenta. Todavía no se verifica ni se envían correos desde SIGET.\n- Usuario y contraseña: Entrar a tu cuenta. La contraseña nunca se guarda: solo una huella irreversible.\n- Actividad de seguridad (inicios de sesión, segundo factor, bloqueos): Proteger tu cuenta y detectar accesos extraños. Tú también la ves en «Mi seguridad». No lleva tu cédula ni tu correo."
+}

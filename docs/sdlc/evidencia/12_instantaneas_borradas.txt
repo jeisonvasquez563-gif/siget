@@ -1,0 +1,12 @@
+# Instantaneas de VMware borradas (17-nov-2026)
+# 2026-11-17 13:44:42  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-sdlc
+$ bash C:\Users\jeiva\AppData\Local\Temp/inst.sh
+== VM1-Backend: instantaneas
+Total snapshots: 0
+== VM1-Backend: estado de los discos (.vmsd)
+snapshot.needConsolidate = "TRUE"
+== VM2-Frontend: instantaneas
+Total snapshots: 0
+== VM2-Frontend: estado de los discos (.vmsd)
+snapshot.needConsolidate = "TRUE"
+# código de salida: 0

@@ -1,0 +1,21 @@
+# Notificaciones: nginx deja pasar /notificaciones/ al backend (24-nov-2026)
+# 2026-11-24 15:21:49  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/n018/paso4.sh
+== 12. nginx: agregar /notificaciones/ a las rutas que van al backend
+antes:  location ~ ^/(auth|tramites|catalogo|equipo|auditoria|politicas|plataforma|salud)
+inodo antes: 51171641
+respaldo: nginx.conf.respaldo-2026-11-24
+diferencias con el respaldo: 0 lineas
+inodo despues: 51171641  (mismo inodo: el contenedor ve el cambio)
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+recargado sin cortar conexiones
+despues: location ~ ^/(auth|tramites|catalogo|equipo|auditoria|politicas|plataforma|notificaciones|salud)
+/salud/            200
+/notificaciones/   401
+/tramites/         401
+== 13. Desde el anfitrion
+/notificaciones/   401
+/tramites/         401
+diff: /home/siget/config/nginx.conf.respaldo-2026-11-24: Permiso denegado
+# código de salida: 0

@@ -1,0 +1,560 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+    Bandit Report
+</title>
+
+<style>
+
+html * {
+    font-family: "Arial", sans-serif;
+}
+
+pre {
+    font-family: "Monaco", monospace;
+}
+
+.bordered-box {
+    border: 1px solid black;
+    padding-top:.5em;
+    padding-bottom:.5em;
+    padding-left:1em;
+}
+
+.metrics-box {
+    font-size: 1.1em;
+    line-height: 130%;
+}
+
+.metrics-title {
+    font-size: 1.5em;
+    font-weight: 500;
+    margin-bottom: .25em;
+}
+
+.issue-description {
+    font-size: 1.3em;
+    font-weight: 500;
+}
+
+.candidate-issues {
+    margin-left: 2em;
+    border-left: solid 1px; LightGray;
+    padding-left: 5%;
+    margin-top: .2em;
+    margin-bottom: .2em;
+}
+
+.issue-block {
+    border: 1px solid LightGray;
+    padding-left: .5em;
+    padding-top: .5em;
+    padding-bottom: .5em;
+    margin-bottom: .5em;
+}
+
+.issue-sev-high {
+    background-color: Pink;
+}
+
+.issue-sev-medium {
+    background-color: NavajoWhite;
+}
+
+.issue-sev-low {
+    background-color: LightCyan;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="metrics">
+    <div class="metrics-box bordered-box">
+        <div class="metrics-title">
+            Metrics:<br>
+        </div>
+        Total lines of code: <span id="loc">4491</span><br>
+        Total lines skipped (#nosec): <span id="nosec">0</span>
+    </div>
+</div>
+
+
+
+
+<br>
+<div id="results">
+    
+<div id="issue-0">
+<div class="issue-block issue-sev-low">
+    <b>assert_used: </b> Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.<br>
+    <b>Test ID:</b> B101<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>HIGH<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/703.html" target="_blank">CWE-703</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\sembrar_demo.py" target="_blank">backend/apps\nucleo\management\commands\sembrar_demo.py</a><br>
+    <b>Line number: </b>119<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html</a><br>
+
+<div class="code">
+<pre>
+118	        r = self._http(&quot;post&quot;, &quot;/tramites/&quot;, usuario, {&quot;tipo_tramite&quot;: tipo.pk})
+119	        assert r.status_code == 201, (usuario, r.status_code, r.content[:200])
+120	        return r.json()[&quot;id&quot;]
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-1">
+<div class="issue-block issue-sev-low">
+    <b>assert_used: </b> Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.<br>
+    <b>Test ID:</b> B101<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>HIGH<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/703.html" target="_blank">CWE-703</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\sembrar_demo.py" target="_blank">backend/apps\nucleo\management\commands\sembrar_demo.py</a><br>
+    <b>Line number: </b>124<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html</a><br>
+
+<div class="code">
+<pre>
+123	        r = self._http(&quot;post&quot;, f&quot;/tramites/{tramite}/estado/&quot;, usuario, {&quot;estado&quot;: estado})
+124	        assert r.status_code == 200, (usuario, tramite, estado, r.status_code, r.content[:200])
+125	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-2">
+<div class="issue-block issue-sev-low">
+    <b>assert_used: </b> Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.<br>
+    <b>Test ID:</b> B101<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>HIGH<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/703.html" target="_blank">CWE-703</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\sembrar_demo.py" target="_blank">backend/apps\nucleo\management\commands\sembrar_demo.py</a><br>
+    <b>Line number: </b>128<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b101_assert_used.html</a><br>
+
+<div class="code">
+<pre>
+127	        r = self._http(&quot;post&quot;, f&quot;/tramites/{tramite}/reasignar/&quot;, usuario, {&quot;funcionario_id&quot;: destino.pk})
+128	        assert r.status_code == 200, (usuario, tramite, r.status_code, r.content[:200])
+129	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-3">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_funcarg: </b> Possible hardcoded password: 'x'<br>
+    <b>Test ID:</b> B106<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_auditoria.py" target="_blank">backend/apps\nucleo\management\commands\verificar_auditoria.py</a><br>
+    <b>Line number: </b>56<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html</a><br>
+
+<div class="code">
+<pre>
+55	    def _persona(self, nombre, rol_plataforma=&quot;ninguno&quot;, nivel=1, mfa_hace_min=1):
+56	        return Usuario.objects.create(username=f&quot;int_a_{nombre}&quot;, password_hash=&quot;x&quot;, rol_plataforma=rol_plataforma, mfa_activo=True,
+57	                                      nivel_aseguramiento=nivel, mfa_verificado_en=timezone.now() - timedelta(minutes=mfa_hace_min))
+58	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-4">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'corta'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_autenticacion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_autenticacion.py</a><br>
+    <b>Line number: </b>88<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+87	        # ---------------------------------------------------------------- registro
+88	        r = self._http(&quot;post&quot;, &quot;/auth/registro/&quot;, {&quot;username&quot;: &quot;int_ana&quot;, &quot;password&quot;: &quot;corta&quot;})
+89	        self._paso(&quot;rechaza una contraseña débil&quot;, r.status_code == 400, r.status_code)
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-5">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'passwordpassword'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_autenticacion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_autenticacion.py</a><br>
+    <b>Line number: </b>90<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+89	        self._paso(&quot;rechaza una contraseña débil&quot;, r.status_code == 400, r.status_code)
+90	        r = self._http(&quot;post&quot;, &quot;/auth/registro/&quot;, {&quot;username&quot;: &quot;int_ana&quot;, &quot;password&quot;: &quot;passwordpassword&quot;})
+91	        self._paso(&quot;rechaza una contraseña común aunque sea larga&quot;, r.status_code == 400)
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-6">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'incorrecta-incorrecta'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_autenticacion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_autenticacion.py</a><br>
+    <b>Line number: </b>117<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+116	        # ---------------------------------------------------------------- login sin enumerar usuarios
+117	        mala = self._http(&quot;post&quot;, &quot;/auth/login/&quot;, {&quot;username&quot;: &quot;int_ana&quot;, &quot;password&quot;: &quot;incorrecta-incorrecta&quot;})
+118	        inexistente = self._http(&quot;post&quot;, &quot;/auth/login/&quot;, {&quot;username&quot;: &quot;no_existe_nadie&quot;, &quot;password&quot;: &quot;incorrecta-incorrecta&quot;})
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-7">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'incorrecta-incorrecta'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_autenticacion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_autenticacion.py</a><br>
+    <b>Line number: </b>118<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+117	        mala = self._http(&quot;post&quot;, &quot;/auth/login/&quot;, {&quot;username&quot;: &quot;int_ana&quot;, &quot;password&quot;: &quot;incorrecta-incorrecta&quot;})
+118	        inexistente = self._http(&quot;post&quot;, &quot;/auth/login/&quot;, {&quot;username&quot;: &quot;no_existe_nadie&quot;, &quot;password&quot;: &quot;incorrecta-incorrecta&quot;})
+119	        self._paso(&quot;usuario inexistente y contraseña mala dan la MISMA respuesta (no se enumera)&quot;,
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-8">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: '12345'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_autenticacion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_autenticacion.py</a><br>
+    <b>Line number: </b>123<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+122	        self._paso(&quot;un login sin contraseña no rompe nada&quot;, r.status_code == 401)
+123	        r = self._http(&quot;post&quot;, &quot;/auth/login/&quot;, {&quot;username&quot;: [&quot;int_ana&quot;], &quot;password&quot;: 12345})
+124	        self._paso(&quot;tipos de datos inesperados no provocan un error 500&quot;, r.status_code == 401, r.status_code)
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-9">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'mala-mala-mala-1'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_autenticacion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_autenticacion.py</a><br>
+    <b>Line number: </b>229<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+228	        for _ in range(3):
+229	            self._http(&quot;post&quot;, &quot;/auth/login/&quot;, {&quot;username&quot;: &quot;int_beto&quot;, &quot;password&quot;: &quot;mala-mala-mala-1&quot;})
+230	        r = self._http(&quot;post&quot;, &quot;/auth/login/&quot;, {&quot;username&quot;: &quot;int_beto&quot;, &quot;password&quot;: CLAVE_BUENA})
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-10">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'mala-mala-mala-1'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_autenticacion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_autenticacion.py</a><br>
+    <b>Line number: </b>242<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+241	        dani = Usuario.objects.get(username=&quot;int_dani&quot;)
+242	        mala_dani = {&quot;username&quot;: &quot;int_dani&quot;, &quot;password&quot;: &quot;mala-mala-mala-1&quot;}
+243	        buena_dani = {&quot;username&quot;: &quot;int_dani&quot;, &quot;password&quot;: CLAVE_BUENA}
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-11">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'x'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_autenticacion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_autenticacion.py</a><br>
+    <b>Line number: </b>323<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+322	        self._limpiar()
+323	        codigos = [self.cliente.post(&quot;/auth/login/&quot;, {&quot;username&quot;: &quot;nadie&quot;, &quot;password&quot;: &quot;x&quot;}, format=&quot;json&quot;, secure=True, **HOST).status_code for _ in range(12)]
+324	        self._limpiar()
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-12">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_funcarg: </b> Possible hardcoded password: 'x'<br>
+    <b>Test ID:</b> B106<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_integracion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_integracion.py</a><br>
+    <b>Line number: </b>65<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html</a><br>
+
+<div class="code">
+<pre>
+64	        minsa = Institucion.objects.create(nombre=&quot;MINSA (integración)&quot;, tipo=&quot;demostracion&quot;)
+65	        ana = Usuario.objects.create(username=&quot;int_ana&quot;, password_hash=&quot;x&quot;)
+66	        beto = Usuario.objects.create(username=&quot;int_beto&quot;, password_hash=&quot;x&quot;)
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-13">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_funcarg: </b> Possible hardcoded password: 'x'<br>
+    <b>Test ID:</b> B106<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_integracion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_integracion.py</a><br>
+    <b>Line number: </b>66<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html</a><br>
+
+<div class="code">
+<pre>
+65	        ana = Usuario.objects.create(username=&quot;int_ana&quot;, password_hash=&quot;x&quot;)
+66	        beto = Usuario.objects.create(username=&quot;int_beto&quot;, password_hash=&quot;x&quot;)
+67	        func_mop = Usuario.objects.create(username=&quot;int_func_mop&quot;, password_hash=&quot;x&quot;)
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-14">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_funcarg: </b> Possible hardcoded password: 'x'<br>
+    <b>Test ID:</b> B106<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_integracion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_integracion.py</a><br>
+    <b>Line number: </b>67<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html</a><br>
+
+<div class="code">
+<pre>
+66	        beto = Usuario.objects.create(username=&quot;int_beto&quot;, password_hash=&quot;x&quot;)
+67	        func_mop = Usuario.objects.create(username=&quot;int_func_mop&quot;, password_hash=&quot;x&quot;)
+68	        func_minsa = Usuario.objects.create(username=&quot;int_func_minsa&quot;, password_hash=&quot;x&quot;)
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-15">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_funcarg: </b> Possible hardcoded password: 'x'<br>
+    <b>Test ID:</b> B106<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_integracion.py" target="_blank">backend/apps\nucleo\management\commands\verificar_integracion.py</a><br>
+    <b>Line number: </b>68<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html</a><br>
+
+<div class="code">
+<pre>
+67	        func_mop = Usuario.objects.create(username=&quot;int_func_mop&quot;, password_hash=&quot;x&quot;)
+68	        func_minsa = Usuario.objects.create(username=&quot;int_func_minsa&quot;, password_hash=&quot;x&quot;)
+69	        tipo_mop = TipoTramite.objects.create(institucion=mop, nombre=&quot;Trámite MOP&quot;, sla_dias=10)
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-16">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'corta'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_plataforma.py" target="_blank">backend/apps\nucleo\management\commands\verificar_plataforma.py</a><br>
+    <b>Line number: </b>126<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+125	                   mala.status_code == inexistente.status_code == ajeno.status_code == 400 and mala.json() == inexistente.json() == ajeno.json(), mala.json())
+126	        r = self._publica(&quot;/auth/restablecer/&quot;, {&quot;username&quot;: &quot;vp_ana&quot;, &quot;codigo&quot;: codigo, &quot;password&quot;: &quot;corta&quot;})
+127	        self._paso(&quot;una contraseña débil se rechaza diciendo por qué&quot;, r.status_code == 400 and r.json().get(&quot;errores&quot;), r.status_code)
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-17">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_funcarg: </b> Possible hardcoded password: 'x'<br>
+    <b>Test ID:</b> B106<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_politicas.py" target="_blank">backend/apps\nucleo\management\commands\verificar_politicas.py</a><br>
+    <b>Line number: </b>58<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html</a><br>
+
+<div class="code">
+<pre>
+57	    def _persona(self, nombre, rol_plataforma=&quot;ninguno&quot;):
+58	        return Usuario.objects.create(username=f&quot;int_p_{nombre}&quot;, password_hash=&quot;x&quot;, rol_plataforma=rol_plataforma, mfa_activo=True,
+59	                                      mfa_verificado_en=timezone.now() - timedelta(minutes=1))
+60	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-18">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_funcarg: </b> Possible hardcoded password: 'x'<br>
+    <b>Test ID:</b> B106<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="backend/apps\nucleo\management\commands\verificar_tramites.py" target="_blank">backend/apps\nucleo\management\commands\verificar_tramites.py</a><br>
+    <b>Line number: </b>61<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b106_hardcoded_password_funcarg.html</a><br>
+
+<div class="code">
+<pre>
+60	        ahora = timezone.now()
+61	        return Usuario.objects.create(username=f&quot;int_t_{nombre}&quot;, password_hash=&quot;x&quot;, rol_plataforma=rol_plataforma, mfa_activo=True,
+62	                                      mfa_verificado_en=ahora - timedelta(minutes=mfa_hace_min))
+63	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-19">
+<div class="issue-block issue-sev-medium">
+    <b>hardcoded_tmp_directory: </b> Probable insecure usage of temp file/directory.<br>
+    <b>Test ID:</b> B108<br>
+    <b>Severity: </b>MEDIUM<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/377.html" target="_blank">CWE-377</a><br>
+    <b>File: </b><a href="backend/config\settings.py" target="_blank">backend/config\settings.py</a><br>
+    <b>Line number: </b>110<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b108_hardcoded_tmp_directory.html</a><br>
+
+<div class="code">
+<pre>
+109	CACHES = {&quot;default&quot;: {&quot;BACKEND&quot;: &quot;django.core.cache.backends.filebased.FileBasedCache&quot;,
+110	                      &quot;LOCATION&quot;: os.environ.get(&quot;SIGET_CACHE_DIR&quot;, &quot;/tmp/siget-cache&quot;)}}
+111	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+</div>
+
+</body>
+</html>

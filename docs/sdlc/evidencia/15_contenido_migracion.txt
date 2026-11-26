@@ -1,0 +1,16 @@
+# Contenido del tramite: migracion 017 aplicada en produccion (24-nov-2026)
+# 2026-11-24 12:54:29  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/c017/paso2.sh
+== 4. Migracion 017 real (una sola transaccion)
+CREATE TRIGGER
+COMMIT
+== 5. Comprobaciones sobre la base migrada (dentro de una transaccion que se revierte)
+PASA  todos los tipos de tramite tienen su formulario cargado
+PASA  los tramites existentes quedan sin contenido (no se inventa)
+PASA  app_role actualiza datos y estado, no el solicitante, y no borra
+PASA  ningun otro rol puede cambiar el contenido
+PASA  estan los 3 triggers nuevos
+PASA  esta la politica para responder la subsanacion
+PASA  la base rechaza un rechazo sin motivo (La transicion En Tramitacion -> Rechazado exige un motivo de)
+PASA  la base rechaza un motivo de solo espacios
+# código de salida: 0

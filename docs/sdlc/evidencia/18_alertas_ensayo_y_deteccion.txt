@@ -1,0 +1,15 @@
+# Alertas: ensayo completo y el detector encontrando lo que probo el ensayo (26-nov-2026)
+# 2026-11-26 11:44:01  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/a019/ensayo.sh
+== 11. Ensayo completo contra produccion (11:44)
+  OK    la consola de alertas responde al operador de seguridad: /plataforma/alertas/ atraviesa nginx  [200]
+  OK    sin sesión la consola de alertas responde 401  [401]
+  OK    secretos no ve las alertas (403)  [403]
+ENSAYO: 116 de 116 comprobaciones correctas
+== 12. Corrida del detector despues del ensayo
+detectar_anomalias: 1 alerta(s) creada(s) o actualizada(s)
+== 13. Alertas abiertas en la base (regla, persona, conteo)
+ERROR:  syntax error at or near ")"
+LINE 1: ...elect a.regla, a.severidad, coalesce(u.username, -) as perso...
+                                                             ^
+# código de salida: 0

@@ -1,0 +1,51 @@
+# Semgrep — reglas OWASP Top 10, Django, Python, React y secretos (inicial)
+# 2026-11-08 13:36:33  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ semgrep scan --metrics=off --config p/owasp-top-ten --config p/django --config p/python --config p/javascript --config p/react --config p/secrets --exclude .venv --exclude node_modules --exclude dist --exclude *.min.js --json-output=docs/analisis-seguridad/antes/semgrep.json backend frontend/src infra demo database
+                   
+                   
+┌─────────────────┐
+│ 2 Code Findings │
+└─────────────────┘
+                                           
+    infra\podman\vm1-app-backend\nginx.conf
+    ❯❱ generic.nginx.security.request-host-used.request-host-used
+          ❰❰ Blocking ❱❱
+          '$http_host' and '$host' variables may contain a malicious value from attacker controlled 'Host'
+          request header. Use an explicitly configured host value or a allow list for validation.         
+          Details: https://sg.run/4x3Z                                                                    
+                                                                                                          
+           40┆ return 301 https://$host:8443$request_uri;
+            ⋮┆----------------------------------------
+           99┆ proxy_set_header Host $host;
+
+               
+               
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 181 files tracked by git with 603 Code rules:
+                                                                                                                        
+  Language      Rules   Files          Origin      Rules                                                                
+ ─────────────────────────────        ───────────────────                                                               
+  <multilang>      48     181          Community     603                                                                
+  python          151      85                                                                                           
+  js               68      34                                                                                           
+  bash              1       5                                                                                           
+  json              3       4                                                                                           
+                                                                                                                        
+                
+                
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 2 (2 blocking)
+ • Rules run: 271
+ • Targets scanned: 181
+ • Parsed lines: ~100.0%
+ • Scan skipped: 
+   ◦ Files matching .semgrepignore patterns: 15
+ • Scan was limited to files tracked by git
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 271 rules on 181 files: 2 findings.
+# código de salida: 0

@@ -4,7 +4,9 @@
 require __DIR__ . '/config.php';
 
 try {
-    $pdo = new PDO("pgsql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME, DB_USER, DB_PASSWORD, [
+    $pdo = new PDO("pgsql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME
+        // Zero Trust (principio 2): la conexion va cifrada y se verifica el certificado del servidor
+        . ";sslmode=verify-full;sslrootcert=/etc/pki/siget/ca.crt", DB_USER, DB_PASSWORD, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
 } catch (PDOException $e) {

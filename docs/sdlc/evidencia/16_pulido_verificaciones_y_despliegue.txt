@@ -1,0 +1,20 @@
+# Cambio de contrasena, pantalla de error y paginacion: imagen verificada y despliegue (24-nov-2026)
+# 2026-11-24 13:51:04  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pul/paso.sh
+== 6. Imagen en uso guardada para volver atras
+respaldo-2026-11-24c -> 1fadf1b8b13a
+== 7. Imagen candidata con develop y verificaciones contra la base migrada (todas se revierten)
+verificar_esquema: rotacion_secreto: OK
+verificar_tramites: 155 de 155 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_autenticacion: 200 de 200 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_plataforma: 125 de 125 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_politicas: 41 de 41 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_equipo: 51 de 51 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_auditoria: 34 de 34 pasos correctos; no quedó ningún dato (transacción revertida).
+verificar_integracion: 15 de 15 pasos correctos; no quedó ningún dato (transacción revertida).
+== 8. Despliegue del backend (candidata 61a1eb9b2e11; la unidad no cambia)
+servicios: active active active  salud: 200
+== 9. Interfaz con respaldo y vuelta atras automatica
+interfaz index-CCoBVMZM.js -> 200
+todo desplegado
+# código de salida: 0

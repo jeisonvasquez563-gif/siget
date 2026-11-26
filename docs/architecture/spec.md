@@ -16,7 +16,7 @@ Problema real que resuelve el proyecto (no es un proyecto "de ciberseguridad" te
 
 La seguridad (SELinux, Podman rootless, autorización ABAC con Zero Trust, Row Level Security, auditoría inmutable) es el mecanismo que garantiza que la trazabilidad sea confiable, no el tema del proyecto en sí.
 
-El objetivo es un sistema donde cada actuación sobre un trámite queda registrada de forma que nadie pueda alterarla, ni siquiera un administrador, con plazos exigibles y escalamiento automático cuando se vencen. Como SIGET integra trámites de varias instituciones, el desafío central es que **ninguna institución pueda ver ni modificar lo que pertenece a otra**, y que cada decisión de acceso se tome y se registre en cada petición.
+El objetivo es un sistema donde cada actuación sobre un trámite queda registrada de forma que nadie pueda alterarla, ni siquiera quien opera la plataforma, con plazos exigibles y escalamiento automático cuando se vencen. Como SIGET integra trámites de varias instituciones, el desafío central es que **ninguna institución pueda ver ni modificar lo que pertenece a otra**, y que cada decisión de acceso se tome y se registre en cada petición.
 
 | Público | Qué necesita | Qué se le da |
 |---|---|---|
@@ -69,12 +69,13 @@ Sigue el modelo de NIST SP 800-207 (Rose et al., 2020): no confiar por ubicació
 | Asumir la brecha | Segmentación de red y de contenedores, dos barreras independientes de aislamiento de datos, auditoría inalterable |
 | Denegar por defecto | Si ninguna política permite la acción, se niega; si el motor de decisión falla, se niega (*fail closed*) |
 | Separación de funciones | Quien administra la plataforma no ve trámites; nadie modifica la auditoría |
+| Sin superusuario | Ninguna pieza opera como superusuario: `postgres` solo hace el arranque inicial; los objetos son de `siget_owner` y la aplicación usa `app_role`, sin `BYPASSRLS` ni capacidad de crear roles. Ver [`../roles-permisos-bd.md`](../roles-permisos-bd.md) |
 
 ### 4.2 Modelo de atributos (ABAC)
 
 El rol es un atributo más. Esto permite que una capa de roles por institución sea la base y se enriquezca con reglas contextuales.
 
-- **Sujeto:** `nivel_aseguramiento` (bajo, medio o alto), `mfa_verificado_en`, `membresias` (lista de institución y rol; una persona puede tener roles distintos en instituciones distintas), `estado_cuenta` (activa, bloqueada, suspendida). Roles de plataforma sin acceso a trámites: administrador de plataforma y auditor.
+- **Sujeto:** `nivel_aseguramiento` (bajo, medio o alto), `mfa_verificado_en`, `membresias` (lista de institución y rol; una persona puede tener roles distintos en instituciones distintas), `estado_cuenta` (activa, bloqueada, suspendida). Roles de plataforma sin acceso a trámites: operador de infraestructura, de identidades, de catálogo, de seguridad, custodio de secretos y auditor.
 - **Recurso (trámite):** institución dueña, tipo de trámite, estado, solicitante, funcionario asignado, sensibilidad y si está vencido.
 - **Acción:** ver, crear, cambiar estado, reasignar, escalar, consultar auditoría, administrar catálogo y administrar usuarios.
 - **Entorno:** MFA reciente (por ejemplo, ≤15 minutos para cambiar estados), red de origen, hora, intentos fallidos recientes y estado de la cuenta.
@@ -113,8 +114,12 @@ Todo lo que no está permitido queda denegado.
 | Ciudadano | Crear trámite; ver y adjuntar documentos a sus propios trámites | Solo los suyos; MFA activo |
 | Funcionario | Ver trámites de su institución; cambiar estado; pedir subsanación | Misma institución; trámite asignado a él o en su cola; MFA ≤15 min; transición válida |
 | Supervisor | Lo del funcionario; reasignar; atender escalados | Solo su institución; MFA ≤15 min |
-| Administrador institucional | Gestionar usuarios, membresías, tipos de trámite y SLA | Solo su institución; no cambia estados ni lee documentos |
-| Administrador de plataforma | Alta de instituciones, infraestructura, catálogo base | Sin acceso a trámites ni a documentos |
+| Coordinador institucional | Gestionar usuarios, membresías, tipos de trámite y SLA | Solo su institución; no cambia estados ni lee documentos |
+| Operador de infraestructura | Servidores, contenedores, despliegues y parches | Sin acceso a trámites, documentos ni gestión de usuarios |
+| Operador de identidades | Altas de coordinadores institucionales y restablecer el segundo factor | Alta con control dual; sin acceso a trámites ni a infraestructura |
+| Operador de catálogo | Alta de instituciones y de los tipos de trámite base | Alta con control dual; sin acceso a usuarios ni a infraestructura |
+| Operador de seguridad | Bloquear cuentas y revocar sesiones ante incidentes | No crea cuentas, no lee trámites y no modifica la auditoría |
+| Custodio de secretos | Rotar contraseñas, claves y certificados | No despliega, no crea usuarios y no lee datos |
 | Auditor | Leer eventos de auditoría y decisiones del PDP | Solo lectura, transversal; nivel de aseguramiento alto y MFA obligatorio |
 
 **Reglas cruzadas:**
@@ -122,6 +127,8 @@ Todo lo que no está permitido queda denegado.
 - Un funcionario no puede cambiar el estado de un trámite que él mismo creó como ciudadano (conflicto de interés).
 - Nadie se otorga permisos a sí mismo: las membresías las asigna otro rol y todo cambio queda en la auditoría.
 - Los estados finales (Aprobado, Rechazado) no admiten más transiciones.
+- Una persona tiene un solo rol de plataforma, y quien lo tiene no puede tener membresías de institución (ni al revés): lo impone la base con triggers.
+- Control dual: dar de alta una institución o un coordinador requiere dos personas distintas; quien propone no puede aprobar (`aprobacion_control_dual`).
 
 ### 4.6 Modelo de amenazas (STRIDE)
 

@@ -1,0 +1,20 @@
+# PT-15: respaldo verificado y ensayo de la migracion 016 con ROLLBACK (24-nov-2026)
+# 2026-11-24 11:28:41  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pt15/paso1.sh
+== 1. Respaldo verificado (pg_dump, restauracion de prueba y comparacion con la base viva)
+OK: tramites_demo-20261124-112843.dump (164754 bytes, 17 tablas), restauración probada y verificada contra la base viva
+copia fuera de la rotacion: pre-016-tramites_demo-20261124-112843.dump
+73796ab34d2ed7cf
+== 2. Ensayo de la migracion 016 dentro de una transaccion que termina en ROLLBACK
+PASA  app_role puede corregir correo, provincia y ciudad
+PASA  app_role NO puede tocar nombre, cedula ni la constancia del aviso, ni borrar perfiles
+PASA  app_role lee e inserta solicitudes, sin borrar ni cambiar detalle ni la hora de respuesta
+PASA  pgadmin_lectura, auditor_role, checkpoint_app y escalador_role no leen solicitudes
+PASA  solicitud_derecho tiene sus 2 triggers (alta y respuesta)
+PASA  perfil tiene los 2 triggers nuevos
+PASA  los perfiles existentes quedan sin constancia del aviso (no se inventa)
+== 3. No quedo nada
+ERROR:  trailing junk after numeric literal at or near "5258siget"
+LINE 1: select (to_regclass(5258siget.solicitud_derecho5258) is null...
+                            ^
+# código de salida: 1

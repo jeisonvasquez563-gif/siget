@@ -1,0 +1,453 @@
+// Servidor de mentira SOLO para desarrollo (`npm run dev`): permite ver y probar cada pantalla por rol sin VM ni credenciales.
+// No se incluye en el build de producción (main.jsx lo importa solo si `import.meta.env.DEV`).
+// Uso: http://localhost:5173/?mock            -> pantalla de acceso; entra con cualquier usuario de la lista y cualquier clave
+//      http://localhost:5173/?mock=fabio.mop  -> ya con la sesión iniciada como esa persona
+//      http://localhost:5173/?mock=enrolar    -> alta del segundo factor
+//      «Cambiar la contraseña» (Mi seguridad): la contraseña actual es CLAVE_DE_EJEMPLO; pide el segundo factor si no se verificó hace poco
+// Usuarios: ana.ciudadana beto.ciudadano fabio.mop flor.mop saul.mop carla.mop felix.minsa ines.infra ivan.identidades
+//           cata.catalogo sergio.seguridad silvia.secretos aldo.auditor
+
+import { derechosMock, MENSAJE_ACEPTA_AVISO } from './mock-derechos.js'
+import { catalogoMock } from './mock-catalogo.js'
+import { equipoMock } from './mock-equipo.js'
+import { notificacionesMock } from './mock-notificaciones.js'
+import { plataformaMock } from './mock-plataforma.js'
+import { olvidarConfiguracion } from './api.js'
+import {
+  FORMULARIO_CONSTRUCCION, FORMULARIO_DEMOSTRACION, FORMULARIO_DENUNCIA, FORMULARIO_EMPRESA, FORMULARIO_INTERINSTITUCIONAL,
+  motivoParaLaPersona, respuestaDatosInvalidos, validarDatos, validarTextoLibre,
+} from './mock-contenido.js'
+
+// La contraseña actual que acepta el servidor de ejemplo al cambiarla (el acceso acepta cualquiera; esta se usa solo para «Cambiar la contraseña»)
+export const CLAVE_DE_EJEMPLO = 'clave-de-ejemplo-2026'
+const DIA = 86400000
+const hace = (ms) => new Date(Date.now() - ms).toISOString()
+
+const mem = (id, nombre, rol) => ({ institucion_id: id, institucion: nombre, rol })
+const MOP = (rol) => mem(3, 'MOP', rol)
+
+const USUARIOS = {
+  'ana.ciudadana': { id: 101, plataforma: 'ninguno', membresias: [] },
+  'beto.ciudadano': { id: 102, plataforma: 'ninguno', membresias: [] },
+  'fabio.mop': { id: 201, plataforma: 'ninguno', membresias: [MOP('funcionario')] },
+  'flor.mop': { id: 202, plataforma: 'ninguno', membresias: [MOP('funcionario')] },
+  'saul.mop': { id: 203, plataforma: 'ninguno', membresias: [MOP('supervisor')] },
+  'carla.mop': { id: 204, plataforma: 'ninguno', membresias: [MOP('coordinador_institucional')] },
+  'felix.minsa': { id: 205, plataforma: 'ninguno', membresias: [mem(2, 'MINSA', 'funcionario')] },
+  'ines.infra': { id: 301, plataforma: 'operador_infraestructura', membresias: [] },
+  'ivan.identidades': { id: 302, plataforma: 'operador_identidades', membresias: [] },
+  'cata.catalogo': { id: 303, plataforma: 'operador_catalogo', membresias: [] },
+  'sergio.seguridad': { id: 304, plataforma: 'operador_seguridad', membresias: [] },
+  'silvia.secretos': { id: 305, plataforma: 'custodio_secretos', membresias: [] },
+  'aldo.auditor': { id: 306, plataforma: 'auditor', membresias: [] },
+  'irene.identidades': { id: 307, plataforma: 'operador_identidades', membresias: [] },
+  'camilo.catalogo': { id: 308, plataforma: 'operador_catalogo', membresias: [] },
+}
+const NOMBRES = Object.fromEntries(Object.entries(USUARIOS).map(([n, u]) => [u.id, n]))
+
+const MODULOS = {
+  mis_tramites: ['Mis trámites', 'Consulta el estado y el historial de los trámites que iniciaste.', 'disponible'],
+  nuevo_tramite: ['Iniciar un trámite', 'Elige una institución y un trámite del catálogo.', 'disponible'],
+  bandeja: ['Bandeja de la institución', 'Trámites de tu institución: revisarlos y cambiar su estado.', 'disponible'],
+  supervision: ['Supervisión', 'Reasigna trámites y atiende los escalados de tu institución.', 'disponible'],
+  equipo: ['Equipo de la institución', 'Personal y roles de tu institución.', 'disponible'],
+  catalogo_institucion: ['Catálogo de la institución', 'Los trámites que ofrece tu institución: crea, edita, activa o desactiva, y consulta quién cambió qué.', 'disponible'],
+  mis_datos: ['Mis datos', 'Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.', 'disponible'],
+  seguridad: ['Mi seguridad', 'Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.', 'disponible'],
+  mfa: ['Segundo factor (MFA)', 'Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.', 'disponible'],
+  prueba_acceso: ['Acceso a trámites', 'Comprueba en vivo que tu rol de plataforma no puede ver trámites.', 'disponible'],
+  consola_infraestructura: ['Infraestructura', 'Estado de la base de datos y del servicio, y vencimiento del certificado (solo lectura).', 'disponible'],
+  consola_identidades: ['Identidades', 'Restablece contraseñas y segundo factor, y da de alta a las coordinadoras con control dual.', 'disponible'],
+  consola_catalogo: ['Catálogo', 'Alta de instituciones con control dual.', 'disponible'],
+  consola_seguridad: ['Respuesta a incidentes', 'Bloquea cuentas, revoca sesiones, mira los eventos de seguridad y revisa las alertas.', 'disponible'],
+  consola_secretos: ['Custodia de secretos', 'Registra la rotación de secretos y avisa cuándo toca.', 'disponible'],
+  auditoria: ['Auditoría', 'Consulta del registro inalterable de eventos y de decisiones de acceso, y de las alertas de seguridad.', 'disponible'],
+}
+const POR_PLATAFORMA = {
+  operador_infraestructura: 'consola_infraestructura', operador_identidades: 'consola_identidades', operador_catalogo: 'consola_catalogo',
+  operador_seguridad: 'consola_seguridad', custodio_secretos: 'consola_secretos', auditor: 'auditoria',
+}
+
+function modulosDe(u) {
+  let ids
+  if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa']
+  else {
+    const roles = u.membresias.map((m) => m.rol)
+    ids = ['mis_tramites', 'nuevo_tramite', 'mis_datos']
+    if (roles.some((r) => r === 'funcionario' || r === 'supervisor')) ids.push('bandeja')
+    if (roles.includes('supervisor')) ids.push('supervision')
+    if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('equipo')
+    if (roles.includes('coordinador_institucional')) ids.push('catalogo_institucion')
+    ids.push('seguridad', 'mfa')
+  }
+  return ids.map((id) => ({ id, nombre: MODULOS[id][0], descripcion: MODULOS[id][1], estado: MODULOS[id][2] }))
+}
+
+const INSTITUCIONES = [
+  { id: 1, nombre: 'Alcaldía (Municipio de Panamá)', tipo: 'real' }, { id: 2, nombre: 'MINSA', tipo: 'demostracion' },
+  { id: 3, nombre: 'MOP', tipo: 'demostracion' }, { id: 4, nombre: 'MiAmbiente', tipo: 'demostracion' },
+  { id: 5, nombre: 'Ministerio Público / 311', tipo: 'real' }, { id: 6, nombre: 'AMPYME', tipo: 'real' },
+]
+const TIPOS = [
+  { id: 1, nombre: 'Permiso de construcción', sla_dias: 15, institucion: { id: 1, nombre: 'Alcaldía (Municipio de Panamá)' } },
+  { id: 2, nombre: 'Certificado de salud ocupacional', sla_dias: 10, institucion: { id: 2, nombre: 'MINSA' } },
+  { id: 3, nombre: 'Permiso de uso de vía pública', sla_dias: 10, institucion: { id: 3, nombre: 'MOP' } },
+  { id: 4, nombre: 'Estudio de impacto ambiental', sla_dias: 10, institucion: { id: 4, nombre: 'MiAmbiente' } },
+  { id: 5, nombre: 'Denuncia ciudadana 311', sla_dias: 5, institucion: { id: 5, nombre: 'Ministerio Público / 311' } },
+  { id: 6, nombre: 'Registro de microempresa', sla_dias: 10, institucion: { id: 6, nombre: 'AMPYME' } },
+]
+TIPOS.forEach((t) => { t.audiencia = 'ciudadania' })
+// Los formularios son los de la migración 017 (el catálogo de ejemplo usa otros nombres, pero la misma forma)
+const FORMULARIOS_BASE = [FORMULARIO_CONSTRUCCION, FORMULARIO_DEMOSTRACION, FORMULARIO_DEMOSTRACION, FORMULARIO_DEMOSTRACION, FORMULARIO_DENUNCIA, FORMULARIO_EMPRESA]
+FORMULARIOS_BASE.forEach((f, i) => { TIPOS[i].formulario = f })
+// Cada institución recibe también solicitudes de otras instituciones (audiencia «institucion»)
+for (const base of TIPOS.slice(0, 6)) TIPOS.push({ id: TIPOS.length + 1, nombre: 'Solicitud interinstitucional de información', sla_dias: 5, institucion: base.institucion, audiencia: 'institucion', formulario: FORMULARIO_INTERINSTITUCIONAL })
+
+const T = (id, tipo, estado, solicitante, asignado, creadoDias, sla, extra = {}) => {
+  const t = TIPOS[tipo - 1]
+  const creado = Date.now() - creadoDias * DIA
+  const limite = creado + sla * DIA
+  const vencido = !['Aprobado', 'Rechazado'].includes(estado) && limite < Date.now()
+  // Como en la plataforma real, el temporizador escala los vencidos (a la hora siguiente de vencer)
+  const escalado_en = vencido ? new Date(limite + 3600000).toISOString() : null
+  return { id, tipo_tramite: { id: t.id, nombre: t.nombre }, institucion: t.institucion, estado, fecha_limite: new Date(limite).toISOString(),
+    vencido, escalado: Boolean(escalado_en), escalado_en, creado_en: new Date(creado).toISOString(),
+    solicitante_id: solicitante, funcionario_asignado_id: asignado, sensibilidad: 2, ...extra }
+}
+const TRAMITES_BASE = [
+  T(35, 3, 'Aprobado', 101, 201, 9, 10), T(36, 2, 'En Tramitacion', 101, 205, 3, 10), T(37, 3, 'En Subsanacion', 102, 202, 8, 10),
+  T(38, 3, 'Pendiente', 102, null, 1, 10), T(39, 1, 'Pendiente', 101, null, 2, 15), T(41, 3, 'En Tramitacion', 102, 201, 12, 10),
+  T(42, 3, 'Pendiente', 101, null, 7, 10), T(43, 3, 'Rechazado', 102, 203, 14, 10), T(44, 3, 'En Tramitacion', 101, 202, 4, 10),
+]
+// Trámites antiguos, ya resueltos (ids 1 a 34): hacen falta más de 20 por lista para probar la paginación. Quedan debajo de los demás (se
+// ordena del id más alto al más bajo) y, al estar resueltos, no cambian los indicadores de lo vencido ni lo escalado.
+// Ana (101) queda con 28 trámites propios y la bandeja del MOP con 41 de otras personas: dos y tres páginas de 20.
+for (let id = 1; id <= 34; id++) {
+  TRAMITES_BASE.push(T(id, 3, id % 3 === 0 ? 'Rechazado' : 'Aprobado', id % 3 === 2 ? 102 : 101, id % 2 ? 201 : 202, 30 + id, 10))
+}
+// Contenido de los trámites de ejemplo (lo que se respondió al iniciar). Los demás son «anteriores a la función»: datos vacíos
+const DATOS_BASE = {
+  35: { asunto: 'Corte de calle por la fiesta patronal', descripcion: 'Se pide cerrar la calle principal el sábado de 8 a 18 h.' },
+  36: { asunto: 'Certificado para tres empleados nuevos' },
+  37: { asunto: 'Ocupación temporal de la acera frente al local', descripcion: 'Mesas y sillas del restaurante, de lunes a viernes.' },
+  39: { direccion_terreno: 'Calle 50, edificio Bella Vista, Panamá', numero_finca: '123456', tipo_obra: 'Ampliación', area_m2: 85.5 },
+}
+const MOTIVOS_BASE = {
+  37: 'Falta el croquis firmado de la zona que se va a ocupar. Adjúntalo en la sección de documentos y responde aquí.',
+  43: 'La solicitud no cumple con la distancia mínima exigida entre la ocupación y la intersección.',
+}
+const EVENTOS_BASE = {}
+const ev = (id, tramite, accion, de, a, actor, hacia, motivo = null) => ({ id, accion, estado_anterior: de, estado_nuevo: a, institucion_id: 3, creado_en: hace(hacia), actor_id: actor, atributos: {}, motivo })
+TRAMITES_BASE.forEach((t, i) => {
+  const lista = [ev(i * 10 + 1, t.id, 'creacion', null, 'Pendiente', t.solicitante_id, (i + 6) * 3600000 * 5)]
+  if (t.estado !== 'Pendiente') lista.push(ev(i * 10 + 2, t.id, 'cambio_estado', 'Pendiente', 'En Tramitacion', t.funcionario_asignado_id || 201, (i + 3) * 3600000 * 4))
+  if (t.estado === 'En Subsanacion') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', 'En Subsanacion', 202, 3600000 * 9, MOTIVOS_BASE[t.id]))
+  if (t.estado === 'Aprobado' || t.estado === 'Rechazado') lista.push(ev(i * 10 + 3, t.id, 'cambio_estado', 'En Tramitacion', t.estado, 203, 3600000 * 6, MOTIVOS_BASE[t.id] ?? null))
+  if (t.escalado) lista.push({ ...ev(i * 10 + 4, t.id, 'escalamiento', t.estado, t.estado, null, 0), creado_en: t.escalado_en, atributos: { regla: 'plazo_vencido' } })
+  EVENTOS_BASE[t.id] = lista
+})
+
+const visibles = (u, t) => t.solicitante_id === u.id || u.membresias.some((m) => m.institucion_id === t.institucion.id && ['funcionario', 'supervisor'].includes(m.rol))
+const esPersonal = (u, t) => u.membresias.some((m) => m.institucion_id === t.institucion.id && ['funcionario', 'supervisor'].includes(m.rol))
+const paraCiudadania = (t) => { const { solicitante_id: _s, funcionario_asignado_id, sensibilidad: _n, ...resto } = t; return { ...resto, asignado: funcionario_asignado_id !== null } }
+const dto = (u, t) => (esPersonal(u, t) ? t : paraCiudadania(t))
+const copiaDe = (formulario) => JSON.parse(JSON.stringify(formulario))
+
+// ---- auditoría
+const POLITICAS = [['ciudadano_sobre_lo_propio', true, 14], ['personal_ve_su_institucion', true, 22], ['funcionario_cambia_estado', true, 9], ['supervisor_reasigna_o_atiende_escalados', true, 4],
+  ['conflicto_de_interes', false, 5], ['plataforma_sin_acceso_a_tramites', false, 11], ['sin_regla_que_permita', false, 7], ['ciudadano_crea_su_tramite', true, 6], ['auditor_consulta', true, 8]]
+const ACCIONES = ['ver_tramite', 'crear_tramite', 'cambiar_estado', 'reasignar_tramite', 'consultar_decisiones']
+const DECISIONES = []
+{
+  let id = 1
+  for (const [politica, permitido, n] of POLITICAS) for (let i = 0; i < n; i++) {
+    const nombres = Object.keys(USUARIOS)
+    const nombre = nombres[(id * 7) % nombres.length]
+    DECISIONES.push({ id: id++, creado_en: hace(((id * 53) % 1400) * 60000), actor: { id: USUARIOS[nombre].id, usuario: nombre }, accion: ACCIONES[id % ACCIONES.length],
+      recurso: politica === 'auditor_consulta' ? 'auditoria' : 'tramite', permitido, politica, motivo: permitido ? null : 'ninguna política permite la acción', institucion_id: 3 })
+  }
+  DECISIONES.sort((a, b) => b.id - a.id)
+}
+const SEGURIDAD = Array.from({ length: 34 }, (_, i) => {
+  const eventos = ['login_ok', 'login_ok', 'refresh_ok', 'login_fallido', 'mfa_verificado', 'logout', 'refresh_ok', 'cuenta_bloqueada']
+  const nombre = Object.keys(USUARIOS)[(i * 5) % 13]
+  return { id: 34 - i, creado_en: hace(i * 47 * 60000), evento: eventos[i % eventos.length], ip: `192.168.100.${10 + (i % 6)}`, actor: i % 7 === 3 ? null : { id: USUARIOS[nombre].id, usuario: nombre }, detalle: {} }
+})
+const ACTUACIONES = Object.values(EVENTOS_BASE).flat().sort((a, b) => b.id - a.id).map((e) => ({ ...e, tramite_id: Object.keys(EVENTOS_BASE).find((k) => EVENTOS_BASE[k].includes(e)) * 1, actor: e.actor_id ? { id: e.actor_id, usuario: NOMBRES[e.actor_id] } : null }))
+
+function paginar(lista, p) {
+  const limite = Number(p.get('limite') || 20)
+  const desde = Number(p.get('desplazamiento') || 0)
+  return { resultados: lista.slice(desde, desde + limite), total: lista.length, limite, desplazamiento: desde }
+}
+
+// Como el servidor: `limite` de 1 a 100 y `desplazamiento` entero no negativo; otra cosa es `paginacion_invalida`
+const paginacionValida = (p) => ['limite', 'desplazamiento'].every((k) => {
+  const v = p.get(k)
+  return v === null || (/^\d+$/.test(v) && (k === 'desplazamiento' || (Number(v) >= 1 && Number(v) <= 100)))
+})
+
+export function instalarMock(inicial, opciones = {}) {
+  const ajustes = opciones // dentro de fetch, «opciones» es la de cada petición
+  olvidarConfiguracion()
+  // Cada instalación parte del mismo estado: lo que se cambie en una sesión de ejemplo no contamina la siguiente
+  const TRAMITES = structuredClone(TRAMITES_BASE)
+  const EVENTOS = structuredClone(EVENTOS_BASE)
+  const DATOS = structuredClone(DATOS_BASE)
+  // Como en la base (migración 020): cada trámite guarda una COPIA del formulario de su tipo al crearse; cambiar el tipo después no la altera
+  const FORMULARIOS = Object.fromEntries(TRAMITES.map((t) => [t.id, copiaDe(TIPOS.find((x) => x.id === t.tipo_tramite.id).formulario)]))
+  const formularioDe = (t) => FORMULARIOS[t.id]
+  let siguiente = 100 // cada instalación numera desde cero, sin chocar con los trámites de ejemplo (35 a 44)
+  const DOCUMENTOS = { 36: [{ id: 1, nombre: 'plano-del-local.pdf', tipo: 'application/pdf', tamano: 482133, creado_en: hace(3600000 * 30) }] }
+  let actual = USUARIOS[inicial] ? inicial : null
+  let enrolando = inicial === 'enrolar'
+  let mfaFresco = false
+  let ultimoCodigo = null // un código ya usado no se acepta otra vez, como en el servidor
+  let claveVigente = CLAVE_DE_EJEMPLO // la contraseña actual que acepta «Cambiar la contraseña»
+  let fallosDeClave = 0 // 3 fallos bloquean (como el bloqueo progresivo del login)
+  let sesionesAbiertas = 1 // cuántas sesiones ha abierto el cambio de contraseña (da un acceso nuevo distinto cada vez)
+  let otrasSesiones = 2 // las demás sesiones abiertas de la cuenta: el cambio las cierra
+  const plataforma = plataformaMock({
+    usuarios: USUARIOS, actual: () => actual, hace, mfaFresco: () => mfaFresco,
+    resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
+    negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
+  })
+  // El catálogo se puede cambiar en la sesión de ejemplo (la coordinación crea, edita y desactiva): cada instalación parte de una copia
+  const tipos = structuredClone(TIPOS)
+  const catalogo = catalogoMock({
+    usuarios: USUARIOS, actual: () => actual, hace, mfaFresco: () => mfaFresco, tipos: () => tipos,
+    resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
+    negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
+    pideCodigo: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: true }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
+  })
+  const equipo = equipoMock({
+    usuarios: USUARIOS, actual: () => actual, tramites: () => TRAMITES,
+    resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
+    negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
+  })
+  const notificaciones = notificacionesMock({ tramites: () => TRAMITES, visibles, resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }), paginar, paginacionValida })
+  const derechos = derechosMock({
+    usuarios: USUARIOS, actual: () => actual, hace, mfaFresco: () => mfaFresco,
+    resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
+    tramitesDe: (u) => TRAMITES.filter((t) => t.solicitante_id === u.id).map(paraCiudadania),
+  })
+  // El detalle lleva el contenido (`datos`) y el formulario de su tipo; el listado no
+  const conContenido = (vista, t) => ({ ...vista, datos: DATOS[t.id] || {}, formulario: formularioDe(t) })
+  const demora = (ms = opciones.demora ?? 140) => new Promise((r) => setTimeout(r, ms))
+  const resp = (estado, cuerpo) => new Response(cuerpo === null ? null : JSON.stringify(cuerpo), { status: estado, headers: { 'Content-Type': 'application/json' } })
+  const yo = () => {
+    if (enrolando) return { id: 999, usuario: 'nuevo.usuario', scope: 'enrolar_mfa', rol_plataforma: 'ninguno', membresias: [], modulos: [], mfa_activo: false, mfa_obligatorio: true, mfa_verificado_en: null, nivel_aseguramiento: 1 }
+    const u = USUARIOS[actual]
+    return { id: u.id, usuario: actual, scope: 'completo', rol_plataforma: u.plataforma, membresias: u.membresias, modulos: modulosDe(u), mfa_activo: true, mfa_ventana_minutos: 15, inactividad_minutos: opciones.inactividad ?? 10, mfa_obligatorio: true,
+      mfa_verificado_en: hace(mfaFresco ? 2 * 60000 : 9 * 60000), nivel_aseguramiento: u.plataforma === 'auditor' ? 3 : 2 }
+  }
+
+  window.fetch = async (ruta, opciones = {}) => {
+    const url = new URL(typeof ruta === 'string' ? ruta : ruta.url, location.origin)
+    const p = url.searchParams
+    const metodo = (opciones.method || 'GET').toUpperCase()
+    const cuerpo = typeof opciones.body === 'string' ? JSON.parse(opciones.body) : {} // FormData (documentos) se lee aparte
+    const camino = url.pathname
+    await demora()
+    if (camino === '/auth/refresh/') return actual || enrolando ? resp(200, { access_token: 'mock', scope: enrolando ? 'enrolar_mfa' : 'completo' }) : resp(401, { codigo: 'sesion_invalida' })
+    if (camino === '/auth/login/') {
+      const nombre = (cuerpo.username || '').trim().toLowerCase()
+      if (nombre === 'nuevo.usuario') { enrolando = true; return resp(200, { access_token: 'mock', scope: 'enrolar_mfa' }) }
+      if (!USUARIOS[nombre]) return resp(401, { codigo: 'credenciales_invalidas' })
+      if (!cuerpo.codigo) return resp(401, { codigo: 'mfa_requerido' })
+      if (cuerpo.canal) {
+        // Igual que el servidor: la puerta se comprueba tras validar las credenciales y solo restringe
+        const u = USUARIOS[nombre]
+        const personal = u.membresias.filter((m) => ['funcionario', 'supervisor', 'coordinador_institucional'].includes(m.rol))
+        const correcta = u.plataforma !== 'ninguno' ? 'plataforma' : personal.length ? 'institucion' : 'ciudadania'
+        const entra = cuerpo.canal === correcta && (correcta !== 'institucion' || personal.some((m) => m.institucion_id === cuerpo.institucion_id))
+        if (!entra) return resp(401, { codigo: 'canal_incorrecto', detalle: 'Tu cuenta no corresponde a este acceso.', acceso_correcto: correcta, instituciones: correcta === 'institucion' ? personal.map((m) => m.institucion) : [] })
+      }
+      actual = nombre
+      mfaFresco = true
+      return resp(200, { access_token: 'mock', scope: 'completo' })
+    }
+    if (camino === '/auth/instituciones/') return resp(200, INSTITUCIONES.map(({ id, nombre }) => ({ id, nombre })))
+    if (camino === '/auth/aviso-privacidad/') return derechos.aviso()
+    if (camino === '/auth/configuracion/') return resp(200, { registro: ajustes.registro || 'abierto', aviso_demostracion: Boolean(ajustes.aviso) })
+    if (camino === '/auth/registro/') {
+      if (ajustes.registro === 'cerrado') return resp(403, { codigo: 'registro_cerrado', detalle: 'La creación de cuentas está cerrada en este momento.' })
+      if (ajustes.registro === 'invitacion' && cuerpo.invitacion !== 'K7MQ-2XWD-9PRT') return resp(400, { codigo: 'invitacion_invalida', detalle: 'La invitación no es válida, ya se usó o venció.' })
+      // Igual que el servidor: sin la confirmación del aviso (el booleano true) no se crea la cuenta
+      if (cuerpo.acepta_aviso !== true) return resp(400, { codigo: 'datos_invalidos', errores: [MENSAJE_ACEPTA_AVISO] })
+      return resp(201, { detalle: 'Cuenta creada.' })
+    }
+    if (camino === '/auth/restablecer/') {
+      const bueno = (cuerpo.codigo || '').replace(/[\s-]/g, '').toUpperCase() === 'K7MQ2XWD9PRT' && USUARIOS[(cuerpo.username || '').trim().toLowerCase()]
+      if (!bueno) return resp(400, { codigo: 'codigo_invalido', detalle: 'El código no es válido, ya se usó o venció.' })
+      if ((cuerpo.password || '').length < 12) return resp(400, { codigo: 'datos_invalidos', errores: ['debe tener al menos 12 caracteres'] })
+      return resp(200, { detalle: 'Contraseña restablecida. Inicia sesión con tu nueva contraseña y tu segundo factor.' })
+    }
+    if (camino === '/auth/logout/') { actual = null; enrolando = false; return resp(200, { detalle: 'Sesión cerrada.' }) }
+    if (camino === '/auth/yo/') return resp(200, yo())
+    if (camino === '/auth/mfa/enrolar/') return resp(201, { secreto: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', uri: 'otpauth://totp/SIGET:nuevo.usuario?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=SIGET' })
+    if (camino === '/auth/mfa/confirmar/') { enrolando = false; actual = 'ana.ciudadana'; mfaFresco = true; return resp(200, { access_token: 'mock', scope: 'completo' }) }
+    if (camino === '/auth/mfa/verificar/') { if (cuerpo.codigo === '000000' || cuerpo.codigo === ultimoCodigo) return resp(400, { codigo: 'mfa_invalido' }); ultimoCodigo = cuerpo.codigo; mfaFresco = true; return resp(200, { detalle: 'Segundo factor verificado.' }) }
+    if (!actual) return resp(401, { codigo: 'no_autenticado' })
+    const u = USUARIOS[actual]
+    const negado = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false })
+    const pideCodigo = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: true })
+
+    if (camino === '/auth/contrasena/' && metodo === 'POST') {
+      // Igual que el servidor: segundo factor reciente (PDP), contraseña actual (400 genérico; 3 fallos bloquean), política y cierre de las demás sesiones
+      if (!mfaFresco) return pideCodigo()
+      if (fallosDeClave >= 3 || cuerpo.actual !== claveVigente) {
+        fallosDeClave += 1
+        return resp(400, { codigo: 'credenciales_invalidas', detalle: 'La contraseña actual no es correcta o la cuenta está bloqueada temporalmente.' })
+      }
+      const nueva = typeof cuerpo.nueva === 'string' ? cuerpo.nueva : ''
+      const errores = []
+      if (nueva.length < 12) errores.push('debe tener al menos 12 caracteres')
+      else if (nueva.length > 128) errores.push('debe tener como máximo 128 caracteres')
+      else if (nueva.toLowerCase().includes(actual)) errores.push('no puede contener el nombre de usuario')
+      else if (nueva === claveVigente) errores.push('debe ser distinta de la actual')
+      if (errores.length) return resp(400, { codigo: 'datos_invalidos', errores })
+      claveVigente = nueva
+      fallosDeClave = 0
+      const cerradas = otrasSesiones
+      otrasSesiones = 0
+      // Como el servidor: la sesión actual también se revoca y se abre una nueva, así que responde con tokens nuevos
+      sesionesAbiertas += 1
+      return resp(200, { access_token: `mock-sesion-${sesionesAbiertas}`, tipo: 'Bearer', expira_en: 600, scope: 'completo',
+        detalle: 'Contraseña cambiada. Cerramos las demás sesiones de tu cuenta y renovamos esta.', sesiones_cerradas: cerradas })
+    }
+    if (camino === '/auth/actividad/') {
+      const eventos = [['mfa_verificado', 9], ['login_ok', 9], ['refresh_ok', 40], ['login_fallido', 300], ['login_ok', 1500], ['logout', 1620]]
+      return resp(200, { eventos: eventos.map(([evento, min], i) => ({ id: 100 - i, evento, creado_en: hace(min * 60000), ip: '192.168.100.10' })) })
+    }
+    if (camino === '/catalogo/instituciones/') return resp(200, INSTITUCIONES)
+    if (camino === '/catalogo/tipos-tramite/') return resp(200, tipos.filter((t) => t.activo !== false && (!p.get('institucion') || String(t.institucion.id) === p.get('institucion'))))
+    if (camino === '/equipo/') return equipo.listar(u)
+    const deNotificaciones = notificaciones.manejar(u, camino, metodo, p)
+    if (deNotificaciones) return deNotificaciones
+    const deEquipo = equipo.manejar(camino, metodo, cuerpo)
+    if (deEquipo) return deEquipo
+    const deCatalogo = catalogo.manejar(camino, metodo, cuerpo, p)
+    if (deCatalogo) return deCatalogo
+    if (camino === '/tramites/' && metodo === 'GET') {
+      if (u.plataforma !== 'ninguno') return negado()
+      if (!paginacionValida(p)) return resp(400, { codigo: 'paginacion_invalida', detalle: 'limite (1 a 100) y desplazamiento deben ser enteros válidos.' })
+      const lista = TRAMITES.filter((t) => visibles(u, t) && (p.get('escalados') !== '1' || t.escalado)).sort((a, b) => b.id - a.id).map((t) => dto(u, t))
+      return resp(200, paginar(lista, p))
+    }
+    if (camino === '/tramites/' && metodo === 'POST') {
+      const tipo = tipos.find((t) => t.id === cuerpo.tipo_tramite)
+      if (!tipo) return resp(404, { codigo: 'tipo_tramite_inexistente' })
+      if (u.membresias.some((m) => m.institucion_id === tipo.institucion.id)) return negado()
+      if (u.membresias.length > 0 ? tipo.audiencia === 'ciudadania' : tipo.audiencia === 'institucion') return negado()
+      if (tipo.activo === false) return resp(400, { codigo: 'tipo_tramite_inactivo', detalle: 'Ese trámite ya no se ofrece. Elige otro del catálogo.' })
+      const { limpios, errores } = validarDatos(tipo.formulario, cuerpo.datos ?? {})
+      if (!limpios) return resp(400, respuestaDatosInvalidos(errores))
+      const t = T(siguiente++, tipo.id, 'Pendiente', u.id, null, 0, tipo.sla_dias)
+      TRAMITES.push(t)
+      DATOS[t.id] = limpios
+      FORMULARIOS[t.id] = copiaDe(tipo.formulario)
+      EVENTOS[t.id] = [ev(Date.now(), t.id, 'creacion', null, 'Pendiente', u.id, 1000)]
+      return resp(201, conContenido(dto(u, t), t))
+    }
+    const d = camino.match(/^\/tramites\/(\d+)\/documentos\/(?:(\d+)\/)?$/)
+    if (d) {
+      const t = TRAMITES.find((x) => x.id === Number(d[1]))
+      if (!t || !visibles(u, t)) return resp(404, { detalle: 'No encontrado.' })
+      const lista = (DOCUMENTOS[t.id] ||= [])
+      if (d[2]) {
+        const doc = lista.find((x) => x.id === Number(d[2]))
+        if (!doc) return resp(404, { detalle: 'No encontrado.' })
+        return new Response(new Blob(['%PDF-1.7 ejemplo'], { type: doc.tipo }), { status: 200, headers: { 'Content-Type': doc.tipo } })
+      }
+      if (metodo === 'GET') return resp(200, { tramite: t.id, documentos: lista })
+      if (esPersonal(u, t)) return negado()
+      const archivo = opciones.body?.get?.('archivo')
+      if (!archivo || !/\.(pdf|png|jpe?g)$/i.test(archivo.name)) return resp(415, { codigo: 'extension_no_permitida', detalle: 'Solo se aceptan PDF, PNG o JPEG.' })
+      const nuevo = { id: Date.now(), nombre: archivo.name, tipo: /\.pdf$/i.test(archivo.name) ? 'application/pdf' : /\.png$/i.test(archivo.name) ? 'image/png' : 'image/jpeg', tamano: archivo.size, creado_en: new Date().toISOString() }
+      lista.push(nuevo)
+      EVENTOS[t.id].push({ ...ev(Date.now(), t.id, 'documento_adjuntado', t.estado, t.estado, u.id, 0), atributos: { documento: nuevo.id } })
+      return resp(201, nuevo)
+    }
+    const m = camino.match(/^\/tramites\/(\d+)\/(estado\/|reasignar\/|historial\/|subsanacion\/)?$/)
+    if (m) {
+      const t = TRAMITES.find((x) => x.id === Number(m[1]))
+      if (!t || !visibles(u, t)) return resp(404, { detalle: 'No encontrado.' })
+      const sub = m[2]
+      if (!sub) return resp(200, conContenido(dto(u, t), t))
+      if (sub === 'historial/') return resp(200, { tramite: t.id, eventos: EVENTOS[t.id].map((e) => (esPersonal(u, t) ? e : { id: e.id, accion: e.accion, estado_anterior: e.estado_anterior, estado_nuevo: e.estado_nuevo, institucion_id: e.institucion_id, creado_en: e.creado_en, motivo: motivoParaLaPersona(e) })) })
+      if (sub === 'subsanacion/') {
+        // La responde quien pidió el trámite, sin segundo factor reciente (igual que adjuntar documentos)
+        if (metodo !== 'POST' || t.solicitante_id !== u.id) return negado()
+        if (t.estado !== 'En Subsanacion') return resp(409, { codigo: 'no_en_subsanacion', detalle: 'El trámite no está en subsanación.' })
+        const errores = {}
+        const falla = validarTextoLibre(cuerpo.respuesta, 10, 2000)
+        if (falla) errores.respuesta = falla
+        let limpios = null
+        if (cuerpo.datos !== undefined) {
+          const r = validarDatos(formularioDe(t), cuerpo.datos)
+          if (r.limpios) limpios = r.limpios
+          else Object.assign(errores, r.errores)
+        }
+        if (Object.keys(errores).length) return resp(400, respuestaDatosInvalidos(errores))
+        if (limpios) DATOS[t.id] = limpios
+        t.estado = 'En Tramitacion'
+        notificaciones.avisar(t, 'En Subsanacion', u.id)
+        EVENTOS[t.id].push(ev(Date.now(), t.id, 'cambio_estado', 'En Subsanacion', 'En Tramitacion', u.id, 500, cuerpo.respuesta.trim()))
+        return resp(200, conContenido(dto(u, t), t))
+      }
+      if (!esPersonal(u, t) || t.solicitante_id === u.id) return negado()
+      if (!mfaFresco) return pideCodigo()
+      if (sub === 'estado/') {
+        const antes = t.estado
+        // Rechazar, pedir subsanación y cerrarla exigen un motivo de 10 a 2000 caracteres (el servidor y la base lo vuelven a exigir)
+        const exige = cuerpo.estado === 'Rechazado' || cuerpo.estado === 'En Subsanacion' || antes === 'En Subsanacion'
+        const sinMotivo = cuerpo.motivo === undefined || cuerpo.motivo === null
+        if (exige && sinMotivo) return resp(400, { codigo: 'motivo_obligatorio', detalle: 'Esta decisión exige un motivo de al menos 10 caracteres.' })
+        const falla = sinMotivo ? null : validarTextoLibre(cuerpo.motivo, 10, 2000)
+        if (falla) return resp(400, respuestaDatosInvalidos({ motivo: falla }))
+        t.estado = cuerpo.estado
+        t.vencido = false
+        notificaciones.avisar(t, antes, u.id)
+        EVENTOS[t.id].push(ev(Date.now(), t.id, 'cambio_estado', antes, t.estado, u.id, 500, sinMotivo ? null : cuerpo.motivo.trim()))
+        return resp(200, conContenido(dto(u, t), t))
+      }
+      if (!u.membresias.some((x) => x.rol === 'supervisor')) return negado()
+      const de = t.funcionario_asignado_id
+      t.funcionario_asignado_id = cuerpo.funcionario_id
+      EVENTOS[t.id].push({ ...ev(Date.now(), t.id, 'reasignacion', t.estado, t.estado, u.id, 400), atributos: { de, a: cuerpo.funcionario_id } })
+      return resp(200, dto(u, t))
+    }
+    if (camino.startsWith('/auditoria/')) {
+      if (u.plataforma !== 'auditor') return negado()
+      if (!mfaFresco) return pideCodigo()
+      if (camino === '/auditoria/resumen/') {
+        const por = {}
+        DECISIONES.forEach((d) => { const f = (por[d.politica] ||= { politica: d.politica, permitidas: 0, negadas: 0 }); f[d.permitido ? 'permitidas' : 'negadas'] += 1 })
+        const negadas = DECISIONES.filter((d) => !d.permitido)
+        const conteo = {}
+        negadas.forEach((d) => { conteo[d.actor.usuario] = (conteo[d.actor.usuario] || 0) + 1 })
+        return resp(200, {
+          decisiones: { total: DECISIONES.length, permitidas: DECISIONES.length - negadas.length, negadas: negadas.length, ultimas_24h: DECISIONES.length, negadas_24h: negadas.length },
+          por_politica: Object.values(por).sort((a, b) => b.negadas - a.negadas || (b.permitidas + b.negadas) - (a.permitidas + a.negadas)),
+          denegaciones_por_persona: Object.entries(conteo).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([usuario, total]) => ({ id: USUARIOS[usuario].id, usuario, total })),
+          seguridad: [['login_ok', 14], ['refresh_ok', 9], ['login_fallido', 5], ['mfa_verificado', 4], ['logout', 3], ['cuenta_bloqueada', 1]].map(([evento, total]) => ({ evento, total })),
+          tramites: [{ accion: 'cambio_estado', total: 14 }, { accion: 'creacion', total: 9 }, { accion: 'reasignacion', total: 2 }],
+        })
+      }
+      if (camino === '/auditoria/decisiones/') {
+        let l = DECISIONES
+        if (p.get('resultado')) l = l.filter((d) => d.permitido === (p.get('resultado') === 'permitidas'))
+        if (p.get('politica')) l = l.filter((d) => d.politica === p.get('politica'))
+        return resp(200, paginar(l, p))
+      }
+      if (camino === '/auditoria/seguridad/') return resp(200, paginar(p.get('evento') ? SEGURIDAD.filter((e) => e.evento === p.get('evento')) : SEGURIDAD, p))
+      if (camino === '/auditoria/tramites/') return resp(200, paginar(p.get('accion') ? ACTUACIONES.filter((e) => e.accion === p.get('accion')) : ACTUACIONES, p))
+    }
+    const deDerechos = derechos.manejar(camino, metodo, cuerpo, p)
+    if (deDerechos) return deDerechos
+    const deConsola = plataforma(camino, metodo, cuerpo, p)
+    if (deConsola) return deConsola
+    return resp(404, { detalle: 'No encontrado.' })
+  }
+}

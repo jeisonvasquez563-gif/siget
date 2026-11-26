@@ -1,0 +1,28 @@
+/* Mapa de Panamá de la portada (siempre sobre el fondo oscuro del faro) */
+.mapa { margin: 0; }
+.mapa svg { display: block; width: 100%; height: auto; overflow: visible; }
+.mapa-halo { fill: none; stroke: #2b8a9a; stroke-linejoin: round; }
+.mapa-halo.h3 { stroke-width: 24; opacity: 0.09; }
+.mapa-halo.h2 { stroke-width: 15; opacity: 0.14; }
+.mapa-halo.h1 { stroke-width: 7; opacity: 0.24; }
+.mapa-pais { fill: #1d6b7a; fill-opacity: 0.6; stroke: #7fc6d3; stroke-width: 1.2; stroke-linejoin: round; }
+.mapa-canal { fill: none; stroke: #d5eaee; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.mapa-nota { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; fill: #9fc2cb; }
+.mapa-ruta { fill: none; stroke: #f26b21; stroke-width: 3.2; stroke-linecap: round; }
+.mapa-ruta-pendiente { fill: none; stroke: #b4d3da; stroke-width: 2.2; stroke-dasharray: 1 7; stroke-linecap: round; opacity: 0.85; }
+.mapa-nodo circle { fill: #0a2a35; stroke: #d5eaee; stroke-width: 2.4; }
+.mapa-nodo.hecho circle { stroke: #f26b21; fill: #f26b21; }
+.mapa-etiqueta { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; fill: #d5eaee; }
+.mapa-boya .punto { fill: #f26b21; stroke: #fff; stroke-width: 2.5; }
+.mapa-boya .aro { fill: none; stroke: #f26b21; stroke-width: 1.8; transform-box: fill-box; transform-origin: center; }
+.mapa figcaption { margin-top: 0.6rem; font-family: var(--f-mono); font-size: var(--t-xs); letter-spacing: 0.08em; color: #7fa7b1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .mapa-ruta { stroke-dasharray: 1; animation: mapa-trazo 2.4s cubic-bezier(0.3, 0.6, 0.2, 1) 0.3s both; }
+  .mapa-nodo, .mapa-ruta-pendiente { animation: mapa-aparece 0.6s ease-out 0.2s both; }
+  .mapa-boya { animation: mapa-aparece 0.6s ease-out 2.2s both; }
+  .mapa-boya .aro { animation: mapa-aro 2.4s ease-out 2.6s infinite; }
+  @keyframes mapa-trazo { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes mapa-aparece { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes mapa-aro { 0% { transform: scale(0.8); opacity: 0.9; } 100% { transform: scale(2.4); opacity: 0; } }
+}

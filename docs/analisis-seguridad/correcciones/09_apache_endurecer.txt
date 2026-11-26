@@ -1,0 +1,13 @@
+# VM1 — Apache: desactivar TRACE y ocultar la versión (TraceEnable, ServerTokens, ServerSignature)
+# 2026-11-08 14:28:13  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=8 jeison_vasquez@192.168.159.137 "set -e; F=/etc/httpd/conf.d/endurecimiento.conf; printf \"%s\n\" \"# SIGET: endurecimiento de Apache (análisis dinámico del 8-nov-2026)\" \"# TRACE devuelve la petición recibida (Cross-Site Tracing) y la versión exacta ayuda a buscar vulnerabilidades.\" \"TraceEnable Off\" \"ServerTokens Prod\" \"ServerSignature Off\" | sudo tee $F; sudo chmod 644 $F; sudo restorecon -v $F || true; if sudo apachectl configtest; then sudo systemctl reload httpd && sleep 2 && systemctl is-active httpd; else echo \"configtest FALLÓ: se quita el archivo\"; sudo rm -f $F; exit 1; fi"
+# SIGET: endurecimiento de Apache (análisis dinámico del 8-nov-2026)
+# TRACE devuelve la petición recibida (Cross-Site Tracing) y la versión exacta ayuda a buscar vulnerabilidades.
+TraceEnable Off
+ServerTokens Prod
+ServerSignature Off
+active
+[Sun Nov 08 14:28:14.139063 2026] [so:warn] [pid 5918:tid 5918] AH01574: module wsgi_module is already loaded, skipping
+AH00558: httpd: Could not reliably determine the server's fully qualified domain name, using fe80::20c:29ff:fefe:9379%ens160. Set the 'ServerName' directive globally to suppress this message
+Syntax OK
+# código de salida: 0

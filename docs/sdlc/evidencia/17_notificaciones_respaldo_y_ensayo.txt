@@ -1,0 +1,49 @@
+# Notificaciones: respaldo verificado y ensayo de la 018 con sus 30 pruebas, con ROLLBACK (24-nov-2026)
+# 2026-11-24 15:17:20  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/n018/paso1.sh
+== 1. Respaldo verificado (pg_dump, restauracion de prueba y comparacion con la base viva)
+OK: tramites_demo-20261124-151721.dump (195650 bytes, 18 tablas), restauración probada y verificada contra la base viva
+copia fuera de la rotacion: pre-018-tramites_demo-20261124-151721.dump  sha256 e49754db796d0b95
+== 2. Ensayo: migracion 018 y sus 30 pruebas en una sola transaccion que termina en ROLLBACK (15:17)
+PASA  Pendiente -> En Tramitacion avisa al solicitante (tramite_en_atencion) y no al actor; reasignar no avisa
+PASA  En Tramitacion -> En Subsanacion avisa al solicitante (subsanacion_pedida)
+PASA  el solicitante responde la subsanacion: avisa al funcionario asignado y no a si mismo
+PASA  si cierra la subsanacion el personal, no se avisa al asignado (y el solicitante solo recibe la segunda peticion)
+PASA  En Tramitacion -> Aprobado avisa al solicitante (tramite_aprobado)
+PASA  En Tramitacion -> Rechazado avisa al solicitante (tramite_rechazado)
+PASA  una transicion rechazada por la base no deja ninguna notificacion
+PASA  sin funcionario asignado, la respuesta a la subsanacion no avisa a nadie
+PASA  ninguna transicion de estado avisa a terceros (otra persona, coordinacion ni supervision)
+PASA  al escalarse un tramite se avisa a la supervision, salvo a quien lo hizo
+PASA  no se avisa a la supervisora con la membresia revocada, ni al funcionario, ni al solicitante, ni a la coordinacion
+PASA  volver a escribir escalado_en (ya no es NULL) no avisa otra vez
+PASA  escalar_vencidos() corrio como escalador_role y escalo al menos el tramite vencido de la prueba
+PASA  el tramite vencido quedo escalado
+PASA  sin contexto de usuario (actor NULL), las dos supervisoras vigentes reciben tramite_escalado
+PASA  y nadie mas (ni la revocada, ni el funcionario, ni el solicitante, ni la coordinacion)
+PASA  es idempotente: la segunda corrida no escala ni avisa otra vez
+PASA  la seguridad por filas deja ver solo las notificaciones propias (8 filas)
+PASA  marcar como leida fija la hora con now() (la base), no la que manda la aplicacion
+PASA  una notificacion leida no se desmarca
+PASA  la hora de lectura no se vuelve a cambiar
+PASA  app_role no puede insertar notificaciones
+PASA  app_role no puede borrar notificaciones
+PASA  app_role solo puede actualizar leida_en (no el tipo)
+PASA  app_role no puede pasarle una notificacion a otra persona
+PASA  otra persona no ve ninguna notificacion ajena ni puede marcarlas (0 filas visibles, 0 marcadas)
+PASA  sin contexto de usuario no se ve ninguna notificacion
+PASA  app_role: SELECT, UPDATE (leida_en) y nada mas (sin INSERT, DELETE ni secuencia)
+PASA  ni auditor_role, ni pgadmin_lectura, ni checkpoint_app ni escalador_role tienen nada sobre notificacion
+PASA  el disparador impide cambiar cualquier columna que no sea leida_en, incluso al duenio
+PASA  un asignado con la membresia revocada no recibe subsanacion_respondida
+PASA  un asignado con la cuenta suspendida no recibe subsanacion_respondida
+PASA  una supervisora con la cuenta suspendida no recibe tramite_escalado
+PASA  y la supervision activa y vigente si (la revocada, no)
+PASA  el funcionario con acceso vigente conserva su unico aviso; la otra persona y la coordinacion siguen sin ninguno
+PASA  un solicitante con la cuenta bloqueada si recibe el aviso de su tramite (lo ve al volver)
+resumen: 36 pasan, 0 fallan
+== 3. El ensayo no dejo nada (debe decir t y 0)
+tabla_no_existe|funciones_nuevas
+t|1
+(1 row)
+# código de salida: 0

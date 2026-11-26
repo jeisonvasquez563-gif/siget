@@ -1,0 +1,24 @@
+# Verificación manual de la alerta «SQL Injection» de ZAP (mismos pares de peticiones)
+# 2026-11-08 14:02:13  jeiva@Jeison  C:\Users\jeiva\Desktop\Proyecto-Ciber5
+$ python docs/analisis-seguridad/herramientas/verificar_sqli.py
+
+=== /auth/login/  (parámetro «password»)
+  original        password='no-es-una-clave'                  -> 401 {"codigo":"credenciales_invalidas","detalle":"Credenciales inválidas o cuenta bloqueada temporalmente."}
+  AND (falsa)     password='no-es-una-clave AND 1=1 -- '      -> 401 {"codigo":"credenciales_invalidas","detalle":"Credenciales inválidas o cuenta bloqueada temporalmente."}
+  OR (verdadera)  password='no-es-una-clave OR 1=1 -- '       -> 401 {"codigo":"credenciales_invalidas","detalle":"Credenciales inválidas o cuenta bloqueada temporalmente."}
+
+=== /auth/registro/  (parámetro «password»)
+  original        password='corta'                            -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3278 segundos."}
+  AND (falsa)     password='corta AND 1=1 -- '                -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3274 segundos."}
+  OR (verdadera)  password='corta OR 1=1 -- '                 -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3270 segundos."}
+
+=== /auth/restablecer/  (parámetro «password»)
+  original        password='corta'                            -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3266 segundos."}
+  AND (falsa)     password="corta' AND '1'='1' -- "           -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3262 segundos."}
+  OR (verdadera)  password="corta' OR '1'='1' -- "            -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3258 segundos."}
+
+=== /auth/restablecer/  (parámetro «username»)
+  original        username='zap.prueba'                       -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3254 segundos."}
+  AND (falsa)     username='zap.prueba AND 1=1 -- '           -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3250 segundos."}
+  OR (verdadera)  username='zap.prueba OR 1=1 -- '            -> 429 {"detail":"Solicitud fue regulada (throttled). Se espera que esté disponible en 3246 segundos."}
+# código de salida: 0

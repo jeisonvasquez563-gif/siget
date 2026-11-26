@@ -1,0 +1,73 @@
+# Plan de OWASP ZAP (Automation Framework) para el análisis dinámico de SIGET.
+# Se ejecuta sin credenciales contra la plataforma desplegada en VM1 (nginx + Django detrás de TLS 1.3).
+# Uso: zap.bat -cmd -autorun zap-plan.yaml   (la carpeta del reporte se pasa con la variable ZAP_SALIDA)
+env:
+  contexts:
+    - name: SIGET
+      urls:
+        - https://192.168.159.137:8443
+      includePaths:
+        - "https://192.168.159.137:8443.*"
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  # 1) Semillas: la interfaz (SPA) y los endpoints públicos documentados en docs/api.md
+  - type: requestor
+    name: semillas
+    requests:
+      - url: https://192.168.159.137:8443/
+      - url: https://192.168.159.137:8443/index.html
+      - url: https://192.168.159.137:8443/salud/
+      - url: https://192.168.159.137:8443/auth/yo/
+      - url: https://192.168.159.137:8443/auth/actividad/
+      - url: https://192.168.159.137:8443/catalogo/instituciones/
+      - url: https://192.168.159.137:8443/catalogo/tipos-tramite/?institucion=1
+      - url: https://192.168.159.137:8443/tramites/
+      - url: https://192.168.159.137:8443/equipo/
+      - url: https://192.168.159.137:8443/politicas/simular/
+      - url: https://192.168.159.137:8443/auth/login/
+        method: POST
+        headers: ["Content-Type: application/json"]
+        data: '{"username":"zap.prueba","password":"no-es-una-clave"}'
+      - url: https://192.168.159.137:8443/auth/registro/
+        method: POST
+        headers: ["Content-Type: application/json"]
+        data: '{"username":"zap.prueba","password":"corta"}'
+      - url: https://192.168.159.137:8443/auth/restablecer/
+        method: POST
+        headers: ["Content-Type: application/json"]
+        data: '{"username":"zap.prueba","codigo":"AAAA-BBBB-CCCC","password":"corta"}'
+      - url: https://192.168.159.137:8443/auth/refresh/
+        method: POST
+        headers: ["Content-Type: application/json"]
+        data: '{}'
+      - url: http://192.168.159.137:8080/
+  # 2) Exploración de enlaces
+  - type: spider
+    parameters:
+      context: SIGET
+      maxDuration: 3
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  # 3) Ataques activos (inyección, XSS, recorrido de rutas, etc.). Con pocos hilos y pausa entre peticiones
+  #    para no confundir el resultado con el límite de tasa de nginx (20 peticiones/s).
+  - type: activeScan
+    parameters:
+      context: SIGET
+      maxScanDurationInMins: 25
+      threadPerHost: 2
+      delayInMs: 60
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: ${ZAP_SALIDA}
+      reportFile: zap_reporte
+      reportTitle: "SIGET — OWASP ZAP"
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: ${ZAP_SALIDA}
+      reportFile: zap_reporte

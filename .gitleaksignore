@@ -1,0 +1,14 @@
+# Hallazgos de Gitleaks revisados y aceptados (ver docs/analisis-seguridad/).
+# Son contraseñas de PRUEBA del ensayo (demo/ensayo.py) que nunca fueron credenciales reales:
+# se usan para pedir un registro incompleto o un restablecimiento con un código falso, y el servidor
+# las rechaza antes de guardarlas. Desde la corrección, el ensayo genera esa contraseña al ejecutarse.
+e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5:demo/ensayo.py:generic-api-key:319
+e9e7b1ebe7fb75790a4505c0898afa7e8d91daa5:demo/ensayo.py:generic-api-key:320
+39644bd260da5ca854240e9e24d41f03b0fc9d6e:demo/ensayo.py:generic-api-key:139
+# Contraseña de prueba de backend/tests/test_registro_configurable.py (PT-2): nunca fue una credencial; desde el commit
+# siguiente la prueba la genera al ejecutarse.
+e4c8bc378f3645cf9af11e96689e7e4ace276843:backend/tests/test_registro_configurable.py:generic-api-key:72
+# Dato personal FALSO de frontend/src/pruebas/errores.prueba.jsx (pantalla de error): «cedula-8-123-456-de-Maria-Perez» es un
+# texto inventado que la prueba mete en un error para comprobar que la pantalla de error NUNCA lo muestra. No es una credencial:
+# la regla generic-api-key saltó por el nombre de la constante (SECRETO), que desde el commit siguiente se llama DATO_PERSONAL_FALSO.
+e9075c8316302eaf8d03ee1e1d03ae3f2c3ba93a:frontend/src/pruebas/errores.prueba.jsx:generic-api-key:14

@@ -1,0 +1,120 @@
+/*
+  SIGET · sistema de diseño — tokens.
+  Idea: el Canal. Un trámite recorre etapas como un buque cruza esclusas.
+  Agua de Miraflores (teal profundo), hormigón frío, una boya naranja para «dónde está» y los plazos,
+  y verde / rojo de sello solo para resolver. Sin estilos en línea en ningún componente (CSP de nginx).
+*/
+:root {
+  color-scheme: light;
+
+  /* superficies */
+  --lienzo: #edf1f0;
+  --superficie: #ffffff;
+  --superficie-2: #f5f8f7;
+  --superficie-3: #e8eeed;
+  --borde: #d3dcda;
+  --borde-fuerte: #aebdba;
+
+  /* texto */
+  --tinta: #0f242c;
+  --tinta-suave: #475d65;
+  --tinta-tenue: #6b7f86;
+  --tinta-inversa: #f4fafb;
+
+  /* agua (acción principal y marca) */
+  --agua: #0f4c5c;
+  --agua-hover: #0a3a47;
+  --agua-media: #2b8a9a;
+  --agua-clara: #d5eaee;
+  --agua-fondo: #e6f2f4;
+
+  /* barra lateral (siempre oscura: es el casco) */
+  --casco: #0b2f3a;
+  --casco-2: #0f3b48;
+  --casco-borde: #1b4b59;
+  --casco-texto: #c5dde2;
+  --casco-activo: #17566a;
+
+  /* señales */
+  --boya: #f26b21;
+  --boya-fondo: #ffe8da;
+  --boya-texto: #9a3f08;
+  --sello-rojo: #b3261e;
+  --sello-rojo-fondo: #fbe7e5;
+  --sello-verde: #1c7a50;
+  --sello-verde-fondo: #e1f3ea;
+  --ambar: #b7791f;
+  --ambar-fondo: #fdf1d7;
+
+  --foco: #2b8a9a;
+
+  /* forma */
+  --radio-s: 6px;
+  --radio: 10px;
+  --radio-l: 16px;
+  --sombra-1: 0 1px 2px rgba(15, 36, 44, 0.06), 0 1px 1px rgba(15, 36, 44, 0.04);
+  --sombra-2: 0 6px 20px rgba(15, 36, 44, 0.1), 0 2px 6px rgba(15, 36, 44, 0.06);
+  --sombra-3: 0 18px 50px rgba(8, 28, 36, 0.28);
+
+  /* tipografía */
+  --f-titulo: 'Archivo Variable', 'Arial Narrow', system-ui, sans-serif;
+  --f-texto: 'Public Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --t-xs: 0.75rem;
+  --t-s: 0.8125rem;
+  --t-base: 0.9375rem;
+  --t-m: 1.0625rem;
+  --t-l: 1.25rem;
+  --t-xl: 1.625rem;
+  --t-2xl: 2.5rem;
+
+  --espacio: 1rem;
+  --ancho-lateral: 272px;
+  --ancho-contenido: 1200px;
+}
+
+/* Noche de puerto */
+:root[data-tema='oscuro'] {
+  color-scheme: dark;
+
+  --lienzo: #08171d;
+  --superficie: #0e2630;
+  --superficie-2: #123039;
+  --superficie-3: #173a45;
+  --borde: #1f4350;
+  --borde-fuerte: #2d5a69;
+
+  --tinta: #e5f0f2;
+  --tinta-suave: #a5bdc4;
+  --tinta-tenue: #7f99a1;
+  --tinta-inversa: #f4fafb;
+
+  --agua: #1e7c8c;
+  --agua-hover: #25909f;
+  --agua-media: #4fb3c3;
+  --agua-clara: #14404b;
+  --agua-fondo: #0f333d;
+
+  --casco: #061319;
+  --casco-2: #0a1f27;
+  --casco-borde: #153743;
+  --casco-texto: #a9c4cb;
+  --casco-activo: #12404e;
+
+  --boya: #ff8a4a;
+  --boya-fondo: #3a2314;
+  --boya-texto: #ffb185;
+  --sello-rojo: #ff7b72;
+  --sello-rojo-fondo: #3a1a1a;
+  --sello-verde: #4cc38a;
+  --sello-verde-fondo: #123327;
+  --ambar: #f0b954;
+  --ambar-fondo: #33270f;
+
+  --foco: #6cc4d3;
+
+  --sombra-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sombra-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --sombra-3: 0 20px 60px rgba(0, 0, 0, 0.6);
+}

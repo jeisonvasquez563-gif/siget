@@ -210,7 +210,7 @@ Fuente: elaboración propia.
 - Registrar cada cambio de estado de un trámite como un evento de auditoría que no pueda modificarse ni eliminarse.
 - Validar las transiciones de estado contra una tabla de transiciones permitidas, nunca libres.
 - Calcular la fecha límite de atención y escalar automáticamente los trámites vencidos.
-- Aplicar controles de seguridad por capas: aislamiento de red, SELinux en modo enforcing, contenedores sin privilegios de administrador (Podman rootless), autenticación multifactor y control de acceso por roles.
+- Aplicar controles de seguridad por capas: aislamiento de red, SELinux en modo enforcing, contenedores sin privilegios de root (Podman rootless), autenticación multifactor y control de acceso por roles.
 
 ### 7.2 Alineación con la normativa
 

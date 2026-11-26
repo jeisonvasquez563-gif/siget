@@ -1,0 +1,8 @@
+# PT-15: el ensayo de la 016 no dejo cambios (24-nov-2026)
+# 2026-11-24 11:29:02  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/pt15/paso1b.sh
+== 3. El ensayo no dejo nada (debe decir t y 0)
+tabla_no_existe|columnas_nuevas
+t|0
+(1 row)
+# código de salida: 0

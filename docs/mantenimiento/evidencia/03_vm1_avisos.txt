@@ -1,0 +1,13 @@
+# VM1: resumen de avisos de seguridad y correcciones pendientes
+# 2026-11-12 18:55:10  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-plazos
+$ ssh -i C:/Users/jeiva/.ssh/ciber5_vm1 -o BatchMode=yes -o LogLevel=ERROR jeison_vasquez@192.168.159.137 "sudo dnf -q updateinfo summary; echo; echo \"Paquetes con actualización disponible: $(sudo dnf -q check-update | grep -c \"^[a-zA-Z]\")\""
+Resumen de la información de actualización: disponible
+    170 Aviso(s) de seguridad
+          2 Avisos de seguridad críticos
+         93 Avisos de seguridad importantes
+         69 Avisos de seguridad moderados
+          6 Avisos de seguridad bajos
+      5 Aviso(s) de errores corregidos
+
+Paquetes con actualización disponible: 212
+# código de salida: 0
