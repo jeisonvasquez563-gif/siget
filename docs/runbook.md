@@ -2213,6 +2213,8 @@ Si algún paso falla, **no desplegar**.
 - **Una persona que no existe no genera alerta.** `decision_pdp.actor_id` no tiene clave foránea y podría traer un id huérfano: `denegaciones_persona` lo descarta (`JOIN` con `usuario`), porque su `INSERT` fallaría por la clave foránea de `alerta_seguridad.usuario_id` y abortaría **todas** las reglas de la corrida. Las otras reglas leen `evento_seguridad.actor_id`, que sí tiene la clave foránea.
 - **El ensayo (`demo/ensayo.py`) no debe provocar alertas reales.** Corre contra producción y cada negación del PDP queda en `decision_pdp`: ninguna cuenta del ensayo debe llegar a 5 negaciones en 10 minutos (umbral de `denegaciones_persona`). Si tras un ensayo aparece una alerta abierta de una cuenta `*.mop`, `*.identidades` o similar, es de esto: descartarla con nota.
 
+- **El ensayo dispara alertas a propósito (decisión aceptada).** Prueba que fabio, ana e ivan **no** pueden hacer lo que no les corresponde, y cada uno junta 5 o 6 denegaciones del PDP en pocos minutos: la regla `denegaciones_persona` crea o actualiza su alerta en cada ensayo. Es el detector funcionando, no un falso positivo. **No** se excluyen cuentas del detector (una cuenta de demostración comprometida pasaría sin alertas) ni se sube el umbral (bajaría la sensibilidad para todos). Después de cada ensayo, el operador de seguridad las descarta con la nota «ensayo de la demostración».
+
 ### 43.10 Registro de la aplicación
 
 *Pendiente: se completa al aplicarla (fecha, hora, respaldo, números de las pruebas y de las verificaciones, y el resultado del ensayo).*

@@ -402,8 +402,8 @@ paso(e == 403, "seguridad no ve la infraestructura (403)", e)
 # abre una alerta REAL con 5 o más negaciones de una misma cuenta en 10 minutos. Ninguna cuenta del ensayo debe llegar a 5 negaciones en
 # 10 minutos. Por eso el 403 de las alertas se comprueba con silvia (secretos, que solo lleva esa negación) y no con ivan, que ya acumula
 # las suyas en esta sección. Negaciones por cuenta (403 o 404 esperados, conteo estático): ana 5, fabio 6, ivan 5, ines 3, saul 2,
-# aldo 1, sergio 1, silvia 1, felix 1. PENDIENTE: ana, fabio e ivan ya están en el límite o por encima si sus negaciones caen dentro de los
-# mismos 10 minutos (no se verificó contra producción): hay que repartirlas o confirmar que la ventana no se cumple.
+# aldo 1, sergio 1, silvia 1, felix 1. Decisión aceptada (runbook 43.9): ana, fabio e ivan disparan `denegaciones_persona` en cada
+# ensayo porque el ensayo los hace intentar lo que no pueden; es el detector funcionando. El operador de seguridad las descarta después.
 # Alertas ante patrones sospechosos (PT-10). Solo se lee: el ensayo no revisa alertas reales. Pasa por nginx de verdad (/plataforma/ ya estaba en su lista)
 e, alertas = sergio.pedir("GET", "/plataforma/alertas/?limite=5")
 paso(e == 200 and {"resultados", "total", "abiertas"} <= set(alertas or {}) and isinstance((alertas or {}).get("abiertas"), int),
