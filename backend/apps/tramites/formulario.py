@@ -131,6 +131,19 @@ def validar_texto_libre(valor, minimo, maximo):
     return limpio, None
 
 
+def validar_texto_corto(valor, minimo, maximo):
+    """Un texto de una sola línea (nombre de un trámite, etiqueta de un campo): de `minimo` a `maximo` caracteres, sin saltos de línea ni
+    caracteres de control, y con al menos una letra o un número. Devuelve `(texto, None)` o `(None, mensaje)`."""
+    if not isinstance(valor, str):
+        return None, "Debe ser un texto."
+    limpio, error = _texto(valor, {"tipo": "texto", "max": maximo, "obligatorio": True})
+    if error:
+        return None, error
+    if _largo_real(limpio) < minimo:
+        return None, f"Debe tener al menos {minimo} caracteres."
+    return limpio, None
+
+
 def _numero(valor, campo):
     if isinstance(valor, bool) or not isinstance(valor, (int, float)):
         return None, "Debe ser un número."

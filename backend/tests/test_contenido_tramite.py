@@ -82,7 +82,7 @@ def registro(monkeypatch):
     monkeypatch.setattr(vistas._Base, "throttle_classes", [])
     monkeypatch.setattr(vistas._Base, "_tramite_visible", lambda self, pk: un_tramite(pk=pk))
     monkeypatch.setattr(vistas, "autorizar", lambda request, accion, recurso: reg.pasos.append(("pdp", accion, recurso)))
-    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=FORMULARIO)
+    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=FORMULARIO, activo=True)
     monkeypatch.setattr(vistas, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(
         select_related=lambda *a: SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: tipo if k.get("pk") == 1 else None)))))
     monkeypatch.setattr(vistas, "feriados_entre", lambda *a: set())
@@ -173,7 +173,7 @@ def test_el_tope_de_python_deja_margen_bajo_el_check_de_la_base():
 
 def test_un_formulario_mal_definido_da_503_con_un_evento_de_seguridad_sin_datos_personales(registro, monkeypatch):
     mal = [{"id": "Asunto Con Espacios", "tipo": "inventado"}]
-    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=mal)
+    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=mal, activo=True)
     monkeypatch.setattr(vistas, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(
         select_related=lambda *a: SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: tipo)))))
     r = crear({"tipo_tramite": 1, "datos": {"asunto": "Mi dato personal 8-123-456"}})
@@ -418,3 +418,35 @@ def test_un_formulario_mal_definido_al_responder_la_subsanacion_da_503(en_subsan
     r = subsanacion({"respuesta": MOTIVO, "datos": {"asunto": "Corregido"}})
     assert r.status_code == 503 and r.data["codigo"] == "formulario_no_disponible" and not pasos(en_subsanacion, "update")
     assert pasos(en_subsanacion, "seguridad")[0][2] == "formulario_no_disponible"
+
+
+# --------------------------------------------------------------------------- tipo desactivado (migración 020)
+
+def test_un_tipo_desactivado_no_admite_tramites_nuevos_y_responde_400_claro(registro, monkeypatch):
+    inactivo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=FORMULARIO,
+                               activo=False)
+    monkeypatch.setattr(vistas, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(
+        select_related=lambda *a: SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: inactivo)))))
+    r = crear({"tipo_tramite": 1, "datos": {"asunto": "ok"}})
+    assert r.status_code == 400 and r.data["codigo"] == "tipo_tramite_inactivo" and "ya no se ofrece" in r.data["detalle"]
+    assert not pasos(registro, "crear") and not pasos(registro, "evento")
+    assert pasos(registro, "pdp")  # el PDP va primero: quien no puede crear el trámite no se entera de que el tipo está desactivado
+
+
+def test_el_catalogo_publico_no_muestra_los_tipos_desactivados(monkeypatch):
+    from apps.catalogo import vistas as catalogo
+    filtros = []
+
+    class Consulta:
+        def select_related(self, *a):
+            return self
+
+        def order_by(self, *a):
+            return []
+
+    monkeypatch.setattr(catalogo, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(filter=lambda **k: (filtros.append(k), Consulta())[1])))
+    monkeypatch.setattr(catalogo.TiposTramiteLista, "throttle_classes", [])
+    peticion = APIRequestFactory().get("/catalogo/tipos-tramite/", secure=True)
+    force_authenticate(peticion, user=SimpleNamespace(usuario=SimpleNamespace(pk=7), claims=SimpleNamespace(scope="completo"), is_authenticated=True, pk=7))
+    assert catalogo.TiposTramiteLista.as_view()(peticion).status_code == 200
+    assert filtros[0] == {"activo": True}

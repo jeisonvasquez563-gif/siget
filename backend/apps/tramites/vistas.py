@@ -141,6 +141,8 @@ class TramitesColeccion(_Base):
         # El solicitante siempre es quien actúa: cualquier otro campo del cuerpo se ignora
         autorizar(request, Accion.CREAR_TRAMITE, Recurso(tipo="tramite", institucion_id=tipo.institucion_id, solicitante_id=usuario.pk,
                                                                      audiencia=tipo.audiencia))
+        if not tipo.activo:  # la coordinación lo desactivó: no admite trámites nuevos (los que ya existen siguen su curso; la base también lo impide)
+            return _error("tipo_tramite_inactivo", "Ese trámite ya no se ofrece. Elige otro del catálogo.", status.HTTP_400_BAD_REQUEST)
         contenido, fallo = _validar_contenido(request, tipo.pk, tipo.formulario, _datos(request).get("datos", {}))
         if fallo:
             return fallo
