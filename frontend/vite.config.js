@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // En desarrollo, la API se pide al mismo origen de nginx (https://<vm1>:8443) mediante un proxy;
 // en producción nginx sirve esta carpeta y la API bajo el mismo origen (sin CORS).
 const API = process.env.SIGET_API || 'https://192.168.159.137:8443'
-const rutas = ['/auth', '/tramites', '/catalogo', '/equipo', '/auditoria', '/politicas', '/plataforma', '/notificaciones', '/salud']
+const rutas = ['/auth', '/tramites', '/catalogo', '/equipo', '/auditoria', '/plataforma', '/notificaciones', '/salud']
 
 export default defineConfig({
   plugins: [react()],
@@ -16,7 +16,7 @@ export default defineConfig({
     setupFiles: ['./src/pruebas/preparar.js'],
     include: ['src/pruebas/**/*.prueba.{js,jsx}'],
     css: false,
-    // Los chequeos de accesibilidad (axe) recorren tablas grandes, como la matriz de 25 acciones por 10 roles: con el límite
+    // Los chequeos de accesibilidad (axe) recorren tablas grandes, como las listas largas de los listados: con el límite
     // de 5 s fallaban a veces por tiempo, nunca por una afirmación
     testTimeout: 20000,
   },

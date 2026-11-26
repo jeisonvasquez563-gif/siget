@@ -51,7 +51,7 @@ PostgreSQL, el backend y nginx corren como contenedores Podman rootless gestiona
 | # | Módulo (app) | Qué hace | Estado |
 |---|---|---|---|
 | 1 | Autenticación (`autenticacion`) | Registro, Argon2, JWT de vida corta, refresco de un solo uso, MFA TOTP, reautenticación escalonada, bloqueo, actividad de seguridad propia | ✅ runbook 25 |
-| 2 | Autorización (`autorizacion`) | **PDP** (ABAC, niega por defecto, *fail closed*), módulos por rol, **matriz de permisos calculada por el PDP**, privilegios reales de la base y **simulador** | ✅ runbook 30, 31 |
+| 2 | Autorización (`autorizacion`) | **PDP** (ABAC, niega por defecto, *fail closed*), módulos por rol (la matriz de permisos, el simulador y la vista de la base se retiraron en el runbook 45) | ✅ runbook 30, 31, 45 |
 | 3 | Catálogo (`catalogo`) | Instituciones y tipos de trámite con su SLA | ✅ runbook 26 |
 | 4 | Trámites (`tramites`) | Crear, listar, ver, cambiar de estado, reasignar e historial, con RLS y auditoría en la misma transacción | ✅ runbook 26 |
 | 5 | Identidad y equipo (`identidad`) | Usuarios, membresías y el equipo de cada institución | ✅ runbook 27 |
@@ -67,7 +67,7 @@ El servidor calcula el menú de cada persona (`/auth/yo/` → `modulos`); la int
 
 Diagrama: [`diagrama-roles-modulos.svg`](./diagrama-roles-modulos.svg) (generado desde la matriz del backend).
 
-Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ módulo anunciado, aún sin construir; hoy los 16 están construidos). Se genera desde `modulos_para()` y se comprueba en `test_matriz.py` (la vista por módulo es la inversa exacta de la vista por rol), y la misma tabla está en la pantalla **Roles y permisos → Módulos por rol**.
+Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ módulo anunciado, aún sin construir; hoy todos están construidos). Se genera desde `modulos_para()` y se comprueba en `test_modulos.py`. Desde el 26-nov-2026 el módulo «Roles y permisos» ya no existe (runbook 45); el diagrama SVG de arriba se generó antes y todavía lo dibuja.
 
 | Módulo | Estado | Ciudadanía | Funcionario | Supervisor | Coordinación | Infraest. | Identid. | Catálogo | Seguridad | Secretos | Auditor | Roles |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -79,7 +79,6 @@ Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ mód
 | **Equipo de la institución** | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | 2 |
 | **Mi seguridad** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
 | **Segundo factor (MFA)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
-| **Roles y permisos** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |
 | **Acceso a trámites** | ✅ | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 6 |
 | **Infraestructura** | ✅ | — | — | — | — | ✅ | — | — | — | — | — | 1 |
 | **Identidades** | ✅ | — | — | — | — | — | ✅ | — | — | — | — | 1 |
@@ -87,9 +86,9 @@ Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ mód
 | **Respuesta a incidentes** | ✅ | — | — | — | — | — | — | — | ✅ | — | — | 1 |
 | **Custodia de secretos** | ✅ | — | — | — | — | — | — | — | — | ✅ | — | 1 |
 | **Auditoría** | ✅ | — | — | — | — | — | — | — | — | — | ✅ | 1 |
-| **Módulos que ve** | | 6 | 7 | 9 | 7 | 5 | 5 | 5 | 5 | 5 | 5 | |
+| **Módulos que ve** | | 5 | 6 | 8 | 6 | 4 | 4 | 4 | 4 | 4 | 4 | |
 
-Lectura rápida: un rol llega a varios módulos (el supervisor ve 8) y un módulo lo comparten varios roles (los tres de transparencia —Mi seguridad, Segundo factor y Roles y permisos— los ven los diez). Los cinco roles de plataforma comparten el mismo patrón: su consola + «Acceso a trámites» + transparencia, y ninguno ve trámites.
+Lectura rápida: un rol llega a varios módulos (el supervisor ve 8) y un módulo lo comparten varios roles (los dos de transparencia —Mi seguridad y Segundo factor— los ven los diez). Los cinco roles de plataforma comparten el mismo patrón: su consola + «Acceso a trámites» + transparencia, y ninguno ve trámites.
 
 Los cinco roles de plataforma (infraestructura, identidades, catálogo, seguridad y custodio de secretos) tienen cada uno su consola, y ninguno ve trámites. El auditor es un sexto rol de plataforma de solo lectura.
 

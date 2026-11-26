@@ -27,7 +27,7 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 
 | Cuenta | Rol | Qué ve |
 |---|---|---|
-| `ana.ciudadana`, `beto.ciudadano` | Ciudadanía | Mis trámites, Iniciar un trámite, Mi seguridad, Segundo factor, Roles y permisos |
+| `ana.ciudadana`, `beto.ciudadano` | Ciudadanía | Mis trámites, Iniciar un trámite, Mi seguridad, Segundo factor |
 | `fabio.mop`, `flor.mop` | Funcionario del MOP | Lo anterior + Bandeja de la institución |
 | `saul.mop` | Supervisor del MOP | Lo anterior + Supervisión (reasignar) y Equipo |
 | `carla.mop` | Coordinadora del MOP | Equipo y roles; **no** ve trámites |
@@ -49,12 +49,7 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 7. **`carla.mop` (coordinadora).** Ve el equipo y los roles de su institución, pero la lista de trámites está vacía: gestionar personas no da acceso a los datos de la ciudadanía.
 8. ★ **Un rol de plataforma** (por ejemplo `ines.infra`). Menú distinto: solo su consola. En «Acceso a trámites», pulsar el botón: el servidor responde 403 y la decisión queda registrada. *Ningún operador, ni el de infraestructura, ve trámites; y no existe un superusuario.*
 9. ★ **`aldo.auditor`.** Auditoría: el resumen muestra cuántas decisiones permitió y negó el sistema y qué políticas las motivaron; en «Decisiones de acceso» se filtra por «Solo negadas» y se ve quién intentó qué (por ejemplo, Ines pidiendo trámites). Remarcar: **la consola lee con un rol de base de datos de solo lectura** y **la propia consulta del auditor queda registrada** (quién audita al auditor).
-10. ★ **Roles y permisos** (cualquier cuenta, mejor `saul.mop`). Menú «Seguridad y permisos» → «Roles y permisos»:
-    - *Roles y módulos* y **Módulos por rol:** los 10 roles, cuántas acciones puede cada uno y sus módulos; la tabla **Módulos por rol** cruza los 16 módulos con los 10 roles (un rol llega a varios módulos y un módulo lo comparten varios roles); el aviso verde **«No existe un superusuario»** (el que más puede hace 7 de 21).
-    - *Matriz de permisos:* cada ✔/✖ sale de evaluar el motor de decisiones real. Pulsar una celda explica **la política que decidió**. Alternar «Fuera de su ámbito». La llave marca lo que **exige segundo factor reciente**.
-    - *¿Qué pasaría si…?:* **la pieza más vistosa.** Elegir un escenario («El segundo factor venció», «…y el trámite lo pidió él mismo», «El operador de infraestructura quiere ver un trámite») y mostrar el veredicto, **la traza regla por regla** y «qué lo cambiaría» (con «Probarlo»). Armar uno propio cambiando el rol y las circunstancias. Remarcar: *lo responde el motor de decisiones real y no deja rastro en la auditoría*.
-    - *Base de datos:* elegir `auditor_role` (solo lee) y `app_role` (inserta decisiones pero no las altera ni borra); ningún rol es superusuario; RLS y disparadores por tabla.
-    - *Cómo se decide:* las cinco capas y «si esta capa fallara…».
+10. *(Retirado el 26-nov-2026.)* La pantalla «Roles y permisos» (matriz, simulador y base de datos) ya no existe: `/politicas/` responde 404 y el ensayo lo comprueba. Para mostrar que no hay superusuario, usar «Acceso a trámites» (paso 8) y la consola de auditoría (paso 9).
 11. ★ **Segundo factor (MFA)** (`fabio.mop`). Menú «Segundo factor (MFA)»: explicar los 6 pasos; escribir el código actual en «Pruébalo ahora» → la ventana se renueva; luego **«Enviar el mismo código de nuevo»** → el servidor lo rechaza (anti-repetición). Mostrar la actividad de seguridad propia. *No introducir códigos incorrectos a propósito: tres bloquean la cuenta, y el bloqueo es progresivo (5 minutos, luego 15 y luego 60). Si se quiere mostrar, hacerlo con una cuenta que no se vaya a usar después.*
 12. ★ **Crear una cuenta y alta del segundo factor en vivo:** «Crear una cuenta» pide nombre, apellidos, cédula (formato panameño, p. ej. `8-123-456`), fecha de nacimiento (mayor de 18), provincia, ciudad y correo, más usuario y contraseña de 12 caracteres o más. Al enviar, entra directo al código QR para escanear con el celular → confirmar con el código. Remarcar: *la cédula se guarda cifrada y ni el auditor ni ningún otro rol puede leer los datos personales; el correo aún no se verifica (no hay servidor de correo). Deja una cuenta nueva en la base: el registro es inalterable y la cuenta se puede suspender, no borrar.*
 13. ★ **Cierre por inactividad y recarga.** Con una sesión abierta y un trámite a la vista: **recargar la página (F5)** → vuelve al Inicio (la vista no se recuerda). Dejar la sesión sin tocar: a los 9 minutos sale el aviso «¿Sigues ahí?» con cuenta regresiva y a los 10 se cierra la sesión (se revoca en el servidor) y el acceso explica el motivo. Para no esperar 10 minutos, ver «Cómo mostrar el cierre por inactividad».
@@ -67,13 +62,13 @@ Qué mostrar al profesor y en qué orden. La plataforma corre en VM1 (`app-backe
 
 Es la pieza del segundo factor que más impresiona y la que no aparece sola, porque el inicio de sesión ya verifica el factor. Tres formas, de la más segura a la más vistosa:
 
-- **A. Con el simulador (sin riesgo):** escenario «El segundo factor venció» → se niega y «qué lo cambiaría» dice que con un segundo factor reciente se permitiría. Es el mismo motor que decide de verdad.
+- **A. (Retirada: dependía del simulador, que ya no existe.)** Quedan las formas B y C.
 - **B. Esperar:** iniciar sesión como `fabio.mop`, mostrar otras pantallas y volver a cambiar un estado pasados 15 minutos (útil si la presentación es larga).
 - **C. Acortar la ventana para la demostración (decisión de Jeison):** en VM1, agregar `Environment=SIGET_MFA_RECIENTE_MINUTOS=2` a `/home/siget/.config/containers/systemd/siget-backend.container`, y reiniciar:
   ```bash
   sudo -H -u siget bash -lc 'export XDG_RUNTIME_DIR=/run/user/1009; systemctl --user daemon-reload; systemctl --user stop siget-nginx.service siget-backend.service siget-pod.service; systemctl --user start siget-pod.service; sleep 3; systemctl --user start siget-backend.service siget-nginx.service'
   ```
-  Toda la interfaz (anillo, textos, matriz y simulador) toma la ventana del servidor. Al terminar, quitar la línea y repetir el reinicio para volver a 15 minutos. Es una ventana **más estricta**, no más débil.
+  Toda la interfaz (anillo y textos) toma la ventana del servidor. Al terminar, quitar la línea y repetir el reinicio para volver a 15 minutos. Es una ventana **más estricta**, no más débil.
 
 ## Cómo mostrar el cierre por inactividad
 
@@ -87,7 +82,7 @@ La sesión se cierra a los **10 minutos** sin actividad, con aviso un minuto ant
 - **Mínimo privilegio y separación de poderes:** 5 roles de plataforma + auditor, sin superusuario; el control dual para altas sensibles; nadie se asigna un rol a sí mismo (lo impone la base).
 - **Trazabilidad:** cada cambio de estado queda en el historial inalterable, escrito por la propia base en la misma transacción.
 - **Defensa en capas:** TLS 1.3 → nginx → Django/DRF → PDP → RLS en PostgreSQL → contenedores rootless sin privilegios.
-- **Verificable:** la matriz y el simulador salen del motor real; hay 1044 pruebas del backend, 292 del frontend (cifras del 24-nov-2026) (con accesibilidad y seguridad del código) y pruebas contra la base real.
+- **Verificable:** las decisiones salen del motor real; hay 1044 pruebas del backend, 292 del frontend (cifras del 24-nov-2026) (con accesibilidad y seguridad del código) y pruebas contra la base real.
 
 ## Preguntas que puede hacer el profesor
 

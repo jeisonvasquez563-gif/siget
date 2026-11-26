@@ -14,7 +14,7 @@ Se activa con `systemctl --user daemon-reload` y `systemctl --user start siget-p
 
 Para actualizar `nginx.conf` hay que escribir **sobre el mismo archivo** (`tee`), no reemplazarlo.
 
-**nginx sirve la interfaz y solo reenvía a Django estas rutas:** `auth`, `tramites`, `catalogo`, `equipo`, `auditoria`, `politicas` y `salud`. Todo lo demás responde 404. Cualquier `add_header` dentro de un `location` anula las cabeceras de seguridad del servidor: para el caché se usa `expires`.
+**nginx sirve la interfaz y solo reenvía a Django estas rutas:** `auth`, `tramites`, `catalogo`, `equipo`, `auditoria` y `salud`. Todo lo demás responde 404. Cualquier `add_header` dentro de un `location` anula las cabeceras de seguridad del servidor: para el caché se usa `expires`.
 
 **Reinicio ordenado** (reiniciar backend y nginx a la vez detiene el pod, porque están enlazados):
 

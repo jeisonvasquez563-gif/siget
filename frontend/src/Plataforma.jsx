@@ -399,20 +399,14 @@ export function ConsolaIdentidades({ yo }) {
 
 function FormularioInstitucion({ correr, recargar }) {
   const [nombre, setNombre] = useState('')
-  const [tipo, setTipo] = useState('real')
   return (
     <form className="formulario-fila" onSubmit={async (e) => {
       e.preventDefault()
-      const r = await correr(() => api('/plataforma/aprobaciones/', { metodo: 'POST', cuerpo: { nombre, tipo } }), 'Propuesta enviada: falta que otra persona la apruebe.')
+      const r = await correr(() => api('/plataforma/aprobaciones/', { metodo: 'POST', cuerpo: { nombre, tipo: 'real' } }), 'Propuesta enviada: falta que otra persona la apruebe.')
       if (r) { setNombre(''); recargar() }
     }}>
       <label className="campo"><span>Nombre de la institución</span>
         <input className="entrada" value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3} maxLength={80} />
-      </label>
-      <label className="campo"><span>Tipo</span>
-        <select className="entrada" value={tipo} onChange={(e) => setTipo(e.target.value)}>
-          <option value="real">Real</option><option value="demostracion">Demostración</option>
-        </select>
       </label>
       <button className="btn" type="submit">Proponer institución</button>
     </form>
@@ -425,7 +419,7 @@ export function ConsolaCatalogo({ yo }) {
     <>
       <Encabezado titulo="Catálogo" texto="Propón y aprueba, entre dos personas, las instituciones que aparecen en SIGET. Los trámites de cada institución los gestiona su coordinación." />
       <PanelAprobaciones yo={yo} titulo="Propuestas de instituciones" nuevo="Proponer una institución nueva"
-        resumen={(o) => `Alta de la institución «${o.nombre}» (${o.tipo === 'real' ? 'real' : 'demostración'})`}
+        resumen={(o) => `Alta de la institución «${o.nombre}»${o.tipo === 'demostracion' ? ' (demostración)' : ''}`}
         formulario={(props) => <FormularioInstitucion {...props} />} />
       <section className="panel">
         <div className="panel-cabecera"><h3>Instituciones hoy</h3></div>

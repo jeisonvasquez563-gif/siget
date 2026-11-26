@@ -15,8 +15,7 @@ Django 5.2 LTS + Django REST Framework (API-first). Corre en un contenedor Podma
 | Trámites y catálogo (crear, bandeja, estado, reasignar, historial) | ✅ 51 pasos contra la base real |
 | Equipo, módulos por rol y cuentas de demostración (`sembrar_demo`) | ✅ |
 | Consola de auditoría con rol de base de datos propio (solo lectura) | ✅ 34 pasos contra la base real |
-| Simulador de «qué pasaría si…» (`/politicas/simular/`: puro, valida estrictamente, no registra decisiones) | ✅ 53 pruebas + 38 pasos contra la base real |
-| Transparencia: matriz de permisos calculada por el PDP y permisos reales de la base (`/politicas/`), actividad de seguridad propia | ✅ 30 pasos contra la base real |
+| Transparencia de la propia cuenta: actividad de seguridad propia (las rutas `/politicas/` se retiraron el 26-nov-2026: responden 404) | ✅ pasos contra la base real |
 | Consolas de plataforma (control dual), plazos hábiles y escalamiento, documentos, notificaciones | ⏳ ([hoja de ruta](../docs/organizacion-backend-frontend.md)) |
 
 ## Stack
@@ -38,7 +37,7 @@ backend/
 │   └── settings_test.py    # solo para las pruebas
 ├── apps/
 │   ├── autenticacion/      # login, MFA, sesiones, tokens, eventos de seguridad y actividad propia
-│   ├── autorizacion/       # PDP (pdp.py), permisos de DRF, módulos por rol, matriz de permisos, simulador y transparencia
+│   ├── autorizacion/       # PDP (pdp.py), permisos de DRF, módulos por rol
 │   ├── catalogo/           # Institucion, TipoTramite
 │   ├── identidad/          # Usuario, Membresia, Aprobacion, el adaptador al PDP y el equipo de cada institución
 │   ├── tramites/           # Tramite, Transicion
@@ -63,7 +62,7 @@ Las pruebas de `pytest` no necesitan la base de datos. Para probar contra la bas
 - `python manage.py verificar_autenticacion`: recorrido HTTP de la autenticación (registro, login, MFA, refresco, bloqueo, límites) en una transacción que se revierte, con el reloj controlado.
 - `python manage.py verificar_tramites`: la API de trámites por HTTP (visibilidad por rol e institución, conflicto de interés, segundo factor vencido, historial).
 - `python manage.py verificar_auditoria`: la consola de auditoría y que la conexión de solo lectura **no pueda** escribir ni leer secretos.
-- `python manage.py verificar_politicas`: matriz, permisos reales de la base, actividad de seguridad y simulador.
+- `python manage.py verificar_politicas`: las rutas `/politicas/` ya no existen (404), permisos reales de la base (leídos del catálogo de PostgreSQL), el PDP y la actividad de seguridad.
 - `python manage.py sembrar_demo [--ensayo]`: crea las 13 cuentas de demostración (una por rol, con segundo factor) y trámites de ejemplo **por la propia API**; `--ensayo` lo hace todo dentro de una transacción que se revierte. Imprime las credenciales una sola vez (no las guarda).
 
 Se ejecutan en VM1 con la imagen del `Containerfile` y los secretos como `podman secret`; el comando exacto está en [`docs/runbook.md`](../docs/runbook.md) sección 23.
