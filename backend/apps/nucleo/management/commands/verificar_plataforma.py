@@ -22,7 +22,8 @@ from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimie
 from apps.autorizacion import permisos
 from apps.catalogo.models import Institucion
 from apps.identidad.models import Aprobacion, Membresia, SolicitudDerecho, Usuario
-from apps.plataforma.models import RotacionSecreto
+from apps.nucleo.contexto import fijar_contexto
+from apps.plataforma.models import AlertaSeguridad, RotacionSecreto
 
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.21"}
 CLAVE = "una-frase-larga-y-poco-comun-6402"
@@ -432,3 +433,126 @@ class Command(BaseCommand):
             c.execute("select current_user, (select rolsuper from pg_roles where rolname = current_user)")
             usuario_bd, es_super = c.fetchone()
         self._paso("todo se ejecutó como app_role, sin superusuario", usuario_bd == "app_role" and es_super is False, usuario_bd)
+        self._alertas(ana, ida, ca, sec, inf, seg)
+
+    # ------------------------------------------------------------------ alertas de seguridad (migración 019, PT-10)
+    def _alertas(self, ana, ida, ca, sec, inf, seg):
+        """Las alertas por la API y por la base, como app_role. `app_role` no puede insertar alertas (solo lo hace siget.detectar_anomalias()
+        como detector_role, que aquí no se ejecuta): lo que depende de que haya una alerta usa una real si existe (todo se revierte) y, si no hay
+        ninguna abierta, lo dice. Que el detector detecte lo correcto lo prueba database/pruebas-alertas.sql."""
+        def rechazada_por_la_base(sql, parametros=()):
+            try:
+                with transaction.atomic(), connection.cursor() as c:
+                    c.execute(sql, parametros)
+                return False
+            except DatabaseError:
+                return True
+
+        seg2 = self._persona("vp_seg_dos", "operador_seguridad")
+        aud = self._persona("vp_aud", "auditor")
+        Usuario.objects.filter(pk=aud.pk).update(nivel_aseguramiento=3)  # el auditor exige nivel 3
+        n0 = len(self.decisiones)
+
+        # ------------------------------------------------------------ quién las ve y cómo
+        r = self._llamar(seg, "get", "/plataforma/alertas/")
+        cuerpo = r.json() if r.status_code == 200 else {}
+        self._paso("seguridad lista las alertas, con el total, las abiertas y la paginación",
+                   r.status_code == 200 and {"resultados", "total", "abiertas", "limite", "desplazamiento"} <= set(cuerpo) and isinstance(cuerpo.get("resultados"), list), r.status_code)
+        self._paso("la respuesta de las alertas no se guarda en cachés", r.headers.get("Cache-Control") == "no-store")
+        crudo = json.dumps(cuerpo)
+        self._paso("cada alerta trae la persona por su usuario, la IP y contadores, y nunca cédula, correo ni credenciales",
+                   all(set(a) == {"id", "regla", "severidad", "persona", "ip", "conteo", "primera_vez", "ultima_vez", "detalle", "estado", "revisada_por", "revisada_en", "nota"}
+                       and (a["persona"] is None or set(a["persona"]) == {"id", "usuario"}) for a in cuerpo.get("resultados", []))
+                   and all(x not in crudo for x in ("password", "argon2", "mfa_secreto", "cedula", "correo")))
+        r = self._llamar(seg, "get", "/plataforma/alertas/?estado=abierta&limite=5&desplazamiento=0")
+        self._paso("el filtro por estado y la paginación funcionan",
+                   r.status_code == 200 and r.json()["limite"] == 5 and all(a["estado"] == "abierta" for a in r.json()["resultados"]) and len(r.json()["resultados"]) <= 5, r.status_code)
+        self._paso("un estado o una paginación inválidos dan 400",
+                   all(self._llamar(seg, "get", f"/plataforma/alertas/?{q}").status_code == 400 for q in ("estado=cerrada", "limite=0", "limite=101", "desplazamiento=-1", "limite=abc")))
+        r = self._llamar(aud, "get", "/plataforma/alertas/")
+        self._paso("el auditor también las ve (por su conexión de solo lectura)", r.status_code == 200 and {"resultados", "total", "abiertas"} <= set(r.json()), r.status_code)
+        self._paso("nadie más las ve: ni la ciudadanía ni los otros cuatro operadores (403)",
+                   all(self._llamar(x, "get", "/plataforma/alertas/").status_code == 403 for x in (ana, ida, ca, sec, inf)))
+        sin_factor = self._persona("vp_seg_sin_factor", "operador_seguridad")
+        sesion = Sesion.objects.create(usuario=sin_factor, refresh_hash=tokens.hash_refresh(tokens.nuevo_refresh()), expira_en=timezone.now() + timedelta(minutes=10))
+        Usuario.objects.filter(pk=sin_factor.pk).update(mfa_verificado_en=timezone.now() - timedelta(hours=2))
+        token = tokens.emitir_access(settings.SIGET_JWT_KEY, sin_factor.pk, sesion.pk, tokens.SCOPE_COMPLETO, timezone.now(), 300, settings.SIGET_EMISOR)
+        r = APIClient().get("/plataforma/alertas/", secure=True, **dict(HOST, HTTP_AUTHORIZATION=f"Bearer {token}"))
+        cache.clear()
+        transaction.set_rollback(False)
+        self._paso("el operador sin segundo factor reciente no las ve y se le sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
+
+        # ------------------------------------------------------------ quién las revisa
+        revisar = {"estado": "revisada", "nota": "Revisada por la verificación de integración."}
+        self._paso("solo el operador de seguridad revisa: el auditor, la ciudadanía y los otros operadores reciben 403, existan o no",
+                   all(self._llamar(x, "post", f"/plataforma/alertas/{i}/revisar/", revisar).status_code == 403 for x in (aud, ana, ida, ca, sec, inf) for i in (1, 999999999)))
+        r = self._llamar(seg, "post", "/plataforma/alertas/999999999/revisar/", revisar)
+        self._paso("revisar una alerta que no existe da 404", r.status_code == 404, r.status_code)
+        self._paso("el PDP registró las decisiones sobre las alertas, también las negadas",
+                   any(d[1] == "ver_alertas" and d[2] is True for d in self.decisiones[n0:]) and any(d[1] == "ver_alertas" and d[2] is False for d in self.decisiones[n0:])
+                   and any(d[1] == "revisar_alerta" and d[2] is False for d in self.decisiones[n0:]))
+
+        # ------------------------------------------------------------ la base: seguridad por filas y permisos
+        fijar_contexto(ana.pk)
+        self._paso("con el contexto de una persona que no es operador de seguridad, la base no muestra ninguna alerta", AlertaSeguridad.objects.count() == 0)
+        fijar_contexto(sec.pk)
+        self._paso("ni con el de otro operador de plataforma", AlertaSeguridad.objects.count() == 0)
+        with connection.cursor() as c:
+            c.execute("""select r.rolname, has_table_privilege(r.rolname,'siget.alerta_seguridad','INSERT'), has_table_privilege(r.rolname,'siget.alerta_seguridad','DELETE'),
+                         has_column_privilege(r.rolname,'siget.alerta_seguridad','estado','UPDATE'), has_column_privilege(r.rolname,'siget.alerta_seguridad','nota','UPDATE'),
+                         has_column_privilege(r.rolname,'siget.alerta_seguridad','conteo','UPDATE'), has_column_privilege(r.rolname,'siget.alerta_seguridad','detalle','UPDATE'),
+                         has_any_column_privilege(r.rolname,'siget.alerta_seguridad','SELECT'), has_function_privilege(r.rolname,'siget.detectar_anomalias()','EXECUTE')
+                         from pg_roles r where r.rolname in ('app_role','auditor_role','pgadmin_lectura','checkpoint_app','escalador_role','detector_role')""")
+            privilegios = {f[0]: f[1:] for f in c.fetchall()}
+        self._paso("existen los seis roles (detector_role lo crea la migración 019)", len(privilegios) == 6, sorted(privilegios))
+        app, aud_bd = privilegios.get("app_role"), privilegios.get("auditor_role")
+        self._paso("app_role lee las alertas y solo actualiza estado y nota (por columna): ni inserta, ni borra, ni toca el conteo ni el detalle",
+                   app == (False, False, True, True, False, False, True, False), app)
+        self._paso("auditor_role solo las lee, y no ejecuta el detector", aud_bd == (False, False, False, False, False, False, True, False), aud_bd)
+        self._paso("ni pgadmin_lectura, ni el checkpoint, ni el escalador, ni el propio detector_role leen las alertas ni ejecutan lo que no es suyo",
+                   all(privilegios.get(rol, (True,))[:7] == (False,) * 7 for rol in ("pgadmin_lectura", "checkpoint_app", "escalador_role", "detector_role"))
+                   and all(privilegios.get(rol, (None,) * 8)[7] is False for rol in ("pgadmin_lectura", "checkpoint_app", "escalador_role")))
+        self._paso("solo detector_role ejecuta siget.detectar_anomalias() (y la aplicación no)", privilegios.get("detector_role", (None,) * 8)[7] is True and app[7] is False)
+        self._paso("app_role no puede insertar una alerta",
+                   rechazada_por_la_base("insert into siget.alerta_seguridad (regla, severidad, conteo, primera_vez, ultima_vez) values ('bloqueos_repetidos', 'alta', 2, now(), now())"))
+        self._paso("ni borrarlas ni vaciar la tabla", rechazada_por_la_base("delete from siget.alerta_seguridad where id = -1") and rechazada_por_la_base("truncate siget.alerta_seguridad"))
+        self._paso("ni cambiar el conteo, el detalle o la regla", rechazada_por_la_base("update siget.alerta_seguridad set conteo = 1 where id = -1")
+                   and rechazada_por_la_base("update siget.alerta_seguridad set detalle = '{}'::jsonb where id = -1")
+                   and rechazada_por_la_base("update siget.alerta_seguridad set regla = 'reuso_token_refresco' where id = -1"))
+        self._paso("ni ejecutar el detector", rechazada_por_la_base("select siget.detectar_anomalias()"))
+
+        # ------------------------------------------------------------ la revisión, sobre una alerta real si la hay (todo se revierte)
+        fijar_contexto(seg.pk)
+        abierta = AlertaSeguridad.objects.filter(estado="abierta").order_by("id").first()
+        if abierta is None:
+            self._paso("(no hay ninguna alerta abierta en esta base: la revisión de punta a punta queda cubierta por database/pruebas-alertas.sql)", True)
+            return
+        ruta = f"/plataforma/alertas/{abierta.pk}/revisar/"
+        r = self._llamar(seg, "post", ruta, {"estado": "revisada"})
+        self._paso("revisar sin nota da 400 y la alerta sigue abierta", r.status_code == 400 and AlertaSeguridad.objects.get(pk=abierta.pk).estado == "abierta", r.status_code)
+        r = self._llamar(seg, "post", ruta, {"estado": "abierta", "nota": "Reabrir una alerta no es una revisión."})
+        self._paso("tampoco se puede «revisar» con un estado que no es revisada ni descartada", r.status_code == 400 and AlertaSeguridad.objects.get(pk=abierta.pk).estado == "abierta", r.status_code)
+        fijar_contexto(seg.pk)
+        actualizar = "update siget.alerta_seguridad set estado = 'revisada', revisada_por = %s, nota = %s where id = %s"
+        self._paso("la base rechaza una revisión sin nota, con la nota vacía, a nombre de otro operador o de quien no es operador de seguridad",
+                   rechazada_por_la_base(actualizar, [seg.pk, None, abierta.pk]) and rechazada_por_la_base(actualizar, [seg.pk, "   ", abierta.pk])
+                   and rechazada_por_la_base(actualizar, [seg2.pk, "Otro operador figura como revisor.", abierta.pk])
+                   and rechazada_por_la_base(actualizar, [ana.pk, "Una persona sin ese rol no revisa.", abierta.pk])
+                   and AlertaSeguridad.objects.get(pk=abierta.pk).estado == "abierta")
+        r = self._llamar(seg, "post", ruta, revisar)
+        fijar_contexto(seg.pk)
+        hecha = AlertaSeguridad.objects.get(pk=abierta.pk)
+        self._paso("el operador la revisa con su nota: queda a su nombre y con la hora de la base",
+                   r.status_code == 200 and r.json()["codigo"] == "alerta_revisada" and hecha.estado == "revisada" and hecha.revisada_por_id == seg.pk
+                   and hecha.nota == revisar["nota"] and hecha.revisada_en is not None and hecha.revisada_en <= timezone.now(), r.status_code)
+        evento = EventoSeguridad.objects.filter(evento="alerta_revisada", actor=seg).values_list("detalle", flat=True).first() or {}
+        self._paso("quedó en los eventos de seguridad con la alerta, la regla y el resultado, sin la nota",
+                   set(evento) == {"alerta", "regla", "estado"} and evento["alerta"] == abierta.pk and revisar["nota"] not in json.dumps(evento))
+        r = self._llamar(seg2, "post", ruta, {"estado": "descartada", "nota": "Otro operador intenta cambiarla."})
+        self._paso("una alerta ya revisada no se revisa otra vez, ni por otro operador (409)", r.status_code == 409 and r.json()["codigo"] == "ya_revisada", r.status_code)
+        fijar_contexto(seg.pk)
+        self._paso("la base tampoco deja reabrirla ni cambiar su nota ni su resultado",
+                   rechazada_por_la_base("update siget.alerta_seguridad set estado = 'abierta', revisada_por = null, revisada_en = null, nota = null where id = %s", [abierta.pk])
+                   and rechazada_por_la_base("update siget.alerta_seguridad set nota = 'Nota cambiada después.' where id = %s", [abierta.pk])
+                   and rechazada_por_la_base("update siget.alerta_seguridad set estado = 'descartada' where id = %s", [abierta.pk])
+                   and AlertaSeguridad.objects.get(pk=abierta.pk).estado == "revisada")

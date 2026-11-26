@@ -11,7 +11,7 @@ from datetime import timedelta
 import django
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import Count, OuterRef, Subquery
 from django.utils import timezone
 
 from apps.autenticacion import derechos, servicio as auth
