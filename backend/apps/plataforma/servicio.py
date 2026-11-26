@@ -21,6 +21,7 @@ from apps.catalogo.models import Institucion
 from apps.identidad.models import Aprobacion, Membresia, SolicitudDerecho, Usuario
 
 from apps.identidad import equipo
+from apps.tramites import formulario
 
 from . import secretos
 from .models import ESTADOS_ALERTA, AlertaSeguridad, RotacionSecreto
@@ -317,11 +318,15 @@ def validar_revision(datos):
     datos = datos if isinstance(datos, dict) else {}
     errores = []
     estado, nota = datos.get("estado"), datos.get("nota")
-    nota = nota.strip() if isinstance(nota, str) else ""
     if not isinstance(estado, str) or estado not in RESOLUCIONES_DE_ALERTA:
         errores.append("el estado debe ser «revisada» o «descartada»")
-    if not NOTA_ALERTA_MIN <= len(nota) <= NOTA_ALERTA_MAX:
+    # Mismo criterio que los motivos de los trámites: sin NUL ni caracteres de control, sin solo invisibles, con letra o número
+    if nota is None:
         errores.append(f"la nota debe tener de {NOTA_ALERTA_MIN} a {NOTA_ALERTA_MAX} caracteres")
+    else:
+        nota, error = formulario.validar_texto_libre(nota, NOTA_ALERTA_MIN, NOTA_ALERTA_MAX)
+        if error:
+            errores.append(f"la nota no es válida: {error[0].lower()}{error[1:]}")
     return ((estado, nota), []) if not errores else (None, errores)
 
 

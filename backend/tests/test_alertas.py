@@ -155,6 +155,13 @@ def test_la_alerta_revisada_muestra_quien_y_la_nota():
     ({"estado": "cerrada", "nota": "Estado inventado"}, 1),
     ({"estado": ["revisada"], "nota": "Un estado que es una lista"}, 1),
     ({"estado": "revisada", "nota": 12345}, 1),
+    ({"estado": "revisada", "nota": "Con un nulo\u0000 adentro"}, 1),
+    ({"estado": "revisada", "nota": "Con control\x07 adentro"}, 1),
+    ({"estado": "revisada", "nota": "​​​​"}, 1),
+    ({"estado": "revisada", "nota": "ab​​"}, 1),
+    ({"estado": "revisada", "nota": "...!!!"}, 1),
+    ({"estado": "revisada", "nota": "Linea uno\nlinea dos"}, 0),
+    ({"estado": "revisada", "nota": "x" * 1000}, 0),
     ({}, 2),
     (None, 2),
 ])
