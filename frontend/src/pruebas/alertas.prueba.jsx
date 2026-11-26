@@ -139,6 +139,29 @@ describe('panel de alertas del operador de seguridad', () => {
     expect(within(panel()).getByRole('status')).toHaveTextContent('4 alertas abiertas')
   })
 
+  it('con el envío en curso, Escape y «Cancelar» no cierran el modal', async () => {
+    const { user } = await abrirConsola()
+    const original = window.fetch
+    let responder
+    window.fetch = (ruta, opciones) => (String(ruta).includes('/revisar/')
+      ? new Promise((resolver) => { responder = () => resolver(new Response(JSON.stringify({ codigo: 'ya_revisada', detalle: 'Esta alerta ya fue revisada o descartada.' }), { status: 409, headers: { 'Content-Type': 'application/json' } })) })
+      : original(ruta, opciones))
+    await user.click(within(filaDe(/^Cuenta bloqueada varias veces/)).getByRole('button', { name: 'Revisar' }))
+    const modal = await screen.findByRole('dialog', { name: /Revisar la alerta/ })
+    await user.type(within(modal).getByLabelText(/^Nota/), 'Reviso mientras el servidor responde.')
+    await user.click(within(modal).getByRole('button', { name: 'Guardar revisión' }))
+    await waitFor(() => expect(within(modal).getByRole('button', { name: 'Cancelar' })).toBeDisabled())
+    await user.keyboard('{Escape}')
+    await user.click(within(modal).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByRole('dialog', { name: /Revisar la alerta/ })).toBeInTheDocument()
+    expect(within(modal).getByLabelText(/^Nota/)).toHaveValue('Reviso mientras el servidor responde.')
+    responder()
+    expect(await within(modal).findByText('Esta alerta ya fue revisada o descartada.')).toBeInTheDocument()
+    expect(within(modal).getByRole('button', { name: 'Cancelar' })).toBeEnabled() // terminó: vuelve a poder cerrarse
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: /Revisar la alerta/ })).not.toBeInTheDocument()
+  })
+
   it('es accesible (axe)', async () => {
     const { container, user } = await abrirConsola()
     expect(await axe(container, AXE)).toHaveNoViolations()

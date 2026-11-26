@@ -456,10 +456,11 @@ function ventanaDe(minutos) {
 }
 
 function ModalRevision({ alerta, error, alCancelar, alEnviar }) {
-  useModal(alCancelar)
   const [estado, setEstado] = useState('revisada')
   const [nota, setNota] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const cancelar = () => { if (!enviando) alCancelar() } // con el POST en curso no se cierra: se perdería el resultado y la nota
+  useModal(cancelar)
   async function enviar(e) {
     e.preventDefault()
     setEnviando(true)
@@ -484,7 +485,7 @@ function ModalRevision({ alerta, error, alCancelar, alEnviar }) {
           <small>Entre 3 y 1000 caracteres ({nota.trim().length}/1000). No escribas contraseñas ni datos personales.</small>
         </label>
         <div className="fila-botones">
-          <button type="button" className="btn btn-sec" onClick={alCancelar}>Cancelar</button>
+          <button type="button" className="btn btn-sec" onClick={cancelar} disabled={enviando}>Cancelar</button>
           <button type="submit" className="btn" disabled={nota.trim().length < 3 || enviando}>Guardar revisión</button>
         </div>
         </form>
