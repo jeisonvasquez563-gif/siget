@@ -6,6 +6,15 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Despliegue (alertas ante patrones sospechosos en producción, 26-nov)
+- **Migración 019 aplicada** (runbook 43.10, evidencia `docs/sdlc/evidencia/18_alertas_*`):
+  - ensayo con sus pruebas: **57/57 a la primera**;
+  - migración real: 57/57, sin romper escalamiento (10/10) ni notificaciones (36/36);
+  - `detector_role` con su línea en `pg_hba.conf` (mismo inodo) y la contraseña pasada directo a un `podman secret`, sin mostrarse.
+- **Imagen verificada antes de reiniciar** (`verificar_plataforma` **147/147** y las otras 7 en verde), despliegue y temporizador `siget-detectar.timer` cada 5 minutos.
+- **Ensayo 116/116.** Después, el detector abrió las dos alertas que el ensayo provoca a propósito (`fabio.mop` e `ivan.identidades`, denegaciones del PDP).
+- **SDLC:** RS-24 pasa a «Cumple» (24 de 26 requisitos; queda RS-26, que depende de terceros) y ZT-8 queda hecho salvo la exportación firmada.
+
 ### Alertas ante patrones sospechosos (PT-10, RS-24, ZT-8; migración 019, runbook 43)
 - **Estado: implementado, sin aplicar en producción.** La migración, la función y sus pruebas de base se escribieron sin poder ejecutarlas contra PostgreSQL (no había una base disponible): se prueban con `database/pruebas-alertas.sql` y `verificar_plataforma` al aplicar. La exportación firmada de la auditoría **no** entra en este cambio.
 - **Base de datos (`019-alertas-seguridad.sql`):** tabla `siget.alerta_seguridad` (`regla` de una lista cerrada de cuatro, `severidad`, `usuario_id`, `ip inet`, `conteo`, `primera_vez`, `ultima_vez`, `detalle jsonb` solo con contadores y nombres, `estado`, `revisada_por`, `revisada_en`, `nota`) y un índice único parcial: **una alerta abierta por (regla, persona, IP)**, con los nulos contados como iguales. Dos índices nuevos para los filtros por tiempo (`evento_seguridad (evento, creado_en)` y `decision_pdp (creado_en) WHERE NOT permitido`).

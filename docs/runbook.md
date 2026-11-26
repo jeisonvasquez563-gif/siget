@@ -2074,7 +2074,7 @@ Aplicado el **24 de noviembre de 2026**, a las 15:17, lejos de la hora en punto 
 
 ## 43. Alertas ante patrones sospechosos: aplicar la migración 019 y el temporizador del detector (PT-10)
 
-**Estado: implementado, sin aplicar en producción.** Todo lo de este apartado se escribió sin poder ejecutarlo contra PostgreSQL ni contra las VMs: se comprueba al aplicarlo (43.3, 43.4 y 43.6). Cubre el requisito RS-24 y ZT-8 del documento de requisitos (que se actualiza al desplegar, no antes). **La exportación firmada de la auditoría no entra aquí.**
+**Estado: aplicado en producción el 26 de noviembre de 2026** (registro en 43.10).
 
 ### 43.1 Qué cambia y en qué orden hay que aplicarlo
 
@@ -2217,4 +2217,15 @@ Si algún paso falla, **no desplegar**.
 
 ### 43.10 Registro de la aplicación
 
-*Pendiente: se completa al aplicarla (fecha, hora, respaldo, números de las pruebas y de las verificaciones, y el resultado del ensayo).*
+Aplicado el **26 de noviembre de 2026**, a las 11:41. Evidencia en `docs/sdlc/evidencia/18_alertas_*`.
+
+1. **VM2, respaldo verificado:** `tramites_demo-20261126-114113.dump` (19 tablas, restauración probada), copiado como `pre-019-…` (SHA-256 `caec24b7a3b417f5…`).
+2. **Ensayo de la 019 junto con `pruebas-alertas.sql`** en una sola transacción revertida (armado como dice 43.3): **57 de 57 a la primera**. Después no quedaba ni la tabla, ni el rol, ni la función. Las ventanas deslizantes y el `ON CONFLICT` contra el índice parcial, que eran los puntos de riesgo, funcionaron sin cambios.
+3. **Migración real** y las mismas pruebas sobre la base migrada: 57/57. Regresión de las pruebas de la base anteriores: escalamiento 10/10 y notificaciones 36/36.
+4. **`pg_hba.conf`:** línea de `detector_role` (desde `192.168.100.10/32`, como `escalador_role`) agregada con `tee -a` sobre el **mismo inodo** (50628156 antes y después), permisos 644, respaldo `pg_hba.conf.respaldo-2026-11-26`; `pg_reload_conf()` la tomó sin error (`pg_hba_file_rules`, línea 9). `log_statement` estaba en `none`.
+5. **Contraseña de `detector_role`:** generada en VM2 (40 caracteres), fijada por la entrada estándar de psql y pasada por una tubería SSH directo a `podman secret create siget-db-detector-password -` en VM1. **Nunca se mostró ni se guardó en un archivo.**
+6. **VM1, imagen candidata** (`alertas-candidata`) y las 8 verificaciones **antes** de reiniciar, todas a la primera: `verificar_plataforma` **147/147** (con las alertas), `verificar_tramites` 214/214, `verificar_autenticacion` 200/200, `verificar_politicas` 41/41, `verificar_equipo` 51/51, `verificar_auditoria` 34/34, `verificar_integracion` 15/15 y `verificar_esquema` OK. Despliegue de backend e interfaz con respaldo (`respaldo-2026-11-26`).
+7. **Temporizador** `siget-detectar.timer` instalado y activo (la unidad es idéntica a la del escalador salvo los nombres). Primera corrida a mano: `0 alerta(s)` (sin actividad sospechosa reciente; las denegaciones de las personas de prueba ya revertidas se ignoraron sin romper nada, que era el hallazgo medio de la revisión).
+8. **Ensayo completo: 116/116** (con la consola de alertas atravesando nginx, 401 sin sesión y 403 para custodia de secretos). La corrida del detector después del ensayo abrió **dos alertas** `denegaciones_persona`: `fabio.mop` (6) e `ivan.identidades` (5), con el desglose por política y nada sensible. Es lo que el ensayo provoca a propósito (43.9). Quedaron abiertas para mostrar en la defensa cómo las revisa el operador de seguridad.
+
+**Volver atrás:** `systemctl --user disable --now siget-detectar.timer` (como `siget`) detiene la detección sin tocar datos; la imagen anterior es `respaldo-2026-11-26` y la interfaz `frontend.respaldo-2026-11-26`. El backend anterior funciona con la base migrada.

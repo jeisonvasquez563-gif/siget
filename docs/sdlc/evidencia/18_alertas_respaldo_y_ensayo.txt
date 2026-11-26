@@ -1,0 +1,70 @@
+# Alertas: respaldo verificado y ensayo de la 019 con sus pruebas, con ROLLBACK (26-nov-2026)
+# 2026-11-26 11:41:12  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/a019/paso1.sh
+== 1. Respaldo verificado (pg_dump, restauracion de prueba y comparacion con la base viva)
+OK: tramites_demo-20261126-114113.dump (212222 bytes, 19 tablas), restauración probada y verificada contra la base viva
+copia fuera de la rotacion: pre-019-tramites_demo-20261126-114113.dump  sha256 caec24b7a3b417f5
+== 2. Ensayo: migracion 019 y sus pruebas en una sola transaccion que termina en ROLLBACK (11:41)
+PASA  10 login_fallido desde una IP en 10 minutos crean UNA alerta media, con conteo 10 y sin persona
+PASA  9 login_fallido (bajo el umbral) no alertan
+PASA  login_fallido y cambio_contrasena_fallido de una misma IP se suman (6 + 4) y el detalle los cuenta por nombre
+PASA  10 fallos repartidos en 50 minutos (nunca 10 en 10 minutos) no alertan
+PASA  10 fallos de hace 3 horas (fuera de la ventana revisada) no alertan
+PASA  otros eventos (login_exitoso) de una IP no cuentan
+PASA  una IP invalida en un evento no rompe al detector ni genera una alerta sin IP
+PASA  5 decisiones negadas de una persona en 10 minutos crean una alerta media, con las politicas contadas en el detalle
+PASA  4 negadas (bajo el umbral) no alertan
+PASA  5 negadas repartidas en 25 minutos no alertan
+PASA  las decisiones permitidas no cuentan (8 permitidas y 3 negadas)
+PASA  5 negadas de un actor_id que no existe en usuario no rompen la corrida ni crean alerta
+PASA  un solo refresh_reuso crea una alerta alta para esa persona
+PASA  un refresh_reuso de hace mas de 24 horas no alerta
+PASA  2 cuenta_bloqueada de una cuenta en 24 horas crean una alerta alta
+PASA  un solo bloqueo no alerta
+PASA  2 bloqueos con uno de hace mas de 24 horas no alertan
+PASA  el detalle solo lleva ventana, umbral y contadores por nombre: nada del detalle original de los eventos
+PASA  la primera corrida crea las 6 alertas esperadas (3 por IP, 1 por denegaciones, 1 por reuso y 1 por bloqueos) y devuelve al menos 6
+PASA  idempotente: correrla otra vez sin eventos nuevos no crea ni cambia ninguna alerta de la prueba
+PASA  dedupe por IP: tres eventos mas actualizan la misma alerta abierta (conteo 13, ultima_vez mas reciente), no crean otra
+PASA  dedupe por persona: un segundo refresh_reuso sube el conteo a 2 de la alerta abierta, no crea otra
+PASA  la corrida que actualiza devuelve al menos las dos alertas actualizadas
+PASA  la base impide dos alertas abiertas para la misma regla, persona e IP (indice unico parcial)
+PASA  lo mismo cuando la clave lleva persona y no IP
+PASA  la regla es de una lista cerrada (CHECK)
+PASA  app_role sin contexto de sesion no ve ninguna alerta (seguridad por filas)
+PASA  con el contexto de una persona que no es operador de seguridad no ve alertas ni puede revisar ninguna
+PASA  con el contexto de un operador de seguridad activo ve las alertas
+PASA  app_role no puede insertar alertas (solo las inserta la funcion)
+PASA  app_role no puede borrar alertas
+PASA  app_role no puede vaciar la tabla
+PASA  app_role solo puede actualizar estado, revisada_por, revisada_en y nota (no conteo, detalle ni regla)
+PASA  app_role no puede ejecutar siget.detectar_anomalias()
+PASA  revisar exige una nota (ausente o vacia)
+PASA  la nota tiene un maximo de 1000 caracteres
+PASA  revisar exige un revisor con rol de operador de seguridad (ni vacio ni una persona sin ese rol)
+PASA  la revision se registra a nombre de quien tiene la sesion, no de otro operador
+PASA  el estado es de una lista cerrada (CHECK)
+PASA  una alerta abierta no recibe datos de revision
+PASA  el operador revisa una alerta abierta con su nota
+PASA  la hora de la revision la fija la base (now()), no la aplicacion
+PASA  una alerta revisada no se revisa otra vez, ni se reabre ni cambia su nota
+PASA  ni el dueño borra una alerta (disparador de solo insercion)
+PASA  ni el dueño vacia la tabla
+PASA  una alerta revisada no se vuelve a crear con los MISMOS eventos (siguen dentro de la ventana, pero ya se revisaron)
+PASA  con 10 eventos NUEVOS tras la revision se abre otra alerta (conteo 10, sin sumar los ya revisados) y la revisada queda como estaba
+PASA  auditor_role lee las alertas (como el resto de la auditoria) y no puede modificarlas
+PASA  pgadmin_lectura no puede leer la tabla de alertas
+PASA  escalador_role no puede leer la tabla de alertas
+PASA  checkpoint_app no puede leer la tabla de alertas
+PASA  detector_role no puede leer la tabla de alertas
+PASA  detector_role no lee los eventos de seguridad ni las decisiones: solo ejecuta la funcion
+PASA  detector_role: LOGIN, sin superusuario, sin crear bases ni roles, sin saltar la seguridad por filas
+PASA  solo detector_role (y el dueño) puede ejecutar siget.detectar_anomalias(): ni PUBLIC ni los demas roles
+PASA  siget.detectar_anomalias() es SECURITY DEFINER, del dueño y con la ruta de busqueda fija
+PASA  por el catalogo: app_role sin INSERT, DELETE ni la secuencia; detector_role sin ningun permiso de tabla
+RESUMEN: 57 de 57 comprobaciones PASAN, 0 FALLAN
+== 3. El ensayo no dejo nada (debe decir t|0|0)
+tabla_no_existe|rol_detector|funcion
+t|0|0
+(1 row)
+# código de salida: 0
