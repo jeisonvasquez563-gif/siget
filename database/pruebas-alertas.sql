@@ -107,6 +107,12 @@ INSERT INTO siget.decision_pdp (actor_id, accion, recurso, permitido, politica, 
 SELECT pg_temp.id('denperm'), 'ver_tramite', 'tramite', (g > 3), 'x', now() - interval '5 minutes' + g * interval '20 seconds'
   FROM generate_series(1, 11) g;                                   -- 3 negadas y 8 permitidas: las permitidas no cuentan
 
+-- Un actor_id que no existe en usuario (decision_pdp no tiene clave foranea): 5 negadas no deben romper la corrida ni crear alerta
+INSERT INTO _p019 VALUES ('huerfano', (SELECT max(id) + 1000000 FROM siget.usuario));
+INSERT INTO siget.decision_pdp (actor_id, accion, recurso, permitido, politica, creado_en)
+SELECT pg_temp.id('huerfano'), 'ver_tramite', 'tramite', false, 'sin_regla_que_permita', now() - interval '5 minutes' + g * interval '20 seconds'
+  FROM generate_series(1, 5) g;
+
 -- Reuso de token de refresco
 INSERT INTO siget.evento_seguridad (actor_id, evento, ip, creado_en) VALUES
   (pg_temp.id('reuso'), 'refresh_reuso', '192.0.2.20', now() - interval '30 minutes'),
@@ -155,6 +161,9 @@ BEGIN
   PERFORM pg_temp.r(pg_temp.n_u('denegaciones_persona', 'den4') = 0, '4 negadas (bajo el umbral) no alertan');
   PERFORM pg_temp.r(pg_temp.n_u('denegaciones_persona', 'denlento') = 0, '5 negadas repartidas en 25 minutos no alertan');
   PERFORM pg_temp.r(pg_temp.n_u('denegaciones_persona', 'denperm') = 0, 'las decisiones permitidas no cuentan (8 permitidas y 3 negadas)');
+  PERFORM pg_temp.r(current_setting('p019.corrida1', true) IS NOT NULL
+                    AND NOT EXISTS (SELECT 1 FROM siget.alerta_seguridad WHERE usuario_id = pg_temp.id('huerfano')),
+                    '5 negadas de un actor_id que no existe en usuario no rompen la corrida ni crean alerta');
 
   -- Reuso de token
   v_ok := (SELECT count(*) FROM siget.alerta_seguridad WHERE regla = 'reuso_token_refresco' AND usuario_id = pg_temp.id('reuso')

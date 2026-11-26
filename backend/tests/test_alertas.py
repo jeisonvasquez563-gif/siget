@@ -487,6 +487,23 @@ def test_las_cuatro_reglas_llevan_su_severidad_ventana_y_umbral():
     assert "NOT d.permitido" in funcion
 
 
+def test_el_detector_se_serializa_con_la_revision_y_no_pide_permisos_al_rol():
+    funcion = re.search(r"CREATE FUNCTION siget\.detectar_anomalias\(\) RETURNS int.*?END \$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
+    assert funcion.index("LOCK TABLE siget.alerta_seguridad IN SHARE ROW EXCLUSIVE MODE;") < funcion.index("WITH")
+    assert len(re.findall(r"GRANT[^;]*detector_role", SQL_SIN_COMENTARIOS)) == 3  # conectar, usar el esquema y ejecutar la funcion: nada mas
+
+
+def test_las_denegaciones_solo_cuentan_personas_que_existen():
+    funcion = re.search(r"CREATE FUNCTION siget\.detectar_anomalias\(\) RETURNS int.*?END \$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
+    assert "FROM siget.decision_pdp d JOIN siget.usuario u ON u.id = d.actor_id" in funcion  # sin clave foranea en decision_pdp
+
+
+def test_el_detector_une_por_coalesce_y_calcula_la_ip_una_sola_vez():
+    funcion = re.search(r"CREATE FUNCTION siget\.detectar_anomalias\(\) RETURNS int.*?END \$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
+    assert "IS NOT DISTINCT FROM" not in funcion
+    assert funcion.count("siget.ip_o_nulo(") == 1
+
+
 def test_el_detalle_solo_lleva_contadores_y_nombres():
     funcion = re.search(r"CREATE FUNCTION siget\.detectar_anomalias\(\) RETURNS int.*?END \$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
     assert "jsonb_build_object('ventana_minutos', d.ventana_min, 'umbral', d.umbral, 'por_nombre'," in funcion
@@ -512,8 +529,8 @@ def test_la_seguridad_por_filas_deja_ver_y_revisar_solo_al_operador_y_leer_al_au
     politicas = re.findall(r"CREATE POLICY (\w+) ON siget\.alerta_seguridad FOR (\w+) TO (\w+)\s+(.*?);", SQL_SIN_COMENTARIOS, re.S)
     assert [(p[0], p[1], p[2]) for p in politicas] == [("alerta_ver_operador", "SELECT", "app_role"), ("alerta_revisar_operador", "UPDATE", "app_role"),
                                                        ("alerta_ver_auditor", "SELECT", "auditor_role")]
-    assert all("siget.es_operador_seguridad(siget.ctx_usuario())" in p[3] for p in politicas[:2])
-    assert "WITH CHECK (siget.es_operador_seguridad(siget.ctx_usuario()))" in politicas[1][3]
+    assert all("(SELECT siget.es_operador_seguridad(siget.ctx_usuario()))" in p[3] for p in politicas[:2])  # envuelto: se evalua una vez
+    assert "WITH CHECK ((SELECT siget.es_operador_seguridad(siget.ctx_usuario())))" in politicas[1][3]
     assert "FORCE ROW LEVEL SECURITY" not in SQL_SIN_COMENTARIOS  # la funcion (dueño de la tabla) inserta por encima de las politicas
 
 

@@ -7,7 +7,8 @@
 --   detalle lleva SOLO contadores y nombres de evento o de politica: nunca contrasenas, tokens, hashes, cedula ni correo. La persona
 --   involucrada, cuando la hay, es usuario_id (la interfaz muestra su username); la IP, cuando el patron es por IP.
 -- * siget.detectar_anomalias(): las crea o las actualiza (SECURITY DEFINER, ruta de busqueda fija, como escalar_vencidos de la 013).
---   Cuatro reglas sobre ventanas recientes:
+--   Cuatro reglas sobre ventanas recientes (detalle.por_nombre cuenta TODOS los eventos entre primera_vez y ultima_vez, no solo los de la
+--   ventana del conteo):
 --     rafaga_login_fallido_ip  (media): 10 o mas login_fallido o cambio_contrasena_fallido desde una misma IP en 10 minutos.
 --     denegaciones_persona     (media): 5 o mas decisiones del PDP negadas para una misma persona en 10 minutos.
 --     reuso_token_refresco     (alta):  cualquier refresh_reuso (una alerta por persona mientras este abierta).
@@ -59,7 +60,9 @@ CREATE UNIQUE INDEX alerta_abierta_unica ON siget.alerta_seguridad (regla, COALE
 CREATE INDEX alerta_estado_idx ON siget.alerta_seguridad (estado, ultima_vez DESC);
 CREATE INDEX alerta_usuario_idx ON siget.alerta_seguridad (usuario_id);  -- la clave foranea
 
--- Filtros por tiempo del detector: sin estos indices recorreria las dos tablas de auditoria enteras en cada corrida
+-- Filtros por tiempo del detector: sin estos indices recorreria las dos tablas de auditoria enteras en cada corrida.
+-- OJO: CREATE INDEX (sin CONCURRENTLY, que no corre dentro de la transaccion de la migracion) bloquea las escrituras de la tabla mientras
+-- se construye: aplicarla fuera de la hora de mayor uso (en la demo son tablas chicas y dura un instante).
 CREATE INDEX evento_seguridad_evento_creado_idx ON siget.evento_seguridad (evento, creado_en);
 CREATE INDEX decision_pdp_negadas_idx ON siget.decision_pdp (creado_en) WHERE NOT permitido;
 
@@ -103,6 +106,9 @@ CREATE FUNCTION siget.detectar_anomalias() RETURNS int LANGUAGE plpgsql SECURITY
 DECLARE
   v_total int;
 BEGIN
+  -- Serializa con una revision simultanea y con otro detector: sin esto, una alerta que se cierra entre tanto podria recibir el
+  -- UPDATE del detector o dejar pasar un duplicado. Corre como siget_owner (dueno de la tabla), no pide permisos a detector_role.
+  LOCK TABLE siget.alerta_seguridad IN SHARE ROW EXCLUSIVE MODE;
   WITH
   -- regla, severidad, ventana (minutos), umbral
   reglas (regla, severidad, ventana_min, umbral) AS (VALUES
@@ -112,14 +118,18 @@ BEGIN
     ('bloqueos_repetidos',      'alta',  1440, 2)),
   -- Los eventos que cuentan para alguna regla: (regla, persona, IP, nombre del evento o de la politica, hora)
   eventos AS (
-    SELECT 'rafaga_login_fallido_ip' AS regla, NULL::int AS usuario_id, siget.ip_o_nulo(e.ip) AS ip, e.evento AS nombre, e.creado_en
-      FROM siget.evento_seguridad e
-     WHERE e.evento IN ('login_fallido', 'cambio_contrasena_fallido') AND e.creado_en > now() - interval '1 hour'
-       AND siget.ip_o_nulo(e.ip) IS NOT NULL
+    -- ip_o_nulo una sola vez por fila (OFFSET 0 impide que el planificador la repita en el filtro y en el resultado)
+    SELECT 'rafaga_login_fallido_ip' AS regla, NULL::int AS usuario_id, f.ip, f.evento AS nombre, f.creado_en
+      FROM (SELECT e.evento, e.creado_en, siget.ip_o_nulo(e.ip) AS ip
+              FROM siget.evento_seguridad e
+             WHERE e.evento IN ('login_fallido', 'cambio_contrasena_fallido') AND e.creado_en > now() - interval '1 hour' OFFSET 0) f
+     WHERE f.ip IS NOT NULL
     UNION ALL
+    -- decision_pdp.actor_id no tiene clave foranea y puede traer un id que no existe: con el JOIN no llega a alerta_seguridad.usuario_id
+    -- (cuya clave foranea abortaria la corrida entera). evento_seguridad.actor_id si la tiene, por eso las dos reglas de abajo no lo necesitan.
     SELECT 'denegaciones_persona', d.actor_id, NULL::inet, coalesce(d.politica, 'sin_politica'), d.creado_en
-      FROM siget.decision_pdp d
-     WHERE NOT d.permitido AND d.actor_id IS NOT NULL AND d.creado_en > now() - interval '1 hour'
+      FROM siget.decision_pdp d JOIN siget.usuario u ON u.id = d.actor_id
+     WHERE NOT d.permitido AND d.creado_en > now() - interval '1 hour'
     UNION ALL
     SELECT 'reuso_token_refresco', e.actor_id, NULL::inet, e.evento, e.creado_en
       FROM siget.evento_seguridad e
@@ -134,7 +144,8 @@ BEGIN
       FROM siget.alerta_seguridad WHERE estado <> 'abierta' GROUP BY regla, usuario_id, ip),
   nuevos AS (
     SELECT e.* FROM eventos e
-      LEFT JOIN cerradas c ON c.regla = e.regla AND c.usuario_id IS NOT DISTINCT FROM e.usuario_id AND c.ip IS NOT DISTINCT FROM e.ip
+      LEFT JOIN cerradas c ON c.regla = e.regla AND COALESCE(c.usuario_id, 0) = COALESCE(e.usuario_id, 0)
+                          AND COALESCE(c.ip, '0.0.0.0'::inet) = COALESCE(e.ip, '0.0.0.0'::inet)
      WHERE e.creado_en > coalesce(c.hasta, '-infinity'::timestamptz)),
   -- Cuantos eventos de la misma clave hay en la ventana que termina en cada uno (la ventana deslizante)
   ventanas AS (
@@ -152,12 +163,14 @@ BEGIN
       FROM ventanas v JOIN reglas r ON r.regla = v.regla
      WHERE CASE WHEN r.ventana_min = 10 THEN v.n10 ELSE v.n24 END >= r.umbral
      GROUP BY v.regla, r.severidad, v.usuario_id, v.ip, r.ventana_min, r.umbral),
-  -- El detalle: cuantos eventos hubo de cada nombre entre la primera y la ultima vez. Solo contadores y nombres
+  -- El detalle: cuantos eventos hubo de cada nombre entre la primera y la ultima vez (el total de ese tramo, que puede ser mayor que
+  -- conteo: este es el maximo de UNA sola ventana de 10 minutos o de 24 horas). Solo contadores y nombres
   detalladas AS (
     SELECT c.*,
            (SELECT jsonb_object_agg(x.nombre, x.k)
               FROM (SELECT n.nombre, count(*) AS k FROM nuevos n
-                     WHERE n.regla = c.regla AND n.usuario_id IS NOT DISTINCT FROM c.usuario_id AND n.ip IS NOT DISTINCT FROM c.ip
+                     WHERE n.regla = c.regla AND COALESCE(n.usuario_id, 0) = COALESCE(c.usuario_id, 0)
+                       AND COALESCE(n.ip, '0.0.0.0'::inet) = COALESCE(c.ip, '0.0.0.0'::inet)
                        AND n.creado_en BETWEEN c.primera_vez AND c.ultima_vez
                      GROUP BY n.nombre) x) AS por_nombre
       FROM candidatas c),
@@ -233,10 +246,10 @@ GRANT SELECT ON siget.alerta_seguridad TO auditor_role;  -- como lee evento_segu
 
 ALTER TABLE siget.alerta_seguridad ENABLE ROW LEVEL SECURITY;
 CREATE POLICY alerta_ver_operador ON siget.alerta_seguridad FOR SELECT TO app_role
-  USING (siget.es_operador_seguridad(siget.ctx_usuario()));
+  USING ((SELECT siget.es_operador_seguridad(siget.ctx_usuario())));  -- el SELECT interno: se evalua una vez, no por fila
 CREATE POLICY alerta_revisar_operador ON siget.alerta_seguridad FOR UPDATE TO app_role
-  USING (siget.es_operador_seguridad(siget.ctx_usuario()))
-  WITH CHECK (siget.es_operador_seguridad(siget.ctx_usuario()));
+  USING ((SELECT siget.es_operador_seguridad(siget.ctx_usuario())))
+  WITH CHECK ((SELECT siget.es_operador_seguridad(siget.ctx_usuario())));
 CREATE POLICY alerta_ver_auditor ON siget.alerta_seguridad FOR SELECT TO auditor_role
   USING (true);
 
