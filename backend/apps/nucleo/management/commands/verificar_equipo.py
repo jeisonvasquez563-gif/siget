@@ -83,7 +83,7 @@ class Command(BaseCommand):
             r = cliente.get(ruta, secure=True, **cab)
         else:
             r = getattr(cliente, metodo)(ruta, datos or {}, format="json", secure=True, **cab)
-        cache.clear()
+        cache.delete(f"throttle_api_{usuario.pk}")  # solo el contador de la tasa de ESTA persona (alcance «api»), no toda la caché
         transaction.set_rollback(False)  # DRF marca la transacción al rechazar; en producción cada petición tiene la suya
         return r
 
@@ -91,17 +91,22 @@ class Command(BaseCommand):
     def _sondeo(usuario, accion):
         """Ejecuta `accion` como app_role con el contexto de `usuario` (None: sin contexto), en su PROPIO atomic(): un error de la base no estropea
         la transacción de la prueba. Devuelve el SQLSTATE con el que falló la base, o None si no falló."""
+        vaciar = "select set_config('app.usuario_id', '', true), set_config('app.instituciones', '', true)"
         try:
             with transaction.atomic():
                 if usuario is None:
                     with connection.cursor() as c:
-                        c.execute("select set_config('app.usuario_id', '', true), set_config('app.instituciones', '', true)")
+                        c.execute(vaciar)
                 else:
                     fijar_contexto(usuario.pk)
                 accion()
             return None
         except DatabaseError as error:
             return getattr(error.__cause__, "sqlstate", None) or "desconocido"
+        finally:
+            # El contexto es local a la transacción de la prueba, que sigue abierta: sin esto, la persona de un sondeo quedaría puesta en el siguiente
+            with connection.cursor() as c:
+                c.execute(vaciar)
 
     @staticmethod
     def _sql(texto, parametros=()):
@@ -270,7 +275,10 @@ class Command(BaseCommand):
         existentes = {t["id"] for t in r.json().get("tipos", [])}
         self._paso("la coordinación lista el catálogo de SU institución (200)", r.status_code == 200 and r.json()["institucion"]["id"] == inst.pk, r.status_code)
         self._paso("el listado trae los tipos de su institución y de ninguna otra",
-                   existentes == set(TipoTramite.objects.filter(institucion=inst).values_list("pk", flat=True)) and tipo_otra.pk not in existentes)
+                   existentes == set(TipoTramite.objects.filter(institucion=inst).values_list("pk", flat=True))
+                   and (tipo_otra is None or tipo_otra.pk not in existentes))
+        if tipo_otra is None:
+            self._paso("los pasos que usan un tipo de OTRA institución", True, "omitido: la otra institución no tiene ningún tipo")
         r = self._http(coord, "get", f"/catalogo/institucion/{otra.pk}/tipos/")
         self._paso("la coordinación NO lista el catálogo de otra institución (403)", r.status_code == 403, r.status_code)
         for nombre, persona in (("la supervisión", sup), ("el funcionario", f1), ("la ciudadanía", ciud), ("un operador de plataforma", op),
@@ -316,29 +324,40 @@ class Command(BaseCommand):
 
         # ------------------------------------------------------------ editar
         ruta = f"{base}{tipo.pk}/"
-        r = self._http(coord, "patch", ruta, {"nombre": "Prueba del catalogo (editada)", "sla_dias": 9})
+        # Cada edición manda la versión que la persona veía (la vigente en la base): el control de concurrencia la exige
+        con_version = lambda c: {**c, "version": TipoTramite.objects.get(pk=tipo.pk).version}  # noqa: E731
+        version_inicial = tipo.version
+        r = self._http(coord, "patch", ruta, con_version({"nombre": "Prueba del catalogo (editada)", "sla_dias": 9}))
         tipo.refresh_from_db()
         self._paso("la coordinación edita nombre y plazo (200)", r.status_code == 200 and tipo.nombre == "Prueba del catalogo (editada)" and tipo.sla_dias == 9, r.status_code)
         for nombre, persona in (("la supervisión", sup), ("el funcionario", f1), ("la ciudadanía", ciud), ("la coordinación de OTRA institución", coord_b),
                                 ("una coordinación revocada", rev)):
             self._paso(f"{nombre} no edita tipos de esta institución (403)", self._http(persona, "patch", ruta, {"sla_dias": 1}).status_code == 403)
-        self._paso("un tipo de otra institución, por la ruta de la propia, no existe (404)",
-                   self._http(coord, "patch", f"{base}{tipo_otra.pk}/", {"sla_dias": 1}).status_code == 404)
+        if tipo_otra is not None:
+            self._paso("un tipo de otra institución, por la ruta de la propia, no existe (404)",
+                       self._http(coord, "patch", f"{base}{tipo_otra.pk}/", {"sla_dias": 1, "version": tipo_otra.version}).status_code == 404)
         self._paso("la coordinación de otra institución tampoco lo alcanza por la ruta de la suya (404)",
                    self._http(coord_b, "patch", f"/catalogo/institucion/{otra.pk}/tipos/{tipo.pk}/", {"sla_dias": 1}).status_code == 404)
         self._paso("un tipo que no existe da 404", self._http(coord, "patch", f"{base}999999999/", {"sla_dias": 1}).status_code == 404)
         otro_nombre = TipoTramite.objects.filter(institucion=inst).exclude(pk=tipo.pk).order_by("id").first().nombre
         for nombre, c in (("cambiar su institución", {"institucion_id": otra.pk}), ("cambiar su id", {"id": 1}), ("un cuerpo vacío", {}),
                           ("un plazo fuera de rango", {"sla_dias": 400}), ("un nombre que ya tiene otro tipo", {"nombre": otro_nombre})):
-            self._paso(f"{nombre} se rechaza (400)", self._http(coord, "patch", ruta, c).status_code == 400)
+            self._paso(f"{nombre} se rechaza (400)", self._http(coord, "patch", ruta, con_version(c)).status_code == 400)
         tipo.refresh_from_db()
         self._paso("y el tipo sigue igual", tipo.institucion_id == inst.pk and tipo.sla_dias == 9 and tipo.nombre == "Prueba del catalogo (editada)")
+        r = self._http(coord, "patch", ruta, {"sla_dias": 5})
+        self._paso("editar sin indicar la versión se rechaza (400, errores.version)", r.status_code == 400 and "version" in r.json().get("errores", {}), r.status_code)
+        r = self._http(coord, "patch", ruta, {"sla_dias": 5, "version": version_inicial})
+        tipo.refresh_from_db()
+        self._paso("editar con una versión vieja da 409 y no escribe nada", r.status_code == 409 and r.json().get("codigo") == "version_desactualizada" and tipo.sla_dias == 9,
+                   (r.status_code, tipo.version, version_inicial))
+        self._paso("cada cambio real subió la versión en uno (el alta la dejó en 1)", version_inicial == 1 and tipo.version == 2, (version_inicial, tipo.version))
 
         # ------------------------------------------------------------ desactivar: no admite trámites nuevos, los existentes siguen
         r = self._http(ciud, "post", "/tramites/", {"tipo_tramite": tipo.pk, "datos": {"asunto": "Antes de desactivar"}})
         existente = r.json().get("id")
         self._paso("mientras está activo, la ciudadanía inicia un trámite de ese tipo (201)", r.status_code == 201, r.status_code)
-        r = self._http(coord, "patch", ruta, {"activo": False})
+        r = self._http(coord, "patch", ruta, con_version({"activo": False}))
         self._paso("la coordinación lo desactiva (200)", r.status_code == 200 and r.json()["activo"] is False, r.status_code)
         r = self._http(ciud, "get", f"/catalogo/tipos-tramite/?institucion={inst.pk}")
         self._paso("el catálogo público ya no lo muestra", r.status_code == 200 and tipo.pk not in {t["id"] for t in r.json()})
@@ -350,7 +369,7 @@ class Command(BaseCommand):
         self._paso("aunque se salte la API, la base rechaza un trámite nuevo de un tipo inactivo", error == "P0001", error)
         r = self._http(sup, "post", f"/tramites/{existente}/estado/", {"estado": "En Tramitacion"})
         self._paso("el trámite que ya existía sigue su curso (200)", r.status_code == 200 and r.json()["estado"] == "En Tramitacion", r.status_code)
-        r = self._http(coord, "patch", ruta, {"activo": True})
+        r = self._http(coord, "patch", ruta, con_version({"activo": True}))
         self._paso("la coordinación lo reactiva (200)", r.status_code == 200 and r.json()["activo"] is True, r.status_code)
         r = self._http(ciud, "post", "/tramites/", {"tipo_tramite": tipo.pk, "datos": {"asunto": "Después de reactivar"}})
         self._paso("reactivado, vuelve a admitir trámites nuevos (201)", r.status_code == 201, r.status_code)
