@@ -122,7 +122,7 @@ function validar(cuerpo, parcial) {
 
 export function catalogoMock({ usuarios, actual, hace, mfaFresco, tipos, resp, negado, pideCodigo }) {
   const cambios = []
-  const dto = (t) => ({ id: t.id, institucion_id: t.institucion.id, nombre: t.nombre, sla_dias: t.sla_dias, audiencia: t.audiencia, formulario: t.formulario, activo: t.activo !== false })
+  const dto = (t) => ({ id: t.id, institucion_id: t.institucion.id, nombre: t.nombre, sla_dias: t.sla_dias, audiencia: t.audiencia, formulario: t.formulario, activo: t.activo !== false, version: t.version ?? 1 })
   const registrar = (t, accion, antes, despues, actor, cuando = new Date().toISOString()) => {
     cambios.push({ id: cambios.length + 1, institucion_id: t.institucion.id, accion, creado_en: cuando, tipo_tramite: { id: t.id, nombre: t.nombre }, actor: { id: actor.id, usuario: actor.usuario }, antes, despues })
   }
@@ -176,7 +176,7 @@ export function catalogoMock({ usuarios, actual, hace, mfaFresco, tipos, resp, n
         const repetido = (n) => tipos().some((t) => t.institucion.id === institucionId && t.nombre.toLowerCase() === n.toLowerCase())
         if (errores) return resp(400, { codigo: 'datos_invalidos', detalle: 'Los datos del trámite no cumplen las reglas del catálogo.', errores })
         if (repetido(limpio.nombre)) return resp(400, { codigo: 'datos_invalidos', detalle: NOMBRE_REPETIDO, errores: { nombre: NOMBRE_REPETIDO } })
-        const nuevo = { id: Math.max(0, ...tipos().map((t) => t.id)) + 1, institucion: { id: institucionId, nombre: institucion }, ...limpio }
+        const nuevo = { id: Math.max(0, ...tipos().map((t) => t.id)) + 1, institucion: { id: institucionId, nombre: institucion }, ...limpio, version: 1 }
         tipos().push(nuevo)
         registrar(nuevo, 'alta', null, { nombre: nuevo.nombre, sla_dias: nuevo.sla_dias, audiencia: nuevo.audiencia, formulario: nuevo.formulario, activo: nuevo.activo }, actor)
         return resp(201, dto(nuevo))
@@ -185,8 +185,14 @@ export function catalogoMock({ usuarios, actual, hace, mfaFresco, tipos, resp, n
       if (metodo !== 'PATCH') return resp(405, { codigo: 'metodo_no_permitido' })
       const tipo = tipos().find((t) => t.id === Number(ruta[3]) && t.institucion.id === institucionId) // lo de otra institución, para quien pregunta, no existe
       if (!tipo) return resp(404, { detail: 'No encontrado.' })
-      const { limpio, errores } = validar(cuerpo, true)
-      if (errores) return resp(400, { codigo: 'datos_invalidos', detalle: 'Los datos del trámite no cumplen las reglas del catálogo.', errores })
+      // Igual que el servidor: la versión que la persona editaba es obligatoria (entero positivo) y aparte de lo editable
+      const { version, ...editado } = cuerpo && typeof cuerpo === 'object' && !Array.isArray(cuerpo) ? cuerpo : {}
+      const { limpio, errores } = validar(cuerpo && typeof cuerpo === 'object' && !Array.isArray(cuerpo) ? editado : cuerpo, true)
+      const versionValida = Number.isInteger(version) && version > 0 && version <= 2147483647
+      const todos = versionValida ? errores : { ...(errores || {}), version: 'Indica la versión del trámite que estás editando (un número entero).' }
+      if (todos) return resp(400, { codigo: 'datos_invalidos', detalle: 'Los datos del trámite no cumplen las reglas del catálogo.', errores: todos })
+      // Otra persona lo cambió entre tanto: no se pisa
+      if (version !== (tipo.version ?? 1)) return resp(409, { codigo: 'version_desactualizada', detalle: 'Otra persona cambió este trámite mientras lo editabas. Recarga para ver la versión actual y vuelve a aplicar tu cambio.' })
       if ('nombre' in limpio && tipos().some((t) => t.id !== tipo.id && t.institucion.id === institucionId && t.nombre.toLowerCase() === limpio.nombre.toLowerCase())) {
         return resp(400, { codigo: 'datos_invalidos', detalle: NOMBRE_REPETIDO, errores: { nombre: NOMBRE_REPETIDO } })
       }
@@ -197,6 +203,7 @@ export function catalogoMock({ usuarios, actual, hace, mfaFresco, tipos, resp, n
       }
       if (Object.keys(despues).length) {
         Object.assign(tipo, limpio)
+        tipo.version = (tipo.version ?? 1) + 1
         const soloActivo = Object.keys(despues).length === 1 && 'activo' in despues
         registrar(tipo, soloActivo ? (despues.activo ? 'activado' : 'desactivado') : 'cambio', antes, despues, actor)
       }

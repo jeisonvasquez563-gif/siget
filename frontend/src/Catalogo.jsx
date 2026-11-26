@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { api, ApiError } from './api.js'
 import { Paginacion, fecha, hace, mensajeDe, useReautenticacion } from './comun.jsx'
 import { CamposFormulario, ResumenErrores } from './Contenido.jsx'
@@ -14,6 +14,12 @@ import { Alerta, BloquesEsqueleto, Icono, Insignia, Vacio, useUI } from './ui.js
 // dibuja como texto de React, nunca como HTML. Nada se borra: un tipo se desactiva.
 
 const TAM_HISTORIAL = 20
+const PESTANAS = [['tramites', 'Trámites'], ['historial', 'Historial de cambios']]
+
+// El servidor lo responde (409 `version_desactualizada`) cuando otra persona cambió el trámite mientras esta lo editaba
+const esConflicto = (e) => e instanceof ApiError && e.estado === 409
+const textoDeConflicto = (e) => (e.datos?.detalle && typeof e.datos.detalle === 'string' ? e.datos.detalle
+  : 'Otra persona cambió este trámite mientras lo editabas. Recarga para ver la versión actual y vuelve a aplicar tu cambio.')
 
 // Lo que responde un 400: `errores` es {clave: mensaje} (las claves son las de validarBorrador); cualquier otra forma, un mensaje general
 function erroresDelServidor(e) {
@@ -115,11 +121,12 @@ function VistaPrevia({ campos }) {
 
 /* ---------------------------------------------------------------- el editor */
 
-function Editor({ institucion, tipo, alTerminar, alCancelar, ejecutar }) {
+function Editor({ institucion, tipo, alTerminar, alCancelar, alRecargar, ejecutar }) {
   const { avisar } = useUI()
   const [b, setB] = useState(() => (tipo ? borradorDesde(tipo) : borradorVacio()))
   const [errores, setErrores] = useState({})
   const [general, setGeneral] = useState('')
+  const [desactualizado, setDesactualizado] = useState(false) // otra persona lo cambió: lo escrito aquí ya no se puede guardar sobre lo vigente
   const [trabajando, setTrabajando] = useState(false)
 
   const cambiarDatos = (parche, ...claves) => { setB((x) => ({ ...x, ...parche })); setErrores((e) => sinClave(e, ...claves)) }
@@ -151,6 +158,7 @@ function Editor({ institucion, tipo, alTerminar, alCancelar, ejecutar }) {
   async function guardar(ev) {
     ev.preventDefault()
     setGeneral('')
+    setDesactualizado(false)
     const locales = validarBorrador(b)
     setErrores(locales)
     if (Object.keys(locales).length) return
@@ -158,12 +166,19 @@ function Editor({ institucion, tipo, alTerminar, alCancelar, ejecutar }) {
     await ejecutar(async () => {
       setTrabajando(true)
       try {
-        if (tipo) await api(`/catalogo/institucion/${institucion.id}/tipos/${tipo.id}/`, { metodo: 'PATCH', cuerpo })
+        // Al editar se manda la versión que se estaba viendo: si otra persona lo cambió entre tanto, el servidor responde 409 y no pisa su cambio
+        if (tipo) await api(`/catalogo/institucion/${institucion.id}/tipos/${tipo.id}/`, { metodo: 'PATCH', cuerpo: { ...cuerpo, version: tipo.version } })
         else await api(`/catalogo/institucion/${institucion.id}/tipos/`, { metodo: 'POST', cuerpo })
         avisar(tipo ? `Guardaste los cambios de «${cuerpo.nombre}».` : `«${cuerpo.nombre}» se agregó al catálogo.`)
         await alTerminar()
       } catch (e) {
         if (e instanceof ApiError && e.pideReautenticar) throw e
+        if (esConflicto(e)) {
+          setErrores({})
+          setGeneral(textoDeConflicto(e))
+          setDesactualizado(true)
+          return
+        }
         const r = erroresDelServidor(e)
         setErrores(r.errores)
         setGeneral(r.general)
@@ -183,6 +198,11 @@ function Editor({ institucion, tipo, alTerminar, alCancelar, ejecutar }) {
         </div>
         <form onSubmit={guardar} noValidate aria-label={tipo ? 'Editar el trámite' : 'Nuevo trámite'}>
           {hayErrores && <ResumenErrores campos={[]} errores={Object.fromEntries(resumenDeErrores(errores).map((linea, i) => [i, linea]))} general={general} />}
+          {desactualizado && (
+            <div className="fila-botones">
+              <button type="button" className="btn btn-sec" onClick={alRecargar}>Recargar la versión actual</button>
+            </div>
+          )}
           <div className="campo-editor-rejilla">
             <Etiquetado etiqueta="Nombre del trámite" error={errores.nombre} requerido>
               {(p) => <input className="entrada" {...p} value={b.nombre} maxLength={NOMBRE_MAX} onChange={(e) => cambiarDatos({ nombre: e.target.value }, 'nombre')} autoFocus />}
@@ -326,6 +346,8 @@ export function CatalogoInstitucion({ yo }) {
   const [institucionId, setInstitucionId] = useState(coordinaciones[0]?.institucion_id ?? null)
   const institucion = coordinaciones.find((m) => m.institucion_id === institucionId)
   const [pestana, setPestana] = useState('tramites')
+  const idPestanas = useId()
+  const pestanasRef = useRef({})
   const [editando, setEditando] = useState(null) // null: la lista; {tipo: null} un trámite nuevo; {tipo} uno existente
   const [tipos, setTipos] = useState(null)
   const [error, setError] = useState('')
@@ -345,6 +367,33 @@ export function CatalogoInstitucion({ yo }) {
 
   useEffect(() => { if (institucionId !== null) { setTipos(null); setEditando(null); cargar() } }, [institucionId, cargar])
 
+  // Patrón ARIA de pestañas: flechas izquierda y derecha (y Inicio y Fin) mueven el foco y la selección; solo la pestaña activa está en el orden de tabulación
+  function teclearEnPestanas(ev) {
+    const i = PESTANAS.findIndex(([clave]) => clave === pestana)
+    const destino = { ArrowRight: (i + 1) % PESTANAS.length, ArrowLeft: (i - 1 + PESTANAS.length) % PESTANAS.length, Home: 0, End: PESTANAS.length - 1 }[ev.key]
+    if (destino === undefined) return
+    ev.preventDefault()
+    const clave = PESTANAS[destino][0]
+    setPestana(clave)
+    pestanasRef.current[clave]?.focus()
+  }
+
+  // Tras un 409 en el editor: se vuelve a leer lo vigente y se reabre el trámite con la versión nueva
+  async function recargarEdicion(id) {
+    await ejecutar(async () => {
+      try {
+        const lista = (await api(ruta)).tipos
+        setTipos(lista)
+        const vigente = lista.find((t) => t.id === id)
+        setEditando(vigente ? { tipo: vigente } : null)
+        setError('')
+      } catch (e) {
+        if (e instanceof ApiError && e.pideReautenticar) throw e
+        setError(mensajeDe(e))
+      }
+    })
+  }
+
   async function cambiarActivo(t) {
     const desactivar = t.activo
     const si = await confirmar(desactivar ? {
@@ -358,11 +407,16 @@ export function CatalogoInstitucion({ yo }) {
     await ejecutar(async () => {
       setError('')
       try {
-        await api(`${ruta}${t.id}/`, { metodo: 'PATCH', cuerpo: { activo: !desactivar } })
+        await api(`${ruta}${t.id}/`, { metodo: 'PATCH', cuerpo: { activo: !desactivar, version: t.version } })
         avisar(desactivar ? `«${t.nombre}» ya no se ofrece para trámites nuevos.` : `«${t.nombre}» vuelve a ofrecerse.`)
         await recargar()
       } catch (e) {
         if (e instanceof ApiError && e.pideReautenticar) throw e
+        if (esConflicto(e)) {
+          setError(textoDeConflicto(e))
+          await recargar().catch(() => {}) // la lista vuelve a mostrar lo vigente (y su versión) para volver a intentarlo
+          return
+        }
         setError(erroresDelServidor(e).general || Object.values(erroresDelServidor(e).errores).join(' '))
       }
     })
@@ -398,18 +452,28 @@ export function CatalogoInstitucion({ yo }) {
       <Alerta>{error}</Alerta>
       {editando ? (
         <Editor
-          key={editando.tipo?.id ?? 'nuevo'} institucion={{ id: institucionId, nombre: institucion.institucion }} tipo={editando.tipo} ejecutar={ejecutar}
-          alCancelar={() => setEditando(null)} alTerminar={async () => { await recargar(); setEditando(null) }}
+          key={editando.tipo ? `${editando.tipo.id}-${editando.tipo.version}` : 'nuevo'} institucion={{ id: institucionId, nombre: institucion.institucion }}
+          tipo={editando.tipo} ejecutar={ejecutar} alCancelar={() => setEditando(null)} alTerminar={async () => { await recargar(); setEditando(null) }}
+          alRecargar={() => recargarEdicion(editando.tipo.id)}
         />
       ) : (
         <>
-          <div className="pestanas" role="tablist" aria-label="Secciones del catálogo">
-            <button type="button" role="tab" aria-selected={pestana === 'tramites'} onClick={() => setPestana('tramites')}>Trámites</button>
-            <button type="button" role="tab" aria-selected={pestana === 'historial'} onClick={() => setPestana('historial')}>Historial de cambios</button>
+          <div className="pestanas" role="tablist" aria-label="Secciones del catálogo" onKeyDown={teclearEnPestanas}>
+            {PESTANAS.map(([clave, nombre]) => (
+              <button
+                key={clave} type="button" role="tab" id={`${idPestanas}-pestana-${clave}`} aria-selected={pestana === clave} aria-controls={`${idPestanas}-panel-${clave}`}
+                tabIndex={pestana === clave ? 0 : -1} ref={(el) => { pestanasRef.current[clave] = el }} onClick={() => setPestana(clave)}
+              >{nombre}</button>
+            ))}
           </div>
-          {pestana === 'historial'
-            ? <Historial key={institucionId} institucion={{ id: institucionId, nombre: institucion.institucion }} ejecutar={ejecutar} />
-            : tipos === null ? <BloquesEsqueleto n={3} /> : <ListaTipos tipos={tipos} alEditar={(t) => setEditando({ tipo: t })} alCambiarActivo={cambiarActivo} />}
+          {PESTANAS.map(([clave]) => (
+            // Los dos paneles existen siempre (cada pestaña apunta al suyo); solo el de la pestaña activa lleva contenido y se ve
+            <div key={clave} role="tabpanel" id={`${idPestanas}-panel-${clave}`} aria-labelledby={`${idPestanas}-pestana-${clave}`} hidden={pestana !== clave}>
+              {pestana !== clave ? null : clave === 'historial'
+                ? <Historial key={institucionId} institucion={{ id: institucionId, nombre: institucion.institucion }} ejecutar={ejecutar} />
+                : tipos === null ? <BloquesEsqueleto n={3} /> : <ListaTipos tipos={tipos} alEditar={(t) => setEditando({ tipo: t })} alCambiarActivo={cambiarActivo} />}
+            </div>
+          ))}
         </>
       )}
       {modal}

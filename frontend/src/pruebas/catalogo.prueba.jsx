@@ -1,6 +1,6 @@
 // Catálogo de la institución: la coordinación crea, edita, activa y desactiva los trámites de su institución, con un editor visual del
 // formulario, vista previa con el componente real de campos, errores del servidor por campo e historial de cambios.
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
@@ -351,6 +351,145 @@ describe('historial de cambios', () => {
     const { user, container } = await abrir()
     await user.click(screen.getByRole('tab', { name: 'Historial de cambios' }))
     await screen.findByRole('table', { name: 'Cambios del catálogo' })
+    expect(await axe(container, AXE)).toHaveNoViolations()
+  })
+})
+
+describe('edición simultánea', () => {
+  const tipoActual = async () => (await api('/catalogo/institucion/3/tipos/')).tipos.find((t) => t.nombre === TRAMITE)
+
+  it('el editor manda la versión que estaba viendo', async () => {
+    const { user } = await abrir()
+    const antes = await tipoActual()
+    const pedir = vi.spyOn(globalThis, 'fetch')
+    await user.click(screen.getByRole('button', { name: `Editar ${TRAMITE}` }))
+    await user.clear(screen.getByLabelText(/^Plazo/))
+    await user.type(screen.getByLabelText(/^Plazo/), '11')
+    await user.click(screen.getByRole('button', { name: 'Guardar los cambios' }))
+    await screen.findByText(/Guardaste los cambios de/)
+    const parche = pedir.mock.calls.find(([, o]) => o?.method === 'PATCH')
+    expect(JSON.parse(parche[1].body)).toMatchObject({ sla_dias: 11, version: antes.version })
+    expect((await tipoActual()).version).toBe(antes.version + 1)
+    pedir.mockRestore()
+  })
+
+  it('si otra persona lo cambió mientras se editaba, dice que recargue y no pisa su cambio', async () => {
+    const { user } = await abrir()
+    await user.click(screen.getByRole('button', { name: `Editar ${TRAMITE}` }))
+    await screen.findByRole('form', { name: 'Editar el trámite' })
+    const visto = await tipoActual()
+    // Otra persona de la coordinación lo cambia mientras esta tiene el editor abierto
+    await api(`/catalogo/institucion/3/tipos/${visto.id}/`, { metodo: 'PATCH', cuerpo: { sla_dias: 20, version: visto.version } })
+    await user.clear(screen.getByLabelText(/^Nombre del trámite/))
+    await user.type(screen.getByLabelText(/^Nombre del trámite/), 'Un nombre que no debe guardarse')
+    await user.click(screen.getByRole('button', { name: 'Guardar los cambios' }))
+    const caja = (await screen.findByText('Revisa lo que falta o está mal:')).closest('.resumen-errores')
+    expect(within(caja).getByText(/Otra persona cambió este trámite mientras lo editabas\. Recarga/)).toBeInTheDocument()
+    expect((await tipoActual()).nombre).toBe(TRAMITE) // no se pisó
+    expect((await tipoActual()).sla_dias).toBe(20)
+
+    await user.click(screen.getByRole('button', { name: 'Recargar la versión actual' }))
+    await waitFor(() => expect(screen.getByLabelText(/^Plazo/)).toHaveValue('20')) // el editor se reabre con lo vigente
+    expect(screen.getByLabelText(/^Nombre del trámite/)).toHaveValue(TRAMITE)
+    expect(screen.queryByRole('button', { name: 'Recargar la versión actual' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Guardar los cambios' }))
+    expect(await screen.findByText(/Guardaste los cambios de/)).toBeInTheDocument() // con la versión nueva, sí guarda
+  })
+
+  it('desactivar con una lista desactualizada avisa y deja la lista al día', async () => {
+    const { user } = await abrir()
+    const visto = await tipoActual()
+    await api(`/catalogo/institucion/3/tipos/${visto.id}/`, { metodo: 'PATCH', cuerpo: { sla_dias: 20, version: visto.version } })
+    await user.click(screen.getByRole('button', { name: `Desactivar ${TRAMITE}` }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Desactivar' }))
+    expect(await screen.findByText(/Otra persona cambió este trámite mientras lo editabas/)).toBeInTheDocument()
+    expect(await within(await screen.findByRole('row', { name: new RegExp(TRAMITE) })).findByText(/20 días hábiles/)).toBeInTheDocument()
+    expect(fila(TRAMITE)).toHaveTextContent(/Activo/) // no se desactivó
+    await user.click(screen.getByRole('button', { name: `Desactivar ${TRAMITE}` }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Desactivar' }))
+    expect(await screen.findByText(/ya no se ofrece para trámites nuevos/)).toBeInTheDocument() // con la lista al día, sí
+  })
+
+  it('el servidor de ejemplo exige la versión y rechaza una vieja (409)', async () => {
+    await abrir()
+    const visto = await tipoActual()
+    const ruta = `/catalogo/institucion/3/tipos/${visto.id}/`
+    await expect(api(ruta, { metodo: 'PATCH', cuerpo: { sla_dias: 9 } })).rejects.toMatchObject({ estado: 400, datos: { errores: { version: expect.any(String) } } })
+    for (const malo of ['1', 0, -1, 1.5, null]) {
+      await expect(api(ruta, { metodo: 'PATCH', cuerpo: { sla_dias: 9, version: malo } })).rejects.toMatchObject({ estado: 400 })
+    }
+    await expect(api(ruta, { metodo: 'PATCH', cuerpo: { sla_dias: 9, version: visto.version + 3 } })).rejects.toMatchObject({ estado: 409, datos: { codigo: 'version_desactualizada' } })
+    expect((await api(ruta, { metodo: 'PATCH', cuerpo: { sla_dias: 9, version: visto.version } })).version).toBe(visto.version + 1)
+    expect((await api(ruta, { metodo: 'PATCH', cuerpo: { sla_dias: 9, version: visto.version + 1 } })).version).toBe(visto.version + 1) // sin cambios reales no sube
+  })
+})
+
+describe('cada trámite guarda la copia de su formulario', () => {
+  it('cambiar el formulario del tipo no altera el que muestra ni valida un trámite ya iniciado; uno nuevo toma el vigente', async () => {
+    await abrir()
+    const tipo = (await api('/catalogo/institucion/3/tipos/')).tipos.find((t) => t.nombre === TRAMITE)
+    const nuevo = [{ id: 'motivo_nuevo', etiqueta: 'Motivo nuevo', tipo: 'texto', obligatorio: true, max: 50 }]
+    await api(`/catalogo/institucion/3/tipos/${tipo.id}/`, { metodo: 'PATCH', cuerpo: { formulario: nuevo, version: tipo.version } })
+
+    await iniciarSesion('ana.ciudadana', 'una-clave-de-prueba', '123456')
+    expect((await api('/tramites/35/')).formulario).toEqual(tipo.formulario) // trámite de antes del cambio: la copia de entonces
+    const creado = await api('/tramites/', { metodo: 'POST', cuerpo: { tipo_tramite: tipo.id, datos: { motivo_nuevo: 'Hola' } } })
+    expect(creado.formulario.map((c) => c.id)).toEqual(['motivo_nuevo']) // el nuevo toma el vigente
+    expect((await api('/tramites/35/')).formulario).toEqual(tipo.formulario) // y el viejo sigue igual
+
+    // Responder la subsanación de un trámite anterior se valida con SU copia: lo que ya no está en el tipo sigue valiendo y lo nuevo no
+    await iniciarSesion('beto.ciudadano', 'una-clave-de-prueba', '123456')
+    const respuesta = 'Adjunto el plano corregido del terreno.'
+    await expect(api('/tramites/37/subsanacion/', { metodo: 'POST', cuerpo: { respuesta, datos: { motivo_nuevo: 'Hola' } } })).rejects.toMatchObject({ estado: 400 })
+    const corregido = await api('/tramites/37/subsanacion/', { metodo: 'POST', cuerpo: { respuesta, datos: { asunto: 'Asunto corregido' } } })
+    expect(corregido.estado).toBe('En Tramitacion')
+    expect(corregido.datos).toEqual({ asunto: 'Asunto corregido' })
+    expect(corregido.formulario).toEqual(tipo.formulario)
+  })
+})
+
+describe('pestañas accesibles', () => {
+  it('cada pestaña apunta a su panel, solo la activa está en el orden de tabulación y las flechas mueven la selección', async () => {
+    const { user } = await abrir()
+    const lista = screen.getByRole('tablist', { name: 'Secciones del catálogo' })
+    const [tramites, historial] = within(lista).getAllByRole('tab')
+    expect(tramites).toHaveAttribute('aria-selected', 'true')
+    expect(historial).toHaveAttribute('aria-selected', 'false')
+    expect(tramites).toHaveAttribute('tabindex', '0')
+    expect(historial).toHaveAttribute('tabindex', '-1')
+    for (const pestana of [tramites, historial]) {
+      const panel = document.getElementById(pestana.getAttribute('aria-controls'))
+      expect(panel).toHaveAttribute('role', 'tabpanel')
+      expect(panel).toHaveAttribute('aria-labelledby', pestana.id)
+    }
+    expect(screen.getByRole('tabpanel', { name: 'Trámites' })).toContainElement(screen.getByRole('table', { name: 'Trámites de la institución' }))
+    expect(screen.queryByRole('tabpanel', { name: 'Historial de cambios' })).not.toBeInTheDocument() // el otro panel existe pero está oculto
+
+    tramites.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(historial).toHaveFocus()
+    expect(historial).toHaveAttribute('aria-selected', 'true')
+    expect(tramites).toHaveAttribute('tabindex', '-1')
+    expect(historial).toHaveAttribute('tabindex', '0')
+    expect(await within(screen.getByRole('tabpanel', { name: 'Historial de cambios' })).findByRole('table', { name: 'Cambios del catálogo' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Trámites de la institución' })).not.toBeInTheDocument()
+
+    await user.keyboard('{ArrowRight}') // da la vuelta
+    expect(tramites).toHaveFocus()
+    expect(tramites).toHaveAttribute('aria-selected', 'true')
+    await user.keyboard('{ArrowLeft}')
+    expect(historial).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(tramites).toHaveFocus()
+    await user.keyboard('{End}')
+    expect(historial).toHaveFocus()
+    await user.keyboard('{Tab}') // Tab sale de la lista de pestañas, no pasa a la otra pestaña
+    expect(tramites).not.toHaveFocus()
+    expect(historial).not.toHaveFocus()
+  })
+
+  it('no tiene problemas de accesibilidad', async () => {
+    const { container } = await abrir()
     expect(await axe(container, AXE)).toHaveNoViolations()
   })
 })
