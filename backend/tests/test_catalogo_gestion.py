@@ -75,7 +75,7 @@ def test_activo_debe_ser_booleano(activo):
     assert "activo" in gestion.validar({**VALIDO, "activo": activo})[1]
 
 
-@pytest.mark.parametrize("extra", [{"institucion_id": 4}, {"id": 9}, {"creado_en": "hoy"}, {"formulario_viejo": []}])
+@pytest.mark.parametrize("extra", [{"institucion_id": 4}, {"id": 9}, {"creado_en": "hoy"}, {"formulario_viejo": []}, {"version": 99}])
 def test_no_se_aceptan_campos_que_no_se_editan(extra):
     limpio, errores = gestion.validar({**VALIDO, **extra})
     assert limpio is None and "datos" in errores
@@ -202,11 +202,63 @@ def test_los_caracteres_de_control_y_los_invisibles_no_pasan_en_etiquetas_ni_opc
     assert "formulario.0.opciones" in gestion.validar_formulario([{"id": "s", "etiqueta": "S", "tipo": "seleccion", "opciones": ["a\u202eb"]}])[1]
 
 
+def test_un_formulario_de_30_campos_de_texto_de_5000_ya_no_se_acepta_porque_promete_mas_de_lo_que_el_tramite_guarda():
+    prometido = [{"id": f"c{i}", "etiqueta": f"Campo {i}", "tipo": "texto_largo", "max": 5000} for i in range(30)]
+    limpio, errores = gestion.validar_formulario(prometido)
+    assert limpio is None and list(errores) == ["formulario"] and "150000" in errores["formulario"] and "caracteres" in errores["formulario"]
+    assert str(gestion.fm.TAMANO_MAXIMO_DATOS) in errores["formulario"]
+
+
+def test_el_presupuesto_de_texto_se_calcula_con_el_peor_caso_de_bytes_y_deja_margen_bajo_el_tope_de_los_datos():
+    def uno(maximo):
+        return gestion.validar_formulario([{"id": "texto", "etiqueta": "T", "tipo": "texto_largo", "max": maximo}])[1]
+    # un campo: 2 llaves + (5 del id + 8) de puntuacion + max * 2 bytes; con el tope de 5000 caracteres por campo, uno solo siempre cabe
+    assert uno(5000) == {}
+    # dos campos de 5000: 2 + 2 * (id + 8) + 20000 bytes > 15000
+    dos = [{"id": "uno", "etiqueta": "U", "tipo": "texto_largo", "max": 5000}, {"id": "dos", "etiqueta": "D", "tipo": "texto_largo", "max": 5000}]
+    assert "formulario" in gestion.validar_formulario(dos)[1]
+    # el limite exacto: el peso calculado no supera el tope y un caracter mas de promesa si lo supera
+    otros = 2 + len("uno") + 8 + len("dos") + 8
+    cabe = (gestion.fm.TAMANO_MAXIMO_DATOS - otros) // gestion.BYTES_POR_CARACTER
+    ok = [{"id": "uno", "etiqueta": "U", "tipo": "texto_largo", "max": 5000}, {"id": "dos", "etiqueta": "D", "tipo": "texto_largo", "max": cabe - 5000}]
+    assert gestion.validar_formulario(ok)[1] == {}
+    pasado = [ok[0], {**ok[1], "max": cabe - 5000 + 1}]
+    assert "formulario" in gestion.validar_formulario(pasado)[1]
+    assert gestion.fm.TAMANO_MAXIMO_DATOS < gestion.fm.TAMANO_BASE_DATOS
+
+
+def test_las_selecciones_los_numeros_y_las_fechas_tambien_cuentan_en_el_presupuesto():
+    campos = [{"id": "s", "etiqueta": "S", "tipo": "seleccion", "opciones": ["x" * 120, "corta"]}, {"id": "n", "etiqueta": "N", "tipo": "numero", "max": 5},
+              {"id": "f", "etiqueta": "F", "tipo": "fecha"}]
+    limpio, errores = gestion.validar_formulario(campos)
+    assert errores == {}
+    promesa, otros = gestion._peso_de_las_respuestas(limpio)
+    assert promesa == 120 and otros == 2 + (1 + 8) + (1 + 8 + gestion.BYTES_NUMERO) + (1 + 8 + gestion.BYTES_FECHA)
+
+
+def test_los_formularios_de_la_migracion_017_caben_en_el_presupuesto():
+    # El formulario de denuncia es el mas cargado del catalogo inicial (150 + 3000 + 200 caracteres de texto)
+    denuncia = [{"id": "asunto", "etiqueta": "Asunto", "tipo": "texto", "obligatorio": True, "max": 150},
+                {"id": "descripcion", "etiqueta": "Descripción de los hechos", "tipo": "texto_largo", "obligatorio": True, "max": 3000},
+                {"id": "lugar_hechos", "etiqueta": "Lugar de los hechos", "tipo": "texto", "obligatorio": False, "max": 200},
+                {"id": "fecha_hechos", "etiqueta": "Fecha de los hechos", "tipo": "fecha", "obligatorio": False}]
+    assert gestion.validar_formulario(denuncia)[1] == {}
+
+
+def test_una_definicion_demasiado_larga_se_rechaza_antes_de_llegar_al_check_de_la_base():
+    # 30 selecciones de 30 opciones de 120 caracteres: estructuralmente valido, pesa mas de 100 KB (el CHECK de la base es de 16 KB)
+    campos = [{"id": f"c{i}", "etiqueta": f"C{i}", "tipo": "seleccion", "opciones": [f"{i:02d}-{j:02d}-" + "o" * 110 for j in range(30)]} for i in range(30)]
+    limpio, errores = gestion.validar_formulario(campos)
+    assert limpio is None and "demasiado largo" in errores["formulario"]
+    assert gestion.FORMULARIO_TAMANO_MAXIMO < 16384  # margen por el peso distinto de jsonb
+
+
 # --------------------------------------------------------------------------- salida
 
 def test_el_tipo_se_muestra_con_su_institucion_y_estado():
-    t = SimpleNamespace(pk=4, institucion_id=3, nombre="N", sla_dias=5, audiencia="ambas", formulario=FORMULARIO, activo=False)
-    assert gestion.tipo_a_dict(t) == {"id": 4, "institucion_id": 3, "nombre": "N", "sla_dias": 5, "audiencia": "ambas", "formulario": FORMULARIO, "activo": False}
+    t = SimpleNamespace(pk=4, institucion_id=3, nombre="N", sla_dias=5, audiencia="ambas", formulario=FORMULARIO, activo=False, version=3)
+    assert gestion.tipo_a_dict(t) == {"id": 4, "institucion_id": 3, "nombre": "N", "sla_dias": 5, "audiencia": "ambas", "formulario": FORMULARIO, "activo": False,
+                                      "version": 3}
 
 
 def test_el_cambio_muestra_quien_cuando_y_que_sin_datos_de_mas():
@@ -247,7 +299,7 @@ class Registro:
         self.cambios = []
 
     def tipo(self, pk, institucion_id=3, nombre="Existente", **resto):
-        base = dict(pk=pk, institucion_id=institucion_id, nombre=nombre, sla_dias=10, audiencia="ciudadania", formulario=FORMULARIO, activo=True)
+        base = dict(pk=pk, institucion_id=institucion_id, nombre=nombre, sla_dias=10, audiencia="ciudadania", formulario=FORMULARIO, activo=True, version=1)
         self.filas[pk] = SimpleNamespace(**{**base, **resto})
         return self.filas[pk]
 
@@ -292,6 +344,7 @@ def registro(monkeypatch):
             for t in self.filas:
                 for llave, valor in cambios.items():
                     setattr(t, llave, valor)
+                t.version += 1  # lo que hace el disparador de la base en cada cambio real
             return len(self.filas)
 
     def crear(**campos):
@@ -334,6 +387,7 @@ def registro(monkeypatch):
         reg.pasos.append(("cambios", f)), Cambios(reg.cambios))[1])))
     monkeypatch.setattr(vistas, "transaction", SimpleNamespace(atomic=atomico))
     monkeypatch.setattr(vistas, "fijar_contexto", lambda *a: reg.pasos.append(("contexto", a)))
+    monkeypatch.setattr(vistas, "registrar_evento", lambda actor, evento, ip, detalle=None: reg.pasos.append(("seguridad", actor, evento, ip, detalle)))
     monkeypatch.setattr(vistas, "autorizar", lambda request, accion, recurso: reg.pasos.append(("pdp", accion, recurso)))
     monkeypatch.setattr(vistas._Coordinacion, "throttle_classes", [])
     return reg
@@ -360,7 +414,10 @@ def crear(cuerpo, institucion=3):
     return llamar(vistas.TiposDeInstitucion, "post", cuerpo, institucion=institucion)
 
 
-def cambiar(cuerpo, pk=1, institucion=3):
+def cambiar(cuerpo, pk=1, institucion=3, version=1):
+    """PATCH con la versión que la persona veía (1, la del tipo de prueba); `version=None`: sin ella. Un cuerpo que no es objeto va tal cual."""
+    if isinstance(cuerpo, dict) and version is not None and "version" not in cuerpo:
+        cuerpo = {**cuerpo, "version": version}
     return llamar(vistas.TipoDeInstitucion, "patch", cuerpo, institucion=institucion, pk=pk)
 
 
@@ -383,7 +440,7 @@ def test_listar_trae_los_tipos_de_esa_institucion_incluidos_los_desactivados_y_o
     r = listar()
     assert r.data["institucion"] == {"id": 3, "nombre": "MOP"}
     assert [(t["id"], t["nombre"], t["activo"]) for t in r.data["tipos"]] == [(2, "Alfa", False), (1, "Beta", True)]  # no trae el de la 4
-    assert set(r.data["tipos"][0]) == {"id", "institucion_id", "nombre", "sla_dias", "audiencia", "formulario", "activo"}
+    assert set(r.data["tipos"][0]) == {"id", "institucion_id", "nombre", "sla_dias", "audiencia", "formulario", "activo", "version"}
 
 
 def test_si_el_pdp_niega_no_se_toca_nada(registro, monkeypatch):
@@ -432,10 +489,27 @@ def test_si_la_base_rechaza_por_un_disparador_responde_400_y_no_500(registro):
     assert r.status_code == 400 and r.data["codigo"] == "catalogo_rechazado" and "campo 1: id invalido" in r.data["detalle"]
 
 
-def test_si_la_base_rechaza_por_permiso_responde_400_con_un_mensaje_general(registro):
+def test_si_la_base_rechaza_por_permiso_responde_403_y_deja_un_evento_de_seguridad_sin_datos_sensibles(registro):
     registro.fallo_crear = error_de_base("42501", "permission denied for table tipo_tramite")
-    r = crear(VALIDO)
-    assert r.status_code == 400 and r.data["codigo"] == "catalogo_rechazado" and "permission denied" not in str(r.data)
+    r = crear({**VALIDO, "nombre": "Nombre privado del trámite"})
+    assert r.status_code == 403 and r.data == {"codigo": "acceso_denegado", "detalle": "No tienes autorización para esta operación."}
+    evento = pasos(registro, "seguridad")
+    assert len(evento) == 1 and evento[0][1:4] == (7, "catalogo_denegado_por_la_base", None) and evento[0][4] == {"institucion": 3, "metodo": "POST"}
+    assert "permission denied" not in str(evento) and "privado" not in str(evento) and "tipo_tramite" not in str(evento)
+
+
+def test_si_la_base_rechaza_por_permiso_al_editar_tambien_es_403_con_evento(registro):
+    registro.fallo_actualizar = error_de_base("42501", "Catalogo: solo la coordinacion vigente de la institucion gestiona su catalogo")
+    r = cambiar({"sla_dias": 20})
+    assert r.status_code == 403 and r.data["codigo"] == "acceso_denegado" and "coordinacion" not in str(r.data)
+    assert pasos(registro, "seguridad")[0][4] == {"institucion": 3, "metodo": "PATCH"}
+
+
+def test_los_demas_rechazos_de_la_base_no_dejan_evento_de_seguridad(registro):
+    registro.fallo_crear = error_de_base("P0001", "Catalogo: formulario invalido: campo 1: id invalido")
+    assert crear(VALIDO).status_code == 400
+    registro.fallo_crear = error_de_base("23514", "check")
+    assert crear(VALIDO).status_code == 400 and not pasos(registro, "seguridad")
 
 
 def test_si_la_base_rechaza_por_un_check_responde_400_sin_repetir_su_texto(registro):
@@ -471,7 +545,7 @@ def test_cambiar_sin_cambios_no_escribe_nada(registro):
 def test_desactivar_y_reactivar(registro):
     assert cambiar({"activo": False}).data["activo"] is False
     assert pasos(registro, "update")[0][2] == {"activo": False}
-    assert cambiar({"activo": True}, pk=1).data["activo"] is True
+    assert cambiar({"activo": True}, pk=1, version=2).data["activo"] is True
 
 
 def test_cambiar_el_formulario_lo_valida_y_lo_guarda_limpio(registro):
@@ -509,9 +583,68 @@ def test_cambiar_a_un_nombre_que_ya_tiene_otro_tipo_da_400_pero_conservar_el_pro
 
 
 def test_si_la_base_rechaza_el_cambio_responde_400(registro):
-    registro.fallo_actualizar = error_de_base("P0001", "Catalogo: solo la coordinacion vigente de la institucion gestiona su catalogo")
+    registro.fallo_actualizar = error_de_base("P0001", "Catalogo: formulario invalido: campo 1: id invalido")
     r = cambiar({"sla_dias": 20})
-    assert r.status_code == 400 and r.data["codigo"] == "catalogo_rechazado" and "coordinacion vigente" in r.data["detalle"]
+    assert r.status_code == 400 and r.data["codigo"] == "catalogo_rechazado" and "campo 1: id invalido" in r.data["detalle"]
+
+
+def test_al_editar_la_version_es_obligatoria_y_debe_ser_un_entero(registro):
+    r = cambiar({"sla_dias": 12}, version=None)
+    assert r.status_code == 400 and r.data["codigo"] == "datos_invalidos" and set(r.data["errores"]) == {"version"} and not pasos(registro, "update")
+    for malo in (None, "1", 1.5, True, 0, -1, [1], {"v": 1}, 2**31, 2**63):
+        r = cambiar({"sla_dias": 12, "version": malo})
+        assert r.status_code == 400 and "version" in r.data["errores"], malo
+    assert not pasos(registro, "update")
+    r = cambiar({"sla_dias": 400}, version=None)  # los errores del cuerpo y el de la version se dan juntos
+    assert set(r.data["errores"]) == {"sla_dias", "version"}
+
+
+def test_una_version_vieja_responde_409_sin_escribir_nada(registro):
+    registro.filas[1].version = 4  # otra persona ya lo cambio tres veces
+    r = cambiar({"sla_dias": 12}, version=1)
+    assert r.status_code == 409 and r.data["codigo"] == "version_desactualizada" and "Recarga" in r.data["detalle"]
+    assert not pasos(registro, "update") and registro.filas[1].sla_dias == 10
+    assert cambiar({"sla_dias": 12}, version=5).status_code == 409  # una version del futuro tampoco es la vigente
+    assert cambiar({"sla_dias": 12}, version=4).status_code == 200
+
+
+def test_la_version_se_comprueba_tambien_cuando_no_habria_cambios_reales(registro):
+    registro.filas[1].version = 2
+    assert cambiar({"activo": True}, version=1).status_code == 409  # lo que veia ya no es lo vigente: que recargue antes de dar nada por hecho
+
+
+def test_si_otra_persona_lo_cambia_entre_la_lectura_y_el_update_tambien_es_409(registro, monkeypatch):
+    # La version coincide al leer, pero el UPDATE condicionado a ella no encuentra la fila: alguien se adelanto
+    original = registro.filas[1]
+    real = vistas.TipoTramite.objects.filter
+
+    def con_carrera(**filtros):
+        if "version" in filtros:
+            original.version += 1  # la otra persona escribio justo antes
+        return real(**filtros)
+    monkeypatch.setattr(vistas.TipoTramite.objects, "filter", con_carrera)
+    r = cambiar({"sla_dias": 12})
+    assert r.status_code == 409 and r.data["codigo"] == "version_desactualizada"
+    assert original.sla_dias == 10
+
+
+def test_el_update_va_condicionado_a_la_version_y_la_respuesta_trae_la_nueva(registro):
+    r = cambiar({"sla_dias": 12})
+    assert r.status_code == 200 and r.data["version"] == 2
+    assert [p[1] for p in pasos(registro, "buscar") if "version" in p[1]] == [{"pk": 1, "institucion_id": 3, "version": 1}]
+    r = cambiar({"sla_dias": 13}, version=2)
+    assert r.status_code == 200 and r.data["version"] == 3
+    assert cambiar({"sla_dias": 14}, version=2).status_code == 409  # la segunda edicion con la version que ya no es
+
+
+def test_sin_cambios_reales_la_version_no_sube(registro):
+    r = cambiar({"nombre": "Beta", "activo": True})
+    assert r.status_code == 200 and r.data["version"] == 1 and not pasos(registro, "update")
+
+
+def test_la_version_no_se_acepta_al_crear(registro):
+    r = crear({**VALIDO, "version": 7})
+    assert r.status_code == 400 and "datos" in r.data["errores"] and not pasos(registro, "crear")
 
 
 def test_los_cambios_se_paginan_y_llevan_el_total(registro):

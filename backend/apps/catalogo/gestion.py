@@ -5,6 +5,7 @@ Lo que llega es JSON hostil por definición. Aquí se limpia y se valida TODO an
 La definición del formulario se limpia (se quitan los atributos que no aplican al tipo de campo) y se vuelve a revisar con
 `formulario.definicion_valida`, que es la misma regla con la que después se valida lo que responde la ciudadanía.
 """
+import json
 import re
 
 from apps.tramites import formulario as fm
@@ -19,6 +20,18 @@ OPCIONES_MAX = 30
 OPCION_MAX = 120
 AYUDA_MAX = 300
 MAXIMO_POR_TIPO = {"texto": 500, "texto_largo": 5000, "numero": fm.MAX_NUMERO_DEFECTO}
+# Tamaño de la definición: la base impone 16 384 bytes de jsonb (CHECK `tipo_tramite_formulario_tamano`). jsonb pesa distinto que el JSON de texto
+# (cabeceras por elemento y por clave), así que aquí se corta antes, sobre el JSON compacto, para no llegar al CHECK con un error opaco.
+FORMULARIO_TAMANO_MAXIMO = 12000
+# Presupuesto de lo que el formulario puede prometer: un trámite guarda a lo sumo `fm.TAMANO_MAXIMO_DATOS` bytes de JSON en `datos`. Peor caso de
+# las respuestas de un formulario = por cada campo, su clave y la puntuación del JSON (`"id": ` y `, `: largo del id + 8 bytes) más el valor:
+#   texto y texto_largo: `max` caracteres; seleccion: la opción más larga; numero: hasta 24 caracteres; fecha: `"AAAA-MM-DD"` (12 bytes).
+# Los caracteres se cuentan a BYTES_POR_CARACTER bytes (en UTF-8 el español pesa 1 byte, y 2 con tilde o eñe; el emoji y el CJK pesan más y,
+# si alguien los llena, los frena el tope en bytes de la API con «El contenido es demasiado grande», no la base). Con 2 bytes por caracter un
+# formulario puede prometer unos 7 000 caracteres de texto en total; antes de este tope, 30 campos de 5 000 prometían 150 000.
+BYTES_POR_CARACTER = 2
+SOBRECARGA_POR_CAMPO = 8
+BYTES_NUMERO, BYTES_FECHA = 24, 12
 ATRIBUTOS_CAMPO = {"id", "etiqueta", "tipo", "obligatorio", "max", "opciones", "ayuda", "entero"}
 _ID = re.compile(r"[a-z][a-z0-9_]{0,39}")
 _PROBLEMA = re.compile(r"^campo (\d+): (.*)$")
@@ -111,6 +124,34 @@ def _campo(i, crudo, errores, vistos):
     return limpio
 
 
+def _peso_de_las_respuestas(limpio):
+    """`(promesa, otros)`: caracteres que el formulario promete en campos de texto y selecciones, y bytes de claves, números y fechas (peor caso)."""
+    promesa, otros = 0, 2  # las llaves del objeto
+    for campo in limpio:
+        otros += len(campo["id"]) + SOBRECARGA_POR_CAMPO
+        if campo["tipo"] in ("texto", "texto_largo"):
+            promesa += campo["max"]
+        elif campo["tipo"] == "seleccion":
+            promesa += max(len(o) for o in campo["opciones"])
+        elif campo["tipo"] == "numero":
+            otros += BYTES_NUMERO
+        else:
+            otros += BYTES_FECHA
+    return promesa, otros
+
+
+def _errores_de_tamano(limpio):
+    """Errores de lo que el formulario pesa (la definición) o promete (las respuestas), o `{}`. Va después de las demás reglas."""
+    if len(json.dumps(limpio, ensure_ascii=False, separators=(",", ":")).encode()) > FORMULARIO_TAMANO_MAXIMO:
+        return {"formulario": "El formulario es demasiado largo: reduce los campos, las opciones o los textos de ayuda."}
+    promesa, otros = _peso_de_las_respuestas(limpio)
+    if promesa * BYTES_POR_CARACTER + otros > fm.TAMANO_MAXIMO_DATOS:
+        admite = max(0, (fm.TAMANO_MAXIMO_DATOS - otros) // BYTES_POR_CARACTER)
+        return {"formulario": f"Los campos de texto prometen hasta {promesa} caracteres en total y un trámite guarda como máximo unos {admite} con este "
+                              f"formulario (el contenido no puede pasar de {fm.TAMANO_MAXIMO_DATOS} bytes). Baja el máximo de algún campo."}
+    return {}
+
+
 def validar_formulario(crudo):
     """`(formulario_limpio, errores)`. Si hay errores, el primero es `None`."""
     if not isinstance(crudo, list):
@@ -133,6 +174,8 @@ def validar_formulario(crudo):
             errores[llave] = encontrado.group(2).replace("`", "").capitalize() + "."
         else:
             errores["formulario"] = problema.capitalize() + "."
+    if not errores:
+        errores = _errores_de_tamano(limpio)
     return (None, errores) if errores else (limpio, {})
 
 
@@ -188,7 +231,7 @@ def validar(datos, parcial=False):
 
 def tipo_a_dict(tipo):
     return {"id": tipo.pk, "institucion_id": tipo.institucion_id, "nombre": tipo.nombre, "sla_dias": tipo.sla_dias, "audiencia": tipo.audiencia,
-            "formulario": tipo.formulario, "activo": tipo.activo}
+            "formulario": tipo.formulario, "activo": tipo.activo, "version": tipo.version}
 
 
 def cambio_a_dict(cambio):
