@@ -30,7 +30,7 @@ def campo(**cambios):
 
 def test_un_tipo_valido_se_acepta_y_se_normaliza():
     limpio, errores = gestion.validar({"nombre": "  Permiso de uso de vía  ", "sla_dias": 10})
-    assert errores == {} and limpio == {"nombre": "Permiso de uso de vía", "sla_dias": 10, "audiencia": "ciudadania", "formulario": [], "activo": True}
+    assert errores == {} and limpio == {"nombre": "Permiso de uso de vía", "sla_dias": 10, "audiencia": "ciudadania", "formulario": [], "activo": True, "requisitos": {}}
 
 
 def test_al_crear_el_nombre_y_el_plazo_son_obligatorios():
@@ -256,9 +256,10 @@ def test_una_definicion_demasiado_larga_se_rechaza_antes_de_llegar_al_check_de_l
 # --------------------------------------------------------------------------- salida
 
 def test_el_tipo_se_muestra_con_su_institucion_y_estado():
-    t = SimpleNamespace(pk=4, institucion_id=3, nombre="N", sla_dias=5, audiencia="ambas", formulario=FORMULARIO, activo=False, version=3)
+    t = SimpleNamespace(pk=4, institucion_id=3, nombre="N", sla_dias=5, audiencia="ambas", formulario=FORMULARIO, activo=False, version=3,
+                        requisitos={"descripcion": "Sirve para algo."})
     assert gestion.tipo_a_dict(t) == {"id": 4, "institucion_id": 3, "nombre": "N", "sla_dias": 5, "audiencia": "ambas", "formulario": FORMULARIO, "activo": False,
-                                      "version": 3}
+                                      "version": 3, "requisitos": {"descripcion": "Sirve para algo."}}
 
 
 def test_el_cambio_muestra_quien_cuando_y_que_sin_datos_de_mas():
@@ -299,7 +300,7 @@ class Registro:
         self.cambios = []
 
     def tipo(self, pk, institucion_id=3, nombre="Existente", **resto):
-        base = dict(pk=pk, institucion_id=institucion_id, nombre=nombre, sla_dias=10, audiencia="ciudadania", formulario=FORMULARIO, activo=True, version=1)
+        base = dict(pk=pk, institucion_id=institucion_id, nombre=nombre, sla_dias=10, audiencia="ciudadania", formulario=FORMULARIO, activo=True, version=1, requisitos={})
         self.filas[pk] = SimpleNamespace(**{**base, **resto})
         return self.filas[pk]
 
@@ -440,7 +441,7 @@ def test_listar_trae_los_tipos_de_esa_institucion_incluidos_los_desactivados_y_o
     r = listar()
     assert r.data["institucion"] == {"id": 3, "nombre": "MOP"}
     assert [(t["id"], t["nombre"], t["activo"]) for t in r.data["tipos"]] == [(2, "Alfa", False), (1, "Beta", True)]  # no trae el de la 4
-    assert set(r.data["tipos"][0]) == {"id", "institucion_id", "nombre", "sla_dias", "audiencia", "formulario", "activo", "version"}
+    assert set(r.data["tipos"][0]) == {"id", "institucion_id", "nombre", "sla_dias", "audiencia", "formulario", "activo", "version", "requisitos"}
 
 
 def test_si_el_pdp_niega_no_se_toca_nada(registro, monkeypatch):
@@ -666,3 +667,96 @@ def test_toda_vista_de_gestion_exige_acceso_completo_y_limita_la_tasa():
     for clase in (vistas.TiposDeInstitucion, vistas.TipoDeInstitucion, vistas.CambiosDeInstitucion):
         assert any(c.__name__ == "_ExigeScope" for c in clase.permission_classes), clase
         assert clase.throttle_scope == "api"
+
+
+# --------------------------------------------------------------------------- requisitos antes de iniciar (migración 021)
+
+REQUISITOS = {"descripcion": "Autorización para construir.", "documentos": ["Cédula", "Planos firmados"], "despues": "Se revisa y te avisamos."}
+
+
+def test_sin_requisitos_se_guarda_un_objeto_vacio_y_al_cambiar_otra_cosa_no_se_tocan():
+    assert gestion.validar(VALIDO)[0]["requisitos"] == {}
+    assert "requisitos" not in gestion.validar({"nombre": "Otro nombre"}, parcial=True)[0]
+
+
+def test_los_requisitos_validos_se_limpian_y_lo_no_dicho_no_se_guarda():
+    limpio, errores = gestion.validar_requisitos({"descripcion": "  Para qué sirve.  ", "documentos": [" Cédula ", "Plano"], "despues": "   "})
+    assert errores == {} and limpio == {"descripcion": "Para qué sirve.", "documentos": ["Cédula", "Plano"]}
+    assert gestion.validar_requisitos({}) == ({}, {})
+    assert gestion.validar_requisitos({"descripcion": None, "documentos": [], "despues": ""}) == ({}, {})
+    assert gestion.validar_requisitos(REQUISITOS) == (REQUISITOS, {})
+
+
+def test_los_requisitos_aceptan_los_limites_exactos():
+    limpio, errores = gestion.validar_requisitos({"descripcion": "d" * 1000, "despues": "p" * 1000, "documentos": [f"D{i:02d}" + "x" * 150 for i in range(15)]})
+    assert errores == {} and len(limpio["documentos"]) == 15
+    assert gestion.validar_requisitos({"documentos": ["x" * 200]})[1] == {}
+    assert gestion.validar_requisitos({"descripcion": "Dos\nlíneas"})[1] == {}  # el texto libre admite saltos de línea
+
+
+@pytest.mark.parametrize("crudo,clave", [
+    (None, "requisitos"), ([], "requisitos"), ("texto", "requisitos"), (5, "requisitos"),
+    ({"otra": "x"}, "requisitos"), ({1: "x"}, "requisitos"),
+    ({"descripcion": "d" * 1001}, "requisitos.descripcion"), ({"descripcion": 5}, "requisitos.descripcion"), ({"descripcion": ["a"]}, "requisitos.descripcion"),
+    ({"descripcion": "con\x00control"}, "requisitos.descripcion"), ({"descripcion": "\u200d\u200c\u200d\u200d"}, "requisitos.descripcion"),
+    ({"despues": "p" * 1001}, "requisitos.despues"), ({"despues": {"a": 1}}, "requisitos.despues"),
+    ({"documentos": "cédula"}, "requisitos.documentos"), ({"documentos": {"a": "b"}}, "requisitos.documentos"),
+    ({"documentos": [f"D{i}" for i in range(16)]}, "requisitos.documentos"), ({"documentos": ["Cédula", "Cédula"]}, "requisitos.documentos"),
+    ({"documentos": ["ok", 5]}, "requisitos.documentos.1"), ({"documentos": ["", "ok"]}, "requisitos.documentos.0"),
+    ({"documentos": ["   "]}, "requisitos.documentos.0"), ({"documentos": ["x" * 201]}, "requisitos.documentos.0"),
+    ({"documentos": ["uno\ndos"]}, "requisitos.documentos.0"), ({"documentos": [None]}, "requisitos.documentos.0"),
+])
+def test_requisitos_invalidos(crudo, clave):
+    limpio, errores = gestion.validar_requisitos(crudo)
+    assert limpio is None and clave in errores, errores
+
+
+def test_los_requisitos_se_validan_junto_con_el_resto_del_tipo():
+    limpio, errores = gestion.validar({**VALIDO, "requisitos": REQUISITOS})
+    assert errores == {} and limpio["requisitos"] == REQUISITOS
+    limpio, errores = gestion.validar({**VALIDO, "requisitos": {"documentos": "x"}})
+    assert limpio is None and list(errores) == ["requisitos.documentos"]
+    limpio, errores = gestion.validar({"requisitos": REQUISITOS}, parcial=True)
+    assert errores == {} and limpio == {"requisitos": REQUISITOS}
+
+
+def test_crear_un_tipo_con_requisitos_los_guarda_y_los_devuelve(registro):
+    r = crear({**VALIDO, "requisitos": REQUISITOS})
+    assert r.status_code == 201 and r.data["requisitos"] == REQUISITOS
+    assert pasos(registro, "crear")[0][1]["requisitos"] == REQUISITOS
+
+
+def test_crear_un_tipo_con_requisitos_malos_da_400_por_campo_y_no_escribe(registro):
+    r = crear({**VALIDO, "requisitos": {"documentos": ["", "ok"], "descripcion": "d" * 1001}})
+    assert r.status_code == 400 and set(r.data["errores"]) == {"requisitos.documentos.0", "requisitos.descripcion"} and not pasos(registro, "crear")
+
+
+def test_cambiar_los_requisitos_escribe_solo_eso_y_la_version_sube(registro):
+    r = cambiar({"requisitos": REQUISITOS})
+    assert r.status_code == 200 and r.data["requisitos"] == REQUISITOS and r.data["version"] == 2
+    assert pasos(registro, "update")[0][2] == {"requisitos": REQUISITOS}
+
+
+def test_repetir_los_mismos_requisitos_no_escribe_nada(registro):
+    registro.filas[1].requisitos = REQUISITOS
+    r = cambiar({"requisitos": REQUISITOS})
+    assert r.status_code == 200 and r.data["version"] == 1 and not pasos(registro, "update")
+
+
+def test_quitar_los_requisitos_los_deja_vacios(registro):
+    registro.filas[1].requisitos = REQUISITOS
+    r = cambiar({"requisitos": {}})
+    assert r.status_code == 200 and r.data["requisitos"] == {} and pasos(registro, "update")[0][2] == {"requisitos": {}}
+
+
+def test_el_catalogo_publico_lleva_los_requisitos(monkeypatch):
+    from apps.catalogo import vistas as publicas
+    tipo = SimpleNamespace(pk=1, nombre="Permiso", sla_dias=10, audiencia="ciudadania", formulario=[], requisitos=REQUISITOS, institucion_id=3,
+                           institucion=SimpleNamespace(nombre="MOP"))
+    consulta = SimpleNamespace(select_related=lambda *a: SimpleNamespace(order_by=lambda *a: [tipo]))
+    monkeypatch.setattr(publicas, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(filter=lambda **f: consulta)))
+    monkeypatch.setattr(publicas._Lectura, "throttle_classes", [])
+    peticion = APIRequestFactory().get("/catalogo/tipos-tramite/", secure=True)
+    force_authenticate(peticion, user=SimpleNamespace(usuario=SimpleNamespace(pk=7), claims=SimpleNamespace(scope="completo"), is_authenticated=True, pk=7))
+    r = publicas.TiposTramiteLista.as_view()(peticion)
+    assert r.status_code == 200 and r.data[0]["requisitos"] == REQUISITOS
