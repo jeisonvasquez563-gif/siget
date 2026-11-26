@@ -2112,6 +2112,8 @@ Las pruebas **corren `detectar_anomalias()` sobre toda la base** (como `detector
 
 ### 43.4 Migración real y pruebas de la base
 
+**Aplicarla fuera de la hora de mayor uso.** Los dos `CREATE INDEX` de la migración (sobre `evento_seguridad` y `decision_pdp`, tablas de auditoría) **bloquean las escrituras de esa tabla mientras se construyen** (no usan `CONCURRENTLY`, que no corre dentro de la transacción de la migración); en la demo son tablas chicas y dura un instante, pero con más volumen conviene una ventana tranquila.
+
 ```bash
 cat database/migraciones/019-alertas-seguridad.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
 cat database/pruebas-alertas.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
@@ -2206,6 +2208,10 @@ Si algún paso falla, **no desplegar**.
 - **Sin política de retención.** La tabla solo crece (nadie borra); definirla antes de que pese.
 - **La nota de la revisión queda en la alerta, no en los eventos de seguridad** (ahí solo van el identificador, la regla y el resultado). Pedir a quien revise que no escriba contraseñas ni datos personales en ella (la ventana lo recuerda).
 - **Quien revisa es quien tiene la sesión.** El disparador rechaza una revisión a nombre de otro operador y la seguridad por filas solo deja ver y revisar a un operador de seguridad con la cuenta activa: aunque la API tuviera un error, un usuario sin ese rol no ve ni toca nada.
+- **`detalle.por_nombre` cuenta todo el tramo, no solo la ventana del `conteo`.** Es el total de eventos de cada nombre entre `primera_vez` y `ultima_vez`: puede sumar más que `conteo`, que es el máximo de **una** ventana (10 minutos o 24 horas).
+- **El detector toma `SHARE ROW EXCLUSIVE` sobre `alerta_seguridad` al empezar.** Así una revisión simultánea no se cruza con su `UPDATE` y dos detectores no corren a la vez; la revisión espera lo que dure la corrida (un instante). Lo hace como `siget_owner`, dueño de la tabla (`SECURITY DEFINER`): `detector_role` no necesita más permisos. Una transacción larga que haya actualizado alertas (por ejemplo `verificar_plataforma` revisando una alerta real) retiene su bloqueo hasta terminar y el detector espera.
+- **Una persona que no existe no genera alerta.** `decision_pdp.actor_id` no tiene clave foránea y podría traer un id huérfano: `denegaciones_persona` lo descarta (`JOIN` con `usuario`), porque su `INSERT` fallaría por la clave foránea de `alerta_seguridad.usuario_id` y abortaría **todas** las reglas de la corrida. Las otras reglas leen `evento_seguridad.actor_id`, que sí tiene la clave foránea.
+- **El ensayo (`demo/ensayo.py`) no debe provocar alertas reales.** Corre contra producción y cada negación del PDP queda en `decision_pdp`: ninguna cuenta del ensayo debe llegar a 5 negaciones en 10 minutos (umbral de `denegaciones_persona`). Si tras un ensayo aparece una alerta abierta de una cuenta `*.mop`, `*.identidades` o similar, es de esto: descartarla con nota.
 
 ### 43.10 Registro de la aplicación
 
