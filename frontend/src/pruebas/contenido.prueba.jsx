@@ -26,9 +26,15 @@ async function abrirComo(usuario, modulo, falsa) {
   return { ...utilidades, user, llamadas }
 }
 
+// Elegir un trámite muestra «Antes de empezar»; el formulario aparece al pulsar «Empezar»
+async function empezar(user) {
+  await user.click(await screen.findByRole('button', { name: 'Empezar' }))
+}
+
 async function elegirTramite(user, institucion, tramite) {
   await user.click(await screen.findByRole('radio', { name: new RegExp(`^${institucion}`) }))
   await user.click(await screen.findByRole('radio', { name: new RegExp(tramite) }))
+  await empezar(user)
 }
 
 async function abrirDetalle(usuario, modulo, numero, falsa) {
@@ -93,6 +99,7 @@ describe('el formulario dinámico al iniciar un trámite', () => {
     expect(await screen.findByRole('spinbutton', { name: 'Número de empleados' })).toHaveAttribute('step', '1')
     await user.click(screen.getByRole('radio', { name: /^Ministerio Público/ }))
     await user.click(await screen.findByRole('radio', { name: /Denuncia ciudadana 311/ }))
+    await empezar(user)
     const fecha = await screen.findByLabelText(/Fecha de los hechos/)
     expect(fecha).toHaveAttribute('type', 'date')
     expect(fecha.max).toMatch(/^\d{4}-\d{2}-\d{2}$/)
@@ -107,6 +114,7 @@ describe('el formulario dinámico al iniciar un trámite', () => {
     await user.click(await screen.findByRole('radio', { name: /Denuncia ciudadana 311/ }))
     await user.click(screen.getByRole('radio', { name: /^AMPYME/ }))
     await user.click(await screen.findByRole('radio', { name: /Registro de microempresa/ }))
+    await empezar(user)
     expect(await screen.findByRole('textbox', { name: 'Nombre comercial' })).toHaveValue('')
   })
 

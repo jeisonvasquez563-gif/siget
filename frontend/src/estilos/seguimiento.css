@@ -15,6 +15,8 @@
 .seg-paso.alerta .seg-nodo::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid var(--boya); opacity: 0; animation: seg-aro 2.2s ease-out infinite; }
 .seg-paso.aprobado .seg-nodo { background: var(--sello-verde); border: 2px solid var(--sello-verde); color: #fff; }
 .seg-paso.rechazado .seg-nodo { background: var(--sello-rojo); border: 2px solid var(--sello-rojo); color: #fff; }
+.seg-paso.desistido .seg-nodo { background: var(--tinta-suave); border: 2px solid var(--tinta-suave); color: #fff; }
+.seg-paso.omitido .seg-nodo { background: var(--superficie-3); border: 2px dashed var(--borde-fuerte); color: var(--tinta-tenue); }
 .seg-paso.aprobado strong { color: var(--sello-verde); }
 .seg-paso.rechazado strong { color: var(--sello-rojo); }
 
@@ -32,6 +34,8 @@
 .seguimiento-frase.tono-bien .icono { color: var(--sello-verde); }
 .seguimiento-frase.tono-mal { background: color-mix(in srgb, var(--sello-rojo) 12%, var(--superficie)); border-color: color-mix(in srgb, var(--sello-rojo) 45%, var(--borde)); }
 .seguimiento-frase.tono-mal .icono { color: var(--sello-rojo); }
+.seguimiento-frase.tono-neutro { background: var(--superficie-2); }
+.seguimiento-frase.tono-neutro .icono { color: var(--tinta-suave); }
 
 @keyframes seg-aro { 0% { transform: scale(0.85); opacity: 0.9; } 100% { transform: scale(1.35); opacity: 0; } }
 @keyframes seg-trazo { from { transform: scaleX(0); } to { transform: scaleX(1); } }

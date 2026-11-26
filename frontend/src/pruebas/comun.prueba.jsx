@@ -30,7 +30,8 @@ describe('plazos', () => {
   })
 
   it('un trámite resuelto ya no corre contra el reloj', () => {
-    for (const estado of FINALES) expect(plazoDe(tramite(30, 10, estado, true))).toMatchObject({ texto: 'Resuelto', clase: '' })
+    for (const estado of FINALES.filter((e) => e !== 'Desistido')) expect(plazoDe(tramite(30, 10, estado, true))).toMatchObject({ texto: 'Resuelto', clase: '' })
+    expect(plazoDe(tramite(30, 10, 'Desistido', true))).toMatchObject({ texto: 'Cerrado por desistimiento', clase: '' })   // no «resuelto»: nadie lo resolvió
   })
 
   it('el progreso nunca sale del rango 0 a 1', () => {
@@ -51,6 +52,7 @@ describe('estados', () => {
       'En Subsanacion': ['En Tramitacion'],
       Aprobado: [],
       Rechazado: [],
+      Desistido: [],   // lo pone solo la persona que presentó el trámite, por su propia ruta (no por «cambiar estado»)
     })
   })
 

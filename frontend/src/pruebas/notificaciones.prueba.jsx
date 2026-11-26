@@ -411,8 +411,8 @@ describe('sin sesión', () => {
 })
 
 describe('el texto de cada tipo', () => {
-  it('cubre los seis tipos del servidor en lenguaje llano y con el número del trámite', () => {
-    expect(Object.keys(TEXTOS).sort()).toEqual(['subsanacion_pedida', 'subsanacion_respondida', 'tramite_aprobado', 'tramite_en_atencion', 'tramite_escalado', 'tramite_rechazado'])
+  it('cubre los siete tipos del servidor en lenguaje llano y con el número del trámite', () => {
+    expect(Object.keys(TEXTOS).sort()).toEqual(['subsanacion_pedida', 'subsanacion_respondida', 'tramite_aprobado', 'tramite_desistido', 'tramite_en_atencion', 'tramite_escalado', 'tramite_rechazado'])
     expect(textoDe({ tipo: 'subsanacion_pedida', tramite_id: 7 })).toBe('Te pidieron corregir algo en el trámite #7')
     for (const tipo of Object.keys(TEXTOS)) expect(textoDe({ tipo, tramite_id: 12 })).toContain('#12')
   })

@@ -1,0 +1,40 @@
+/* Trámites de la ciudadanía: «Antes de empezar», filtros de «Mis trámites» y la constancia de presentación (con su hoja de impresión) */
+
+/* ---------- antes de empezar ---------- */
+.antes-de-empezar h4 { margin: 1rem 0 0.4rem; font-size: var(--t-base); }
+.antes-de-empezar > p { margin: 0 0 0.75rem; }
+.antes-de-empezar .datos { margin-bottom: 0.25rem; }
+.lista-requisitos { margin: 0 0 0.5rem; padding-left: 1.25rem; display: grid; gap: 0.3rem; }
+.lista-requisitos li { overflow-wrap: anywhere; }
+
+/* ---------- filtros de «Mis trámites» ---------- */
+.barra-herramientas .filtro { width: auto; min-width: 11rem; max-width: 100%; }
+
+/* ---------- constancia ---------- */
+.constancia-barra { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.constancia-barra .migas { margin-bottom: 0; }
+.constancia { background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio-l); box-shadow: var(--sombra-1); padding: 1.75rem 2rem; max-width: 52rem; }
+.constancia-cabecera { display: flex; align-items: center; gap: 1rem; padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 2px solid var(--tinta); }
+.constancia-logo { width: 3.25rem; height: 3.25rem; flex: none; }
+.constancia-cabecera h2 { margin: 0; font-size: var(--t-xl); }
+.constancia-sistema { margin: 0 0 0.15rem; color: var(--tinta-suave); font-size: var(--t-s); }
+.constancia h3 { margin: 1.5rem 0 0.6rem; font-size: var(--t-m, 1.05rem); }
+.constancia .datos { margin-bottom: 0.5rem; }
+.constancia dd { overflow-wrap: anywhere; }
+.constancia-pie { margin-top: 1.75rem; padding-top: 0.9rem; border-top: 1px solid var(--borde); color: var(--tinta-suave); font-size: var(--t-s); }
+.constancia-pie p { margin: 0 0 0.4rem; }
+
+/* ---------- impresión: solo la constancia, en blanco y negro y sin menú ---------- */
+@page { margin: 16mm 14mm; }
+@media print {
+  .lateral, .barra-superior, .telon, .saltar, .no-imprimir, .aviso-demostracion, .avisos, .fondo-modal { display: none !important; }
+  html, body { background: #fff !important; color: #000 !important; }
+  .aplicacion { display: block; min-height: 0; background: #fff; }
+  .principal { display: block; }
+  .contenido { max-width: none; margin: 0; padding: 0; }
+  .constancia { border: 0; border-radius: 0; box-shadow: none; padding: 0; max-width: none; background: #fff; color: #000; }
+  .constancia-cabecera { border-bottom-color: #000; }
+  .constancia-sistema, .constancia-pie, .constancia .suave { color: #333; }
+  .constancia h3, .constancia-cabecera, .constancia .dato-fila { break-inside: avoid; }
+  .constancia .insignia { background: none; color: #000; box-shadow: inset 0 0 0 1px #000; }
+}

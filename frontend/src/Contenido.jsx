@@ -143,7 +143,7 @@ export function ResumenErrores({ campos = [], errores, general }) {
 
 /* ---------------------------------------------------------------- datos de la solicitud (detalle) */
 
-function valorLegible(c, v) {
+export function valorLegible(c, v) {
   if (v === undefined || v === null || v === '') return '—'
   if (c.tipo === 'fecha') return fechaCalendario(v)
   if (c.tipo === 'numero') return Number(v).toLocaleString('es-PA')
@@ -183,6 +183,12 @@ const TEXTOS_MOTIVO = {
     titulo: 'Cerrar la subsanación', etiqueta: 'Cerrar y pasar a tramitación',
     texto: 'El trámite vuelve a tramitación. Deja constancia de por qué la respuesta de la persona es suficiente.',
     aviso: AVISO_LA_PERSONA_LO_LEE,
+  },
+  // La persona que presentó el trámite desiste de él (migración 021): no se deshace
+  desistir: {
+    titulo: 'Desistir del trámite', peligro: true, etiqueta: 'Desistir del trámite',
+    texto: 'Esta acción no se puede deshacer: el trámite se cierra, ya no se tramita y no podrás reabrirlo ni adjuntar más documentos. Si lo necesitas más adelante, tendrás que iniciar uno nuevo.',
+    aviso: 'El motivo queda en el historial del trámite y lo puede leer el personal de la institución',
   },
   // Las demás transiciones (si se pidiera un motivo): el servidor no lo muestra a la ciudadanía
   interno: {
