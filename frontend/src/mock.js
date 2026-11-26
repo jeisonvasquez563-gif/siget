@@ -54,7 +54,9 @@ const MODULOS = {
   bandeja: ['Bandeja de la institución', 'Trámites de tu institución: revisarlos y cambiar su estado.', 'disponible'],
   supervision: ['Supervisión', 'Reasigna trámites y atiende los escalados de tu institución.', 'disponible'],
   equipo: ['Equipo de la institución', 'Personal y roles de tu institución.', 'disponible'],
+  indicadores: ['Indicadores', 'Cifras de tu institución: trámites por estado, vencidos, escalados, tiempo de resolución y carga por funcionario.', 'disponible'],
   catalogo_institucion: ['Catálogo de la institución', 'Los trámites que ofrece tu institución: crea, edita, activa o desactiva, y consulta quién cambió qué.', 'disponible'],
+  mis_documentos: ['Mis documentos', 'Todos los documentos que adjuntaste en tus trámites, con su descarga y el enlace a cada trámite.', 'disponible'],
   mis_datos: ['Mis datos', 'Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.', 'disponible'],
   seguridad: ['Mi seguridad', 'Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.', 'disponible'],
   mfa: ['Segundo factor (MFA)', 'Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.', 'disponible'],
@@ -65,6 +67,7 @@ const MODULOS = {
   consola_catalogo: ['Catálogo', 'Alta de instituciones con control dual.', 'disponible'],
   consola_seguridad: ['Respuesta a incidentes', 'Bloquea cuentas, revoca sesiones, mira los eventos de seguridad y revisa las alertas.', 'disponible'],
   consola_secretos: ['Custodia de secretos', 'Registra la rotación de secretos y avisa cuándo toca.', 'disponible'],
+  ayuda: ['Ayuda', 'Preguntas frecuentes en lenguaje llano: trámites, estados, segundo factor, tus datos y, si atiendes trámites, la bandeja.', 'disponible'],
   auditoria: ['Auditoría', 'Consulta del registro inalterable de eventos y de decisiones de acceso, y de las alertas de seguridad.', 'disponible'],
 }
 const POR_PLATAFORMA = {
@@ -74,15 +77,16 @@ const POR_PLATAFORMA = {
 
 function modulosDe(u) {
   let ids
-  if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa', 'roles_permisos']
+  if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa', 'roles_permisos', 'ayuda']
   else {
     const roles = u.membresias.map((m) => m.rol)
-    ids = ['mis_tramites', 'nuevo_tramite', 'mis_datos']
+    ids = ['mis_tramites', 'nuevo_tramite', 'mis_datos', 'mis_documentos']
     if (roles.some((r) => r === 'funcionario' || r === 'supervisor')) ids.push('bandeja')
     if (roles.includes('supervisor')) ids.push('supervision')
     if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('equipo')
     if (roles.includes('coordinador_institucional')) ids.push('catalogo_institucion')
-    ids.push('seguridad', 'mfa', 'roles_permisos')
+    if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('indicadores')
+    ids.push('seguridad', 'mfa', 'roles_permisos', 'ayuda')
   }
   return ids.map((id) => ({ id, nombre: MODULOS[id][0], descripcion: MODULOS[id][1], estado: MODULOS[id][2] }))
 }
@@ -202,7 +206,12 @@ export function instalarMock(inicial, opciones = {}) {
   const FORMULARIOS = Object.fromEntries(TRAMITES.map((t) => [t.id, copiaDe(TIPOS.find((x) => x.id === t.tipo_tramite.id).formulario)]))
   const formularioDe = (t) => FORMULARIOS[t.id]
   let siguiente = 100 // cada instalación numera desde cero, sin chocar con los trámites de ejemplo (35 a 44)
-  const DOCUMENTOS = { 36: [{ id: 1, nombre: 'plano-del-local.pdf', tipo: 'application/pdf', tamano: 482133, creado_en: hace(3600000 * 30) }] }
+  const DOCUMENTOS = {
+    36: [{ id: 1, nombre: 'plano-del-local.pdf', tipo: 'application/pdf', tamano: 482133, creado_en: hace(3600000 * 30) }],
+    39: [{ id: 2, nombre: 'escritura-del-terreno.pdf', tipo: 'application/pdf', tamano: 1250000, creado_en: hace(3600000 * 40) },
+      { id: 3, nombre: 'foto-del-lote.jpg', tipo: 'image/jpeg', tamano: 734000, creado_en: hace(3600000 * 39) }],
+    37: [{ id: 4, nombre: 'croquis-de-la-acera.png', tipo: 'image/png', tamano: 90000, creado_en: hace(3600000 * 100) }],
+  }
   let actual = USUARIOS[inicial] ? inicial : null
   let enrolando = inicial === 'enrolar'
   let mfaFresco = false
@@ -363,6 +372,40 @@ export function instalarMock(inicial, opciones = {}) {
       FORMULARIOS[t.id] = copiaDe(tipo.formulario)
       EVENTOS[t.id] = [ev(Date.now(), t.id, 'creacion', null, 'Pendiente', u.id, 1000)]
       return resp(201, conContenido(dto(u, t), t))
+    }
+    if (camino === '/tramites/mis-documentos/' && metodo === 'GET') {
+      // Como el servidor: solo lo que adjuntó la propia persona en sus trámites (el personal no ve aquí lo de los trámites que atiende); los roles de plataforma no acceden
+      if (u.plataforma !== 'ninguno') return negado()
+      if (!paginacionValida(p)) return resp(400, { codigo: 'paginacion_invalida', detalle: 'limite (1 a 100) y desplazamiento deben ser enteros válidos.' })
+      const q = (p.get('q') || '').trim().toLowerCase()
+      if (q.length > 100) return resp(400, { codigo: 'filtro_invalido', detalle: '`q` admite hasta 100 caracteres.' })
+      const numero = /^#?\d+$/.test(q) ? Number(q.replace('#', '')) : null // «36» o «#36»: el número del trámite
+      const lista = TRAMITES.filter((t) => t.solicitante_id === u.id)
+        .flatMap((t) => (DOCUMENTOS[t.id] || []).map((x) => ({ ...x, tramite: { id: t.id, tipo_tramite: t.tipo_tramite.nombre, institucion: t.institucion.nombre } })))
+        .filter((x) => !q || x.nombre.toLowerCase().includes(q) || x.tramite.tipo_tramite.toLowerCase().includes(q) || x.tramite.institucion.toLowerCase().includes(q) || x.tramite.id === numero)
+        .sort((a, b) => b.creado_en.localeCompare(a.creado_en) || b.id - a.id)
+      return resp(200, paginar(lista, p))
+    }
+    const ind = camino.match(/^\/equipo\/(\d+)\/indicadores\/$/)
+    if (ind && metodo === 'GET') {
+      // Como el servidor: supervisión o coordinación de ESA institución; solo agregados (la coordinación recibe las cifras aunque no vea trámites)
+      const inst = Number(ind[1])
+      if (!u.membresias.some((m) => m.institucion_id === inst && ['supervisor', 'coordinador_institucional'].includes(m.rol))) return negado()
+      const de = TRAMITES.filter((t) => t.institucion.id === inst)
+      const abiertos = de.filter((t) => !['Aprobado', 'Rechazado', 'Desistido'].includes(t.estado))
+      const por_estado = Object.fromEntries(['Pendiente', 'En Tramitacion', 'En Subsanacion', 'Aprobado', 'Rechazado'].map((e) => [e, de.filter((t) => t.estado === e).length]))
+      const resueltos = de.filter((t) => ['Aprobado', 'Rechazado'].includes(t.estado)).map((t) => {
+        const cierre = EVENTOS[t.id].filter((e) => e.accion === 'cambio_estado').at(-1)
+        return cierre ? (Date.parse(cierre.creado_en) - Date.parse(t.creado_en)) / DIA : null
+      }).filter((d) => d !== null)
+      const carga = {}
+      abiertos.filter((t) => t.funcionario_asignado_id).forEach((t) => { carga[t.funcionario_asignado_id] = (carga[t.funcionario_asignado_id] || 0) + 1 })
+      return resp(200, {
+        institucion: inst, generado_en: new Date().toISOString(), por_estado, abiertos: abiertos.length, vencidos: abiertos.filter((t) => t.vencido).length,
+        escalados_abiertos: abiertos.filter((t) => t.escalado).length, sin_asignar: abiertos.filter((t) => !t.funcionario_asignado_id).length,
+        resueltos_90_dias: resueltos.length, dias_promedio_resolucion: resueltos.length ? Math.round((resueltos.reduce((a, b) => a + b, 0) / resueltos.length) * 10) / 10 : null,
+        por_funcionario: Object.entries(carga).map(([id, abiertos]) => ({ usuario_id: Number(id), usuario: NOMBRES[id], abiertos })).sort((a, b) => b.abiertos - a.abiertos || a.usuario.localeCompare(b.usuario)),
+      })
     }
     const d = camino.match(/^\/tramites\/(\d+)\/documentos\/(?:(\d+)\/)?$/)
     if (d) {
