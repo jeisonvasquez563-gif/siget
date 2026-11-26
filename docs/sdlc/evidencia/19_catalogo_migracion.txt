@@ -1,0 +1,12 @@
+# Catalogo: migracion 020 y todas las pruebas de la base (26-nov-2026)
+# 2026-11-26 13:22:34  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/c020/paso2.sh
+== 4. Migracion 020 real (13:22)
+UPDATE 103 COMMIT 
+tramites con copia del formulario: 103 de 103
+== 5. Pruebas de la base sobre la base migrada (todas terminan en ROLLBACK)
+pruebas-020: 83 PASA, 0 FALLA
+p-escalamiento: 10 PASA, 0 FALLA
+p-notificaciones: 36 PASA, 0 FALLA
+p-alertas: 58 PASA, 0 FALLA
+# código de salida: 0

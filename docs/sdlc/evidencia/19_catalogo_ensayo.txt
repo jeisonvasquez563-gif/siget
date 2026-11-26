@@ -1,0 +1,9 @@
+# Catalogo: ensayo completo contra produccion (26-nov-2026)
+# 2026-11-26 13:23:38  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/c020/ensayo.sh
+== 10. Ensayo completo contra produccion (13:23)
+  OK    la coordinadora lista el catálogo de su institución: /catalogo/institucion/<id>/tipos/ atraviesa nginx  [200]
+  OK    y su historial de cambios: /catalogo/institucion/<id>/cambios/ también  [200]
+  OK    la supervisión no gestiona el catálogo (403)  [403]
+ENSAYO: 119 de 119 comprobaciones correctas
+# código de salida: 0

@@ -6,6 +6,13 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Despliegue (gestión del catálogo en producción, 26-nov)
+- **Migración 020 aplicada** (runbook 44.9, evidencia `docs/sdlc/evidencia/19_catalogo_*`):
+  - ensayo con sus pruebas: **82/82 a la primera**;
+  - migración real, con la copia del formulario completada en los 103 trámites existentes;
+  - todas las pruebas de la base en verde (catálogo, escalamiento, notificaciones y alertas).
+- **Imagen verificada antes de reiniciar,** con las 8 verificaciones a la primera (`verificar_equipo` **133/133**), despliegue con respaldo y **ensayo 119/119**.
+
 ### Catálogo de la institución: gestión de trámites por su coordinación (migración 020, runbook 44)
 - **Estado: implementado, sin aplicar en producción.** La migración, `database/pruebas-catalogo.sql` y el método nuevo de `verificar_equipo` se escribieron **sin poder ejecutarlos contra PostgreSQL** (no había una base disponible): se prueban al aplicarla (runbook 44.3 a 44.5). Lo que no necesita base sí corrió: backend **1380** pruebas, frontend **417** (21 archivos).
 - **Base de datos (`020-catalogo-institucion.sql`):**

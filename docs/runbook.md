@@ -2232,7 +2232,7 @@ Aplicado el **26 de noviembre de 2026**, a las 11:41. Evidencia en `docs/sdlc/ev
 
 ## 44. Catálogo de la institución: aplicar la migración 020 (gestión de trámites por la coordinación)
 
-**Estado: implementado, sin aplicar en producción.** La migración, sus pruebas de base y el método nuevo de `verificar_equipo` se escribieron **sin poder ejecutarlos contra PostgreSQL** (no había una base disponible): esta sección es el procedimiento para correrlos por primera vez. Lo único que corrió fue lo que no necesita base (pruebas unitarias del backend y del frontend).
+**Estado: aplicado en producción el 26 de noviembre de 2026** (registro en 44.9).
 
 ### 44.1 Qué cambia y en qué orden hay que aplicarlo
 
@@ -2343,4 +2343,12 @@ Si algún paso falla, **no desplegar**.
 
 ### 44.9 Registro de la aplicación
 
-*(Pendiente: se completa al aplicarla, con fecha, respaldo `pre-020`, resultado del ensayo y de las pruebas, las verificaciones de la imagen candidata y el ensayo de la demostración.)*
+Aplicado el **26 de noviembre de 2026**, a las 13:22. Evidencia en `docs/sdlc/evidencia/19_catalogo_*`.
+
+1. **VM2, respaldo verificado:** `tramites_demo-20261126-132145.dump` (20 tablas, restauración probada), copiado como `pre-020-…` (SHA-256 `751b22dd5ea94dee…`).
+2. **Ensayo de la 020 junto con `pruebas-catalogo.sql`** en una sola transacción revertida: **82 de 82 a la primera**, incluido `app_role` sin contexto rechazado por `session_user`. Después no quedaba ni la tabla `catalogo_cambio` ni las columnas nuevas.
+3. **Migración real:** completó la copia del formulario en los **103 trámites** existentes (`UPDATE 103`, 103 de 103 con copia). Las pruebas de la base sobre la base migrada siguieron en verde: catálogo, escalamiento (10/10), notificaciones (36/36) y alertas (57/57).
+4. **VM1, imagen candidata** (`catalogo-candidata`) y las 8 verificaciones **antes** de reiniciar, todas a la primera: `verificar_equipo` **133/133** (con la gestión del catálogo), `verificar_plataforma` 154/154, `verificar_tramites` 214/214, `verificar_autenticacion` 200/200, `verificar_politicas` 41/41, `verificar_auditoria` 34/34, `verificar_integracion` 15/15 (ya fija el contexto de una coordinación antes de crear tipos) y `verificar_esquema` OK. Despliegue de backend e interfaz con respaldo (`respaldo-2026-11-26b`).
+5. **Ensayo completo: 119/119**, con la coordinación listando el catálogo y su historial a través de nginx y la supervisión recibiendo 403.
+
+**Volver atrás:** imagen `respaldo-2026-11-26b` como `dev` y reiniciar el backend; interfaz desde `frontend.respaldo-2026-11-26b`. Revertir la base solo restaurando `pre-020-…` (perdiendo lo posterior).
