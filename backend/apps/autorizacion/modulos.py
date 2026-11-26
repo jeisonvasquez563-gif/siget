@@ -19,9 +19,9 @@ CATALOGO = {
     "consola_infraestructura": ("Infraestructura", "Estado de la base de datos y del servicio, y vencimiento del certificado (solo lectura).", DISPONIBLE),
     "consola_identidades": ("Identidades", "Restablece contraseñas y segundo factor, y da de alta a las coordinadoras con control dual.", DISPONIBLE),
     "consola_catalogo": ("Catálogo", "Alta de instituciones con control dual.", DISPONIBLE),
-    "consola_seguridad": ("Respuesta a incidentes", "Bloquea cuentas, revoca sesiones y mira los eventos de seguridad.", DISPONIBLE),
+    "consola_seguridad": ("Respuesta a incidentes", "Bloquea cuentas, revoca sesiones, mira los eventos de seguridad y revisa las alertas.", DISPONIBLE),
     "consola_secretos": ("Custodia de secretos", "Registra la rotación de secretos y avisa cuándo toca.", DISPONIBLE),
-    "auditoria": ("Auditoría", "Consulta del registro inalterable de eventos y de decisiones de acceso.", DISPONIBLE),
+    "auditoria": ("Auditoría", "Consulta del registro inalterable de eventos y de decisiones de acceso, y de las alertas de seguridad.", DISPONIBLE),
 }
 
 _POR_ROL_PLATAFORMA = {

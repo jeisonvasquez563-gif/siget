@@ -48,6 +48,8 @@ class Accion(str, Enum):
     RESPONDER_SOLICITUD_DATOS = "responder_solicitud_datos"
     CAMBIAR_CONTRASENA = "cambiar_contrasena"
     VER_MIS_NOTIFICACIONES = "ver_mis_notificaciones"
+    VER_ALERTAS = "ver_alertas"
+    REVISAR_ALERTA = "revisar_alerta"
 
 
 # Transiciones válidas de un trámite (espejo de siget.transicion en la base, que es la autoridad).
@@ -248,7 +250,7 @@ _ACCIONES_POR_ROL_PLATAFORMA = {
     "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA, Accion.EMITIR_INVITACION,
                              Accion.CONSULTAR_SOLICITUDES_DATOS, Accion.RESPONDER_SOLICITUD_DATOS},
     "operador_catalogo": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA},
-    "operador_seguridad": {Accion.BLOQUEAR_CUENTA, Accion.REVOCAR_SESION},
+    "operador_seguridad": {Accion.BLOQUEAR_CUENTA, Accion.REVOCAR_SESION, Accion.VER_ALERTAS, Accion.REVISAR_ALERTA},
     "custodio_secretos": {Accion.ROTAR_SECRETOS},
 }
 _ALTAS_POR_ROL = {"operador_identidades": "alta_coordinador", "operador_catalogo": "alta_institucion"}
@@ -264,7 +266,8 @@ def _operadores(s, a, r, e):
 
 
 def _auditor(s, a, r, e):
-    if s.rol_plataforma == "auditor" and a in {Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES} \
+    """El auditor lee (nunca escribe): la auditoría, las decisiones y las alertas de seguridad. Nivel 3 y segundo factor reciente."""
+    if s.rol_plataforma == "auditor" and a in {Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES, Accion.VER_ALERTAS} \
             and s.nivel_aseguramiento >= 3 and _mfa_reciente(s, e):
         return Decision(True, "auditor_consulta")
 
