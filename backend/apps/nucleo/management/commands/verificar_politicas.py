@@ -1,20 +1,45 @@
-"""Prueba contra la base real de la transparencia de roles y permisos, y de la actividad de seguridad propia.
+"""Prueba contra la base real de los permisos de PostgreSQL, del PDP y de la actividad de seguridad propia.
 
-La parte importante es que lo que `/politicas/base-de-datos/` MUESTRA coincide con lo que PostgreSQL REALMENTE permite:
-si alguien concediera por error un permiso de más, esta prueba (y la pantalla) lo mostrarían.
+Las rutas `/politicas/` (matriz, simulador y vista de la base) se retiraron al pasar a plataforma final: aquí se comprueba que
+ya no existen (404) y se conservan las comprobaciones de la base, que ahora consultan el catálogo de PostgreSQL directamente:
+si alguien concediera por error un permiso de más, esta prueba lo mostraría.
 Las personas de la prueba viven en una transacción que se revierte.
 """
 from datetime import timedelta
 
 from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connections, transaction
+from django.db import connection, transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.autenticacion import contrasenas, tokens
 from apps.autenticacion.models import EventoSeguridad, Sesion
+from apps.autorizacion.pdp import Accion, Entorno, Recurso, Sujeto, decidir
 from apps.identidad.models import Usuario
+
+ROLES_BD = ("app_role", "auditor_role", "siget_owner", "checkpoint_app", "pgadmin_lectura")
+PRIVILEGIOS = ("SELECT", "INSERT", "UPDATE", "DELETE")
+
+_SQL_PRIVILEGIOS = """
+    SELECT r.rolname, c.relname, p.priv,
+           has_table_privilege(r.rolname, c.oid, p.priv) AS tabla,
+           -- DELETE no existe a nivel de columna: PostgreSQL solo admite SELECT, INSERT, UPDATE y REFERENCES
+           (p.priv <> 'DELETE' AND has_any_column_privilege(r.rolname, c.oid, p.priv)) AS columnas
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'siget'
+     CROSS JOIN pg_roles r
+     CROSS JOIN (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')) AS p(priv)
+     WHERE c.relkind = 'r' AND r.rolname = ANY(%s)
+"""
+_SQL_ATRIBUTOS = "SELECT rolname, rolsuper, rolbypassrls, rolcanlogin, rolconnlimit FROM pg_roles WHERE rolname = ANY(%s)"
+_SQL_TABLAS = """
+    SELECT c.relname, c.relrowsecurity,
+           (SELECT count(*) FROM pg_policies p WHERE p.schemaname = 'siget' AND p.tablename = c.relname),
+           (SELECT count(*) FROM pg_trigger t WHERE t.tgrelid = c.oid AND NOT t.tgisinternal)
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'siget'
+     WHERE c.relkind = 'r' ORDER BY c.relname
+"""
 
 HOST = {"HTTP_HOST": "localhost", "HTTP_X_REAL_IP": "198.51.100.9"}
 
@@ -24,7 +49,7 @@ class _Revertir(Exception):
 
 
 class Command(BaseCommand):
-    help = "Prueba de integración de roles, permisos y actividad de seguridad contra la base real (se revierte al final)."
+    help = "Prueba de integración de los permisos de la base, el PDP y la actividad de seguridad contra la base real (se revierte al final)."
 
     def _paso(self, nombre, ok, detalle=""):
         self.resultados.append(ok)
@@ -40,19 +65,28 @@ class Command(BaseCommand):
         transaction.set_rollback(False)
         return r
 
-    def _post(self, ruta, cuerpo, token=None, formato="json"):
+    def _post(self, ruta, cuerpo, token=None):
         cabeceras = dict(HOST)
         if token:
             cabeceras["HTTP_AUTHORIZATION"] = f"Bearer {token}"
-        r = self.cliente.post(ruta, cuerpo, format=formato, secure=True, **cabeceras)
+        r = self.cliente.post(ruta, cuerpo, format="json", secure=True, **cabeceras)
         cache.clear()
         transaction.set_rollback(False)
         return r
 
-    def _decisiones_registradas(self):
-        with connections["auditoria"].cursor() as c:
-            c.execute("select count(*) from siget.decision_pdp")
-            return c.fetchone()[0]
+    def _base(self):
+        """Atributos de los roles, privilegios por tabla y protecciones de las tablas, leídos del catálogo de PostgreSQL."""
+        with connection.cursor() as c:
+            c.execute(_SQL_ATRIBUTOS, [[*ROLES_BD, "postgres"]])
+            atributos = {f[0]: f for f in c.fetchall()}
+            c.execute(_SQL_PRIVILEGIOS, [list(ROLES_BD)])
+            filas = c.fetchall()
+            c.execute(_SQL_TABLAS)
+            tablas = {f[0]: {"rls": f[1], "politicas": f[2], "triggers": f[3]} for f in c.fetchall()}
+        priv = {r: {t: {p: "no" for p in PRIVILEGIOS} for t in tablas} for r in ROLES_BD}
+        for rol, tabla, p, total, columnas in filas:
+            priv[rol][tabla][p] = "total" if total else ("columnas" if columnas else "no")
+        return atributos, priv, tablas
 
     def _persona(self, nombre, rol_plataforma="ninguno"):
         return Usuario.objects.create(username=f"int_p_{nombre}", password_hash=contrasenas.inutilizable(), rol_plataforma=rol_plataforma, mfa_activo=True,
@@ -83,36 +117,30 @@ class Command(BaseCommand):
     def _recorrer(self):
         ana, auditor, operador = self._persona("ana"), self._persona("auditor", "auditor"), self._persona("operador", "operador_seguridad")
         t = {u.username: self._token(u) for u in (ana, auditor, operador)}
-        for ruta in ("/politicas/matriz/", "/politicas/base-de-datos/", "/auth/actividad/"):
-            self._paso(f"{ruta} sin token responde 401", self._http(ruta).status_code == 401)
+        self._paso("/auth/actividad/ sin token responde 401", self._http("/auth/actividad/").status_code == 401)
 
-        # ---------------------------------------------------------------- base de datos
-        self._paso("una ciudadana NO ve los permisos de la base: es información técnica de seguridad (403)", self._http("/politicas/base-de-datos/", t[ana.username]).status_code == 403)
-        # Las dos formas de ser ciudadano: sin ninguna membresía (arriba) y con una membresía de rol «ciudadano» en una institución
-        from apps.catalogo.models import Institucion
-        from apps.identidad.models import Membresia
-        con_membresia = self._persona("ciudadano_con_membresia")
-        asignadora = self._persona("quien_asigna")
-        Membresia.objects.create(usuario=con_membresia, institucion=Institucion.objects.order_by("id").first(), rol="ciudadano", asignado_por=asignadora)
-        self._paso("tampoco la ve una persona con membresía de rol «ciudadano» en una institución (403)", self._http("/politicas/base-de-datos/", self._token(con_membresia)).status_code == 403)
-        r = self._http("/politicas/base-de-datos/", t[operador.username])
-        d = r.json() if r.status_code == 200 else {}
-        self._paso("el personal (aquí, un operador de plataforma) sí los ve", r.status_code == 200 and len(d.get("roles", [])) == 5, r.status_code)
-        roles = {x["nombre"]: x for x in d.get("roles", [])}
-        priv = d.get("privilegios", {})
-        tablas = {x["nombre"]: x for x in d.get("tablas", [])}
-        self._paso("existen los 5 roles de la base", all(roles[n]["existe"] for n in ("app_role", "auditor_role", "siget_owner", "checkpoint_app", "pgadmin_lectura")))
-        self._paso("ningún rol de la aplicación es superusuario ni omite la seguridad por filas", d.get("ningun_rol_de_aplicacion_es_superusuario") is True)
-        self._paso("el administrador del motor existe pero está contenido (sin contraseña, solo socket local)", d.get("administrador_del_motor", {}).get("superusuario") is True)
-        self._paso("el dueño de las tablas no puede iniciar sesión", roles["siget_owner"]["puede_conectar"] is False)
-        self._paso("app_role tiene límite de conexiones", (roles["app_role"]["limite_conexiones"] or -1) > 0, roles["app_role"]["limite_conexiones"])
+        # ---------------------------------------------------------------- las rutas de transparencia ya no existen
+        for ruta in ("/politicas/matriz/", "/politicas/base-de-datos/", "/politicas/simular/", "/politicas/"):
+            for quien, token in (("sin sesión", None), ("con sesión de ciudadana", t[ana.username]), ("con sesión de operador", t[operador.username])):
+                r = self._http(ruta, token)
+                self._paso(f"{ruta} {quien} responde 404 (la ruta ya no existe)", r.status_code == 404, r.status_code)
+        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "ver_tramite"}, t[ana.username])
+        self._paso("un POST a /politicas/simular/ también responde 404", r.status_code == 404, r.status_code)
+
+        # ---------------------------------------------------------------- base de datos (catálogo de PostgreSQL)
+        atributos, priv, tablas = self._base()
+        self._paso("existen los 5 roles de la base", all(n in atributos for n in ROLES_BD))
+        self._paso("ningún rol de la aplicación es superusuario ni omite la seguridad por filas", not any(atributos[n][1] or atributos[n][2] for n in ROLES_BD if n in atributos))
+        self._paso("el administrador del motor existe pero está contenido (sin contraseña, solo socket local)", bool(atributos.get("postgres") and atributos["postgres"][1]))
+        self._paso("el dueño de las tablas no puede iniciar sesión", atributos["siget_owner"][3] is False)
+        self._paso("app_role tiene límite de conexiones", (atributos["app_role"][4] or -1) > 0, atributos["app_role"][4])
         self._paso("las tablas del negocio tienen seguridad por filas (RLS) y políticas", all(tablas[n]["rls"] and tablas[n]["politicas"] > 0 for n in ("tramite", "evento_auditoria")),
                    {n: (tablas[n]["rls"], tablas[n]["politicas"]) for n in ("tramite", "evento_auditoria")})
         self._paso("hay disparadores que protegen el registro y las transiciones", tablas["evento_auditoria"]["triggers"] > 0 and tablas["tramite"]["triggers"] > 0)
 
         for tabla in ("decision_pdp", "evento_auditoria", "evento_seguridad"):
             # El dueño de la tabla tiene todos los privilegios por serlo: lo que lo contiene es que NO puede iniciar sesión y que
-            # los disparadores de solo inserción rechazan el UPDATE y el DELETE incluso para él (se comprueba más abajo).
+            # los disparadores de solo inserción rechazan el UPDATE y el DELETE incluso para él.
             peor = [(r, p) for r in priv if r != "siget_owner" for p in ("UPDATE", "DELETE") if priv[r][tabla][p] != "no"]
             self._paso(f"ningún rol que se conecta puede alterar ni borrar {tabla} (registro inalterable)", peor == [], peor)
             self._paso(f"{tabla} está protegida además por disparadores (el dueño, que no inicia sesión, tampoco la altera)", tablas[tabla]["triggers"] > 0, tablas[tabla]["triggers"])
@@ -126,14 +154,11 @@ class Command(BaseCommand):
         self._paso("de las personas, app_role solo altera algunas columnas (no puede cambiar su rol de plataforma)", priv["app_role"]["usuario"]["UPDATE"] == "columnas")
         self._paso("el catálogo de transiciones es inmodificable para la aplicación", priv["app_role"]["transicion"]["INSERT"] == "no" and priv["app_role"]["transicion"]["UPDATE"] == "no")
 
-        # ---------------------------------------------------------------- matriz del PDP
-        r = self._http("/politicas/matriz/", t[operador.username])
-        m = r.json() if r.status_code == 200 else {}
-        self._paso("un operador de plataforma ve la matriz de permisos", r.status_code == 200 and len(m.get("roles", [])) == 10, r.status_code)
-        self._paso("la matriz confirma que no existe un superusuario", m.get("ningun_rol_puede_todo") is True)
-        fila = m.get("matriz", {}).get("operador_seguridad", {})
-        self._paso("y que el operador de seguridad no ve trámites, con la política que lo dice",
-                   fila.get("ver_tramite", {}).get("favorable") == {"permitido": False, "politica": "plataforma_sin_acceso_a_tramites"})
+        # ---------------------------------------------------------------- PDP (evaluado directamente)
+        ahora = timezone.now()
+        sujeto = Sujeto(id=operador.pk, mfa_verificado_en=ahora, rol_plataforma="operador_seguridad")
+        d = decidir(sujeto, Accion.VER_TRAMITE, Recurso(tipo="tramite", institucion_id=1, solicitante_id=999999), Entorno(ahora=ahora))
+        self._paso("el PDP niega al operador de seguridad ver trámites, con la política que lo dice", not d.permitido and d.politica == "plataforma_sin_acceso_a_tramites", d.politica)
 
         # ---------------------------------------------------------------- actividad de seguridad propia
         EventoSeguridad.objects.create(actor_id=ana.pk, evento="login_ok", ip="198.51.100.9", detalle={})
@@ -143,38 +168,3 @@ class Command(BaseCommand):
         eventos = r.json()["eventos"] if r.status_code == 200 else []
         self._paso("cada persona ve su propia actividad de seguridad", r.status_code == 200 and [e["evento"] for e in eventos] == ["mfa_verificado", "login_ok"], [e["evento"] for e in eventos])
         self._paso("y solo la suya: nunca la de otra persona", all("198.51.100.10" != e["ip"] for e in eventos))
-
-        # ---------------------------------------------------------------- simulador de «qué pasaría si…»
-        self._paso("el simulador sin token responde 401", self._post("/politicas/simular/", {"rol": "funcionario", "accion": "ver_tramite"}).status_code == 401)
-        antes = self._decisiones_registradas()
-        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado"}, t[ana.username])
-        c = r.json() if r.status_code == 200 else {}
-        self._paso("una ciudadana simula qué pasaría si un funcionario cambia un estado: se permite", r.status_code == 200 and c.get("decision", {}).get("permitido") is True and c["decision"]["politica"] == "funcionario_cambia_estado", r.status_code)
-        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado", "solicitante": "yo"}, t[ana.username])
-        c = r.json() if r.status_code == 200 else {}
-        self._paso("y si el trámite lo pidió él mismo, se niega por conflicto de interés, con la traza que lo explica",
-                   c.get("decision", {}).get("politica") == "conflicto_de_interes" and c["traza"][-1]["resultado"] == "niega" and c.get("hipotetico") is True)
-        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado", "segundo_factor": "vencido"}, t[ana.username])
-        c = r.json() if r.status_code == 200 else {}
-        self._paso("con el segundo factor vencido se niega y la alternativa dice que con uno reciente se permitiría",
-                   c.get("decision", {}).get("permitido") is False and any(a["variable"] == "segundo_factor" and a["valor"] == "reciente" and a["permitido"] for a in c.get("alternativas", [])))
-        for cuerpo in ({"rol": ["x"], "accion": "ver_tramite"}, {"rol": "funcionario", "accion": "borrar_todo"}, {"rol": "funcionario", "accion": "ver_tramite", "cuenta": "root"}, [1, 2], "texto"):
-            r = self._post("/politicas/simular/", cuerpo, t[ana.username])
-            if r.status_code != 400:
-                self._paso(f"una entrada inválida ({cuerpo!r}) se rechaza con 400 y no con un error del servidor", False, r.status_code)
-                break
-        else:
-            self._paso("las entradas inválidas (rol o acción desconocidos, valores fuera de la lista, formatos raros) se rechazan con 400", True)
-        r = self._post("/politicas/simular/", {"rol": "funcionario", "accion": "ver_tramite"}, t[ana.username], formato="multipart")
-        self._paso("un cuerpo que no es JSON se rechaza (415)", r.status_code == 415, r.status_code)
-        r = self._http("/politicas/simular/", t[ana.username])
-        self._paso("el formulario del simulador (GET) lista las variables de las 30 acciones", r.status_code == 200 and len(r.json()["variables"]) == 30)
-        self._paso("el simulador no registró ninguna decisión: es hipotético y no ensucia la auditoría", self._decisiones_registradas() == antes, f"{antes} -> {self._decisiones_registradas()}")
-
-        # ---------------------------------------------------------------- una sola fuente para la ventana del segundo factor
-        yo = self._http("/auth/yo/", t[ana.username]).json()
-        matriz_v = self._http("/politicas/matriz/", t[ana.username]).json()["ventana_minutos"]
-        meta_v = self._http("/politicas/simular/", t[ana.username]).json()["ventana_minutos"]
-        self._paso("la ventana del segundo factor es la misma en /auth/yo/, la matriz y el simulador (la configuración real)",
-                   yo["mfa_ventana_minutos"] == matriz_v == meta_v, f"{yo['mfa_ventana_minutos']} / {matriz_v} / {meta_v}")
-

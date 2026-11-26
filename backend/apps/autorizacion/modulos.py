@@ -15,7 +15,6 @@ CATALOGO = {
     "mis_datos": ("Mis datos", "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.", DISPONIBLE),
     "seguridad": ("Mi seguridad", "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.", DISPONIBLE),
     "mfa": ("Segundo factor (MFA)", "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.", DISPONIBLE),
-    "roles_permisos": ("Roles y permisos", "Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.", DISPONIBLE),
     "prueba_acceso": ("Acceso a trámites", "Comprueba en vivo que tu rol de plataforma no puede ver trámites.", DISPONIBLE),
     "consola_infraestructura": ("Infraestructura", "Estado de la base de datos y del servicio, y vencimiento del certificado (solo lectura).", DISPONIBLE),
     "consola_identidades": ("Identidades", "Restablece contraseñas y segundo factor, y da de alta a las coordinadoras con control dual.", DISPONIBLE),
@@ -35,8 +34,8 @@ _POR_ROL_PLATAFORMA = {
 }
 
 
-# Todas las personas pueden ver su propia seguridad, cómo funciona el segundo factor y qué permite cada rol (transparencia)
-_TRANSPARENCIA = ["seguridad", "mfa", "roles_permisos"]
+# Todas las personas pueden ver su propia seguridad y cómo funciona el segundo factor (transparencia)
+_TRANSPARENCIA = ["seguridad", "mfa"]
 
 
 def _entrada(identificador):

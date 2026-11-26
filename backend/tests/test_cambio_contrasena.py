@@ -1,4 +1,4 @@
-"""Cambio de contraseña desde la sesión: regla del PDP, matriz, simulador, ruta y límite de tasa.
+"""Cambio de contraseña desde la sesión: regla del PDP, ruta y límite de tasa.
 
 Sin base de datos: el recorrido real (contraseña actual, bloqueo progresivo, cierre de las demás sesiones) lo hace `verificar_autenticacion`.
 """
@@ -13,11 +13,11 @@ from django.urls import resolve, reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.autenticacion import contrasenas, servicio, tokens, vistas
-from apps.autorizacion import matriz, simulador
 from apps.autorizacion.pdp import Accion, Entorno, Recurso, Sujeto, decidir
+from tests import ejemplos_pdp
 
 AHORA = datetime(2026, 11, 24, 12, 0, tzinfo=timezone.utc)
-ROLES_PLATAFORMA = [r[0] for r in matriz.ROLES[4:]]
+ROLES_PLATAFORMA = ejemplos_pdp.ROLES_DE_PLATAFORMA
 NUEVA = "otra-frase-larga-y-poco-comun-5528"
 ACTUAL = "Actual-" + secrets.token_urlsafe(12)  # generada al ejecutar: no queda ninguna contraseña escrita en el código
 
@@ -69,26 +69,13 @@ def test_otro_tipo_de_recurso_no_sirve():
     assert not decide(sujeto(), Recurso(tipo="perfil", solicitante_id=10)).permitido
 
 
-def test_la_matriz_la_calcula_para_los_diez_roles():
-    M = matriz.construir()
+def test_el_pdp_la_calcula_para_los_diez_roles():
+    M = ejemplos_pdp.construir()
     assert len(M["acciones"]) == len(Accion) == 30
     for rol in M["matriz"].values():
         celda = rol["cambiar_contrasena"]
         assert celda["favorable"]["permitido"] and not celda["desfavorable"]["permitido"] and celda["exige_segundo_factor"] is True
-    assert next(a for a in M["acciones"] if a["id"] == "cambiar_contrasena")["grupo"] == "Cuenta"
     assert M["ningun_rol_puede_todo"] is True
-
-
-def test_el_simulador_la_conoce_y_explica_el_resultado():
-    assert len(simulador.meta()["variables"]) == 30
-    entrada, errores = simulador.normalizar({"rol": "auditor", "accion": "cambiar_contrasena", "segundo_factor": "vencido"})
-    assert errores == []
-    r = simulador.simular(entrada, AHORA)
-    assert r["decision"]["permitido"] is False
-    assert {"variable": "segundo_factor", "valor": "reciente"}.items() <= next(a for a in r["alternativas"] if a["variable"] == "segundo_factor").items()
-    ok = simulador.simular(simulador.normalizar({"rol": "ciudadano", "accion": "cambiar_contrasena"})[0], AHORA)
-    assert ok["decision"]["politica"] == "titular_cambia_su_contrasena"
-    assert simulador.normalizar({"rol": "ciudadano", "accion": "cambiar_contrasena", "cuenta_de": "alguien"})[0] is None
 
 
 def test_la_ruta_exige_sesion_completa_y_no_corre_en_una_transaccion():
