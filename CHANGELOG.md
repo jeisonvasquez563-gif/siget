@@ -6,6 +6,10 @@ Registro cronológico de cada cambio significativo del proyecto. Formato inspira
 
 ## [Sin liberar] — en desarrollo
 
+### Documentación (SDLC seguro y entregables al día, 26-nov)
+- **Las 8 etapas de [`docs/sdlc/`](./docs/sdlc/README.md) se actualizaron** con lo hecho del 17 al 26-nov (PT-15, contenido del trámite, cambio de contraseña, notificaciones, alertas y catálogo): 27 riesgos (13 con algo pendiente; R22 mitigado, R25 a R27 nuevos), 26 requisitos (24 cumplen), 62 amenazas (42 mitigadas, 19 parciales, 1 abierta), 19 reglas de codificación segura, 57 controles, plan de pruebas con las pruebas de la base y el ensayo 119/119, el entorno con el rol `detector_role` y las bitácoras. Se corrigió además el conteo de riesgos pendientes, que decía 12 y eran 11, y se actualizaron las preguntas del profesor.
+- **[`docs/SIGET_Guia_de_Defensa_SDLC_Seguro.docx`](./docs/SIGET_Guia_de_Defensa_SDLC_Seguro.docx) e [`docs/SIGET_Informe_Final_Trabajo_Realizado.docx`](./docs/SIGET_Informe_Final_Trabajo_Realizado.docx)** regenerados con sus generadores: el informe suma las seis funcionalidades nuevas con su evidencia (32 figuras y 6 tablas), el procedimiento común de despliegue y sus dos lecciones, y los pendientes reales.
+
 ### Despliegue (gestión del catálogo en producción, 26-nov)
 - **Migración 020 aplicada** (runbook 44.9, evidencia `docs/sdlc/evidencia/19_catalogo_*`):
   - ensayo con sus pruebas: **82/82 a la primera**;
