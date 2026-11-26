@@ -7,7 +7,7 @@ from apps.auditoria.models import DecisionPdp, EventoAuditoria
 from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 from apps.notificaciones.models import Notificacion
 from apps.plataforma.models import AlertaSeguridad, RotacionSecreto
-from apps.catalogo.models import Feriado, Institucion, TipoTramite
+from apps.catalogo.models import CatalogoCambio, Feriado, Institucion, TipoTramite
 from apps.identidad.models import Aprobacion, Membresia, Perfil, SolicitudDerecho, Usuario
 from apps.identidad.sujeto import construir_sujeto
 from apps.nucleo.esquema import columnas_del_modelo, diferencias, modelos_de_dominio
@@ -24,6 +24,7 @@ TABLAS = {
     SolicitudDerecho: "solicitud_derecho",
     Notificacion: "notificacion",
     AlertaSeguridad: "alerta_seguridad",
+    CatalogoCambio: "catalogo_cambio",
 }
 
 
@@ -62,6 +63,24 @@ def test_la_auditoria_no_se_modifica_ni_se_borra(modelo):
         existente.save()
     with pytest.raises(PermissionError):
         existente.delete()
+
+
+def test_el_registro_de_cambios_del_catalogo_lo_escribe_la_base_y_no_la_aplicacion():
+    with pytest.raises(PermissionError):
+        CatalogoCambio(accion="alta").save()
+    with pytest.raises(PermissionError):
+        CatalogoCambio(pk=1).delete()
+
+
+def test_el_tipo_de_tramite_mapea_la_columna_activo_y_el_registro_sus_columnas():
+    assert "activo" in columnas_del_modelo(TipoTramite)
+    assert columnas_del_modelo(CatalogoCambio) == {"id", "tipo_tramite_id", "institucion_id", "actor_id", "accion", "antes", "despues", "creado_en"}
+    assert TipoTramite().activo is True  # un tipo nuevo se ofrece, como la columna (DEFAULT true)
+
+
+def test_el_tramite_mapea_la_copia_del_formulario_y_el_tipo_su_version():
+    assert "formulario" in columnas_del_modelo(Tramite)
+    assert "version" in columnas_del_modelo(TipoTramite) and TipoTramite().version == 1  # como la columna (DEFAULT 1)
 
 
 def test_el_adaptador_traduce_el_usuario_al_sujeto_del_pdp():

@@ -27,7 +27,8 @@ class InstitucionesLista(_Lectura):
 
 class TiposTramiteLista(_Lectura):
     def get(self, request):
-        consulta = TipoTramite.objects.select_related("institucion").order_by("id")
+        # Un tipo desactivado no se ofrece para trámites nuevos (migración 020): la coordinación lo ve en su propio módulo
+        consulta = TipoTramite.objects.filter(activo=True).select_related("institucion").order_by("id")
         crudo = request.query_params.get("institucion")
         if crudo is not None:
             if not crudo.isascii() or not crudo.isdigit() or entero_positivo(int(crudo)) is None:

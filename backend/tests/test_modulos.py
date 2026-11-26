@@ -28,10 +28,18 @@ def test_el_coordinador_ve_el_equipo_pero_no_los_tramites_de_la_institucion():
     assert "equipo" in r and "bandeja" not in r and "supervision" not in r
 
 
+def test_el_catalogo_de_la_institucion_es_solo_de_la_coordinacion():
+    assert ids(roles=["coordinador_institucional"]) == ["mis_tramites", "nuevo_tramite", "mis_datos", "equipo", "catalogo_institucion",
+                                                        "seguridad", "mfa", "roles_permisos"]
+    for roles in ([], ["ciudadano"], ["funcionario"], ["supervisor"], ["funcionario", "supervisor"]):
+        assert "catalogo_institucion" not in ids(roles=roles), roles
+    assert CATALOGO["catalogo_institucion"][0] == "Catálogo de la institución"
+
+
 @pytest.mark.parametrize("rol", sorted(ROLES_PLATAFORMA))
 def test_un_rol_de_plataforma_no_ve_ningun_modulo_de_tramites(rol):
     r = ids(rol, ["funcionario"])  # aunque llegara con una membresía (la base lo impide), no cuenta
-    assert not {"mis_tramites", "nuevo_tramite", "mis_datos", "bandeja", "supervision", "equipo"} & set(r)
+    assert not {"mis_tramites", "nuevo_tramite", "mis_datos", "bandeja", "supervision", "equipo", "catalogo_institucion"} & set(r)
     assert {"prueba_acceso", "seguridad", "mfa", "roles_permisos"} <= set(r) and len(r) == 5
 
 

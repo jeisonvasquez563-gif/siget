@@ -43,7 +43,9 @@ def registro(monkeypatch):
     def un_tramite(pk=5, **cambios):
         base = dict(pk=pk, tipo_tramite_id=1, tipo_tramite=SimpleNamespace(nombre="Demo", formulario=FORMULARIO), institucion_id=3,
                     institucion=SimpleNamespace(nombre="MOP"), fecha_limite=AHORA, creado_en=AHORA, funcionario_asignado_id=None,
-                    sensibilidad=1, escalado_en=None, **{**tramite, **cambios})
+                    sensibilidad=1, escalado_en=None, formulario=FORMULARIO)
+        base.update(tramite)
+        base.update(cambios)
         return SimpleNamespace(**base)
 
     reg.tramite = tramite
@@ -82,7 +84,7 @@ def registro(monkeypatch):
     monkeypatch.setattr(vistas._Base, "throttle_classes", [])
     monkeypatch.setattr(vistas._Base, "_tramite_visible", lambda self, pk: un_tramite(pk=pk))
     monkeypatch.setattr(vistas, "autorizar", lambda request, accion, recurso: reg.pasos.append(("pdp", accion, recurso)))
-    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=FORMULARIO)
+    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=FORMULARIO, activo=True)
     monkeypatch.setattr(vistas, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(
         select_related=lambda *a: SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: tipo if k.get("pk") == 1 else None)))))
     monkeypatch.setattr(vistas, "feriados_entre", lambda *a: set())
@@ -120,6 +122,12 @@ def test_crear_con_datos_validos_los_guarda_normalizados(registro):
     assert r.status_code == 201
     assert pasos(registro, "crear")[0][1]["datos"] == {"asunto": "Bache en la vía"}
     assert r.data["formulario"] == FORMULARIO and "datos" in r.data
+
+
+def test_crear_valida_con_el_formulario_vigente_del_tipo_y_manda_ese_mismo_para_la_copia(registro):
+    r = crear({"tipo_tramite": 1, "datos": {"asunto": "Bache"}})
+    assert r.status_code == 201
+    assert pasos(registro, "crear")[0][1]["formulario"] == FORMULARIO  # la base lo copia por su cuenta e ignora lo que se le mande
 
 
 def test_crear_consulta_al_pdp_antes_de_validar_los_datos(registro):
@@ -173,7 +181,7 @@ def test_el_tope_de_python_deja_margen_bajo_el_check_de_la_base():
 
 def test_un_formulario_mal_definido_da_503_con_un_evento_de_seguridad_sin_datos_personales(registro, monkeypatch):
     mal = [{"id": "Asunto Con Espacios", "tipo": "inventado"}]
-    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=mal)
+    tipo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=mal, activo=True)
     monkeypatch.setattr(vistas, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(
         select_related=lambda *a: SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: tipo)))))
     r = crear({"tipo_tramite": 1, "datos": {"asunto": "Mi dato personal 8-123-456"}})
@@ -286,6 +294,17 @@ def test_con_datos_los_reemplaza_en_el_mismo_update(en_subsanacion):
     assert pasos(en_subsanacion, "update")[0][2] == {"estado": "En Tramitacion", "datos": {"asunto": "Corregido"}}
 
 
+def test_responder_valida_con_la_copia_del_tramite_aunque_la_coordinacion_haya_cambiado_el_tipo(en_subsanacion, monkeypatch):
+    # El tipo hoy pide `motivo` (y no tiene `asunto`); el trámite se creó con `asunto`: lo que vale es lo que el trámite mostró
+    tramite = en_subsanacion.un_tramite(tipo_tramite=SimpleNamespace(nombre="Demo", formulario=FORMULARIO_NUEVO_DEL_TIPO))
+    monkeypatch.setattr(vistas._Base, "_tramite_visible", lambda self, pk: tramite)
+    r = subsanacion({"respuesta": MOTIVO, "datos": {"asunto": "Corregido"}})
+    assert r.status_code == 200
+    assert pasos(en_subsanacion, "update")[0][2] == {"estado": "En Tramitacion", "datos": {"asunto": "Corregido"}}  # no se pierde el campo quitado del tipo
+    r = subsanacion({"respuesta": MOTIVO, "datos": {"motivo": "Uno"}})  # lo que pide el tipo hoy, pero el trámite no tiene
+    assert r.status_code == 400 and "datos" in r.data["errores"] and "asunto" in r.data["errores"] and len(pasos(en_subsanacion, "update")) == 1
+
+
 @pytest.mark.parametrize("datos", [{}, {"asunto": 5}, {"x": 1}, None, [], "x"])
 def test_unos_datos_que_no_cumplen_el_formulario_completo_se_rechazan(en_subsanacion, datos):
     r = subsanacion({"respuesta": MOTIVO, "datos": datos})
@@ -345,7 +364,7 @@ def test_la_ruta_de_subsanacion_existe():
 def un_tramite_serializable(**kw):
     base = dict(pk=9, tipo_tramite_id=1, tipo_tramite=SimpleNamespace(nombre="Permiso", formulario=FORMULARIO), institucion_id=3,
                 institucion=SimpleNamespace(nombre="MOP"), estado="En Subsanacion", fecha_limite=AHORA, creado_en=AHORA,
-                solicitante_id=77, funcionario_asignado_id=88, sensibilidad=2, escalado_en=None, datos={"asunto": "Hola"})
+                solicitante_id=77, funcionario_asignado_id=88, sensibilidad=2, escalado_en=None, datos={"asunto": "Hola"}, formulario=FORMULARIO)
     base.update(kw)
     return SimpleNamespace(**base)
 
@@ -354,6 +373,16 @@ def un_tramite_serializable(**kw):
 def test_el_detalle_lleva_los_datos_y_el_formulario_para_el_solicitante_y_para_el_personal(personal):
     d = ser.tramite_a_dict(un_tramite_serializable(), personal, AHORA, detalle=True)
     assert d["datos"] == {"asunto": "Hola"} and d["formulario"] == FORMULARIO
+
+
+# El formulario con el que se creó el trámite y el que tiene hoy el tipo (la coordinación lo cambió): no se parecen en nada
+FORMULARIO_NUEVO_DEL_TIPO = [{"id": "motivo", "etiqueta": "Motivo", "tipo": "seleccion", "obligatorio": True, "opciones": ["Uno", "Dos"]}]
+
+
+def test_el_detalle_muestra_la_copia_del_tramite_y_no_el_formulario_vigente_del_tipo():
+    t = un_tramite_serializable(tipo_tramite=SimpleNamespace(nombre="Permiso", formulario=FORMULARIO_NUEVO_DEL_TIPO))
+    d = ser.tramite_a_dict(t, True, AHORA, detalle=True)
+    assert d["formulario"] == FORMULARIO and d["datos"] == {"asunto": "Hola"}
 
 
 def test_el_listado_no_lleva_el_contenido():
@@ -411,10 +440,40 @@ def test_un_evento_que_no_es_un_cambio_de_estado_no_muestra_motivo_a_la_persona(
 
 
 def test_un_formulario_mal_definido_al_responder_la_subsanacion_da_503(en_subsanacion, monkeypatch):
-    mal = SimpleNamespace(nombre="Demo", formulario=[{"id": "X", "tipo": "inventado"}])
-    tramite = en_subsanacion.un_tramite()
-    tramite.tipo_tramite = mal
+    tramite = en_subsanacion.un_tramite(formulario=[{"id": "X", "tipo": "inventado"}])  # la copia del trámite; el tipo, en cambio, está bien
     monkeypatch.setattr(vistas._Base, "_tramite_visible", lambda self, pk: tramite)
     r = subsanacion({"respuesta": MOTIVO, "datos": {"asunto": "Corregido"}})
     assert r.status_code == 503 and r.data["codigo"] == "formulario_no_disponible" and not pasos(en_subsanacion, "update")
     assert pasos(en_subsanacion, "seguridad")[0][2] == "formulario_no_disponible"
+
+
+# --------------------------------------------------------------------------- tipo desactivado (migración 020)
+
+def test_un_tipo_desactivado_no_admite_tramites_nuevos_y_responde_400_claro(registro, monkeypatch):
+    inactivo = SimpleNamespace(pk=1, institucion_id=3, institucion=SimpleNamespace(nombre="MOP"), audiencia="ciudadania", sla_dias=10, formulario=FORMULARIO,
+                               activo=False)
+    monkeypatch.setattr(vistas, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(
+        select_related=lambda *a: SimpleNamespace(filter=lambda **k: SimpleNamespace(first=lambda: inactivo)))))
+    r = crear({"tipo_tramite": 1, "datos": {"asunto": "ok"}})
+    assert r.status_code == 400 and r.data["codigo"] == "tipo_tramite_inactivo" and "ya no se ofrece" in r.data["detalle"]
+    assert not pasos(registro, "crear") and not pasos(registro, "evento")
+    assert pasos(registro, "pdp")  # el PDP va primero: quien no puede crear el trámite no se entera de que el tipo está desactivado
+
+
+def test_el_catalogo_publico_no_muestra_los_tipos_desactivados(monkeypatch):
+    from apps.catalogo import vistas as catalogo
+    filtros = []
+
+    class Consulta:
+        def select_related(self, *a):
+            return self
+
+        def order_by(self, *a):
+            return []
+
+    monkeypatch.setattr(catalogo, "TipoTramite", SimpleNamespace(objects=SimpleNamespace(filter=lambda **k: (filtros.append(k), Consulta())[1])))
+    monkeypatch.setattr(catalogo.TiposTramiteLista, "throttle_classes", [])
+    peticion = APIRequestFactory().get("/catalogo/tipos-tramite/", secure=True)
+    force_authenticate(peticion, user=SimpleNamespace(usuario=SimpleNamespace(pk=7), claims=SimpleNamespace(scope="completo"), is_authenticated=True, pk=7))
+    assert catalogo.TiposTramiteLista.as_view()(peticion).status_code == 200
+    assert filtros[0] == {"activo": True}

@@ -29,6 +29,9 @@ class Tramite(ModeloDeEsquema):
     escalado_en = models.DateTimeField(null=True, blank=True)
     # Lo que la persona respondió al formulario del tipo (migración 017). Solo cambia al responder una subsanación: la base lo impone
     datos = models.JSONField(default=dict)
+    # Copia del formulario del tipo, tomada por la base al crear el trámite (migración 020) e inmutable: el expediente se muestra y se valida con
+    # ella aunque la coordinación cambie después el formulario del tipo. Lo que mande la aplicación al insertar, la base lo ignora
+    formulario = models.JSONField(default=list)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta(ModeloDeEsquema.Meta):
