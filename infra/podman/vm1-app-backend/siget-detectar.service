@@ -1,0 +1,19 @@
+# SIGET: detección de patrones sospechosos (PT-10, RS-24). Lo dispara siget-detectar.timer cada 5 minutos.
+# Unidad de usuario de `siget` en VM1: ~/.config/systemd/user/siget-detectar.service
+# Contenedor desechable con la imagen del backend y SOLO dos secretos: la contraseña de detector_role y la CA.
+# Ese rol solo puede ejecutar siget.detectar_anomalias(): no lee ni escribe ninguna tabla.
+[Unit]
+Description=SIGET: detectar patrones sospechosos y crear las alertas de seguridad
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/podman run --rm --name siget-detectar \
+  --secret siget-db-detector-password,mode=0444 --secret siget-ca,mode=0444 \
+  -e DJANGO_SETTINGS_MODULE=config.settings_detector \
+  -e SIGET_DB_DETECTOR_PASSWORD_FILE=/run/secrets/siget-db-detector-password \
+  -e SIGET_DB_SSLROOTCERT=/run/secrets/siget-ca \
+  -e SIGET_CACHE_DIR=/tmp/siget-cache-detector \
+  --read-only --tmpfs /tmp --cap-drop=ALL --security-opt=no-new-privileges \
+  localhost/siget-backend:dev python manage.py detectar_anomalias
