@@ -50,6 +50,7 @@ class Accion(str, Enum):
     VER_MIS_NOTIFICACIONES = "ver_mis_notificaciones"
     VER_ALERTAS = "ver_alertas"
     REVISAR_ALERTA = "revisar_alerta"
+    VER_INDICADORES_INSTITUCION = "ver_indicadores_institucion"
 
 
 # Transiciones válidas de un trámite (espejo de siget.transicion en la base, que es la autoridad).
@@ -245,6 +246,14 @@ def _titular_de_sus_notificaciones(s, a, r, e):
         return Decision(True, "titular_ve_sus_notificaciones")
 
 
+def _indicadores_de_la_institucion(s, a, r, e):
+    """Las cifras agregadas de una institución (conteos y tiempos, sin datos de personas ni identificadores de trámites): solo la supervisión y la
+    coordinación de ESA institución. No exige segundo factor reciente: es lectura de agregados y no cambia nada. La coordinación no ve trámites
+    (la base se lo impide), pero sí estas cifras: salen de una función de la base que vuelve a comprobar el rol vigente."""
+    if a == Accion.VER_INDICADORES_INSTITUCION and r.tipo == "indicadores"             and _roles_en(s, r.institucion_id) & {"supervisor", "coordinador_institucional"}:
+        return Decision(True, "supervision_o_coordinacion_ve_indicadores")
+
+
 _ACCIONES_POR_ROL_PLATAFORMA = {
     "operador_infraestructura": {Accion.ADMINISTRAR_INFRAESTRUCTURA},
     "operador_identidades": {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA, Accion.RESTABLECER_MFA, Accion.EMITIR_INVITACION,
@@ -272,7 +281,7 @@ def _auditor(s, a, r, e):
         return Decision(True, "auditor_consulta")
 
 
-PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _titular_de_sus_datos, _titular_de_su_cuenta, _titular_de_sus_notificaciones, _operadores, _auditor]
+PERMISOS: list[Callable] = [_ciudadano, _personal_de_tramites, _coordinador, _titular_de_sus_datos, _titular_de_su_cuenta, _titular_de_sus_notificaciones, _indicadores_de_la_institucion, _operadores, _auditor]
 
 
 # ----------------------------------------------------------------------------- decisión

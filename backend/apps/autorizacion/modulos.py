@@ -11,7 +11,9 @@ CATALOGO = {
     "bandeja": ("Bandeja de la institución", "Trámites de tu institución: revisarlos y cambiar su estado.", DISPONIBLE),
     "supervision": ("Supervisión", "Reasigna trámites y atiende los escalados de tu institución.", DISPONIBLE),
     "equipo": ("Equipo de la institución", "Personal y roles de tu institución.", DISPONIBLE),
+    "indicadores": ("Indicadores", "Cifras de tu institución: trámites por estado, vencidos, escalados, tiempo de resolución y carga por funcionario.", DISPONIBLE),
     "catalogo_institucion": ("Catálogo de la institución", "Los trámites que ofrece tu institución: crea, edita, activa o desactiva, y consulta quién cambió qué.", DISPONIBLE),
+    "mis_documentos": ("Mis documentos", "Todos los documentos que adjuntaste en tus trámites, con su descarga y el enlace a cada trámite.", DISPONIBLE),
     "mis_datos": ("Mis datos", "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.", DISPONIBLE),
     "seguridad": ("Mi seguridad", "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.", DISPONIBLE),
     "mfa": ("Segundo factor (MFA)", "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.", DISPONIBLE),
@@ -22,6 +24,7 @@ CATALOGO = {
     "consola_catalogo": ("Catálogo", "Alta de instituciones con control dual.", DISPONIBLE),
     "consola_seguridad": ("Respuesta a incidentes", "Bloquea cuentas, revoca sesiones, mira los eventos de seguridad y revisa las alertas.", DISPONIBLE),
     "consola_secretos": ("Custodia de secretos", "Registra la rotación de secretos y avisa cuándo toca.", DISPONIBLE),
+    "ayuda": ("Ayuda", "Preguntas frecuentes en lenguaje llano: trámites, estados, segundo factor, tus datos y, si atiendes trámites, la bandeja.", DISPONIBLE),
     "auditoria": ("Auditoría", "Consulta del registro inalterable de eventos y de decisiones de acceso, y de las alertas de seguridad.", DISPONIBLE),
 }
 
@@ -48,10 +51,10 @@ def modulos_para(rol_plataforma, roles_en_instituciones):
     """`roles_en_instituciones`: los roles (texto) que la persona tiene en cualquier institución."""
     if rol_plataforma != "ninguno":
         # Un rol de plataforma excluye al resto (lo impone la base): sin trámites, solo su consola
-        ids = _POR_ROL_PLATAFORMA.get(rol_plataforma, []) + ["prueba_acceso", *_TRANSPARENCIA]
+        ids = _POR_ROL_PLATAFORMA.get(rol_plataforma, []) + ["prueba_acceso", *_TRANSPARENCIA, "ayuda"]
         return [_entrada(i) for i in ids]
     roles = set(roles_en_instituciones)
-    ids = ["mis_tramites", "nuevo_tramite", "mis_datos"]  # las cuentas de plataforma no tienen perfil de persona: no lo ven
+    ids = ["mis_tramites", "nuevo_tramite", "mis_datos", "mis_documentos"]  # las cuentas de plataforma no tienen perfil de persona ni trámites propios: no los ven
     if roles & {"funcionario", "supervisor"}:
         ids.append("bandeja")
     if "supervisor" in roles:
@@ -60,5 +63,8 @@ def modulos_para(rol_plataforma, roles_en_instituciones):
         ids.append("equipo")
     if "coordinador_institucional" in roles:
         ids.append("catalogo_institucion")  # solo la coordinación gestiona el catálogo; el PDP lo vuelve a decidir en cada petición
+    if roles & {"supervisor", "coordinador_institucional"}:
+        ids.append("indicadores")  # la coordinación tampoco ve trámites, pero sí las cifras agregadas; el PDP y la base lo vuelven a decidir
     ids.extend(_TRANSPARENCIA)
+    ids.append("ayuda")
     return [_entrada(i) for i in ids]
