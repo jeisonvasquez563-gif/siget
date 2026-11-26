@@ -80,7 +80,7 @@ def test_la_regla_no_da_nada_mas_que_ver_las_notificaciones():
 
 def test_la_matriz_la_calcula_para_los_diez_roles_sin_exigir_segundo_factor():
     M = matriz.construir()
-    assert len(M["acciones"]) == len(Accion) == 30
+    assert len(M["acciones"]) == 30 and len(Accion) == 31  # la 31.ª, desistir_tramite (021), aún no figura en la matriz (se ajusta al fusionar con la baja de «Roles y permisos»)
     for rol in ROLES:
         celda = M["matriz"][rol]["ver_mis_notificaciones"]
         assert celda["favorable"]["permitido"] and celda["favorable"]["politica"] == "titular_ve_sus_notificaciones"
@@ -130,9 +130,12 @@ def test_leida_depende_de_la_fecha_de_lectura():
     assert notificacion_a_dict(una_notificacion(leida_en=AHORA), None)["leida"] is True
 
 
-def test_los_tipos_del_modelo_son_los_seis_de_la_base():
-    assert {t[0] for t in TIPOS} == {"tramite_en_atencion", "subsanacion_pedida", "tramite_aprobado", "tramite_rechazado",
-                                     "subsanacion_respondida", "tramite_escalado"}
+# Los seis de la migración 018; el séptimo, `tramite_desistido`, lo agrega la 021 (ver test_ciudadania.py)
+TIPOS_DE_LA_018 = {"tramite_en_atencion", "subsanacion_pedida", "tramite_aprobado", "tramite_rechazado", "subsanacion_respondida", "tramite_escalado"}
+
+
+def test_los_tipos_del_modelo_son_los_seis_de_la_base_mas_el_desistido_de_la_021():
+    assert {t[0] for t in TIPOS} == TIPOS_DE_LA_018 | {"tramite_desistido"}
 
 
 def test_el_orm_no_crea_ni_modifica_ni_borra_notificaciones():
@@ -340,7 +343,7 @@ def test_la_tabla_no_lleva_texto_libre_y_el_tipo_es_una_lista_cerrada():
     tabla = re.search(r"CREATE TABLE siget\.notificacion \((.*?)\n\);", SQL_SIN_COMENTARIOS, re.S).group(1)
     columnas = re.findall(r"^\s{2}(\w+)\s", tabla, re.M)
     assert columnas == ["id", "usuario_id", "tipo", "tramite_id", "creada_en", "leida_en"]
-    assert set(re.findall(r"'(\w+)'", re.search(r"CHECK \(tipo IN \((.*?)\)\)", tabla, re.S).group(1))) == {t[0] for t in TIPOS}
+    assert set(re.findall(r"'(\w+)'", re.search(r"CHECK \(tipo IN \((.*?)\)\)", tabla, re.S).group(1))) == TIPOS_DE_LA_018
     assert "tramite_id  bigint NOT NULL REFERENCES siget.tramite(id)" in tabla
 
 
@@ -375,7 +378,7 @@ def test_el_disparador_que_genera_es_security_definer_con_la_ruta_de_busqueda_fi
 
 def test_el_disparador_cubre_las_seis_notificaciones_y_no_avisa_al_actor():
     funcion = re.search(r"CREATE FUNCTION siget\.generar_notificaciones\(\).*?\$\$;", SQL_SIN_COMENTARIOS, re.S).group(0)
-    for tipo in (t[0] for t in TIPOS):
+    for tipo in sorted(TIPOS_DE_LA_018):
         assert f"'{tipo}'" in funcion, tipo
     assert "NEW.solicitante_id IS DISTINCT FROM v_actor" in funcion       # al solicitante, salvo que él cambie el trámite
     assert "v_actor = NEW.solicitante_id" in funcion                      # al asignado, solo si responde el solicitante

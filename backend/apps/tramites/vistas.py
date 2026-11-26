@@ -35,8 +35,8 @@ from apps.autenticacion.servicio import registrar_evento
 from apps.tramites import almacen, documentos, formulario
 from apps.tramites.models import Documento, Tramite
 
-from .serializacion import (ESTADOS_FINALES, ESTADOS_VALIDOS, calcular_fecha_limite, entero_positivo, evento_a_dict, pagina_de, paginacion,
-                            texto, tramite_a_dict)
+from .serializacion import (ESTADOS_FINALES, ESTADOS_VALIDOS, calcular_fecha_limite, constancia_a_dict, entero_positivo, evento_a_dict, pagina_de,
+                            paginacion, texto, tramite_a_dict)
 
 
 ROLES_QUE_ATIENDEN = {"funcionario", "supervisor"}
@@ -232,6 +232,50 @@ class TramiteSubsanacion(_Base):
         if filas != 1:
             return _error("conflicto", "El trámite cambió mientras se procesaba. Consúltalo de nuevo.", status.HTTP_409_CONFLICT)
         return self._respuesta(tramite.pk)
+
+
+class TramiteDesistir(_Base):
+    """La persona que pidió el trámite desiste de él (migración 021): pasa a «Desistido», un estado final, con un motivo obligatorio.
+    Solo ella (el PDP exige además segundo factor reciente: no se deshace) y mientras el trámite no esté resuelto (409). Todo en una
+    transacción; la base la acota otra vez (política RLS, disparadores y transiciones). Lo ajeno no existe para quien pregunta (404)."""
+
+    def post(self, request, pk):
+        tramite = self._tramite_visible(pk)
+        autorizar(request, Accion.DESISTIR_TRAMITE, _recurso(tramite, "Desistido"))  # primero el PDP: quien no puede desistir no aprende nada del motivo
+        if tramite.estado in ESTADOS_FINALES:
+            return _error("tramite_resuelto", "El trámite ya está resuelto: no se puede desistir de él.", status.HTTP_409_CONFLICT)
+        crudo = _datos(request).get("motivo")
+        if crudo is None:
+            return _error("motivo_obligatorio", f"Indica el `motivo` ({MOTIVO_MINIMO} a {MOTIVO_MAXIMO} caracteres) por el que desistes.",
+                          status.HTTP_400_BAD_REQUEST, {"motivo": "Este campo es obligatorio."})
+        motivo, error = formulario.validar_texto_libre(crudo, MOTIVO_MINIMO, MOTIVO_MAXIMO)
+        if error:
+            return _error("datos_invalidos", f"`motivo`: {error}", status.HTTP_400_BAD_REQUEST, {"motivo": error})
+        try:
+            with transaction.atomic():
+                _fijar_motivo(motivo)
+                # `estado=` en el filtro: si alguien lo cambió entre tanto, no se pisa su cambio (concurrencia optimista).
+                # La base valida la transición, el motivo y que quien actualiza sea la persona solicitante, y escribe la auditoría y el aviso.
+                filas = Tramite.objects.filter(pk=tramite.pk, estado=tramite.estado).update(estado="Desistido")
+        except DatabaseError:
+            return _error("transicion_rechazada", "La base de datos rechazó el desistimiento.", status.HTTP_409_CONFLICT)
+        if filas != 1:
+            return _error("conflicto", "El trámite cambió mientras se procesaba. Consúltalo de nuevo.", status.HTTP_409_CONFLICT)
+        return self._respuesta(tramite.pk)
+
+
+class TramiteConstancia(_Base):
+    """Constancia de presentación: solo para quien pidió el trámite. Lleva número, tipo, institución, fecha y hora de presentación, fecha límite,
+    estado actual, los datos enviados (con las etiquetas de la COPIA del formulario del trámite) y los nombres de los documentos adjuntos."""
+
+    def get(self, request, pk):
+        tramite = self._tramite_visible(pk)
+        # Sin `institucion_id` en el recurso, la regla del personal no aplica: solo quien pidió el trámite lo ve (el personal de la institución recibe 403)
+        autorizar(request, Accion.VER_TRAMITE, Recurso(tipo="tramite", solicitante_id=tramite.solicitante_id))
+        adjuntos = Documento.objects.filter(tramite_id=tramite.pk).order_by("id")
+        respuesta = Response(constancia_a_dict(tramite, adjuntos, timezone.now()))
+        respuesta["Cache-Control"] = "no-store"  # lleva los datos que la persona envió: que ningún intermediario los guarde
+        return respuesta
 
 
 class TramiteReasignar(_Base):

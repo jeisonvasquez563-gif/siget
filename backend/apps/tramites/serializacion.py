@@ -7,8 +7,8 @@ institución ve además los identificadores de las personas y el detalle interno
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-ESTADOS_VALIDOS = {"Pendiente", "En Tramitacion", "En Subsanacion", "Aprobado", "Rechazado"}
-ESTADOS_FINALES = {"Aprobado", "Rechazado"}
+ESTADOS_VALIDOS = {"Pendiente", "En Tramitacion", "En Subsanacion", "Aprobado", "Rechazado", "Desistido"}
+ESTADOS_FINALES = {"Aprobado", "Rechazado", "Desistido"}  # Desistido: la persona solicitante desistió (migración 021)
 LIMITE_DEFECTO, LIMITE_MAXIMO = 20, 100
 BIGINT_MAXIMO = 2**63 - 1
 ZONA_PANAMA = ZoneInfo("America/Panama")
@@ -101,18 +101,44 @@ def tramite_a_dict(tramite, personal, ahora, detalle=False):
     return datos
 
 
+def datos_con_etiquetas(formulario, datos):
+    """Lo que la persona respondió, en el orden del formulario y con las etiquetas de ESE formulario (la copia del trámite): una lista de
+    `{id, etiqueta, tipo, valor}`. Solo los campos respondidos; lo que ya no está en el formulario no se inventa ni se muestra."""
+    datos = datos if isinstance(datos, dict) else {}
+    respondidos = []
+    for campo in formulario if isinstance(formulario, list) else []:
+        if isinstance(campo, dict) and campo.get("id") in datos:
+            respondidos.append({"id": campo["id"], "etiqueta": campo.get("etiqueta", campo["id"]), "tipo": campo.get("tipo"), "valor": datos[campo["id"]]})
+    return respondidos
+
+
+def constancia_a_dict(tramite, documentos, ahora):
+    """Constancia de presentación: lo que consta del trámite al pedirla, para quien lo presentó. `documentos`: los adjuntos (solo sus nombres)."""
+    return {
+        "numero": tramite.pk,
+        "tipo_tramite": {"id": tramite.tipo_tramite_id, "nombre": tramite.tipo_tramite.nombre},
+        "institucion": {"id": tramite.institucion_id, "nombre": tramite.institucion.nombre},
+        "presentado_en": _iso(tramite.creado_en),
+        "fecha_limite": _iso(tramite.fecha_limite),
+        "estado": tramite.estado,
+        "datos": datos_con_etiquetas(tramite.formulario, tramite.datos),
+        "documentos": [{"id": d.pk, "nombre": d.nombre} for d in documentos],
+        "emitida_en": _iso(ahora),
+    }
+
+
 def _motivo_de(atributos):
     motivo = atributos.get("motivo") if isinstance(atributos, dict) else None
     return motivo if isinstance(motivo, str) else None
 
 
 def _motivo_para_la_persona(evento):
-    """La persona que pidió el trámite lee el motivo solo cuando es para ella: al rechazarlo, al pedirle una subsanación, y al cerrarla
-    (la respuesta de ella misma o el cierre del personal, ambos En Subsanacion -> En Tramitacion). El resto de los motivos son
-    comentarios internos del personal (y texto libre que podría llevar datos de terceros): no se le muestran."""
+    """La persona que pidió el trámite lee el motivo solo cuando es para ella: al rechazarlo, al pedirle una subsanación, al cerrarla
+    (la respuesta de ella misma o el cierre del personal, ambos En Subsanacion -> En Tramitacion) y al desistir (son sus propias palabras).
+    El resto de los motivos son comentarios internos del personal (y texto libre que podría llevar datos de terceros): no se le muestran."""
     if evento.accion != "cambio_estado":
         return None
-    destino_para_ella = evento.estado_nuevo in {"Rechazado", "En Subsanacion"}
+    destino_para_ella = evento.estado_nuevo in {"Rechazado", "En Subsanacion", "Desistido"}
     cierre_de_subsanacion = evento.estado_anterior == "En Subsanacion" and evento.estado_nuevo == "En Tramitacion"
     return _motivo_de(evento.atributos) if destino_para_ella or cierre_de_subsanacion else None
 
