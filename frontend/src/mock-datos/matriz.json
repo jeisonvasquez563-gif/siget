@@ -193,6 +193,12 @@
                     "estado": "disponible"
                 },
                 {
+                    "id": "catalogo_institucion",
+                    "nombre": "Catálogo de la institución",
+                    "descripcion": "Los trámites que ofrece tu institución: crea, edita, activa o desactiva, y consulta quién cambió qué.",
+                    "estado": "disponible"
+                },
+                {
                     "id": "seguridad",
                     "nombre": "Mi seguridad",
                     "descripcion": "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.",
@@ -4064,6 +4070,15 @@
             "estado": "disponible",
             "roles": [
                 "supervisor",
+                "coordinador_institucional"
+            ]
+        },
+        {
+            "id": "catalogo_institucion",
+            "nombre": "Catálogo de la institución",
+            "descripcion": "Los trámites que ofrece tu institución: crea, edita, activa o desactiva, y consulta quién cambió qué.",
+            "estado": "disponible",
+            "roles": [
                 "coordinador_institucional"
             ]
         },

@@ -38,7 +38,7 @@ def test_al_crear_el_nombre_y_el_plazo_son_obligatorios():
     assert limpio is None and errores == {"nombre": "Este campo es obligatorio.", "sla_dias": "Este campo es obligatorio."}
 
 
-@pytest.mark.parametrize("nombre", ["", "ab", "  ab  ", "x" * 151, 5, ["Permiso"], "Con\nsalto", "con\x00control", "‍‌‍‍", True])
+@pytest.mark.parametrize("nombre", ["", "ab", "  ab  ", "x" * 151, 5, ["Permiso"], "Con\nsalto", "con\x00control", "\u200d\u200c\u200d\u200d", True])
 def test_nombre_invalido(nombre):
     limpio, errores = gestion.validar({**VALIDO, "nombre": nombre})
     assert limpio is None and "nombre" in errores
@@ -197,9 +197,9 @@ def test_los_errores_no_repiten_lo_recibido():
 
 def test_los_caracteres_de_control_y_los_invisibles_no_pasan_en_etiquetas_ni_opciones():
     assert "formulario.0.etiqueta" in gestion.validar_formulario([campo(etiqueta="a\x00b")])[1]
-    assert "formulario.0.etiqueta" in gestion.validar_formulario([campo(etiqueta="a‮b")])[1]
+    assert "formulario.0.etiqueta" in gestion.validar_formulario([campo(etiqueta="a\u202eb")])[1]
     assert "formulario.0.etiqueta" in gestion.validar_formulario([campo(etiqueta="a\nb")])[1]
-    assert "formulario.0.opciones" in gestion.validar_formulario([{"id": "s", "etiqueta": "S", "tipo": "seleccion", "opciones": ["a‮b"]}])[1]
+    assert "formulario.0.opciones" in gestion.validar_formulario([{"id": "s", "etiqueta": "S", "tipo": "seleccion", "opciones": ["a\u202eb"]}])[1]
 
 
 # --------------------------------------------------------------------------- salida

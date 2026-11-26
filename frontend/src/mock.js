@@ -9,6 +9,7 @@
 
 import matrizEjemplo from './mock-datos/matriz.json'
 import { derechosMock, MENSAJE_ACEPTA_AVISO } from './mock-derechos.js'
+import { catalogoMock } from './mock-catalogo.js'
 import { equipoMock } from './mock-equipo.js'
 import { notificacionesMock } from './mock-notificaciones.js'
 import { plataformaMock } from './mock-plataforma.js'
@@ -53,6 +54,7 @@ const MODULOS = {
   bandeja: ['Bandeja de la institución', 'Trámites de tu institución: revisarlos y cambiar su estado.', 'disponible'],
   supervision: ['Supervisión', 'Reasigna trámites y atiende los escalados de tu institución.', 'disponible'],
   equipo: ['Equipo de la institución', 'Personal y roles de tu institución.', 'disponible'],
+  catalogo_institucion: ['Catálogo de la institución', 'Los trámites que ofrece tu institución: crea, edita, activa o desactiva, y consulta quién cambió qué.', 'disponible'],
   mis_datos: ['Mis datos', 'Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.', 'disponible'],
   seguridad: ['Mi seguridad', 'Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.', 'disponible'],
   mfa: ['Segundo factor (MFA)', 'Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.', 'disponible'],
@@ -79,6 +81,7 @@ function modulosDe(u) {
     if (roles.some((r) => r === 'funcionario' || r === 'supervisor')) ids.push('bandeja')
     if (roles.includes('supervisor')) ids.push('supervision')
     if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('equipo')
+    if (roles.includes('coordinador_institucional')) ids.push('catalogo_institucion')
     ids.push('seguridad', 'mfa', 'roles_permisos')
   }
   return ids.map((id) => ({ id, nombre: MODULOS[id][0], descripcion: MODULOS[id][1], estado: MODULOS[id][2] }))
@@ -210,6 +213,14 @@ export function instalarMock(inicial, opciones = {}) {
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
     negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
   })
+  // El catálogo se puede cambiar en la sesión de ejemplo (la coordinación crea, edita y desactiva): cada instalación parte de una copia
+  const tipos = structuredClone(TIPOS)
+  const catalogo = catalogoMock({
+    usuarios: USUARIOS, actual: () => actual, hace, mfaFresco: () => mfaFresco, tipos: () => tipos,
+    resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
+    negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
+    pideCodigo: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: true }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
+  })
   const equipo = equipoMock({
     usuarios: USUARIOS, actual: () => actual, tramites: () => TRAMITES,
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
@@ -321,12 +332,14 @@ export function instalarMock(inicial, opciones = {}) {
       return resp(200, { eventos: eventos.map(([evento, min], i) => ({ id: 100 - i, evento, creado_en: hace(min * 60000), ip: '192.168.100.10' })) })
     }
     if (camino === '/catalogo/instituciones/') return resp(200, INSTITUCIONES)
-    if (camino === '/catalogo/tipos-tramite/') return resp(200, TIPOS.filter((t) => !p.get('institucion') || String(t.institucion.id) === p.get('institucion')))
+    if (camino === '/catalogo/tipos-tramite/') return resp(200, tipos.filter((t) => t.activo !== false && (!p.get('institucion') || String(t.institucion.id) === p.get('institucion'))))
     if (camino === '/equipo/') return equipo.listar(u)
     const deNotificaciones = notificaciones.manejar(u, camino, metodo, p)
     if (deNotificaciones) return deNotificaciones
     const deEquipo = equipo.manejar(camino, metodo, cuerpo)
     if (deEquipo) return deEquipo
+    const deCatalogo = catalogo.manejar(camino, metodo, cuerpo, p)
+    if (deCatalogo) return deCatalogo
     if (camino === '/tramites/' && metodo === 'GET') {
       if (u.plataforma !== 'ninguno') return negado()
       if (!paginacionValida(p)) return resp(400, { codigo: 'paginacion_invalida', detalle: 'limite (1 a 100) y desplazamiento deben ser enteros válidos.' })
@@ -334,10 +347,11 @@ export function instalarMock(inicial, opciones = {}) {
       return resp(200, paginar(lista, p))
     }
     if (camino === '/tramites/' && metodo === 'POST') {
-      const tipo = TIPOS.find((t) => t.id === cuerpo.tipo_tramite)
+      const tipo = tipos.find((t) => t.id === cuerpo.tipo_tramite)
       if (!tipo) return resp(404, { codigo: 'tipo_tramite_inexistente' })
       if (u.membresias.some((m) => m.institucion_id === tipo.institucion.id)) return negado()
       if (u.membresias.length > 0 ? tipo.audiencia === 'ciudadania' : tipo.audiencia === 'institucion') return negado()
+      if (tipo.activo === false) return resp(400, { codigo: 'tipo_tramite_inactivo', detalle: 'Ese trámite ya no se ofrece. Elige otro del catálogo.' })
       const { limpios, errores } = validarDatos(tipo.formulario, cuerpo.datos ?? {})
       if (!limpios) return resp(400, respuestaDatosInvalidos(errores))
       const t = T(siguiente++, tipo.id, 'Pendiente', u.id, null, 0, tipo.sla_dias)
