@@ -13,7 +13,7 @@ const SECRETOS = {
 }
 const DIA = 86400000
 
-export function plataformaMock({ usuarios, actual, resp, negado, hace }) {
+export function plataformaMock({ usuarios, actual, resp, negado, hace, mfaFresco = () => true }) {
   const personas = Object.entries(usuarios).map(([usuario, u]) => ({
     id: u.id, usuario, estado_cuenta: 'activa', rol_plataforma: u.plataforma, mfa_activo: true, sesiones_activas: 1, bloqueada_hasta: null,
   }))
@@ -28,6 +28,30 @@ export function plataformaMock({ usuarios, actual, resp, negado, hace }) {
     id: 90 - i, creado_en: hace((i + 1) * 420000), evento, usuario: ['ana.ciudadana', 'fabio.mop', 'beto.ciudadano'][i % 3], ip: '192.168.100.10',
   }))
   let sigAprobacion = 3
+  // Alertas del detector (migración 019). Datos de ejemplo: solo contadores y nombres, nunca contraseñas ni datos personales
+  const idDe = (nombre) => usuarios[nombre]?.id ?? null
+  const alertas = [
+    { id: 6, regla: 'bloqueos_repetidos', severidad: 'alta', persona: { id: idDe('fabio.mop'), usuario: 'fabio.mop' }, ip: null, conteo: 2, primera_vez: hace(5 * 3600000), ultima_vez: hace(2 * 3600000),
+      detalle: { ventana_minutos: 1440, umbral: 2, por_nombre: { cuenta_bloqueada: 2 } }, estado: 'abierta', revisada_por: null, revisada_en: null, nota: null },
+    { id: 5, regla: 'denegaciones_persona', severidad: 'media', persona: { id: idDe('beto.ciudadano'), usuario: 'beto.ciudadano' }, ip: null, conteo: 7, primera_vez: hace(14 * 60000), ultima_vez: hace(9 * 60000),
+      detalle: { ventana_minutos: 10, umbral: 5, por_nombre: { sin_regla_que_permita: 5, conflicto_de_interes: 2 } }, estado: 'abierta', revisada_por: null, revisada_en: null, nota: null },
+    { id: 4, regla: 'reuso_token_refresco', severidad: 'alta', persona: { id: idDe('ana.ciudadana'), usuario: 'ana.ciudadana' }, ip: null, conteo: 1, primera_vez: hace(40 * 60000), ultima_vez: hace(40 * 60000),
+      detalle: { ventana_minutos: 1440, umbral: 1, por_nombre: { refresh_reuso: 1 } }, estado: 'abierta', revisada_por: null, revisada_en: null, nota: null },
+    { id: 3, regla: 'rafaga_login_fallido_ip', severidad: 'media', persona: null, ip: '198.51.100.23', conteo: 14, primera_vez: hace(3 * 3600000), ultima_vez: hace(3 * 3600000 - 480000),
+      detalle: { ventana_minutos: 10, umbral: 10, por_nombre: { login_fallido: 11, cambio_contrasena_fallido: 3 } }, estado: 'abierta', revisada_por: null, revisada_en: null, nota: null },
+    { id: 2, regla: 'rafaga_login_fallido_ip', severidad: 'media', persona: null, ip: '203.0.113.9', conteo: 12, primera_vez: hace(2 * DIA), ultima_vez: hace(2 * DIA - 420000),
+      detalle: { ventana_minutos: 10, umbral: 10, por_nombre: { login_fallido: 12 } }, estado: 'revisada', revisada_por: { id: idDe('sergio.seguridad'), usuario: 'sergio.seguridad' }, revisada_en: hace(2 * DIA - 3600000),
+      nota: 'Eran las pruebas de carga del equipo de calidad.' },
+    { id: 1, regla: 'denegaciones_persona', severidad: 'media', persona: { id: idDe('fabio.mop'), usuario: 'fabio.mop' }, ip: null, conteo: 5, primera_vez: hace(5 * DIA), ultima_vez: hace(5 * DIA - 300000),
+      detalle: { ventana_minutos: 10, umbral: 5, por_nombre: { sin_regla_que_permita: 5 } }, estado: 'descartada', revisada_por: { id: idDe('sergio.seguridad'), usuario: 'sergio.seguridad' }, revisada_en: hace(5 * DIA - 7200000),
+      nota: 'Falso positivo: probaba un trámite de otra institución.' },
+  ]
+  const pideCodigo = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: true })
+  const entero = (valor, defecto, minimo, maximo) => {
+    if (valor === null) return defecto
+    return /^\d+$/.test(valor) && Number(valor) >= minimo && Number(valor) <= maximo ? Number(valor) : null
+  }
+
 
   const estadoSecreto = (ultima, frecuencia) => {
     if (!ultima) return { estado: 'sin_registro', dias_restantes: null }
@@ -73,6 +97,33 @@ export function plataformaMock({ usuarios, actual, resp, negado, hace }) {
       }
       const cuantas = p.sesiones_activas; p.sesiones_activas = 0
       return resp(200, { codigo: 'sesiones_revocadas', cuantas })
+    }
+    if (camino === '/plataforma/alertas/' && metodo === 'GET') {
+      // Igual que el servidor: el operador de seguridad y el auditor las ven, con segundo factor reciente (el auditor, además, nivel 3)
+      if (!['operador_seguridad', 'auditor'].includes(rol)) return negado()
+      if (!mfaFresco()) return pideCodigo()
+      const estado = parametros.get('estado') || ''
+      const limite = entero(parametros.get('limite'), 20, 1, 100)
+      const desplazamiento = entero(parametros.get('desplazamiento'), 0, 0, 1000000)
+      if (limite === null || desplazamiento === null) return resp(400, { codigo: 'paginacion_invalida', detalle: 'limite (1 a 100) y desplazamiento deben ser enteros válidos.' })
+      if (estado && !['abierta', 'revisada', 'descartada'].includes(estado)) return resp(400, { codigo: 'datos_invalidos', errores: ['el estado debe ser «abierta», «revisada» o «descartada»'] })
+      const filtradas = alertas.filter((a) => !estado || a.estado === estado).sort((a, b) => new Date(b.ultima_vez) - new Date(a.ultima_vez) || b.id - a.id)
+      return resp(200, { resultados: filtradas.slice(desplazamiento, desplazamiento + limite), total: filtradas.length, abiertas: alertas.filter((a) => a.estado === 'abierta').length, limite, desplazamiento })
+    }
+    const revisar = camino.match(/^\/plataforma\/alertas\/(\d+)\/revisar\/$/)
+    if (revisar && metodo === 'POST') {
+      if (rol !== 'operador_seguridad') return negado() // solo el operador de seguridad revisa; el auditor no
+      if (!mfaFresco()) return pideCodigo()
+      const a = alertas.find((x) => x.id === Number(revisar[1]))
+      if (!a) return resp(404, { detalle: 'No encontrado.' })
+      const nota = typeof cuerpo.nota === 'string' ? cuerpo.nota.trim() : ''
+      const errores = []
+      if (!['revisada', 'descartada'].includes(cuerpo.estado)) errores.push('el estado debe ser «revisada» o «descartada»')
+      if (nota.length < 3 || nota.length > 1000) errores.push('la nota debe tener de 3 a 1000 caracteres')
+      if (errores.length) return resp(400, { codigo: 'datos_invalidos', errores })
+      if (a.estado !== 'abierta') return resp(409, { codigo: 'ya_revisada', detalle: 'Esta alerta ya fue revisada o descartada.' })
+      Object.assign(a, { estado: cuerpo.estado, nota, revisada_por: { id: yo.id, usuario: actual() }, revisada_en: new Date().toISOString() })
+      return resp(200, { codigo: `alerta_${cuerpo.estado}`, id: a.id, estado: a.estado })
     }
     if (camino === '/plataforma/eventos/') return rol === 'operador_seguridad' ? resp(200, { eventos }) : negado()
     if (camino === '/plataforma/invitaciones/') {

@@ -1,0 +1,14 @@
+# Alertas: migracion 019, pruebas de la base y pg_hba de detector_role (26-nov-2026)
+# 2026-11-26 11:41:41  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/a019/paso2.sh
+== 4. Migracion 019 real (11:41)
+COMMIT CREATE ROLE COMMIT 
+== 5. Las mismas pruebas sobre la base migrada (terminan en ROLLBACK)
+RESUMEN: 57 de 57 comprobaciones PASAN, 0 FALLAN
+NOTICE:  RESUMEN: 57 de 57 comprobaciones PASAN, 0 FALLAN
+regresion: escalamiento 10 PASA / 0 FALLA; notificaciones 36 PASA / 0 FALLA
+== 6. pg_hba.conf: linea de detector_role escrita en el MISMO inodo
+inodo antes 50628156, despues 50628156, permisos 644
+9 detector_role sin error
+log_statement = none
+# código de salida: 0

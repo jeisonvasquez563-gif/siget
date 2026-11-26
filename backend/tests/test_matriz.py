@@ -87,9 +87,9 @@ def test_el_control_dual_impide_aprobar_lo_propio():
 def test_cada_operador_de_plataforma_tiene_solo_su_area():
     esperado = {
         "operador_infraestructura": {Accion.ADMINISTRAR_INFRAESTRUCTURA},
-        "operador_seguridad": {Accion.BLOQUEAR_CUENTA, Accion.REVOCAR_SESION},
+        "operador_seguridad": {Accion.BLOQUEAR_CUENTA, Accion.REVOCAR_SESION, Accion.VER_ALERTAS, Accion.REVISAR_ALERTA},
         "custodio_secretos": {Accion.ROTAR_SECRETOS},
-        "auditor": {Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES},
+        "auditor": {Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES, Accion.VER_ALERTAS},
     }
     for rol, acciones in esperado.items():
         # cambiar la propia contraseña y ver las propias notificaciones las tiene toda cuenta: no son parte de su área
@@ -99,7 +99,7 @@ def test_cada_operador_de_plataforma_tiene_solo_su_area():
 
 def test_el_auditor_solo_lee_y_no_puede_hacer_nada_mas():
     for a in Accion:
-        if a not in (Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES, Accion.CAMBIAR_CONTRASENA, Accion.VER_MIS_NOTIFICACIONES):
+        if a not in (Accion.CONSULTAR_AUDITORIA, Accion.CONSULTAR_DECISIONES, Accion.VER_ALERTAS, Accion.CAMBIAR_CONTRASENA, Accion.VER_MIS_NOTIFICACIONES):
             assert celda("auditor", a)["permitido"] is False, a
 
 

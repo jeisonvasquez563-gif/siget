@@ -2071,3 +2071,161 @@ Aplicado el **24 de noviembre de 2026**, a las 15:17, lejos de la hora en punto 
 **Volver atrás:** imagen `respaldo-2026-11-24d` como `dev` y reiniciar el backend; interfaz desde `frontend.respaldo-2026-11-24d`; nginx con `sudo sh -c 'cat /home/siget/config/nginx.conf.respaldo-2026-11-24 > /home/siget/config/nginx.conf'` y `nginx -s reload`. El backend anterior funciona con la base migrada.
 
 **Lección:** toda ruta nueva de primer nivel (`/algo/`) necesita tres cambios: la vista en Django, la lista de `location` de `infra/podman/vm1-app-backend/nginx.conf` y la lista `rutas` de `frontend/vite.config.js`. El ensayo ahora pide `/notificaciones/` con sesión real; las rutas nuevas futuras deberían sumar una comprobación igual.
+
+## 43. Alertas ante patrones sospechosos: aplicar la migración 019 y el temporizador del detector (PT-10)
+
+**Estado: aplicado en producción el 26 de noviembre de 2026** (registro en 43.10).
+
+### 43.1 Qué cambia y en qué orden hay que aplicarlo
+
+La migración [`019-alertas-seguridad.sql`](../database/migraciones/019-alertas-seguridad.sql) crea la tabla `siget.alerta_seguridad`, dos índices nuevos para los filtros por tiempo (`evento_seguridad (evento, creado_en)` y `decision_pdp (creado_en) WHERE NOT permitido`), la función `siget.detectar_anomalias()` (`SECURITY DEFINER`, ruta de búsqueda fija, sin `EXECUTE` para `PUBLIC`), el auxiliar `siget.es_operador_seguridad()`, el disparador de revisión, la seguridad por filas y el rol `detector_role` (`LOGIN`, **solo `EXECUTE` sobre esa función**). La contraseña del rol **no** va en la migración (43.5). El temporizador es el mismo modelo que el del escalamiento (sección 35): un contenedor desechable con la imagen del backend, solo dos secretos (`siget-db-detector-password` y `siget-ca`) y `config.settings_detector`, que se niega a arrancar si le llegan las claves reales de Django, JWT o el segundo factor.
+
+**La base va primero, el código después.** El backend nuevo lee la tabla nueva (`GET /plataforma/alertas/`): sin la migración, esas rutas darían error 500 (el resto sigue igual). El backend **viejo** funciona con la base ya migrada: la migración solo agrega una tabla, índices, funciones y un rol, y nada de lo que ya existía cambia. **Esto se razonó leyendo las migraciones; no se ejecutó**: se comprueba en 43.4 y 43.6. El temporizador va **al final**, después de desplegar la imagen que trae `manage.py detectar_anomalias` (43.7): antes, la unidad fallaría.
+
+**No hay ruta de primer nivel nueva:** las alertas viven bajo `/plataforma/`, que ya está en la lista de `location` de `infra/podman/vm1-app-backend/nginx.conf` y en `frontend/vite.config.js`. De todos modos, el ensayo (`demo/ensayo.py`) pide `/plataforma/alertas/` con la sesión del operador de seguridad para comprobar que atraviesa nginx (lección de 42.9).
+
+### 43.2 Respaldo previo, verificado
+
+Igual que 42.2: `systemctl start siget-respaldo.service` en VM2, comprobar que terminó bien, y un respaldo manual con sello `pre-019` que la retención de 14 días no borra:
+
+```bash
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/pre-019-tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+No seguir si el respaldo no se pudo restaurar. Los archivos tienen permisos 600 y **no van al repositorio**.
+
+### 43.3 Ensayo con `ROLLBACK`, junto con las pruebas
+
+La migración tiene **dos** transacciones (la tabla y las funciones, y después el rol, porque crear un rol requiere el superusuario y no el dueño). Para ensayarla entera en una sola transacción hay que cambiar el primer `COMMIT;` por `RESET ROLE;` (el rol se crea como superusuario), quitar el segundo `COMMIT;` y el segundo `BEGIN;`, y pegar las pruebas sin su propio `BEGIN;` (ya terminan en `ROLLBACK;`):
+
+```bash
+{ sed -e '0,/^COMMIT;$/s//RESET ROLE;/' -e '/^COMMIT;$/d' -e '0,/^BEGIN;$/!{/^BEGIN;$/d}' database/migraciones/019-alertas-seguridad.sql
+  sed '1,/^BEGIN;$/d' database/pruebas-alertas.sql; } > /tmp/019-ensayo.sql
+cat /tmp/019-ensayo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Debe terminar en `ROLLBACK` sin errores y con `RESUMEN: N de N comprobaciones PASAN, 0 FALLAN`. Después, confirmar que no quedó nada: `\d siget.alerta_seguridad` debe decir que no existe la relación, `\du detector_role` que no hay ese rol y `\df siget.detectar_anomalias` que no hay función.
+
+Las pruebas **corren `detectar_anomalias()` sobre toda la base** (como `detector_role`), así que también procesan los eventos reales de la última hora y del último día; las alertas que cree por ellos se revierten con el `ROLLBACK`. Sus comprobaciones filtran por personas `p019_*` y por IP de documentación (`192.0.2.0/24`), de modo que no dependen de que haya o no eventos reales. Conviene correrlas **lejos de los minutos múltiplos de 5** si el temporizador ya estuviera instalado: si coinciden, uno espera al otro por el índice único. No se usa `psql -1`.
+
+**Es la primera vez que el script corre contra PostgreSQL** (se escribió sin poder ejecutarlo): si algo falla, revisar primero si es un error de la prueba y no de la migración. Dos puntos en los que más conviene mirar: la sintaxis de la consulta del detector (`WINDOW` con `RANGE BETWEEN interval … PRECEDING`) y que `ON CONFLICT (…) WHERE estado = 'abierta'` reconozca el índice parcial de expresiones.
+
+### 43.4 Migración real y pruebas de la base
+
+**Aplicarla fuera de la hora de mayor uso.** Los dos `CREATE INDEX` de la migración (sobre `evento_seguridad` y `decision_pdp`, tablas de auditoría) **bloquean las escrituras de esa tabla mientras se construyen** (no usan `CONCURRENTLY`, que no corre dentro de la transacción de la migración); en la demo son tablas chicas y dura un instante, pero con más volumen conviene una ventana tranquila.
+
+```bash
+cat database/migraciones/019-alertas-seguridad.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+cat database/pruebas-alertas.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Todas deben decir `PASA`. Comprobar además, **con un login real de `app_role`** (regla del README de migraciones) y no solo como superusuario:
+
+- `\dp siget.alerta_seguridad`: `app_role` con `r` (`SELECT`) y `w` solo en `estado`, `revisada_por`, `revisada_en` y `nota`; `auditor_role` solo `r`; **ningún** permiso para `pgadmin_lectura`, `escalador_role`, `checkpoint_app` ni `detector_role`.
+- `select count(*) from siget.alerta_seguridad;` como `app_role` **sin contexto** debe dar `0` (la seguridad por filas no muestra nada sin un operador de seguridad en `app.usuario_id`).
+- `\du detector_role`: sin superusuario, sin `Create role`, sin `Create DB`, sin `Bypass RLS`, límite de 2 conexiones. Todavía **sin contraseña** (se fija en 43.5), así que no puede entrar.
+- Las pruebas de la base que ya existían siguen en verde (`database/pruebas-escalamiento.sql` y `database/pruebas-notificaciones.sql`).
+
+Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
+
+### 43.5 Contraseña de `detector_role`, `pg_hba.conf` y secreto en VM1
+
+Igual que 35.3, y con el mismo cuidado: **la contraseña no se muestra ni se guarda en un archivo**.
+
+1. **VM2, `pg_hba.conf`: editar en el mismo inodo.** El archivo está montado en el contenedor por inodo. Si se reemplaza (con `install`, `mv` o un editor que escribe un archivo nuevo), el contenedor sigue viendo el viejo y `pg_reload_conf()` no alcanza. Por eso se **agrega al final con `tee -a`**, que escribe en el archivo existente, tras un respaldo:
+
+   ```bash
+   sudo cp -p /home/siget/config/pg_hba.conf /home/siget/config/pg_hba.conf.respaldo-AAAA-MM-DD
+   echo 'hostssl  tramites_demo  detector_role  <IP_INTERNA_VM1>/32  scram-sha-256' | sudo tee -a /home/siget/config/pg_hba.conf >/dev/null
+   ls -li /home/siget/config/pg_hba.conf        # el número de inodo debe ser el mismo que antes
+   psql-contenedor.sh -d tramites_demo -c "SELECT pg_reload_conf();"
+   psql-contenedor.sh -d tramites_demo -c "SELECT line_number, type, user_name, error FROM pg_hba_file_rules WHERE array_to_string(user_name, ',') LIKE '%detector_role%';"
+   ```
+
+   La línea debe aparecer sin error (usa la misma IP interna de VM1 que las de `auditor_role` y `escalador_role`). El archivo debe seguir en `644`. Si la recarga no la toma, reiniciar `siget-postgres.service` (reaplica la etiqueta `:Z`).
+2. **VM2, contraseña:** comprobar primero que el registro de sentencias está apagado (`SHOW log_statement;` debe decir `none`), generarla y fijarla por la entrada estándar de psql, y pasarla por una tubería SSH a VM1, **sin imprimirla**:
+
+   ```bash
+   PW=$(openssl rand -base64 33 | tr -d '/+=\n' | cut -c1-40)
+   printf "ALTER ROLE detector_role PASSWORD '%s';\n" "$PW" | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+   printf %s "$PW" | ssh siget@<VM1> 'podman secret create siget-db-detector-password -'
+   unset PW
+   ```
+3. **VM1, comprobar** (como `siget`): `podman secret ls` lista `siget-db-detector-password` y `siget-ca`. No se lee su valor.
+
+### 43.6 Imagen candidata y verificaciones (VM1)
+
+Con la base ya migrada, en VM1: guardar la imagen en uso (`podman tag localhost/siget-backend:dev localhost/siget-backend:respaldo-AAAA-MM-DD`, ver 39.10), reconstruir con el código nuevo y correr cada comando contra la base real (todos se revierten) **antes de reiniciar**:
+
+1. `verificar_esquema`: el modelo `AlertaSeguridad` coincide con la tabla.
+2. `verificar_plataforma`: trae el método nuevo `_alertas` (la API lista y revisa, la ciudadanía y los demás operadores reciben 403, el auditor lee por su conexión, `app_role` no inserta ni borra ni reabre, y la revisión exige nota). **Es la primera vez que corre contra la base real** (lección de 40.9): si falla, revisar primero si es un error del paso y no de la base. **Limitación conocida:** `app_role` no puede crear alertas (solo las inserta la función del detector, que corre como `detector_role`), así que la revisión de punta a punta usa una alerta real **abierta** si existe (todo se revierte) y, si no hay ninguna, el paso lo dice y esa parte queda cubierta por `pruebas-alertas.sql`.
+3. `verificar_politicas` (el simulador ahora lista **30** acciones), `verificar_autenticacion`, `verificar_tramites`, `verificar_equipo`, `verificar_auditoria` e `verificar_integracion` como regresión.
+4. El propio detector, con la imagen candidata y el rol de verdad (esta corrida **sí deja alertas** reales, y es lo que se quiere: ver 43.9):
+
+   ```bash
+   podman run --rm --secret siget-db-detector-password,mode=0444 --secret siget-ca,mode=0444 \
+     -e DJANGO_SETTINGS_MODULE=config.settings_detector -e SIGET_DB_DETECTOR_PASSWORD_FILE=/run/secrets/siget-db-detector-password \
+     -e SIGET_DB_SSLROOTCERT=/run/secrets/siget-ca -e SIGET_CACHE_DIR=/tmp/siget-cache-detector \
+     --read-only --tmpfs /tmp --cap-drop=ALL --security-opt=no-new-privileges \
+     localhost/siget-backend:<etiqueta-candidata> python manage.py detectar_anomalias
+   ```
+
+   Debe imprimir `detectar_anomalias: N alerta(s) creada(s) o actualizada(s)`. Repetirlo enseguida debe dar `0` (idempotente).
+
+Si algún paso falla, **no desplegar**.
+
+### 43.7 Despliegue, temporizador y ensayo
+
+1. `desplegar.sh` (backend e interfaz; devuelve la inactividad a 10 minutos, ver 34.2). Backend e interfaz pueden ir juntos o separados: la interfaz nueva sin el backend nuevo muestra el panel con un error (las rutas no existen); el backend nuevo con la interfaz vieja no se nota.
+2. VM1, como `siget`: copiar `siget-detectar.service` y `siget-detectar.timer` (de `infra/podman/vm1-app-backend/`) a `~/.config/systemd/user/` y activar el temporizador:
+
+   ```bash
+   systemctl --user daemon-reload && systemctl --user enable --now siget-detectar.timer
+   systemctl --user start siget-detectar.service && journalctl --user -u siget-detectar -n 5
+   systemctl --user list-timers siget-detectar.timer
+   ```
+
+   La unidad usa la imagen `localhost/siget-backend:dev`, así que el temporizador debe activarse **después** de desplegar la imagen nueva. Con `Persistent=true`, si la VM estaba apagada corre al encender.
+3. El ensayo (`demo/ensayo.py`): trae tres comprobaciones nuevas sobre la consola de alertas (responde al operador de seguridad **atravesando nginx**, sin sesión da 401 y identidades recibe 403). **No revisa alertas reales.**
+
+### 43.8 Qué hacer si algo sale mal
+
+- **La migración falla:** al ser transacciones, no queda nada a medias en cada una (si fallara solo la segunda, queda la tabla sin el rol: se crea el rol a mano con el mismo bloque y se sigue); se corrige y se repite el ensayo.
+- **Hay que detener la detección:** `systemctl --user disable --now siget-detectar.timer` no toca datos. Las alertas ya creadas quedan (son evidencia y nadie las borra).
+- **Hay que volver atrás el código:** `podman tag localhost/siget-backend:respaldo-AAAA-MM-DD localhost/siget-backend:dev`, reiniciar el backend (como `siget`) y restaurar la interfaz desde su respaldo. La base migrada funciona con el backend anterior (43.1).
+- **Se sospecha del rol:** `ALTER ROLE detector_role NOLOGIN` lo deja sin entrar y no toca nada más.
+- **Si la función diera problemas**, se corrige hacia adelante; revertir la base es la última opción (restaurar `pre-019`, **perdiendo todo lo posterior**: avisar antes). No se hace `DROP` a mano en producción.
+
+### 43.9 Gotchas y riesgos aceptados
+
+- **Las crea la base, no la aplicación.** `app_role` no puede insertar alertas: solo `detector_role`, ejecutando la función. Cualquier `INSERT` a mano en `psql` como superusuario también valdría, pero nada lo hace.
+- **Una alerta abierta por (regla, persona, IP).** Si el patrón sigue, se actualizan `conteo` y `ultima_vez`; no se crean más. `conteo` es el **máximo de eventos en una ventana** (10 minutos o 24 horas según la regla), no el total desde la primera vez.
+- **Lo revisado no se repite con los mismos eventos.** Una alerta revisada o descartada se acuerda hasta su `ultima_vez`; si el patrón continúa, los eventos **posteriores** abren una alerta nueva. Es lo que se quiere: una ráfaga que sigue después de revisarla merece otra alerta.
+- **Ventana de lo que se mira.** Las reglas de 10 minutos revisan la **última hora** y las de 24 horas, el último día. Si el temporizador estuvo detenido más de eso, una ráfaga vieja ya no se detecta. Los eventos solo son visibles al confirmarse la transacción que los escribió, pero como cada corrida mira toda la ventana, uno que se confirma tarde se ve en la corrida siguiente.
+- **Las primeras corridas pueden crear alertas por eventos de los ensayos del último día** (cierres de sesión por reúso, bloqueos de las pruebas). Es normal: se revisan o descartan con nota.
+- **La IP es la que pone nginx** (`X-Real-IP`). Varias personas detrás de una misma salida a internet suman sus fallos en una sola ráfaga; quien rota de IP no la dispara (la regla `denegaciones_persona` y los bloqueos por cuenta lo cubren en parte). Una IP con formato inválido en un evento se ignora (no rompe al detector).
+- **Solo lo ve quien entra a la consola.** No hay otro canal (correo, mensajería): el operador de seguridad ve el contador de abiertas al abrir su consola. Una notificación activa sería una mejora futura.
+- **Sin política de retención.** La tabla solo crece (nadie borra); definirla antes de que pese.
+- **La nota de la revisión queda en la alerta, no en los eventos de seguridad** (ahí solo van el identificador, la regla y el resultado). Pedir a quien revise que no escriba contraseñas ni datos personales en ella (la ventana lo recuerda).
+- **Quien revisa es quien tiene la sesión.** El disparador rechaza una revisión a nombre de otro operador y la seguridad por filas solo deja ver y revisar a un operador de seguridad con la cuenta activa: aunque la API tuviera un error, un usuario sin ese rol no ve ni toca nada.
+- **`detalle.por_nombre` cuenta todo el tramo, no solo la ventana del `conteo`.** Es el total de eventos de cada nombre entre `primera_vez` y `ultima_vez`: puede sumar más que `conteo`, que es el máximo de **una** ventana (10 minutos o 24 horas).
+- **El detector toma `SHARE ROW EXCLUSIVE` sobre `alerta_seguridad` al empezar.** Así una revisión simultánea no se cruza con su `UPDATE` y dos detectores no corren a la vez; la revisión espera lo que dure la corrida (un instante). Lo hace como `siget_owner`, dueño de la tabla (`SECURITY DEFINER`): `detector_role` no necesita más permisos. Una transacción larga que haya actualizado alertas (por ejemplo `verificar_plataforma` revisando una alerta real) retiene su bloqueo hasta terminar y el detector espera.
+- **Una persona que no existe no genera alerta.** `decision_pdp.actor_id` no tiene clave foránea y podría traer un id huérfano: `denegaciones_persona` lo descarta (`JOIN` con `usuario`), porque su `INSERT` fallaría por la clave foránea de `alerta_seguridad.usuario_id` y abortaría **todas** las reglas de la corrida. Las otras reglas leen `evento_seguridad.actor_id`, que sí tiene la clave foránea.
+- **El ensayo (`demo/ensayo.py`) no debe provocar alertas reales.** Corre contra producción y cada negación del PDP queda en `decision_pdp`: ninguna cuenta del ensayo debe llegar a 5 negaciones en 10 minutos (umbral de `denegaciones_persona`). Si tras un ensayo aparece una alerta abierta de una cuenta `*.mop`, `*.identidades` o similar, es de esto: descartarla con nota.
+
+- **El ensayo dispara alertas a propósito (decisión aceptada).** Prueba que fabio, ana e ivan **no** pueden hacer lo que no les corresponde, y cada uno junta 5 o 6 denegaciones del PDP en pocos minutos: la regla `denegaciones_persona` crea o actualiza su alerta en cada ensayo. Es el detector funcionando, no un falso positivo. **No** se excluyen cuentas del detector (una cuenta de demostración comprometida pasaría sin alertas) ni se sube el umbral (bajaría la sensibilidad para todos). Después de cada ensayo, el operador de seguridad las descarta con la nota «ensayo de la demostración».
+
+### 43.10 Registro de la aplicación
+
+Aplicado el **26 de noviembre de 2026**, a las 11:41. Evidencia en `docs/sdlc/evidencia/18_alertas_*`.
+
+1. **VM2, respaldo verificado:** `tramites_demo-20261126-114113.dump` (19 tablas, restauración probada), copiado como `pre-019-…` (SHA-256 `caec24b7a3b417f5…`).
+2. **Ensayo de la 019 junto con `pruebas-alertas.sql`** en una sola transacción revertida (armado como dice 43.3): **57 de 57 a la primera**. Después no quedaba ni la tabla, ni el rol, ni la función. Las ventanas deslizantes y el `ON CONFLICT` contra el índice parcial, que eran los puntos de riesgo, funcionaron sin cambios.
+3. **Migración real** y las mismas pruebas sobre la base migrada: 57/57. Regresión de las pruebas de la base anteriores: escalamiento 10/10 y notificaciones 36/36.
+4. **`pg_hba.conf`:** línea de `detector_role` (desde `192.168.100.10/32`, como `escalador_role`) agregada con `tee -a` sobre el **mismo inodo** (50628156 antes y después), permisos 644, respaldo `pg_hba.conf.respaldo-2026-11-26`; `pg_reload_conf()` la tomó sin error (`pg_hba_file_rules`, línea 9). `log_statement` estaba en `none`.
+5. **Contraseña de `detector_role`:** generada en VM2 (40 caracteres), fijada por la entrada estándar de psql y pasada por una tubería SSH directo a `podman secret create siget-db-detector-password -` en VM1. **Nunca se mostró ni se guardó en un archivo.**
+6. **VM1, imagen candidata** (`alertas-candidata`) y las 8 verificaciones **antes** de reiniciar, todas a la primera: `verificar_plataforma` **147/147** (con las alertas), `verificar_tramites` 214/214, `verificar_autenticacion` 200/200, `verificar_politicas` 41/41, `verificar_equipo` 51/51, `verificar_auditoria` 34/34, `verificar_integracion` 15/15 y `verificar_esquema` OK. Despliegue de backend e interfaz con respaldo (`respaldo-2026-11-26`).
+7. **Temporizador** `siget-detectar.timer` instalado y activo (la unidad es idéntica a la del escalador salvo los nombres). Primera corrida a mano: `0 alerta(s)` (sin actividad sospechosa reciente; las denegaciones de las personas de prueba ya revertidas se ignoraron sin romper nada, que era el hallazgo medio de la revisión).
+8. **Ensayo completo: 116/116** (con la consola de alertas atravesando nginx, 401 sin sesión y 403 para custodia de secretos). La corrida del detector después del ensayo abrió **dos alertas** `denegaciones_persona`: `fabio.mop` (6) e `ivan.identidades` (5), con el desglose por política y nada sensible. Es lo que el ensayo provoca a propósito (43.9). Quedaron abiertas para mostrar en la defensa cómo las revisa el operador de seguridad.
+
+**Volver atrás:** `systemctl --user disable --now siget-detectar.timer` (como `siget`) detiene la detección sin tocar datos; la imagen anterior es `respaldo-2026-11-26` y la interfaz `frontend.respaldo-2026-11-26`. El backend anterior funciona con la base migrada.

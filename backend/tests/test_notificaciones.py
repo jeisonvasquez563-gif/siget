@@ -80,7 +80,7 @@ def test_la_regla_no_da_nada_mas_que_ver_las_notificaciones():
 
 def test_la_matriz_la_calcula_para_los_diez_roles_sin_exigir_segundo_factor():
     M = matriz.construir()
-    assert len(M["acciones"]) == len(Accion) == 28
+    assert len(M["acciones"]) == len(Accion) == 30
     for rol in ROLES:
         celda = M["matriz"][rol]["ver_mis_notificaciones"]
         assert celda["favorable"]["permitido"] and celda["favorable"]["politica"] == "titular_ve_sus_notificaciones"
@@ -91,7 +91,7 @@ def test_la_matriz_la_calcula_para_los_diez_roles_sin_exigir_segundo_factor():
 
 def test_el_simulador_la_conoce_y_explica_el_resultado():
     meta = simulador.meta()
-    assert len(meta["variables"]) == 28 and "notificaciones_de" in meta["variables"]["ver_mis_notificaciones"]
+    assert len(meta["variables"]) == 30 and "notificaciones_de" in meta["variables"]["ver_mis_notificaciones"]
     assert "notificaciones_de" in meta["valores"] and meta["defectos"]["notificaciones_de"] == "yo"
     ok = simulador.simular(simulador.normalizar({"rol": "auditor", "accion": "ver_mis_notificaciones", "segundo_factor": "ninguno"})[0], AHORA)
     assert ok["decision"]["permitido"] and ok["decision"]["politica"] == "titular_ve_sus_notificaciones"

@@ -6,7 +6,7 @@ import pytest
 from apps.auditoria.models import DecisionPdp, EventoAuditoria
 from apps.autenticacion.models import EventoSeguridad, Invitacion, Restablecimiento, Sesion
 from apps.notificaciones.models import Notificacion
-from apps.plataforma.models import RotacionSecreto
+from apps.plataforma.models import AlertaSeguridad, RotacionSecreto
 from apps.catalogo.models import Feriado, Institucion, TipoTramite
 from apps.identidad.models import Aprobacion, Membresia, Perfil, SolicitudDerecho, Usuario
 from apps.identidad.sujeto import construir_sujeto
@@ -23,6 +23,7 @@ TABLAS = {
     Documento: "documento",
     SolicitudDerecho: "solicitud_derecho",
     Notificacion: "notificacion",
+    AlertaSeguridad: "alerta_seguridad",
 }
 
 
@@ -32,7 +33,7 @@ def test_ningun_modelo_crea_ni_migra_tablas(modelo, tabla):
     assert modelo._meta.db_table == tabla
 
 
-def test_estan_los_quince_modelos_del_esquema():
+def test_estan_los_dieciseis_modelos_del_esquema():
     assert {m._meta.db_table for m in modelos_de_dominio()} == set(TABLAS.values())
 
 

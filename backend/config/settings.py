@@ -109,6 +109,12 @@ DATABASES["auditoria"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
 DATABASES["escalador"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
                           "USER": os.environ.get("SIGET_DB_ESCALADOR_USER", "escalador_role"),
                           "PASSWORD": _leer("SIGET_DB_ESCALADOR_PASSWORD", "")}
+
+# La detección de patrones sospechosos corre con SU PROPIO rol (detector_role, migración 019): solo puede EXECUTE sobre
+# siget.detectar_anomalias(); no lee ni escribe ninguna tabla directamente. Lo usa un temporizador de systemd.
+DATABASES["detector"] = {**DATABASES["default"], "ATOMIC_REQUESTS": False,
+                         "USER": os.environ.get("SIGET_DB_DETECTOR_USER", "detector_role"),
+                         "PASSWORD": _leer("SIGET_DB_DETECTOR_PASSWORD", "")}
 # --- Documentos adjuntos (PT-8) ---
 # Clave AES-256 (32 bytes en base64) que cifra cada archivo; llega como podman secret. Sin ella, la carga de documentos
 # responde 503 en lugar de guardar archivos en claro. Los archivos viven en un volumen propio, nunca en la imagen.
