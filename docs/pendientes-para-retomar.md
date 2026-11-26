@@ -34,7 +34,7 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 ### Seguridad
 | Pendiente | Impacto | Quién decide |
 |---|---|---|
-| Alertas ante patrones sospechosos y exportación firmada de la auditoría (PT-10, ZT-8, RS-24) | Alto | Se puede hacer |
+| ~~Alertas ante patrones sospechosos (PT-10, ZT-8, RS-24)~~ **HECHO el 26-nov** (PR #29 y #30, runbook 43.10; ensayo 116/116). Queda la exportación firmada de la auditoría | Bajo | Se puede hacer |
 | Segunda copia de la clave de documentos fuera del PC anfitrión (R6) | Alto | Jeison (USB o gestor de contraseñas) |
 | Copia de los respaldos de la base fuera de VM2 (R7) | Alto | Jeison: dónde guardarla |
 | Una sola persona con sudo en VM2 (R9) | Alto | Jeison: a quién dárselo |
@@ -87,7 +87,7 @@ Queda como riesgo aceptado (runbook 39.9): sin seguridad por filas en `perfil` n
 
 **Semana 2**
 1. ~~Notificaciones~~ (hecho el 24-nov) y gestión del catálogo.
-2. Alertas (PT-10).
+2. ~~Alertas (PT-10)~~ (hecho el 26-nov).
 3. Playwright y contraste.
 4. Aviso si falla el escalamiento.
 5. Al final: aplicar en producción, correr el ensayo completo, regenerar los `.docx` y fusionar el PR #6 a `main`.
