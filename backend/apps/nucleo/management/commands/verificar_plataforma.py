@@ -522,10 +522,14 @@ class Command(BaseCommand):
         self._paso("ni ejecutar el detector", rechazada_por_la_base("select siget.detectar_anomalias()"))
 
         # ------------------------------------------------------------ la revisión, sobre una alerta real si la hay (todo se revierte)
+        # Va AL FINAL del método: el UPDATE retiene el bloqueo de la tabla hasta el final de la transacción y el detector (LOCK TABLE ... SHARE
+        # ROW EXCLUSIVE) esperaría ese tiempo; así se retiene lo menos posible.
         fijar_contexto(seg.pk)
         abierta = AlertaSeguridad.objects.filter(estado="abierta").order_by("id").first()
         if abierta is None:
-            self._paso("(no hay ninguna alerta abierta en esta base: la revisión de punta a punta queda cubierta por database/pruebas-alertas.sql)", True)
+            # Omitido: no es un paso (ni correcto ni fallido) y no suma al resultado
+            self.stdout.write(self.style.WARNING("OMITIDO la revisión de punta a punta: no hay ninguna alerta abierta real en esta base "
+                                                 "(la cubre database/pruebas-alertas.sql); no cuenta como paso correcto"))
             return
         ruta = f"/plataforma/alertas/{abierta.pk}/revisar/"
         r = self._llamar(seg, "post", ruta, {"estado": "revisada"})
