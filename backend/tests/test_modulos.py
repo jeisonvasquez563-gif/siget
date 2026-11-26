@@ -10,12 +10,12 @@ def ids(rol_plataforma="ninguno", roles=()):
 
 
 def test_el_ciudadano_ve_sus_tramites_y_nada_de_personal():
-    assert ids() == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa", "roles_permisos"]
-    assert ids(roles=["ciudadano"]) == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa", "roles_permisos"]
+    assert ids() == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa"]
+    assert ids(roles=["ciudadano"]) == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa"]
 
 
 def test_el_funcionario_suma_la_bandeja():
-    assert ids(roles=["funcionario"]) == ["mis_tramites", "nuevo_tramite", "mis_datos", "bandeja", "seguridad", "mfa", "roles_permisos"]
+    assert ids(roles=["funcionario"]) == ["mis_tramites", "nuevo_tramite", "mis_datos", "bandeja", "seguridad", "mfa"]
 
 
 def test_el_supervisor_suma_supervision_y_equipo():
@@ -30,7 +30,7 @@ def test_el_coordinador_ve_el_equipo_pero_no_los_tramites_de_la_institucion():
 
 def test_el_catalogo_de_la_institucion_es_solo_de_la_coordinacion():
     assert ids(roles=["coordinador_institucional"]) == ["mis_tramites", "nuevo_tramite", "mis_datos", "equipo", "catalogo_institucion",
-                                                        "seguridad", "mfa", "roles_permisos"]
+                                                        "seguridad", "mfa"]
     for roles in ([], ["ciudadano"], ["funcionario"], ["supervisor"], ["funcionario", "supervisor"]):
         assert "catalogo_institucion" not in ids(roles=roles), roles
     assert CATALOGO["catalogo_institucion"][0] == "Catálogo de la institución"
@@ -40,7 +40,7 @@ def test_el_catalogo_de_la_institucion_es_solo_de_la_coordinacion():
 def test_un_rol_de_plataforma_no_ve_ningun_modulo_de_tramites(rol):
     r = ids(rol, ["funcionario"])  # aunque llegara con una membresía (la base lo impide), no cuenta
     assert not {"mis_tramites", "nuevo_tramite", "mis_datos", "bandeja", "supervision", "equipo", "catalogo_institucion"} & set(r)
-    assert {"prueba_acceso", "seguridad", "mfa", "roles_permisos"} <= set(r) and len(r) == 5
+    assert {"prueba_acceso", "seguridad", "mfa"} <= set(r) and len(r) == 4
 
 
 def test_cada_rol_de_plataforma_tiene_su_consola():
@@ -56,10 +56,10 @@ def test_todo_modulo_devuelto_existe_en_el_catalogo_y_tiene_estado_valido():
 
 
 def test_un_rol_desconocido_no_da_modulos_de_mas():
-    assert ids("inventado") == ["prueba_acceso", "seguridad", "mfa", "roles_permisos"]
+    assert ids("inventado") == ["prueba_acceso", "seguridad", "mfa"]
 
 
-def test_todas_las_personas_ven_la_transparencia_de_su_seguridad_y_sus_permisos():
+def test_todas_las_personas_ven_la_transparencia_de_su_seguridad():
     for rol in ["ninguno", *ROLES_PLATAFORMA]:
         r = ids(rol, ["funcionario"])
-        assert {"seguridad", "mfa", "roles_permisos"} <= set(r), rol
+        assert {"seguridad", "mfa"} <= set(r), rol

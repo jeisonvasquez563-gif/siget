@@ -80,7 +80,7 @@ flowchart LR
 | R | Un funcionario niega haber aprobado un trámite | Auditoría inalterable (`evento_auditoria`, sin UPDATE ni DELETE) | Mitigada |
 | I | Un error muestra datos de otra institución | Seguridad por filas en la base además del PDP: dos barreras independientes | Mitigada |
 | D | Una ráfaga de peticiones satura el inicio de sesión | Límites de tasa en nginx y en Django | Mitigada |
-| E | Un ciudadano intenta actuar como funcionario | El PDP niega por defecto; ningún rol puede todo (matriz de permisos) | Mitigada |
+| E | Un ciudadano intenta actuar como funcionario | El PDP niega por defecto; ningún rol puede todo (pruebas sobre el PDP) | Mitigada |
 
 ## Navegador e interfaz
 

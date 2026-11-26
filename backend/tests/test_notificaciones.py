@@ -1,4 +1,4 @@
-"""Notificaciones dentro de la plataforma (PT-9): regla del PDP, matriz, simulador, salida de la API, vistas y migración 018.
+"""Notificaciones dentro de la plataforma (PT-9): regla del PDP, salida de la API, vistas y migración 018.
 
 Sin base de datos: que cada transición genere la notificación correcta y que la base filtre y proteja las filas lo recorren
 `verificar_tramites` (por la API) y `database/pruebas-notificaciones.sql` (en la base, incluido `escalar_vencidos()`).
@@ -12,15 +12,15 @@ import pytest
 from django.urls import get_resolver, reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.autorizacion import matriz, simulador
 from apps.autorizacion.pdp import Accion, Entorno, Recurso, Sujeto, decidir
 from apps.nucleo.errores import AccesoDenegado
 from apps.notificaciones import vistas
 from apps.notificaciones.models import TIPOS, Notificacion
 from apps.notificaciones.serializacion import notificacion_a_dict
+from tests import ejemplos_pdp
 
 AHORA = datetime(2026, 11, 24, 12, 0, tzinfo=timezone.utc)
-ROLES = [r[0] for r in matriz.ROLES]
+ROLES = ejemplos_pdp.ROLES
 MIGRACION = Path(__file__).resolve().parents[2] / "database" / "migraciones" / "018-notificaciones.sql"
 
 
@@ -76,29 +76,16 @@ def test_la_regla_no_da_nada_mas_que_ver_las_notificaciones():
             assert decidir(sujeto(), accion, propias(), Entorno(ahora=AHORA)).politica != "titular_ve_sus_notificaciones", accion
 
 
-# --------------------------------------------------------------------------- matriz y simulador
+# --------------------------------------------------------------------------- el PDP evaluado para los diez roles
 
-def test_la_matriz_la_calcula_para_los_diez_roles_sin_exigir_segundo_factor():
-    M = matriz.construir()
+def test_el_pdp_la_calcula_para_los_diez_roles_sin_exigir_segundo_factor():
+    M = ejemplos_pdp.construir()
     assert len(M["acciones"]) == len(Accion) == 30
     for rol in ROLES:
         celda = M["matriz"][rol]["ver_mis_notificaciones"]
         assert celda["favorable"]["permitido"] and celda["favorable"]["politica"] == "titular_ve_sus_notificaciones"
         assert not celda["desfavorable"]["permitido"] and celda["exige_segundo_factor"] is False, rol
-    assert next(a for a in M["acciones"] if a["id"] == "ver_mis_notificaciones")["grupo"] == "Cuenta"
     assert M["ningun_rol_puede_todo"] is True
-
-
-def test_el_simulador_la_conoce_y_explica_el_resultado():
-    meta = simulador.meta()
-    assert len(meta["variables"]) == 30 and "notificaciones_de" in meta["variables"]["ver_mis_notificaciones"]
-    assert "notificaciones_de" in meta["valores"] and meta["defectos"]["notificaciones_de"] == "yo"
-    ok = simulador.simular(simulador.normalizar({"rol": "auditor", "accion": "ver_mis_notificaciones", "segundo_factor": "ninguno"})[0], AHORA)
-    assert ok["decision"]["permitido"] and ok["decision"]["politica"] == "titular_ve_sus_notificaciones"
-    ajeno = simulador.simular(simulador.normalizar({"rol": "ciudadano", "accion": "ver_mis_notificaciones", "notificaciones_de": "otra_persona"})[0], AHORA)
-    assert not ajeno["decision"]["permitido"]
-    assert {"variable": "notificaciones_de", "valor": "yo"}.items() <= next(a for a in ajeno["alternativas"] if a["variable"] == "notificaciones_de").items()
-    assert simulador.normalizar({"rol": "ciudadano", "accion": "ver_mis_notificaciones", "notificaciones_de": "todas"})[0] is None
 
 
 # --------------------------------------------------------------------------- modelo y salida

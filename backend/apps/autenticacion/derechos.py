@@ -84,7 +84,7 @@ FINALIDAD_DE_LOS_DATOS = [
 
 _SECCIONES = [
     ("Quién trata tus datos",
-     "SIGET es la plataforma de trámites con la que las instituciones del Estado atienden a la ciudadanía. Es un entorno de demostración académica. "
+     "SIGET es la plataforma de trámites con la que las instituciones del Estado atienden a la ciudadanía. "
      "Los datos los trata SIGET y, para cada trámite, la institución a la que lo diriges. Para cualquier asunto sobre tus datos, escribe una "
      "solicitud desde «Mis datos»: la atiende el operador de identidades de la plataforma."),
     ("Por qué podemos usarlos",

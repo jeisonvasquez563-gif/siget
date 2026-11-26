@@ -58,7 +58,7 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 
 ## Derechos sobre los datos personales (`/auth/mis-datos/…`) — scope `completo` (PT-15, Ley 81 de 2019)
 
-Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (30 acciones en total en la matriz, con `responder_subsanacion`, `cambiar_contrasena`, `ver_mis_notificaciones`, `ver_alertas` y `revisar_alerta`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
+Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (30 acciones en total en el PDP, con `responder_subsanacion`, `cambiar_contrasena`, `ver_mis_notificaciones`, `ver_alertas` y `revisar_alerta`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
@@ -177,21 +177,11 @@ Todas son de lectura y paginadas: `{total, limite, desplazamiento, resultados[]}
 | `GET /auditoria/seguridad/` | `evento`, `actor` | `{id, creado_en, evento, ip, actor, detalle}` |
 | `GET /auditoria/tramites/` | `accion`, `actor` | `{id, creado_en, tramite_id, institucion_id, accion, estado_anterior, estado_nuevo, actor}` |
 
-## Transparencia: roles, permisos y base de datos (`/politicas/`) — cualquier persona autenticada
+## Rutas retiradas: `/politicas/`
 
-Información de las reglas, no datos de nadie. Se calcula en el momento: no está escrita a mano.
+Las rutas `/politicas/matriz/`, `/politicas/simular/` y `/politicas/base-de-datos/` (matriz de roles y permisos, simulador y vista de la base de datos) **ya no existen**: Django no las enruta y nginx no las reenvía, así que responden `404` a cualquier persona, con o sin sesión. El PDP sigue decidiendo cada petición; solo se retiró la pantalla que lo mostraba.
 
-| Ruta | Respuesta |
-|---|---|
-| `GET /politicas/matriz/` | La matriz de roles y permisos, **generada evaluando el PDP real**: `{ventana_minutos, roles: [{id, nombre, ambito, descripcion, modulos[], acciones_permitidas, acciones_totales}], acciones: [{id, nombre, grupo, casos}], matriz: {<rol>: {<accion>: {favorable: {permitido, politica}, desfavorable: {permitido, politica}, exige_segundo_factor}}}, denegaciones: [{politica, descripcion}], ningun_rol_puede_todo}` |
-| `GET /politicas/base-de-datos/` | Los privilegios REALES de cada rol de PostgreSQL (`has_table_privilege`): `{roles: [{nombre, descripcion, superusuario, omite_rls, puede_conectar, limite_conexiones, ...}], tablas: [{nombre, rls, politicas, triggers}], privilegios: {<rol>: {<tabla>: {SELECT, INSERT, UPDATE, DELETE}}}, administrador_del_motor, ningun_rol_de_aplicacion_es_superusuario}`; cada privilegio es `total`, `columnas` (solo algunas columnas) o `no` |
-
-| `GET /politicas/simular/` | El formulario del simulador: `{variables: {<accion>: [variables que importan]}, etiquetas, valores: {<variable>: [{valor, etiqueta}]}, defectos}` |
-| `POST /politicas/simular/` | Cuerpo `{rol, accion, <variables>}` con valores de listas cerradas (`segundo_factor`: reciente\|vencido\|ninguno; `cuenta`: activa\|bloqueada\|suspendida; `institucion`: propia\|ajena; `solicitante`/`alta_propuesta_por`: otra_persona\|yo; `asignado`: nadie\|yo\|otra_persona; `estado` y `estado_destino`; `tipo_alta`; `nivel`: 1\|2\|3; `perfil_de`: yo\|otra_persona, solo para `corregir_mis_datos`). Respuesta: `{ventana_minutos, entrada, decision: {permitido, politica, motivo}, traza: [{fase, regla, resultado, politica, motivo}], alternativas: [{variable, valor, etiqueta_variable, etiqueta_valor, permitido, politica}], hipotetico: true}`. Entrada inválida: `400 {codigo: "datos_invalidos", errores[]}` |
-
-El simulador evalúa el **PDP real** con una situación hipotética: es puro (no toca la base) y **no registra decisiones** (no es una acción real). `alternativas` son los cambios de UNA sola variable que invertirían el resultado.
-
-El `modulos` de `/auth/yo/` incluye siempre `seguridad`, `mfa` y `roles_permisos` (transparencia para todos los roles).
+El `modulos` de `/auth/yo/` incluye siempre `seguridad` y `mfa` (transparencia sobre la propia cuenta para todos los roles); ya no incluye `roles_permisos`.
 
 ## Reglas para cambiar el contrato
 
@@ -263,7 +253,7 @@ Todas exigen acceso completo y que el rol de plataforma correspondiente tenga el
 
 ### Alertas de seguridad (PT-10, migración 019)
 
-Las crea la base, no la API: `siget.detectar_anomalias()` corre cada 5 minutos (temporizador de systemd, rol `detector_role`) y deja **una alerta abierta por regla, persona e IP** (si el patrón sigue, actualiza `conteo` y `ultima_vez`). La API solo las lista y las revisa. Acciones del PDP: `ver_alertas` (operador de seguridad y auditor, con segundo factor reciente; el auditor, además, nivel 3) y `revisar_alerta` (solo el operador de seguridad, con segundo factor reciente). La matriz y el simulador pasan de 28 a **30 acciones**. Es una ruta de `/plataforma/`: nginx y el proxy de desarrollo ya la dejan pasar.
+Las crea la base, no la API: `siget.detectar_anomalias()` corre cada 5 minutos (temporizador de systemd, rol `detector_role`) y deja **una alerta abierta por regla, persona e IP** (si el patrón sigue, actualiza `conteo` y `ultima_vez`). La API solo las lista y las revisa. Acciones del PDP: `ver_alertas` (operador de seguridad y auditor, con segundo factor reciente; el auditor, además, nivel 3) y `revisar_alerta` (solo el operador de seguridad, con segundo factor reciente). El PDP pasa de 28 a **30 acciones**. Es una ruta de `/plataforma/`: nginx y el proxy de desarrollo ya la dejan pasar.
 
 ```json
 { "id": 7, "regla": "rafaga_login_fallido_ip", "severidad": "media",
