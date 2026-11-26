@@ -38,7 +38,7 @@ Hay **dos barreras independientes**: el decisor de la aplicación y la base de d
 | Aislamiento y acceso (las dos VMs) | ✅ Existe | Red interna, firewall, SELinux, SSH solo por clave, Tailscale, registro persistente |
 | Podman rootless | ✅ En uso en las dos VMs | Usuario de servicio `siget`: en VM2 ejecuta PostgreSQL; en VM1, el pod con `nginx` y Django |
 | `nginx` y el pod de VM1 | ✅ Existe | TLS 1.3, cabeceras de seguridad, límite de tasa; sirve la interfaz y reenvía solo las rutas de la API. Apache + PHP (el checkpoint) se retiró el 17-nov-2026 y el puerto 80 está cerrado |
-| Backend (Django + DRF) | ✅ Existe | Autenticación con segundo factor, decisor de acceso (ABAC), trámites, catálogo, equipo, auditoría, transparencia de roles y simulador |
+| Backend (Django + DRF) | ✅ Existe | Autenticación con segundo factor, decisor de acceso (ABAC), trámites, catálogo, equipo, auditoría y actividad de seguridad propia |
 | Frontend (React) | ✅ Existe | 10 módulos completos por rol, sistema de diseño propio, claro/oscuro, accesible |
 | Plazos con escalamiento automático, documentos y notificaciones | ⏳ No existen | Pendientes (ver [`modulos.md`](./modulos.md)) |
 
@@ -49,7 +49,7 @@ Las dos mitades del diagrama existen; lo pendiente es lo que aparece como ⏳.
 | Carpeta | Qué contiene |
 |---|---|
 | `backend/` | Django + DRF: autenticación, autorización (PDP), trámites, catálogo, identidad, auditoría; comandos de verificación |
-| `frontend/` | React + Vite: pantallas por rol, sistema de diseño, pruebas y simulador de desarrollo |
+| `frontend/` | React + Vite: pantallas por rol, sistema de diseño, pruebas y servidor de ejemplo de desarrollo |
 | `infra/` | Unidades de Podman/Quadlet, `nginx.conf` y la CA pública de las VMs |
 | `database/` | Esquema, roles, migraciones 002–007, pruebas y demo |
 | `demo/` | Ensayo automático de la demostración y herramientas de apoyo |

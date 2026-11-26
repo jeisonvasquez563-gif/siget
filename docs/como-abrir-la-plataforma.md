@@ -12,7 +12,7 @@ Guía paso a paso para **abrir, probar y operar** SIGET: desde encender las máq
   Interfaz React ─────────► │ nginx  :8443 (TLS 1.3, única entrada)  │     │ PostgreSQL 16 (contenedor)   │
   (la sirve nginx)  8443    │   ├─ /            → interfaz (React)   │     │  puerto 5433, TLS 1.3        │
                             │   └─ /auth /tramites /catalogo         │ TLS │  roles sin superusuario,     │
-                            │      /equipo /auditoria /politicas     ├────►│  RLS y auditoría inalterable │
+                            │      /equipo /auditoria                ├────►│  RLS y auditoría inalterable │
                             │      → Django + DRF (gunicorn)         │1.3  └──────────────────────────────┘
                             └────────────────────────────────────────┘
 ```
@@ -93,7 +93,7 @@ SIGET exige **usuario + contraseña + código del segundo factor (TOTP)** para t
 | `ines.infra`, `ivan.identidades`, `cata.catalogo`, `sergio.seguridad`, `silvia.secretos` | Los 5 roles de plataforma | Su consola (identidades, catálogo, respuesta a incidentes, custodia de secretos o infraestructura), «Acceso a trámites» y la transparencia |
 | `aldo.auditor` | Auditor | Consola de auditoría (solo lectura) |
 
-Todas ven además **Mi seguridad**, **Segundo factor (MFA)** y **Roles y permisos** (con el simulador «¿qué pasaría si…?»).
+Todas ven además **Mi seguridad** y **Segundo factor (MFA)**.
 
 ### 5.2 Contraseñas y códigos
 
@@ -122,8 +122,6 @@ backend/.venv/Scripts/python.exe demo/codigo.py fabio.mop    # una sola
 |---|---|
 | Ver qué puedo y qué no puedo hacer | **Mi seguridad** |
 | Entender y probar el segundo factor (incluye reenviar un código para ver que se rechaza) | **Segundo factor (MFA)** |
-| Ver quién puede qué en todo el sistema, y probar situaciones hipotéticas | **Roles y permisos** → «Matriz de permisos» y «¿Qué pasaría si…?» |
-| Ver los permisos reales de la base de datos | **Roles y permisos** → «Base de datos» |
 | Iniciar un trámite y seguirlo | **Iniciar un trámite** / **Mis trámites** (ciudadanía) |
 | Atender trámites | **Bandeja** (funcionario) o **Supervisión** (supervisor) |
 | Auditar lo que pasa | **Auditoría** (`aldo.auditor`) |

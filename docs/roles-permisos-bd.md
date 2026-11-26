@@ -12,7 +12,7 @@ Material para mostrar al profesor. Resume qué roles, permisos y módulos define
 
 Estado real de la base (actualizado el 21 de octubre de 2026): 6 roles (`postgres` es el único superusuario, sin contraseña y rechazado por red; `siget_owner` sin inicio de sesión; `app_role` y `auditor_role` con `LOGIN` y límite de conexiones, sin privilegios especiales; `checkpoint_app` y `pgadmin_lectura`), **11 tablas**, políticas RLS y disparadores, **con datos reales** (personas, trámites, decisiones y eventos de seguridad de la plataforma en producción). La base **corre en un contenedor Podman rootless** desde el 20-oct (runbook 21); la instalación nativa está apagada.
 
-**Se puede comprobar en vivo desde la propia plataforma:** «Roles y permisos» → «Base de datos» muestra, leído de PostgreSQL en ese instante (`has_table_privilege`), qué puede hacer cada rol sobre cada tabla, con la seguridad por filas y los disparadores. Lo verifica `verificar_politicas` contra la base real (runbook 30).
+**Se comprueba contra la base real:** `verificar_politicas` lee de PostgreSQL en ese instante (`has_table_privilege`) qué puede hacer cada rol sobre cada tabla, con la seguridad por filas y los disparadores (runbook 30). La pantalla «Roles y permisos» → «Base de datos» que lo mostraba en la interfaz se retiró el 26-nov-2026 (runbook 45).
 
 ## 2. Principio: no hay superusuario en la operación
 
