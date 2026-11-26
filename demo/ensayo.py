@@ -401,7 +401,7 @@ paso(e == 403, "seguridad no ve la infraestructura (403)", e)
 # OJO, el ensayo corre contra producción y cada negación del PDP queda en decision_pdp: la regla denegaciones_persona de la migración 019
 # abre una alerta REAL con 5 o más negaciones de una misma cuenta en 10 minutos. Ninguna cuenta del ensayo debe llegar a 5 negaciones en
 # 10 minutos. Por eso el 403 de las alertas se comprueba con silvia (secretos, que solo lleva esa negación) y no con ivan, que ya acumula
-# las suyas en esta sección. Negaciones por cuenta (403 o 404 esperados, conteo estático): ana 5, fabio 6, ivan 5, ines 3, saul 2,
+# las suyas en esta sección. Negaciones por cuenta (403 o 404 esperados, conteo estático): ana 5, fabio 6, ivan 5, ines 3, saul 3 (con la del catálogo),
 # aldo 1, sergio 1, silvia 1, felix 1. Decisión aceptada (runbook 43.9): ana, fabio e ivan disparan `denegaciones_persona` en cada
 # ensayo porque el ensayo los hace intentar lo que no pueden; es el detector funcionando. El operador de seguridad las descarta después.
 # Alertas ante patrones sospechosos (PT-10). Solo se lee: el ensayo no revisa alertas reales. Pasa por nginx de verdad (/plataforma/ ya estaba en su lista)
@@ -439,6 +439,16 @@ e, r = carla.pedir("POST", f"/equipo/{mop}/miembros/", {"usuario": "ivan.identid
 paso(e == 400, "una cuenta de plataforma no puede ser personal de una institución (400)", e)
 e, _ = ivan.pedir("POST", f"/equipo/{mop}/miembros/", {"usuario": "beto.ciudadano", "rol": "funcionario"})
 paso(e == 403, "un operador de plataforma no gestiona equipos (403)", e)
+
+# --- catálogo de la institución (solo lectura: el ensayo NO crea ni cambia tipos reales; la gestión completa la prueba verificar_equipo)
+e, cat = carla.pedir("GET", f"/catalogo/institucion/{mop}/tipos/")
+tipos_mop = (cat or {}).get("tipos", []) if e == 200 else []
+paso(e == 200 and (cat or {}).get("institucion", {}).get("id") == mop and len(tipos_mop) >= 1 and all(t["institucion_id"] == mop and "activo" in t for t in tipos_mop),
+     "la coordinadora lista el catálogo de su institución: /catalogo/institucion/<id>/tipos/ atraviesa nginx", e)
+e, hist = carla.pedir("GET", f"/catalogo/institucion/{mop}/cambios/?limite=5")
+paso(e == 200 and {"resultados", "total", "limite", "desplazamiento"} <= set(hist or {}), "y su historial de cambios: /catalogo/institucion/<id>/cambios/ también", e)
+e, _ = saul2.pedir("GET", f"/catalogo/institucion/{mop}/tipos/")  # la única negación nueva de esta sección: saul pasa de 2 a 3 (< 5 en 10 minutos)
+paso(e == 403, "la supervisión no gestiona el catálogo (403)", e)
 
 # --- las tres puertas (la semántica completa la prueba verificar_autenticacion; aquí lo observable desde fuera)
 e, lista = ana.pedir("GET", "/auth/instituciones/")

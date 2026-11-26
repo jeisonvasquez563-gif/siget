@@ -7,6 +7,7 @@ import { SegundoFactor } from './Mfa.jsx'
 import { RolesPermisos } from './Permisos.jsx'
 import { etiquetaDeRol } from './comun.jsx'
 import { agrupar, iconoDe } from './modulos.js'
+import { CatalogoInstitucion } from './Catalogo.jsx'
 import { Equipo } from './Equipo.jsx'
 import { LimiteDeError } from './ErrorBoundary.jsx'
 import { Campana } from './Notificaciones.jsx'
@@ -88,6 +89,7 @@ export default function App() {
     case 'bandeja': contenido = <Bandeja yo={yo} abrir={abrir} modo="bandeja" />; break
     case 'supervision': contenido = <Bandeja yo={yo} abrir={abrir} modo="supervision" />; break
     case 'equipo': contenido = <Equipo />; break
+    case 'catalogo_institucion': contenido = <CatalogoInstitucion yo={yo} />; break
     case 'mis_datos': contenido = <MisDatos yo={yo} />; break
     case 'seguridad': contenido = <Seguridad yo={yo} />; break
     case 'auditoria': contenido = <Auditoria />; break

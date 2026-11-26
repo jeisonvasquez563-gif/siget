@@ -2229,3 +2229,126 @@ Aplicado el **26 de noviembre de 2026**, a las 11:41. Evidencia en `docs/sdlc/ev
 8. **Ensayo completo: 116/116** (con la consola de alertas atravesando nginx, 401 sin sesión y 403 para custodia de secretos). La corrida del detector después del ensayo abrió **dos alertas** `denegaciones_persona`: `fabio.mop` (6) e `ivan.identidades` (5), con el desglose por política y nada sensible. Es lo que el ensayo provoca a propósito (43.9). Quedaron abiertas para mostrar en la defensa cómo las revisa el operador de seguridad.
 
 **Volver atrás:** `systemctl --user disable --now siget-detectar.timer` (como `siget`) detiene la detección sin tocar datos; la imagen anterior es `respaldo-2026-11-26` y la interfaz `frontend.respaldo-2026-11-26`. El backend anterior funciona con la base migrada.
+
+## 44. Catálogo de la institución: aplicar la migración 020 (gestión de trámites por la coordinación)
+
+**Estado: aplicado en producción el 26 de noviembre de 2026** (registro en 44.9).
+
+### 44.1 Qué cambia y en qué orden hay que aplicarlo
+
+La migración [`020-catalogo-institucion.sql`](../database/migraciones/020-catalogo-institucion.sql) (una sola transacción, como `siget_owner`):
+
+- agrega `tipo_tramite.activo` (`boolean NOT NULL DEFAULT true`), `tipo_tramite.version` (entero desde 1, control de concurrencia: lo sube solo el disparador) y tres `CHECK` (`sla_dias` de 1 a 365, `nombre` de 3 a 150 caracteres sin contar los espacios de los bordes y `formulario` de a lo sumo 16 KB con `pg_column_size`, como `tramite_datos_tamano` de la 017);
+- agrega `tramite.formulario` (`jsonb NOT NULL`, lista): **la copia del formulario del tipo al crearse el trámite**. La pone la base (disparador `tramite_copia_formulario`, `BEFORE INSERT`, que ignora lo que mande la aplicación) y es inmutable (disparador `tramite_formulario_inmutable`, `BEFORE UPDATE … WHEN (OLD.formulario IS DISTINCT FROM NEW.formulario)`, que vale también para el dueño y el superusuario; `app_role` no tiene `UPDATE` sobre la columna). Los trámites que ya existen se rellenan en la propia migración con el formulario **actual** de su tipo: es exacto solo si nadie cambió formularios todavía (ver 44.8). Encaja con la 017 y la 018 sin tocarlas: `validar_cambio_de_datos` solo mira `datos`, `validar_respuesta_solicitante` se activa al cambiar estado, funcionario o datos, y las notificaciones se generan `AFTER UPDATE OF estado, escalado_en`;
+- da a `app_role` `UPDATE (nombre, sla_dias, audiencia, formulario, activo)` sobre `tipo_tramite` (nunca `id` ni `institucion_id`; sigue sin `DELETE`);
+- crea `siget.es_coordinador_vigente()` y `siget.formulario_invalido()`, el disparador `tipo_tramite_valida` (con contexto de usuario exige coordinación **vigente** de esa institución y cuenta activa; **sin contexto rechaza a `app_role`** —se mira `session_user`— y deja pasar al dueño y al superusuario; valida la estructura del formulario cuando se crea o cambia el tipo, con opciones de hasta 120 caracteres y ayuda de hasta 300; lleva la `version`; `id` e `institucion_id` no cambian jamás) y el disparador `tramite_valida_tipo_activo` (un tipo desactivado no admite trámites nuevos; lee el tipo con `FOR SHARE`, así nadie lo desactiva ni lo cambia mientras se crea el trámite);
+- crea la tabla inalterable `siget.catalogo_cambio` (la escribe el disparador `tipo_tramite_registra`; ni `UPDATE`, ni `DELETE`, ni `TRUNCATE`, tampoco para el dueño) con seguridad por filas: `app_role` solo ve las filas de instituciones donde la persona del contexto es coordinadora vigente, `auditor_role` lee todo; nada para `pgadmin_lectura`, `escalador_role`, `detector_role` ni `checkpoint_app`.
+
+**La base va primero, el código después.** El backend nuevo lee `activo` y la tabla nueva: sin la migración, `GET /catalogo/tipos-tramite/`, `POST /tramites/` y las rutas `/catalogo/institucion/…` darían error 500. El backend **viejo** funciona con la base ya migrada: la columna tiene valor por defecto, el disparador de `tramite` solo actúa sobre tipos desactivados (no hay ninguno hasta que alguien use la interfaz nueva), el viejo no escribe `tipo_tramite`, el `INSERT` de `tramite` del viejo no menciona `formulario` y la base pone la copia igual, y `catalogo_cambio` no le estorba. **Una excepción:** el `verificar_integracion` **anterior** crea tipos como `app_role` sin contexto y ahora la base lo rechaza (`42501`); el nuevo fija contexto de una coordinación de cada institución antes de crearlos, así que hay que correr el comando de la imagen nueva. **Esto se razonó leyendo las migraciones; no se ejecutó**: se comprueba en 44.4 y 44.6.
+
+**No hay ruta de primer nivel nueva:** `/catalogo/` ya está en la lista de `location` de `infra/podman/vm1-app-backend/nginx.conf` y en `frontend/vite.config.js`. El ensayo (`demo/ensayo.py`) pide `/catalogo/institucion/<id>/tipos/` y `…/cambios/` con la sesión de la coordinadora para comprobar que atraviesan nginx (lección de 42.9). **El ensayo no crea ni cambia tipos reales:** la gestión completa la prueba `verificar_equipo`.
+
+**El alta de una institución no se rompe:** la consola del operador de catálogo (`plataforma/servicio.py`, `_aplicar`) solo inserta en `siget.institucion`; no inserta tipos de trámite, así que no pasa por el disparador. (La «Solicitud interinstitucional de información» la sembró la migración 012 solo para las instituciones que existían entonces.) Se comprueba en `pruebas-catalogo.sql`.
+
+### 44.2 Respaldo previo, verificado
+
+Igual que 42.2 y 43.2: `systemctl start siget-respaldo.service` en VM2, comprobar que terminó bien, y un respaldo manual con sello `pre-020` que la retención de 14 días no borra:
+
+```bash
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/pre-020-tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+No seguir si el respaldo no se pudo restaurar. Los archivos tienen permisos 600 y **no van al repositorio**.
+
+### 44.3 Ensayo con `ROLLBACK`, junto con las pruebas
+
+La migración es **una sola** transacción: para ensayarla junto con sus pruebas basta cambiar su `COMMIT;` final por `RESET ROLE;` (las pruebas corren como superusuario y cambian de rol por su cuenta) y pegar las pruebas sin su propio `BEGIN;` (ya terminan en `ROLLBACK;`):
+
+```bash
+{ sed -e 's/^COMMIT;$/RESET ROLE;/' database/migraciones/020-catalogo-institucion.sql
+  sed '1,/^BEGIN;$/d' database/pruebas-catalogo.sql; } > /tmp/020-ensayo.sql
+cat /tmp/020-ensayo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Debe terminar en `ROLLBACK` sin errores y con `RESUMEN: N de N comprobaciones PASAN, 0 FALLAN`. Después, confirmar que no quedó nada: `\d siget.catalogo_cambio` debe decir que no existe la relación, `\d siget.tipo_tramite` no debe tener la columna `activo` y `\df siget.es_coordinador_vigente` que no hay función.
+
+Las pruebas crean sus propias instituciones (`p020_inst_*`), personas (`p020_*`) y tipos, y comprueban **como `app_role` con el contexto de cada persona** (`set_config('app.usuario_id', …)`). Usan `SET LOCAL session_replication_role = replica` solo para sembrar un tipo anterior a las reglas, y por eso piden superusuario (el que da `psql-contenedor.sh`). Para probar que `app_role` **sin contexto** no escribe usan `SET LOCAL SESSION AUTHORIZATION app_role` y no `SET ROLE`: el disparador mira `session_user`, que `SET ROLE` no cambia (seguiría siendo el superusuario). No usar `psql -1`.
+
+**Correr las pruebas consume secuencias aunque terminen en `ROLLBACK`** (ids de `tipo_tramite`, `tramite`, `usuario`, `catalogo_cambio`…): en producción quedarán huecos en los ids, sobre todo en `catalogo_cambio`. No son borrados ni alteraciones del registro: una secuencia no se revierte nunca. Conviene dejarlo anotado antes de que alguien los vea y se alarme.
+
+**Es la primera vez que el script corre contra PostgreSQL**: si algo falla, revisar primero si es un error de la prueba y no de la migración. Los puntos donde más conviene mirar: la expresión regular de `formulario_invalido` (`~` con `{0,39}`), el `RETURNING … INTO` bajo `app_role` (necesita `SELECT`, que tiene), el orden en que PostgreSQL evalúa disparadores antes que los `CHECK` (las pruebas esperan `P0001` para el formulario y `23514` para plazo y nombre) y que `intenta()` reciba `42501` y no otro código cuando falta el permiso de columna.
+
+### 44.4 Migración real y pruebas de la base
+
+```bash
+cat database/migraciones/020-catalogo-institucion.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+cat database/pruebas-catalogo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Todas deben decir `PASA`. Después, la **regresión de las pruebas de base anteriores**, que no deben cambiar (el disparador nuevo toca `tramite`, `tipo_tramite` y el contexto de sesión):
+
+```bash
+cat database/pruebas-escalamiento.sql   | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+cat database/pruebas-notificaciones.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+cat database/pruebas-alertas.sql        | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Esperado: escalamiento 10/10, notificaciones 36/36 y alertas 57/57 (los números de 42.9 y 43.9). `pruebas-escalamiento.sql` y `pruebas-notificaciones.sql` insertan `tipo_tramite` como dueño y sin contexto: el disparador nuevo debe dejarlos pasar.
+
+Comprobar además, **con un login real de `app_role`** (regla del README de migraciones) y no solo como superusuario:
+
+- `\dp siget.tipo_tramite`: `app_role` con `r`, `a` y `w` **solo** en `nombre`, `sla_dias`, `audiencia`, `formulario` y `activo`; sin `d`.
+- `\dp siget.catalogo_cambio`: `app_role` y `auditor_role` solo `r`; ningún permiso para `pgadmin_lectura`, `escalador_role`, `detector_role` ni `checkpoint_app`.
+- `select count(*) from siget.catalogo_cambio;` como `app_role` **sin contexto** debe dar `0`.
+- `select count(*) from siget.tipo_tramite where activo;` debe coincidir con el total (todos los tipos existentes quedan activos), y `select min(version), max(version) from siget.tipo_tramite;` debe dar `1, 1`.
+- La copia del formulario: `select count(*) from siget.tramite t join siget.tipo_tramite tt on tt.id = t.tipo_tramite_id where t.formulario is distinct from tt.formulario;` debe dar `0` **justo después de migrar** (antes de que nadie edite un tipo), y `\d siget.tramite` debe mostrar `formulario jsonb not null` con sus dos disparadores. Como `app_role`: `select has_column_privilege('app_role', 'siget.tramite', 'formulario', 'UPDATE');` debe dar `f`.
+
+Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
+
+### 44.5 Imagen candidata y verificaciones (VM1)
+
+Con la base ya migrada, en VM1: guardar la imagen en uso (`podman tag localhost/siget-backend:dev localhost/siget-backend:respaldo-AAAA-MM-DD`, ver 39.10), reconstruir con el código nuevo y correr cada comando contra la base real (todos se revierten) **antes de reiniciar**:
+
+1. `verificar_esquema`: `TipoTramite.activo` y el modelo `CatalogoCambio` coinciden con la base.
+2. `verificar_equipo`: trae el método nuevo `_catalogo` (la coordinación lista, crea, edita, desactiva y reactiva por la API; los demás reciben 403 o 404; los datos inválidos dan 400 por campo; el historial queda en orden y a nombre de quien lo hizo; las ediciones mandan la `version` y una versión vieja da 409; y sondeos directos como `app_role` comprueban los disparadores, la seguridad por filas, los permisos por columna y la inalterabilidad). Si la otra institución no tuviera ningún tipo, los pasos que dependen de él salen como «omitido» y no fallan. **Es la primera vez que corre contra la base real** (lección de 40.9): si falla, revisar primero si es un error del paso y no de la base. Sus decisiones del PDP se capturan en memoria, así que no deja ninguna negación real en `decision_pdp`.
+3. `verificar_integracion` (crea una coordinación por institución y fija su contexto **antes** de crear los tipos, porque la base ya no deja escribir en el catálogo a `app_role` sin contexto), `verificar_tramites`, `verificar_politicas` (siguen siendo **30** acciones: no se agregó ninguna), `verificar_plataforma`, `verificar_autenticacion` y `verificar_auditoria` como regresión.
+
+Si algún paso falla, **no desplegar**.
+
+### 44.6 Despliegue y ensayo
+
+1. `desplegar.sh` (backend e interfaz; devuelve la inactividad a 10 minutos, ver 34.2). Backend e interfaz pueden ir juntos o separados: la interfaz nueva sin el backend nuevo muestra el módulo con un error (las rutas no existen); el backend nuevo con la interfaz vieja no se nota. Hay un módulo nuevo en el menú de la coordinación (`catalogo_institucion`, también en `matriz.json` del mock).
+2. El ensayo (`demo/ensayo.py`): trae **tres comprobaciones nuevas** sobre el catálogo (la coordinadora lista el catálogo de su institución y su historial **atravesando nginx**, y la supervisión recibe 403); la cuenta anterior era 116. La única negación nueva es de `saul.mop` (de 2 a 3 en 10 minutos, lejos del umbral de 5 de `denegaciones_persona`, migración 019): ninguna cuenta nueva llega a 5. **No crea ni cambia tipos reales.**
+3. Probar a mano, con la coordinadora y su segundo factor: abrir «Catálogo de la institución», crear un trámite de prueba con un campo de cada tipo, ver la vista previa, desactivarlo y confirmar que desaparece de «Iniciar un trámite», reactivarlo y revisar el historial. Un tipo de prueba **no se puede borrar**: déjelo desactivado (o reutilícelo).
+
+### 44.7 Qué hacer si algo sale mal
+
+- **La migración falla:** al ser una transacción, no queda nada a medias; se corrige y se repite el ensayo.
+- **Hay que volver atrás el código:** `podman tag localhost/siget-backend:respaldo-AAAA-MM-DD localhost/siget-backend:dev`, reiniciar el backend (como `siget`) y restaurar la interfaz desde su respaldo. La base migrada funciona con el backend anterior (44.1).
+- **Alguien desactivó un tipo por error:** lo reactiva la propia coordinación con el botón «Activar». Si no se puede entrar, el dueño puede hacerlo sin contexto (el disparador lo deja pasar y el historial anota `actor` nulo): `UPDATE siget.tipo_tramite SET activo = true WHERE id = N;` ejecutado como `siget_owner` en la base.
+- **Si algo de la base diera problemas**, se corrige hacia adelante; revertir la base es la última opción (restaurar `pre-020`, **perdiendo todo lo posterior**: avisar antes). No se hace `DROP` a mano en producción. `catalogo_cambio` es evidencia: nadie la edita ni la borra.
+
+### 44.8 Gotchas y riesgos aceptados
+
+1. **Sin contexto de usuario, el disparador rechaza a `app_role` y deja pasar a quien no lo es** (el dueño y el superusuario: las migraciones, los datos de arranque, el mantenimiento y las pruebas de base). Se mira `session_user` y no `current_user` porque dentro de la función `SECURITY DEFINER` el `current_user` es el dueño. Consecuencia práctica: un `SET ROLE app_role` hecho por un superusuario **no** cambia `session_user` y por tanto pasa; solo cuenta una conexión abierta como `app_role` (la de la API). Una consulta suelta con la credencial de la aplicación y sin contexto ya no puede tocar el catálogo. Los demás disparadores del esquema siguen dejando pasar sin contexto: este es más estricto a propósito.
+2. **«Inalterable» vale contra DML.** `catalogo_cambio` (y, igual que en la 019, el resto de lo inalterable) está protegido contra `UPDATE`, `DELETE` y `TRUNCATE` por disparadores, incluso para el dueño. Pero el dueño puede deshabilitar los disparadores (`ALTER TABLE … DISABLE TRIGGER`) y el superusuario puede usar `session_replication_role = replica`: contra eso la base no tiene barrera. Lo cubren el control de quién tiene el rol dueño o superusuario, los respaldos y la auditoría del servidor. Lo mismo vale para la inmutabilidad de `tramite.formulario`.
+3. **La copia del formulario del backfill es exacta solo si nadie cambió formularios antes de migrar.** Se rellena con el formulario actual de cada tipo; hasta la 020 solo se podía cambiar un formulario con una migración, y desde la 017 no se cambió ninguno, así que es exacta. Si antes de aplicar alguien hubiera editado a mano un `tipo_tramite.formulario`, los trámites anteriores quedarían con la versión nueva (no hay de dónde recuperar la vieja): comprobarlo antes mirando en el historial del servidor si se tocó `tipo_tramite.formulario` desde la 017.
+4. **Una carrera mínima al crear un trámite:** la API valida `datos` con el formulario que leyó del tipo y la base copia el que ve al insertar (con `FOR SHARE`, así que un cambio concurrente espera o ya estaba hecho). Si la coordinación cambia el formulario justo entre la lectura y el `INSERT`, el trámite nace con el formulario nuevo y datos validados con el anterior. Es poco probable, no pierde ni expone datos y el trámite se ve con la copia real; no se cierra con un bloqueo en la API.
+5. **Editar es optimista:** el `PATCH` exige la `version` y responde `409 version_desactualizada` si otra persona cambió el tipo antes. No hay bloqueo de edición: dos coordinadoras pueden abrir el editor a la vez y la segunda en guardar recibe el aviso de recargar (pierde lo que escribió, la interfaz no fusiona).
+6. **Si la base niega el permiso (`42501`) la API responde `403`** y deja el evento de seguridad `catalogo_denegado_por_la_base` (quién, institución y método). Un evento aislado es esperable si a alguien le quitan la coordinación con la pantalla abierta; varios seguidos de la misma cuenta merecen mirarse.
+7. **El nombre se compara sin importar mayúsculas con `__iexact`**, que usa `UPPER()` de la base: con una configuración regional `C`, las diferencias solo de mayúsculas en letras con tilde (`á` y `Á`) no se detectan. La unicidad de la base (`UNIQUE (institucion_id, nombre)`) es sensible a mayúsculas de todos modos.
+8. **Desactivar no toca los trámites existentes:** siguen su curso y la bandeja los sigue mostrando con su copia del formulario.
+9. **El formulario de un tipo se puede cambiar con trámites ya iniciados:** esos trámites **no** cambian: el detalle muestra la copia con la que nacieron y la subsanación valida contra esa copia, así que ningún dato queda sin campo ni se pierde al corregir. Lo nuevo solo vale para los trámites que se creen después.
+10. **`matriz.json` del mock** se regeneró localmente con `matriz.construir()` (solo cambió el módulo nuevo y el listado de la coordinación); la próxima captura real con `capturar_fixtures.py` debe dar lo mismo.
+
+### 44.9 Registro de la aplicación
+
+Aplicado el **26 de noviembre de 2026**, a las 13:22. Evidencia en `docs/sdlc/evidencia/19_catalogo_*`.
+
+1. **VM2, respaldo verificado:** `tramites_demo-20261126-132145.dump` (20 tablas, restauración probada), copiado como `pre-020-…` (SHA-256 `751b22dd5ea94dee…`).
+2. **Ensayo de la 020 junto con `pruebas-catalogo.sql`** en una sola transacción revertida: **82 de 82 a la primera**, incluido `app_role` sin contexto rechazado por `session_user`. Después no quedaba ni la tabla `catalogo_cambio` ni las columnas nuevas.
+3. **Migración real:** completó la copia del formulario en los **103 trámites** existentes (`UPDATE 103`, 103 de 103 con copia). Las pruebas de la base sobre la base migrada siguieron en verde: catálogo, escalamiento (10/10), notificaciones (36/36) y alertas (57/57).
+4. **VM1, imagen candidata** (`catalogo-candidata`) y las 8 verificaciones **antes** de reiniciar, todas a la primera: `verificar_equipo` **133/133** (con la gestión del catálogo), `verificar_plataforma` 154/154, `verificar_tramites` 214/214, `verificar_autenticacion` 200/200, `verificar_politicas` 41/41, `verificar_auditoria` 34/34, `verificar_integracion` 15/15 (ya fija el contexto de una coordinación antes de crear tipos) y `verificar_esquema` OK. Despliegue de backend e interfaz con respaldo (`respaldo-2026-11-26b`).
+5. **Ensayo completo: 119/119**, con la coordinación listando el catálogo y su historial a través de nginx y la supervisión recibiendo 403.
+
+**Volver atrás:** imagen `respaldo-2026-11-26b` como `dev` y reiniciar el backend; interfaz desde `frontend.respaldo-2026-11-26b`. Revertir la base solo restaurando `pre-020-…` (perdiendo lo posterior).

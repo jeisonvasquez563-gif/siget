@@ -11,6 +11,7 @@ CATALOGO = {
     "bandeja": ("Bandeja de la institución", "Trámites de tu institución: revisarlos y cambiar su estado.", DISPONIBLE),
     "supervision": ("Supervisión", "Reasigna trámites y atiende los escalados de tu institución.", DISPONIBLE),
     "equipo": ("Equipo de la institución", "Personal y roles de tu institución.", DISPONIBLE),
+    "catalogo_institucion": ("Catálogo de la institución", "Los trámites que ofrece tu institución: crea, edita, activa o desactiva, y consulta quién cambió qué.", DISPONIBLE),
     "mis_datos": ("Mis datos", "Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.", DISPONIBLE),
     "seguridad": ("Mi seguridad", "Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.", DISPONIBLE),
     "mfa": ("Segundo factor (MFA)", "Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.", DISPONIBLE),
@@ -57,5 +58,7 @@ def modulos_para(rol_plataforma, roles_en_instituciones):
         ids.append("supervision")
     if roles & {"supervisor", "coordinador_institucional"}:
         ids.append("equipo")
+    if "coordinador_institucional" in roles:
+        ids.append("catalogo_institucion")  # solo la coordinación gestiona el catálogo; el PDP lo vuelve a decidir en cada petición
     ids.extend(_TRANSPARENCIA)
     return [_entrada(i) for i in ids]

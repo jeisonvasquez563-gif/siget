@@ -97,7 +97,7 @@ def tramite_a_dict(tramite, personal, ahora, detalle=False):
         datos["asignado"] = tramite.funcionario_asignado_id is not None  # quién, no: es dato del personal
     if detalle:  # el listado no lleva el contenido (pesa): solo el detalle y la exportación
         datos["datos"] = tramite.datos
-        datos["formulario"] = tramite.tipo_tramite.formulario
+        datos["formulario"] = tramite.formulario  # la copia del trámite, no la vigente del tipo: la coordinación puede haberlo cambiado después
     return datos
 
 

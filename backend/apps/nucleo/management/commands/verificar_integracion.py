@@ -9,7 +9,7 @@ from django.db import DatabaseError, connection, transaction
 from apps.auditoria.models import EventoAuditoria
 from apps.autenticacion import contrasenas
 from apps.catalogo.models import Institucion, TipoTramite
-from apps.identidad.models import Usuario
+from apps.identidad.models import Membresia, Usuario
 from apps.nucleo.contexto import fijar_contexto
 from apps.tramites.models import Tramite
 
@@ -67,7 +67,15 @@ class Command(BaseCommand):
         beto = Usuario.objects.create(username="int_beto", password_hash=contrasenas.inutilizable())
         func_mop = Usuario.objects.create(username="int_func_mop", password_hash=contrasenas.inutilizable())
         func_minsa = Usuario.objects.create(username="int_func_minsa", password_hash=contrasenas.inutilizable())
+        # Crear tipos exige el contexto de la coordinación vigente de ESA institución (migración 020): app_role sin contexto no escribe en el catálogo
+        asignador = Usuario.objects.create(username="int_asig", password_hash=contrasenas.inutilizable(), estado_cuenta="suspendida")
+        coord_mop = Usuario.objects.create(username="int_coord_mop", password_hash=contrasenas.inutilizable())
+        coord_minsa = Usuario.objects.create(username="int_coord_minsa", password_hash=contrasenas.inutilizable())
+        for coord, institucion in ((coord_mop, mop), (coord_minsa, minsa)):
+            Membresia.todas.create(usuario=coord, institucion=institucion, rol="coordinador_institucional", asignado_por=asignador)
+        fijar_contexto(coord_mop.pk)
         tipo_mop = TipoTramite.objects.create(institucion=mop, nombre="Trámite MOP", sla_dias=10)
+        fijar_contexto(coord_minsa.pk)
         tipo_minsa = TipoTramite.objects.create(institucion=minsa, nombre="Trámite MINSA", sla_dias=10)
 
         fijar_contexto(ana.pk)

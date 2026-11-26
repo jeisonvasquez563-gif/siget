@@ -132,6 +132,7 @@ def test_la_vista_por_modulo_es_la_inversa_exacta_de_la_vista_por_rol():
     assert por_modulo["bandeja"] == ["funcionario", "supervisor"]
     assert por_modulo["supervision"] == ["supervisor"]
     assert por_modulo["equipo"] == ["supervisor", "coordinador_institucional"]
+    assert por_modulo["catalogo_institucion"] == ["coordinador_institucional"]
     assert por_modulo["auditoria"] == ["auditor"]
     # Todo módulo del catálogo lo ve al menos un rol (no hay módulos huérfanos)
     assert all(m["roles"] for m in M["modulos"])
