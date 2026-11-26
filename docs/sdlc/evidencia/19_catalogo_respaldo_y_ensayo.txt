@@ -1,0 +1,95 @@
+# Catalogo: respaldo verificado y ensayo de la 020 con sus pruebas, con ROLLBACK (26-nov-2026)
+# 2026-11-26 13:21:44  jeiva@Jeison  C:\Users\jeiva\Desktop\siget-integracion
+$ bash C:/Users/jeiva/AppData/Local/Temp/c020/paso1.sh
+== 1. Respaldo verificado (pg_dump, restauracion de prueba y comparacion con la base viva)
+OK: tramites_demo-20261126-132145.dump (236357 bytes, 20 tablas), restauración probada y verificada contra la base viva
+copia fuera de la rotacion: pre-020-tramites_demo-20261126-132145.dump  sha256 751b22dd5ea94dee
+== 2. Ensayo: migracion 020 y sus pruebas en una sola transaccion que termina en ROLLBACK (13:21)
+PASA  la coordinacion de A crea y edita tipos de su institucion
+PASA  la edicion cambio nombre, plazo, audiencia y formulario y la institucion sigue siendo A
+PASA  p020_coord_b no crea, edita ni desactiva tipos en la institucion A (42501)
+PASA  p020_func_a no crea, edita ni desactiva tipos en la institucion A (42501)
+PASA  p020_sup_a no crea, edita ni desactiva tipos en la institucion A (42501)
+PASA  p020_coord_rev no crea, edita ni desactiva tipos en la institucion A (42501)
+PASA  p020_coord_susp no crea, edita ni desactiva tipos en la institucion A (42501)
+PASA  p020_ciud no crea, edita ni desactiva tipos en la institucion A (42501)
+PASA  p020_opcat no crea, edita ni desactiva tipos en la institucion A (42501)
+PASA  la coordinacion de A tampoco toca el catalogo de B
+PASA  el mismo nombre en OTRA institucion se admite
+PASA  un nombre repetido en la misma institucion se rechaza (unicidad)
+PASA  app_role no puede cambiar institucion_id ni id (permiso por columna)
+PASA  app_role no puede borrar ni vaciar el catalogo
+PASA  app_role SIN contexto de usuario no crea, edita ni desactiva tipos (42501, por session_user)
+PASA  app_role CON el contexto de la coordinacion si crea (el rechazo es por la falta de contexto)
+PASA  el duenio y el superusuario sin contexto siguen pasando (migraciones, mantenimiento)
+PASA  ni el duenio cambia la institucion o el id de un tipo (disparador)
+PASA  cada regla del formulario se rechaza (P0001); aceptados por error: []
+PASA  los limites exactos (30 campos, id de 40, etiqueta de 120, 30 opciones, opcion de 120, ayuda de 300, los cinco tipos, sin campos) se admiten
+PASA  un formulario de mas de 16 KB se rechaza (CHECK de tamano, 23514) aunque cumpla cada regla de estructura
+PASA  el plazo fuera de 1 a 365 dias se rechaza
+PASA  los plazos 1 y 365 se admiten
+PASA  un nombre de menos de 3 (sin contar espacios) o de mas de 150 caracteres se rechaza
+PASA  los nombres de 3 y de 150 caracteres se admiten
+PASA  una audiencia fuera de la lista se rechaza
+PASA  un tipo anterior a las reglas se puede renombrar sin revalidar su formulario
+PASA  pero si se cambia el formulario se revalida: lo malo se rechaza y lo corregido pasa
+PASA  un tipo activo admite tramites nuevos
+PASA  la coordinacion desactiva un tipo (no lo borra: la fila sigue)
+PASA  un tipo inactivo NO admite tramites nuevos (la base lo rechaza)
+PASA  el tramite que ya existia de ese tipo sigue su curso (cambio de estado permitido)
+PASA  al reactivarlo vuelve a admitir tramites nuevos
+PASA  el tipo creado y editado tiene exactamente un alta y un cambio (la edicion sin cambios no deja registro): {alta,cambio}
+PASA  el alta registra quien (la coordinacion), la institucion y la foto completa de lo creado
+PASA  el cambio registra solo lo que cambio (antes y despues) y a nombre de quien lo hizo
+PASA  desactivar y reactivar quedan como acciones propias: {alta,desactivado,activado}
+PASA  la desactivacion registra quien la hizo y el valor anterior y el nuevo
+PASA  un alta sin sesion (el duenio) queda con actor NULL
+PASA  lo que la base rechazo no dejo ningun registro a nombre de quien lo intento
+PASA  app_role no actualiza, borra ni vacia el registro de cambios
+PASA  app_role no inserta en el registro (solo lo escribe el disparador)
+PASA  ni el duenio actualiza, borra ni vacia el registro (disparador)
+PASA  ni el superusuario (disparador)
+PASA  la coordinacion de A ve el registro de A y nada de otras instituciones
+PASA  la coordinacion de B ve el de B y nada del de A
+PASA  sin contexto de sesion no se ve ninguna fila
+PASA  funcionario, supervisor, ciudadania y operador de catalogo no ven el registro
+PASA  la coordinacion revocada y la de cuenta suspendida no ven el registro
+PASA  auditor_role lee todo el registro (como el resto de la auditoria)
+PASA  dar de alta una institucion (como app_role, con el contexto del operador de catalogo) no crea tipos ni registro de catalogo: el disparador no la rompe
+PASA  la version empieza en 1 y cada cambio real la sube en uno (alta y una edicion: 2)
+PASA  escribir el mismo valor no sube la version
+PASA  desactivar tambien es un cambio y sube la version
+PASA  app_role no puede escribir la version (42501)
+PASA  la version la lleva solo el disparador: lo que mande ni el duenio cuenta (6, alta con 99: 1)
+PASA  el tramite que ya existia (del backfill o creado con el disparador) tiene la copia del formulario de su tipo
+PASA  la copia la pone la base aunque la aplicacion mande otro formulario o NULL
+PASA  un tipo inexistente se rechaza por la clave foranea (23503), no por el NOT NULL de la copia
+PASA  cambiar el formulario del tipo NO altera la copia de los tramites ya creados
+PASA  un tramite nuevo toma el formulario vigente del tipo en ese momento
+PASA  app_role no puede actualizar la copia (sin permiso de columna, 42501), ni la ciudadania ni el personal
+PASA  ni el duenio ni el superusuario cambian la copia (disparador)
+PASA  escribir la misma copia no es un cambio y pasa (los UPDATE legitimos del tramite no se ven afectados)
+PASA  despues de todos los intentos la copia sigue siendo la original
+PASA  app_role: solo SELECT sobre el registro de cambios
+PASA  auditor_role: solo SELECT sobre el registro de cambios
+PASA  pgadmin_lectura no tiene ningun permiso sobre el registro de cambios
+PASA  escalador_role no tiene ningun permiso sobre el registro de cambios
+PASA  detector_role no tiene ningun permiso sobre el registro de cambios
+PASA  checkpoint_app no tiene ningun permiso sobre el registro de cambios
+PASA  PUBLIC no tiene permisos sobre el registro de cambios
+PASA  el registro de cambios tiene la seguridad por filas activada
+PASA  app_role actualiza nombre, sla_dias, audiencia, formulario y activo
+PASA  app_role no actualiza id ni institucion_id y no borra ni vacia tipos
+PASA  auditor_role no escribe en el catalogo de tipos
+PASA  pgadmin_lectura no escribe en el catalogo de tipos
+PASA  escalador_role no escribe en el catalogo de tipos
+PASA  detector_role no escribe en el catalogo de tipos
+PASA  checkpoint_app no escribe en el catalogo de tipos
+PASA  las funciones nuevas: ninguna para PUBLIC; la aplicacion ejecuta solo las dos auxiliares
+PASA  las funciones SECURITY DEFINER son del duenio y tienen la ruta de busqueda fija
+RESUMEN: 82 de 82 comprobaciones PASAN, 0 FALLAN
+== 3. El ensayo no dejo nada (debe decir t|0|0)
+tabla_no_existe|col_activo|col_copia
+t|0|0
+(1 row)
+# código de salida: 0
