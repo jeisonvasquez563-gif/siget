@@ -6,6 +6,8 @@
 -- Crea sus propias instituciones (p020_inst_*), personas (p020_*) y tipos de tramite: no depende de datos reales. Las comprobaciones
 -- se hacen COMO app_role con el contexto de cada persona (set_config('app.usuario_id', ...)), igual que la API.
 -- No se usa psql -1 (el archivo ya trae su BEGIN y su ROLLBACK).
+-- Aun con ROLLBACK, correrlo consume valores de secuencias (los ids de catalogo_cambio, tipo_tramite, tramite...): quedan huecos, no borrados.
+-- Las pruebas de 'sin contexto' entran como app_role con SET SESSION AUTHORIZATION (SET ROLE no cambia session_user, que es lo que mira el disparador).
 -- ============================================================================
 BEGIN;
 
@@ -137,10 +139,6 @@ BEGIN
   PERFORM pg_temp.ctx(v_coord_a);
   v_r := v_r || jsonb_build_object('a_en_b_alta', pg_temp.alta(v_b, 'p020 intruso en B'),
                                    'a_en_b_edita', pg_temp.intenta(format('UPDATE siget.tipo_tramite SET nombre = %L WHERE id = %s', 'p020 secuestrado', v_tipo_b)));
-  -- Sin contexto de usuario (documentado en la migracion): el disparador deja pasar
-  PERFORM pg_temp.ctx(NULL);
-  v_r := v_r || jsonb_build_object('sin_contexto', pg_temp.alta(v_a, 'p020 sin contexto'));
-
   -- Lo que ni la coordinacion puede: cambiar la institucion o el id (permiso por columna) ni borrar ni vaciar
   PERFORM pg_temp.ctx(v_coord_a);
   v_r := v_r || jsonb_build_object(
@@ -165,9 +163,48 @@ BEGIN
   PERFORM pg_temp.r(v_r ->> 'a_en_b_alta' = '42501' AND v_r ->> 'a_en_b_edita' = '42501', 'la coordinacion de A tampoco toca el catalogo de B');
   PERFORM pg_temp.r(v_r ->> 'mismo_nombre_otra_institucion' = 'sin_error', 'el mismo nombre en OTRA institucion se admite');
   PERFORM pg_temp.r(v_r ->> 'nombre_repetido' = '23505', 'un nombre repetido en la misma institucion se rechaza (unicidad)');
-  PERFORM pg_temp.r(v_r ->> 'sin_contexto' = 'sin_error', 'sin contexto de usuario el disparador deja pasar (migraciones, mantenimiento): comportamiento documentado');
   PERFORM pg_temp.r(v_r ->> 'cambia_institucion' = '42501' AND v_r ->> 'cambia_id' = '42501', 'app_role no puede cambiar institucion_id ni id (permiso por columna)');
   PERFORM pg_temp.r(v_r ->> 'borra' = '42501' AND v_r ->> 'vacia' = '42501', 'app_role no puede borrar ni vaciar el catalogo');
+END $$;
+
+-- Sin contexto de usuario: la base rechaza a app_role y deja pasar al duenio y al superusuario (migraciones, mantenimiento).
+-- El disparador mira session_user: SET ROLE app_role NO lo cambia (seguiria siendo el superusuario que corre este archivo), por eso aqui se
+-- entra con SET SESSION AUTHORIZATION, que es lo que hace la API al conectarse como app_role.
+DO $$
+DECLARE
+  v_a int := (SELECT id FROM siget.institucion WHERE nombre = 'p020_inst_a');
+  v_tipo_a int := (SELECT id FROM siget.tipo_tramite WHERE nombre = 'p020 base a');
+  v_coord_a int := (SELECT id FROM siget.usuario WHERE username = 'p020_coord_a');
+  v_r jsonb := '{}'::jsonb;
+  v_sesion text;
+BEGIN
+  EXECUTE 'SET LOCAL SESSION AUTHORIZATION app_role';
+  v_sesion := session_user;
+  PERFORM pg_temp.ctx(NULL);
+  v_r := v_r || jsonb_build_object(
+    'app_alta', pg_temp.alta(v_a, 'p020 sin contexto'),
+    'app_edita', pg_temp.intenta(format('UPDATE siget.tipo_tramite SET nombre = %L WHERE id = %s', 'p020 sin contexto edita', v_tipo_a)),
+    'app_desactiva', pg_temp.intenta(format('UPDATE siget.tipo_tramite SET activo = false WHERE id = %s', v_tipo_a)));
+  -- Con la coordinacion correcta en el contexto, la misma conexion si puede (el rechazo es solo por la falta de contexto)
+  PERFORM pg_temp.ctx(v_coord_a);
+  v_r := v_r || jsonb_build_object('app_con_contexto', pg_temp.alta(v_a, 'p020 con contexto'));
+  PERFORM pg_temp.ctx(NULL);
+  EXECUTE 'RESET SESSION AUTHORIZATION';
+  v_r := v_r || jsonb_build_object('sesion', v_sesion);
+
+  -- El duenio (sin contexto) sigue pasando: asi corren las migraciones y los datos de arranque
+  EXECUTE 'SET LOCAL ROLE siget_owner';
+  v_r := v_r || jsonb_build_object('duenio_alta', pg_temp.alta(v_a, 'p020 duenio sin contexto'),
+                                   'duenio_edita', pg_temp.intenta(format('UPDATE siget.tipo_tramite SET nombre = %L WHERE id = %s', 'p020 duenio edita', v_tipo_a)));
+  RESET ROLE;
+  -- Y el superusuario de esta sesion tambien
+  v_r := v_r || jsonb_build_object('super_alta', pg_temp.alta(v_a, 'p020 super sin contexto'));
+
+  PERFORM pg_temp.r(v_r ->> 'sesion' = 'app_role' AND v_r ->> 'app_alta' = '42501' AND v_r ->> 'app_edita' = '42501' AND v_r ->> 'app_desactiva' = '42501',
+                    'app_role SIN contexto de usuario no crea, edita ni desactiva tipos (42501, por session_user)');
+  PERFORM pg_temp.r(v_r ->> 'app_con_contexto' = 'sin_error', 'app_role CON el contexto de la coordinacion si crea (el rechazo es por la falta de contexto)');
+  PERFORM pg_temp.r(v_r ->> 'duenio_alta' = 'sin_error' AND v_r ->> 'duenio_edita' = 'sin_error' AND v_r ->> 'super_alta' = 'sin_error',
+                    'el duenio y el superusuario sin contexto siguen pasando (migraciones, mantenimiento)');
 END $$;
 
 -- El duenio tampoco cambia la institucion ni el id (el disparador lo impide aunque el permiso de columna no cuente)
@@ -198,6 +235,10 @@ DECLARE
   v_mal_31 jsonb := (SELECT jsonb_agg(pg_temp.campo('c' || g)) FROM generate_series(1, 31) g);
   v_opciones_30 jsonb := (SELECT jsonb_agg('op' || g) FROM generate_series(1, 30) g);
   v_opciones_31 jsonb := (SELECT jsonb_agg('op' || g) FROM generate_series(1, 31) g);
+  -- 30 selecciones de 30 opciones de 120 caracteres distintos entre si: cada regla estructural se cumple y pesa mas de 100 KB
+  v_enorme jsonb := (SELECT jsonb_agg(jsonb_build_object('id', 'c' || g, 'etiqueta', 'Campo ' || g, 'tipo', 'seleccion',
+                       'opciones', (SELECT jsonb_agg(left(repeat(md5(g::text || '-' || h), 4), 120)) FROM generate_series(1, 30) h)))
+                       FROM generate_series(1, 30) g);
   v_fallas text[] := '{}';
   v_codigo text;
 BEGIN
@@ -223,7 +264,10 @@ BEGIN
     ('seleccion sin opciones', '[{"id": "a", "etiqueta": "A", "tipo": "seleccion"}]'::jsonb),
     ('seleccion con opciones vacias', '[{"id": "a", "etiqueta": "A", "tipo": "seleccion", "opciones": []}]'::jsonb),
     ('seleccion con 31 opciones', jsonb_build_array(jsonb_build_object('id', 'a', 'etiqueta', 'A', 'tipo', 'seleccion', 'opciones', v_opciones_31))),
-    ('seleccion con opciones que no son texto', '[{"id": "a", "etiqueta": "A", "tipo": "seleccion", "opciones": [1, 2]}]'::jsonb)
+    ('seleccion con opciones que no son texto', '[{"id": "a", "etiqueta": "A", "tipo": "seleccion", "opciones": [1, 2]}]'::jsonb),
+    ('opcion de 121 caracteres', jsonb_build_array(jsonb_build_object('id', 'a', 'etiqueta', 'A', 'tipo', 'seleccion', 'opciones', jsonb_build_array(repeat('o', 121))))),
+    ('ayuda de 301 caracteres', jsonb_build_array(jsonb_build_object('id', 'a', 'etiqueta', 'A', 'tipo', 'texto', 'ayuda', repeat('y', 301)))),
+    ('ayuda que no es texto', '[{"id": "a", "etiqueta": "A", "tipo": "texto", "ayuda": 5}]'::jsonb)
   ) AS t(nombre, formulario) LOOP
     v_codigo := pg_temp.alta(v_a, 'p020 formulario malo', v_caso.formulario);
     IF v_codigo IS DISTINCT FROM 'P0001' THEN
@@ -240,7 +284,11 @@ BEGIN
     'ok_todos_los_tipos', pg_temp.alta(v_a, 'p020 todos los tipos', '[{"id": "a", "etiqueta": "A", "tipo": "texto", "obligatorio": true, "max": 10},
         {"id": "b", "etiqueta": "B", "tipo": "texto_largo", "obligatorio": false, "max": 100}, {"id": "c", "etiqueta": "C", "tipo": "numero", "entero": true, "max": 9},
         {"id": "d", "etiqueta": "D", "tipo": "fecha"}, {"id": "e", "etiqueta": "E", "tipo": "seleccion", "opciones": ["Si", "No"], "ayuda": "Elegir"}]'::jsonb),
-    'ok_vacio', pg_temp.alta(v_a, 'p020 sin campos', '[]'::jsonb));
+    'ok_vacio', pg_temp.alta(v_a, 'p020 sin campos', '[]'::jsonb),
+    'ok_opcion_120', pg_temp.alta(v_a, 'p020 opcion larga', jsonb_build_array(jsonb_build_object('id', 'a', 'etiqueta', 'A', 'tipo', 'seleccion', 'opciones', jsonb_build_array(repeat('o', 120))))),
+    'ok_ayuda_300', pg_temp.alta(v_a, 'p020 ayuda larga', jsonb_build_array(jsonb_build_object('id', 'a', 'etiqueta', 'A', 'tipo', 'texto', 'ayuda', repeat('y', 300)))),
+    -- Cumple cada regla estructural pero pesa mas de 16 KB: lo para el CHECK de tamano (23514), no el disparador
+    'enorme', pg_temp.alta(v_a, 'p020 formulario enorme', v_enorme));
 
   -- Plazo y nombre: CHECK de la tabla (23514)
   v_r := v_r || jsonb_build_object(
@@ -260,8 +308,10 @@ BEGIN
 
   PERFORM pg_temp.r(v_r -> 'malos_aceptados' = '[]'::jsonb, format('cada regla del formulario se rechaza (P0001); aceptados por error: %s', v_r -> 'malos_aceptados'));
   PERFORM pg_temp.r(v_r ->> 'ok_30' = 'sin_error' AND v_r ->> 'ok_id_40' = 'sin_error' AND v_r ->> 'ok_30_opciones' = 'sin_error'
-                    AND v_r ->> 'ok_todos_los_tipos' = 'sin_error' AND v_r ->> 'ok_vacio' = 'sin_error',
-                    'los limites exactos (30 campos, id de 40, etiqueta de 120, 30 opciones, los cinco tipos, sin campos) se admiten');
+                    AND v_r ->> 'ok_todos_los_tipos' = 'sin_error' AND v_r ->> 'ok_vacio' = 'sin_error'
+                    AND v_r ->> 'ok_opcion_120' = 'sin_error' AND v_r ->> 'ok_ayuda_300' = 'sin_error',
+                    'los limites exactos (30 campos, id de 40, etiqueta de 120, 30 opciones, opcion de 120, ayuda de 300, los cinco tipos, sin campos) se admiten');
+  PERFORM pg_temp.r(v_r ->> 'enorme' = '23514' AND pg_column_size(v_enorme) > 16384, 'un formulario de mas de 16 KB se rechaza (CHECK de tamano, 23514) aunque cumpla cada regla de estructura');
   PERFORM pg_temp.r(v_r ->> 'sla_0' = '23514' AND v_r ->> 'sla_366' = '23514', 'el plazo fuera de 1 a 365 dias se rechaza');
   PERFORM pg_temp.r(v_r ->> 'sla_1' = 'sin_error' AND v_r ->> 'sla_365' = 'sin_error', 'los plazos 1 y 365 se admiten');
   PERFORM pg_temp.r(v_r ->> 'nombre_2' = '23514' AND v_r ->> 'nombre_con_espacios' = '23514' AND v_r ->> 'nombre_151' = '23514',
@@ -475,6 +525,121 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
+-- 6b. La version del tipo (control de concurrencia al editar)
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_a int := (SELECT id FROM siget.institucion WHERE nombre = 'p020_inst_a');
+  v_nuevo int := (SELECT id FROM siget.tipo_tramite WHERE nombre = 'p020 renombrado' AND institucion_id = v_a);
+  v_coord_a int := (SELECT id FROM siget.usuario WHERE username = 'p020_coord_a');
+  v_v0 int;
+  v_r jsonb := '{}'::jsonb;
+BEGIN
+  -- El tipo se creo (version 1) y se edito una vez con cambios reales; la edicion sin cambios de la seccion 1 no la subio
+  v_r := v_r || jsonb_build_object('tras_alta_y_una_edicion', (SELECT version FROM siget.tipo_tramite WHERE id = v_nuevo));
+  EXECUTE 'SET LOCAL ROLE app_role';
+  PERFORM pg_temp.ctx(v_coord_a);
+  v_v0 := (SELECT version FROM siget.tipo_tramite WHERE id = v_nuevo);
+  UPDATE siget.tipo_tramite SET sla_dias = 11 WHERE id = v_nuevo;
+  v_r := v_r || jsonb_build_object('tras_cambio', (SELECT version FROM siget.tipo_tramite WHERE id = v_nuevo));
+  UPDATE siget.tipo_tramite SET sla_dias = 11 WHERE id = v_nuevo;  -- el mismo valor: no es un cambio
+  v_r := v_r || jsonb_build_object('tras_mismo_valor', (SELECT version FROM siget.tipo_tramite WHERE id = v_nuevo));
+  UPDATE siget.tipo_tramite SET activo = false WHERE id = v_nuevo;
+  v_r := v_r || jsonb_build_object('tras_desactivar', (SELECT version FROM siget.tipo_tramite WHERE id = v_nuevo));
+  UPDATE siget.tipo_tramite SET activo = true WHERE id = v_nuevo;
+  -- app_role no escribe la version
+  v_r := v_r || jsonb_build_object('app_escribe_version', pg_temp.intenta(format('UPDATE siget.tipo_tramite SET version = 99 WHERE id = %s', v_nuevo)));
+  PERFORM pg_temp.ctx(NULL);
+  RESET ROLE;
+  -- Ni el duenio la fija: lo que mande no cuenta (con un cambio real sube en uno; al crear, vale 1)
+  EXECUTE 'SET LOCAL ROLE siget_owner';
+  UPDATE siget.tipo_tramite SET sla_dias = 12, version = 500 WHERE id = v_nuevo;
+  v_r := v_r || jsonb_build_object('duenio_fija_version', (SELECT version FROM siget.tipo_tramite WHERE id = v_nuevo));
+  INSERT INTO siget.tipo_tramite (institucion_id, nombre, sla_dias, version) VALUES (v_a, 'p020 version forzada', 5, 99);
+  v_r := v_r || jsonb_build_object('alta_con_version', (SELECT version FROM siget.tipo_tramite WHERE nombre = 'p020 version forzada'));
+  RESET ROLE;
+
+  PERFORM pg_temp.r((v_r ->> 'tras_alta_y_una_edicion')::int = 2, format('la version empieza en 1 y cada cambio real la sube en uno (alta y una edicion: %s)', v_r ->> 'tras_alta_y_una_edicion'));
+  PERFORM pg_temp.r((v_r ->> 'tras_cambio')::int = v_v0 + 1 AND (v_r ->> 'tras_mismo_valor')::int = v_v0 + 1, 'escribir el mismo valor no sube la version');
+  PERFORM pg_temp.r((v_r ->> 'tras_desactivar')::int = v_v0 + 2, 'desactivar tambien es un cambio y sube la version');
+  PERFORM pg_temp.r(v_r ->> 'app_escribe_version' = '42501', 'app_role no puede escribir la version (42501)');
+  PERFORM pg_temp.r((v_r ->> 'duenio_fija_version')::int = v_v0 + 4 AND (v_r ->> 'alta_con_version')::int = 1,
+                    format('la version la lleva solo el disparador: lo que mande ni el duenio cuenta (%s, alta con 99: %s)', v_r ->> 'duenio_fija_version', v_r ->> 'alta_con_version'));
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 6c. Cada tramite guarda una copia del formulario con el que se creo
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_a int := (SELECT id FROM siget.institucion WHERE nombre = 'p020_inst_a');
+  v_tipo_a int := (SELECT id FROM siget.tipo_tramite WHERE nombre = 'p020 base a');
+  v_existente bigint := (SELECT id FROM siget.tramite WHERE tipo_tramite_id = v_tipo_a ORDER BY id LIMIT 1);
+  v_coord_a int := (SELECT id FROM siget.usuario WHERE username = 'p020_coord_a');
+  v_ciud int := (SELECT id FROM siget.usuario WHERE username = 'p020_ciud');
+  v_func_a int := (SELECT id FROM siget.usuario WHERE username = 'p020_func_a');
+  v_original jsonb := '[{"id": "asunto", "etiqueta": "Asunto", "tipo": "texto", "obligatorio": true, "max": 100}]'::jsonb;
+  v_ajeno jsonb := '[{"id": "otro", "etiqueta": "Otro", "tipo": "texto", "obligatorio": false, "max": 10}]'::jsonb;
+  v_cambiado jsonb := '[{"id": "motivo", "etiqueta": "Motivo", "tipo": "texto_largo", "obligatorio": true, "max": 500}]'::jsonb;
+  v_t1 bigint;
+  v_t2 bigint;
+  v_t3 bigint;
+  v_r jsonb := '{}'::jsonb;
+BEGIN
+  -- El tramite que ya existia (creado con el disparador instalado) tiene la copia del formulario de su tipo
+  v_r := v_r || jsonb_build_object('existente', (SELECT formulario = v_original FROM siget.tramite WHERE id = v_existente));
+
+  -- La ciudadania crea un tramite MANDANDO otro formulario, y otro mandando NULL: la base pone el del tipo
+  EXECUTE 'SET LOCAL ROLE app_role';
+  PERFORM pg_temp.ctx(v_ciud);
+  INSERT INTO siget.tramite (tipo_tramite_id, institucion_id, solicitante_id, formulario) VALUES (v_tipo_a, v_a, v_ciud, v_ajeno) RETURNING id INTO v_t1;
+  INSERT INTO siget.tramite (tipo_tramite_id, institucion_id, solicitante_id, formulario) VALUES (v_tipo_a, v_a, v_ciud, NULL) RETURNING id INTO v_t2;
+  v_r := v_r || jsonb_build_object('manda_otro', (SELECT formulario = v_original FROM siget.tramite WHERE id = v_t1),
+                                   'manda_null', (SELECT formulario = v_original FROM siget.tramite WHERE id = v_t2));
+  -- Un tipo inexistente lo rechaza la clave foranea (23503), no un NOT NULL
+  v_r := v_r || jsonb_build_object('tipo_inexistente', pg_temp.intenta(format('INSERT INTO siget.tramite (tipo_tramite_id, institucion_id, solicitante_id) VALUES (0, %s, %s)', v_a, v_ciud)));
+
+  -- La coordinacion cambia el formulario del tipo: lo existente no se altera; lo nuevo toma el vigente
+  PERFORM pg_temp.ctx(v_coord_a);
+  UPDATE siget.tipo_tramite SET formulario = v_cambiado WHERE id = v_tipo_a;
+  PERFORM pg_temp.ctx(v_ciud);
+  INSERT INTO siget.tramite (tipo_tramite_id, institucion_id, solicitante_id) VALUES (v_tipo_a, v_a, v_ciud) RETURNING id INTO v_t3;
+  v_r := v_r || jsonb_build_object(
+    'existente_igual', (SELECT formulario = v_original FROM siget.tramite WHERE id = v_existente),
+    'creado_antes_igual', (SELECT formulario = v_original FROM siget.tramite WHERE id = v_t1),
+    'nuevo_toma_el_vigente', (SELECT formulario = v_cambiado FROM siget.tramite WHERE id = v_t3));
+
+  -- Nadie lo cambia: ni la ciudadania ni el personal con la API (sin permiso de columna), ni el duenio ni el superusuario (disparador)
+  v_r := v_r || jsonb_build_object('ciud_cambia', pg_temp.intenta(format('UPDATE siget.tramite SET formulario = %L::jsonb WHERE id = %s', v_ajeno, v_t1)));
+  PERFORM pg_temp.ctx(v_func_a, v_a::text);
+  v_r := v_r || jsonb_build_object('func_cambia', pg_temp.intenta(format('UPDATE siget.tramite SET formulario = %L::jsonb WHERE id = %s', v_ajeno, v_existente)));
+  PERFORM pg_temp.ctx(NULL);
+  RESET ROLE;
+  EXECUTE 'SET LOCAL ROLE siget_owner';
+  v_r := v_r || jsonb_build_object('duenio_cambia', pg_temp.intenta(format('UPDATE siget.tramite SET formulario = %L::jsonb WHERE id = %s', v_ajeno, v_existente)),
+                                   'duenio_mismo_valor', pg_temp.intenta(format('UPDATE siget.tramite SET formulario = formulario WHERE id = %s', v_existente)));
+  RESET ROLE;
+  v_r := v_r || jsonb_build_object('super_cambia', pg_temp.intenta(format('UPDATE siget.tramite SET formulario = %L::jsonb WHERE id = %s', v_ajeno, v_existente)),
+                                   'no_es_lista', pg_temp.intenta(format('UPDATE siget.tramite SET formulario = %L::jsonb WHERE id = %s', '{"a": 1}', v_existente)));
+  v_r := v_r || jsonb_build_object('sigue_igual', (SELECT formulario = v_original FROM siget.tramite WHERE id = v_existente),
+                                   'app_privilegio', has_column_privilege('app_role', 'siget.tramite', 'formulario', 'UPDATE'),
+                                   'auditor_privilegio', has_column_privilege('auditor_role', 'siget.tramite', 'formulario', 'UPDATE'));
+
+  PERFORM pg_temp.r((v_r ->> 'existente')::boolean, 'el tramite que ya existia (del backfill o creado con el disparador) tiene la copia del formulario de su tipo');
+  PERFORM pg_temp.r((v_r ->> 'manda_otro')::boolean AND (v_r ->> 'manda_null')::boolean, 'la copia la pone la base aunque la aplicacion mande otro formulario o NULL');
+  PERFORM pg_temp.r(v_r ->> 'tipo_inexistente' = '23503', 'un tipo inexistente se rechaza por la clave foranea (23503), no por el NOT NULL de la copia');
+  PERFORM pg_temp.r((v_r ->> 'existente_igual')::boolean AND (v_r ->> 'creado_antes_igual')::boolean,
+                    'cambiar el formulario del tipo NO altera la copia de los tramites ya creados');
+  PERFORM pg_temp.r((v_r ->> 'nuevo_toma_el_vigente')::boolean, 'un tramite nuevo toma el formulario vigente del tipo en ese momento');
+  PERFORM pg_temp.r(v_r ->> 'ciud_cambia' = '42501' AND v_r ->> 'func_cambia' = '42501' AND NOT (v_r ->> 'app_privilegio')::boolean AND NOT (v_r ->> 'auditor_privilegio')::boolean,
+                    'app_role no puede actualizar la copia (sin permiso de columna, 42501), ni la ciudadania ni el personal');
+  PERFORM pg_temp.r(v_r ->> 'duenio_cambia' = 'P0001' AND v_r ->> 'super_cambia' = 'P0001' AND v_r ->> 'no_es_lista' = 'P0001',
+                    'ni el duenio ni el superusuario cambian la copia (disparador)');
+  PERFORM pg_temp.r(v_r ->> 'duenio_mismo_valor' = 'sin_error', 'escribir la misma copia no es un cambio y pasa (los UPDATE legitimos del tramite no se ven afectados)');
+  PERFORM pg_temp.r((v_r ->> 'sigue_igual')::boolean, 'despues de todos los intentos la copia sigue siendo la original');
+END $$;
+
+-- ---------------------------------------------------------------------------
 -- 7. Permisos de cada rol (por el catalogo del sistema)
 -- ---------------------------------------------------------------------------
 DO $$
@@ -512,13 +677,15 @@ BEGIN
           AND NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
                            WHERE p.oid IN ('siget.es_coordinador_vigente(int,int)'::regprocedure, 'siget.formulario_invalido(jsonb)'::regprocedure,
                                            'siget.tipo_tramite_valida()'::regprocedure, 'siget.tipo_tramite_registra()'::regprocedure,
-                                           'siget.tramite_valida_tipo_activo()'::regprocedure) AND a.grantee = 0)
+                                           'siget.tramite_valida_tipo_activo()'::regprocedure, 'siget.tramite_copia_formulario()'::regprocedure,
+                                           'siget.tramite_formulario_inmutable()'::regprocedure) AND a.grantee = 0)
           AND NOT has_function_privilege('auditor_role', 'siget.es_coordinador_vigente(int,int)', 'EXECUTE')
           AND NOT has_function_privilege('detector_role', 'siget.es_coordinador_vigente(int,int)', 'EXECUTE');
   PERFORM pg_temp.r(v_ok, 'las funciones nuevas: ninguna para PUBLIC; la aplicacion ejecuta solo las dos auxiliares');
   v_ok := (SELECT bool_and(prosecdef AND pg_get_userbyid(proowner) = 'siget_owner' AND proconfig = ARRAY['search_path=siget, pg_temp'])
              FROM pg_proc WHERE oid IN ('siget.es_coordinador_vigente(int,int)'::regprocedure, 'siget.tipo_tramite_valida()'::regprocedure,
-                                        'siget.tipo_tramite_registra()'::regprocedure, 'siget.tramite_valida_tipo_activo()'::regprocedure));
+                                        'siget.tipo_tramite_registra()'::regprocedure, 'siget.tramite_valida_tipo_activo()'::regprocedure,
+                                        'siget.tramite_copia_formulario()'::regprocedure));
   PERFORM pg_temp.r(v_ok, 'las funciones SECURITY DEFINER son del duenio y tienen la ruta de busqueda fija');
 END $$;
 
