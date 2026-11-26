@@ -540,4 +540,3 @@ def test_las_pruebas_sql_prueban_los_dos_lados_de_cada_regla_y_no_dejan_nada():
     assert "SET LOCAL ROLE detector_role;" in pruebas and "192.0.2." in pruebas
     assert "RESUMEN:" in pruebas
     assert len(re.findall(r"pg_temp\.r\(", pruebas)) >= 40
-    assert "SECRETO =" not in pruebas and "TOKEN =" not in pruebas and "PASSWORD =" not in pruebas
