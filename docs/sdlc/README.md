@@ -21,7 +21,7 @@ Implementación en SIGET de las **ocho etapas** del SDLC seguro de Red Hat (*Seg
 | Etapa | Resultado |
 |---|---|
 | 1. Planificación | 24 riesgos evaluados; 12 con algo pendiente, ordenados para Jeison (R5 de parches mitigado el 16-nov y R24 de repositorios el 17-nov) |
-| 2. Requisitos | 26 requisitos (23 cumplen, 1 parcial, 2 no cumplen) y 11 artículos de las leyes 81 de 2019, 83 de 2012 y 6 de 2002 (7 cumplen). Los derechos del titular y el aviso de privacidad (Ley 81) se implementaron el 24-nov con PT-15 |
+| 2. Requisitos | 26 requisitos (24 cumplen, 1 parcial, 1 no cumple) y 11 artículos de las leyes 81 de 2019, 83 de 2012 y 6 de 2002 (7 cumplen). Los derechos del titular y el aviso de privacidad (Ley 81) se implementaron el 24-nov con PT-15 |
 | 3. Diseño | 41 amenazas STRIDE en 6 componentes, con diagrama de flujo de datos: 25 mitigadas, 15 parciales, 1 abierta (la de VMs sin parches quedó mitigada el 16-nov) |
 | 4. Desarrollo | 14 reglas de codificación segura; CI de seguridad automático (PR #16, 5 controles en verde) y Dependabot |
 | 5. Documentación | 43 controles inventariados y `SECURITY.md` completa |
