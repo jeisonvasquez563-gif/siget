@@ -93,6 +93,18 @@ Lectura rápida: un rol llega a varios módulos (el supervisor ve 8) y un módul
 
 Los cinco roles de plataforma (infraestructura, identidades, catálogo, seguridad y custodio de secretos) tienen cada uno su consola, y ninguno ve trámites. El auditor es un sexto rol de plataforma de solo lectura.
 
+### Tres módulos de la interfaz que se suman (26-nov-2026)
+
+Se agregan **«Mis documentos»**, **«Indicadores»** y **«Ayuda»**. El servidor los incluye en `modulos_para()` y la interfaz los dibuja; como siempre, cada petición se vuelve a autorizar (PDP y base).
+
+| Módulo | Qué es | Ciudadanía | Funcionario | Supervisor | Coordinación | Cuentas de plataforma (6 roles) |
+|---|---|:-:|:-:|:-:|:-:|:-:|
+| **Mis documentos** (sección «Mi espacio») | Todos los documentos que la persona adjuntó en sus trámites, con búsqueda por nombre o trámite, descarga y enlace al trámite. Solo lo propio: `GET /tramites/mis-documentos/` | ✅ | ✅ | ✅ | ✅ | — |
+| **Indicadores** (sección «Mi institución») | Cifras agregadas de la institución: trámites por estado (gráfico de barras en SVG con las cifras como texto), vencidos, escalados, tiempo de resolución y carga por funcionario. `GET /equipo/<id>/indicadores/`, migración 022 | — | — | ✅ | ✅ | — |
+| **Ayuda** (sección propia) | Preguntas frecuentes en lenguaje llano, adaptadas al rol, con buscador y acordeón accesible. Pantalla estática: no llama al servidor | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+La coordinación **no ve trámites**, pero sí los indicadores: salen de una función de la base que devuelve solo agregados (sin ids de trámites ni datos de personas) y que comprueba adentro que quien pregunta sea supervisión o coordinación vigente de esa institución. Con estos tres, el menú de la ciudadanía queda en 8 módulos, el del funcionario en 9, el de la supervisión en 12, el de la coordinación en 11 y el de cada cuenta de plataforma en 6 (valores de `modulos_para()`). La tabla de arriba es anterior a estos módulos y al catálogo de la institución: se regenera al integrar con la limpieza de «Roles y permisos».
+
 ## 6. Qué decir y qué no decir
 
 **Se puede afirmar con evidencia:** el flujo completo de un trámite funciona de punta a punta con 13 cuentas (una por rol) en producción; hay autenticación con segundo factor obligatorio, un decisor de acceso que niega por defecto, aislamiento por institución en dos barreras, auditoría inalterable y una consola de auditoría con su propio rol de solo lectura. Todo está probado: 1044 pruebas del backend y 292 del frontend (último cambio, 24-nov), las verificaciones contra la base real y un ensayo de la demostración de **112 de 112** comprobaciones contra producción (24-nov). Además hay plazos en días hábiles con escalamiento automático, documentos adjuntos cifrados, derechos sobre los datos personales (Ley 81), las cinco consolas de plataforma con control dual, respaldos diarios con restauración probada y CI de seguridad.

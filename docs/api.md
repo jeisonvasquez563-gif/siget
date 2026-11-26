@@ -93,6 +93,7 @@ Solo el operador de identidades, con segundo factor reciente (acciones `consulta
 | `GET /tramites/<id>/documentos/` | — | `{tramite, documentos: [{id, nombre, tipo, tamano, creado_en}]}`; el personal ve además `subido_por` y `sha256` |
 | `POST /tramites/<id>/documentos/` | **multipart** con un solo campo `archivo` (la única ruta que no es JSON) | `201 Documento`. Solo quien pidió el trámite y mientras no tenga resolución final. `413 demasiado_grande` (más de 5 MB), `415` (`extension_no_permitida`, `contenido_no_permitido`, `extension_no_coincide`), `409 tramite_cerrado`, `409 demasiados_documentos` (20), `503 documentos_no_disponibles` (sin clave configurada) |
 | `GET /tramites/<id>/documentos/<doc>/` | — | El archivo, con `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff` y `Cache-Control: no-store`. Si el archivo no supera la verificación de integridad: `500 documento_no_disponible` y un evento de seguridad `documento_alterado` |
+| `GET /tramites/mis-documentos/` | `?limite=1..100&desplazamiento=&q=` (`q`: hasta 100 caracteres; busca en el nombre del documento, el tipo y la institución del trámite y, si es un número o `#número`, el número del trámite) | `{resultados: [{id, nombre, tipo, tamano, creado_en, tramite: {id, tipo_tramite, institucion}}], total, limite, desplazamiento}` — **solo lo que adjuntó la propia persona en sus trámites** (también el personal: lo suyo, no lo de los trámites que atiende). El PDP decide con `ver_documento` sobre un recurso propio (sin acción nueva): un rol de plataforma recibe `403`. La base filtra por filas y la API filtra además por solicitante y por quien subió el archivo. Sin `sha256` ni datos del personal; `Cache-Control: no-store`. `400 paginacion_invalida`, `400 filtro_invalido` (`q` demasiado largo). La descarga usa la ruta de arriba, con el `id` del trámite y del documento que trae cada fila |
 
 Estados: `Pendiente → En Tramitacion → (En Subsanacion ↔ En Tramitacion) → Aprobado \| Rechazado`. Los estados finales no admiten cambios.
 
@@ -210,6 +211,26 @@ El `modulos` de `/auth/yo/` incluye siempre `seguridad`, `mfa` y `roles_permisos
 | `POST /equipo/<institucion>/miembros/<persona>/quitar/` | — | `200`; `409 tiene_tramites_abiertos {tramites_abiertos}` (supervisión debe reasignarlos antes); `409 no_corresponde` |
 
 Quitar **revoca** la membresía (no se borra): queda quién la dio y quién la quitó.
+
+### Indicadores de la institución (`/equipo/<institucion>/indicadores/`) — migración 022
+
+| Ruta | Respuestas |
+|---|---|
+| `GET /equipo/<institucion>/indicadores/` | `200` con los agregados de abajo; `403` para cualquiera que no sea **supervisión o coordinación de esa institución** (el PDP decide antes de tocar la base con `ver_indicadores_institucion`, **sin segundo factor reciente**: es lectura de agregados). Una institución ajena y una que no existe responden **igual** (`403`): no se revela cuáles existen. `Cache-Control: no-store` |
+
+La coordinación no ve trámites (seguridad por filas), pero sí estas cifras: salen de la función `siget.indicadores_institucion()` (`SECURITY DEFINER`, ruta de búsqueda fija, `EXECUTE` solo para `app_role`), que **devuelve solo agregados** y vuelve a comprobar adentro que quien pregunta sea supervisión o coordinación vigente (membresía no revocada y cuenta activa); si no, `42501` y la API responde `403` con un evento de seguridad `indicadores_denegados_por_la_base` (quién y dónde, nada más).
+
+```json
+{
+  "institucion": 3, "generado_en": "2026-11-26T18:00:00+00:00",
+  "por_estado": {"Pendiente": 2, "En Tramitacion": 2, "En Subsanacion": 1, "Aprobado": 24, "Rechazado": 12},
+  "abiertos": 5, "vencidos": 1, "escalados_abiertos": 1, "sin_asignar": 2,
+  "resueltos_90_dias": 36, "dias_promedio_resolucion": 7.4,
+  "por_funcionario": [{"usuario_id": 202, "usuario": "flor.mop", "abiertos": 2}]
+}
+```
+
+`abiertos` = estado distinto de `Aprobado`, `Rechazado` y `Desistido`; `vencidos` = abiertos con `fecha_limite` pasada; `escalados_abiertos` = abiertos con `escalado_en`; `dias_promedio_resolucion` = promedio, en días, de la creación al cambio a `Aprobado` o `Rechazado` de los trámites resueltos en los últimos 90 días (`null` si no hubo ninguno); `por_funcionario` solo nombra **personal** (funcionario o supervisor de esa institución), de mayor a menor carga. `por_estado` trae siempre los cinco estados de siempre (en 0 si no hay) y cualquier otro que exista. **Nunca** trae ids de trámites, personas solicitantes ni contenido. La respuesta se arma clave por clave con una lista fija.
 
 ### Catálogo de la institución (`/catalogo/institucion/<id>/…`) — migración 020
 
