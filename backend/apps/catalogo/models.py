@@ -25,6 +25,8 @@ class TipoTramite(ModeloDeEsquema):
     formulario = models.JSONField(default=list)
     # Migración 020: un tipo desactivado no se ofrece para trámites nuevos (los que ya existen siguen su curso); nunca se borra
     activo = models.BooleanField(default=True)
+    # Migración 020: lo lleva solo la base (1 al crear, +1 en cada cambio real); la API lo usa para no pisar la edición de otra persona
+    version = models.IntegerField(default=1)
 
     class Meta(ModeloDeEsquema.Meta):
         db_table = "tipo_tramite"

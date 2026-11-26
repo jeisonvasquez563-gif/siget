@@ -143,6 +143,7 @@ class TramitesColeccion(_Base):
                                                                      audiencia=tipo.audiencia))
         if not tipo.activo:  # la coordinación lo desactivó: no admite trámites nuevos (los que ya existen siguen su curso; la base también lo impide)
             return _error("tipo_tramite_inactivo", "Ese trámite ya no se ofrece. Elige otro del catálogo.", status.HTTP_400_BAD_REQUEST)
+        # Se valida con el formulario vigente del tipo: es el mismo que copiará la base al crear el trámite (migración 020)
         contenido, fallo = _validar_contenido(request, tipo.pk, tipo.formulario, _datos(request).get("datos", {}))
         if fallo:
             return fallo
@@ -151,8 +152,9 @@ class TramitesColeccion(_Base):
         feriados = feriados_entre(ahora.date(), ahora.date() + timedelta(days=tipo.sla_dias * 3 + 30))
         try:
             with transaction.atomic():  # punto de guardado: si la base rechaza el contenido, la petición sigue viva para responder 400
+                # `formulario`: la base pone su propia copia del formulario del tipo y descarta lo que se le mande; aquí solo se manda el mismo
                 tramite = Tramite.objects.create(tipo_tramite=tipo, institucion=tipo.institucion, solicitante=usuario, datos=contenido,
-                                                 fecha_limite=calcular_fecha_limite(ahora, tipo.sla_dias, feriados))
+                                                 formulario=tipo.formulario, fecha_limite=calcular_fecha_limite(ahora, tipo.sla_dias, feriados))
         except IntegrityError as error:
             if "tramite_datos" not in str(error):  # solo el CHECK del contenido (tamaño u objeto); cualquier otro fallo sí es un error del servidor
                 raise
@@ -216,8 +218,8 @@ class TramiteSubsanacion(_Base):
         if error:
             return _error("datos_invalidos", f"`respuesta`: {error}", status.HTTP_400_BAD_REQUEST, {"respuesta": error})
         cambios = {"estado": "En Tramitacion"}
-        if "datos" in cuerpo:  # si viene, reemplaza al contenido anterior y se valida completo contra el formulario del tipo
-            contenido, fallo = _validar_contenido(request, tramite.tipo_tramite_id, tramite.tipo_tramite.formulario, cuerpo["datos"])
+        if "datos" in cuerpo:  # si viene, reemplaza al contenido anterior y se valida completo contra la copia del formulario del TRÁMITE (no la vigente del tipo)
+            contenido, fallo = _validar_contenido(request, tramite.tipo_tramite_id, tramite.formulario, cuerpo["datos"])
             if fallo:
                 return fallo
             cambios["datos"] = contenido

@@ -78,6 +78,11 @@ def test_el_tipo_de_tramite_mapea_la_columna_activo_y_el_registro_sus_columnas()
     assert TipoTramite().activo is True  # un tipo nuevo se ofrece, como la columna (DEFAULT true)
 
 
+def test_el_tramite_mapea_la_copia_del_formulario_y_el_tipo_su_version():
+    assert "formulario" in columnas_del_modelo(Tramite)
+    assert "version" in columnas_del_modelo(TipoTramite) and TipoTramite().version == 1  # como la columna (DEFAULT 1)
+
+
 def test_el_adaptador_traduce_el_usuario_al_sujeto_del_pdp():
     mfa = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
     u = Usuario(pk=7, username="ana", estado_cuenta="activa", nivel_aseguramiento=2, rol_plataforma="ninguno", mfa_verificado_en=mfa)
