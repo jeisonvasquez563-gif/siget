@@ -11,7 +11,7 @@ from datetime import timedelta
 import django
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import Count, OuterRef, Subquery
 from django.utils import timezone
 
 from apps.autenticacion import derechos, servicio as auth
@@ -21,9 +21,10 @@ from apps.catalogo.models import Institucion
 from apps.identidad.models import Aprobacion, Membresia, SolicitudDerecho, Usuario
 
 from apps.identidad import equipo
+from apps.tramites import formulario
 
 from . import secretos
-from .models import RotacionSecreto
+from .models import ESTADOS_ALERTA, AlertaSeguridad, RotacionSecreto
 
 TIPOS_INSTITUCION = ("real", "demostracion")
 _NOMBRE_INSTITUCION = re.compile(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9][A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 .,'\-/()]{2,79}$")
@@ -280,6 +281,75 @@ def eventos_recientes(evento="", limite=100):
         consulta = consulta.filter(evento=evento)
     return [{"id": e.pk, "creado_en": e.creado_en, "evento": e.evento, "usuario": e.actor.username if e.actor_id else None, "ip": e.ip}
             for e in consulta[:limite]]
+
+
+# --------------------------------------------------------------------------- alertas de seguridad (migración 019)
+
+ESTADOS_DE_ALERTA = tuple(e for e, _ in ESTADOS_ALERTA)
+RESOLUCIONES_DE_ALERTA = ("revisada", "descartada")
+NOTA_ALERTA_MIN, NOTA_ALERTA_MAX = 3, 1000
+_COLUMNAS_ALERTA = ("id", "regla", "severidad", "usuario_id", "usuario__username", "ip", "conteo", "primera_vez", "ultima_vez", "detalle", "estado",
+                    "revisada_por_id", "revisada_por__username", "revisada_en", "nota")
+
+
+def alerta_a_dict(fila):
+    """Una alerta para la consola: la persona va con su usuario (nunca cédula ni correo) y el detalle son solo contadores y nombres."""
+    return {
+        "id": fila["id"], "regla": fila["regla"], "severidad": fila["severidad"],
+        "persona": {"id": fila["usuario_id"], "usuario": fila["usuario__username"]} if fila["usuario_id"] else None,
+        "ip": str(fila["ip"]) if fila["ip"] else None, "conteo": fila["conteo"], "primera_vez": fila["primera_vez"], "ultima_vez": fila["ultima_vez"],
+        "detalle": fila["detalle"], "estado": fila["estado"],
+        "revisada_por": {"id": fila["revisada_por_id"], "usuario": fila["revisada_por__username"]} if fila["revisada_por_id"] else None,
+        "revisada_en": fila["revisada_en"], "nota": fila["nota"],
+    }
+
+
+def alertas(estado, limite, desplazamiento, bd="default"):
+    """Una página de alertas (las más recientes primero) con el total del filtro y cuántas hay abiertas en total.
+    `bd`: la conexión; el auditor lee por la suya (auditor_role, solo SELECT), el operador por la de la aplicación (con la seguridad por filas)."""
+    todas = AlertaSeguridad.objects.using(bd)
+    consulta = todas.filter(estado=estado) if estado else todas
+    filas = consulta.order_by("-ultima_vez", "-id").values(*_COLUMNAS_ALERTA)[desplazamiento:desplazamiento + limite]
+    return {"resultados": [alerta_a_dict(f) for f in filas], "total": consulta.count(), "abiertas": todas.filter(estado="abierta").count()}
+
+
+def validar_revision(datos):
+    """Entrada de la revisión: devuelve ((estado, nota), errores). La nota es obligatoria."""
+    datos = datos if isinstance(datos, dict) else {}
+    errores = []
+    estado, nota = datos.get("estado"), datos.get("nota")
+    if not isinstance(estado, str) or estado not in RESOLUCIONES_DE_ALERTA:
+        errores.append("el estado debe ser «revisada» o «descartada»")
+    # Mismo criterio que los motivos de los trámites: sin NUL ni caracteres de control, sin solo invisibles, con letra o número
+    if nota is None:
+        errores.append(f"la nota debe tener de {NOTA_ALERTA_MIN} a {NOTA_ALERTA_MAX} caracteres")
+    else:
+        nota, error = formulario.validar_texto_libre(nota, NOTA_ALERTA_MIN, NOTA_ALERTA_MAX)
+        if error:
+            errores.append(f"la nota no es válida: {error[0].lower()}{error[1:]}")
+    return ((estado, nota), []) if not errores else (None, errores)
+
+
+def revisar_alerta(operador, pk, datos, ip):
+    """Revisa o descarta una alerta abierta, una sola vez y con nota. La base impone lo mismo (disparador) y que quien revisa sea el operador.
+
+    La nota queda en la alerta, no en los eventos de seguridad: ahí solo van el identificador, la regla y el resultado."""
+    existente = AlertaSeguridad.objects.filter(pk=pk).values("regla", "estado").first()
+    if existente is None:  # la base ya filtró lo que no ve: para quien pregunta, no existe
+        return Resultado(False, "no_existe")
+    valores, errores = validar_revision(datos)
+    if errores:
+        return Resultado(False, "datos_invalidos", detalle={"errores": errores})
+    estado, nota = valores
+    if existente["estado"] != "abierta":
+        return Resultado(False, "ya_revisada")
+    with transaction.atomic():
+        # `estado="abierta"` en el filtro: si otro operador la revisó entre tanto, no se pisa. La hora no se envía: la fija la base
+        filas = AlertaSeguridad.objects.filter(pk=pk, estado="abierta").update(estado=estado, revisada_por=operador, nota=nota)
+        if filas != 1:
+            return Resultado(False, "ya_revisada")
+        registrar_evento(operador.pk, "alerta_revisada", ip, {"alerta": pk, "regla": existente["regla"], "estado": estado})
+    return Resultado(True, "alerta_" + estado, detalle={"id": pk, "estado": estado})
 
 
 # --------------------------------------------------------------------------- secretos

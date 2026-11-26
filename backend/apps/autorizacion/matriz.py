@@ -22,9 +22,9 @@ ROLES = [
     ("operador_infraestructura", "Operador de infraestructura", "plataforma", "Opera servidores y contenedores. No ve trámites."),
     ("operador_identidades", "Operador de identidades", "plataforma", "Altas de coordinadores, restablece el segundo factor (control dual) y responde las solicitudes sobre datos personales."),
     ("operador_catalogo", "Operador de catálogo", "plataforma", "Altas de instituciones y de trámites (control dual)."),
-    ("operador_seguridad", "Operador de seguridad", "plataforma", "Bloquea cuentas y revoca sesiones ante un incidente."),
+    ("operador_seguridad", "Operador de seguridad", "plataforma", "Bloquea cuentas, revoca sesiones ante un incidente y revisa las alertas de seguridad."),
     ("custodio_secretos", "Custodio de secretos", "plataforma", "Rota claves y certificados. No ve datos."),
-    ("auditor", "Auditor", "plataforma", "Lee el registro inalterable. No puede escribir ni ver trámites."),
+    ("auditor", "Auditor", "plataforma", "Lee el registro inalterable y las alertas de seguridad. No puede escribir ni ver trámites."),
 ]
 
 ACCIONES = [
@@ -55,6 +55,8 @@ ACCIONES = [
     (Accion.CORREGIR_MIS_DATOS, "Corregir los propios datos de contacto", "Datos personales", ("Su propio perfil", "El perfil de otra persona")),
     (Accion.CAMBIAR_CONTRASENA, "Cambiar la propia contraseña", "Cuenta", ("Su propia cuenta", "La cuenta de otra persona")),
     (Accion.VER_MIS_NOTIFICACIONES, "Ver las propias notificaciones", "Cuenta", ("Sus propias notificaciones", "Las notificaciones de otra persona")),
+    (Accion.VER_ALERTAS, "Ver las alertas de seguridad", "Alertas", None),
+    (Accion.REVISAR_ALERTA, "Revisar o descartar una alerta de seguridad", "Alertas", None),
     (Accion.CONSULTAR_AUDITORIA, "Consultar la auditoría", "Auditoría", None),
     (Accion.CONSULTAR_DECISIONES, "Consultar las decisiones de acceso", "Auditoría", None),
 ]

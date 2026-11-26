@@ -58,7 +58,7 @@ Los mensajes de autenticación son genéricos a propósito (`Credenciales invál
 
 ## Derechos sobre los datos personales (`/auth/mis-datos/…`) — scope `completo` (PT-15, Ley 81 de 2019)
 
-Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (28 acciones en total en la matriz, con `responder_subsanacion`, `cambiar_contrasena` y `ver_mis_notificaciones`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
+Cada ruta consulta al PDP al inicio (la decisión queda registrada): las acciones `ver_mis_datos`, `exportar_mis_datos`, `crear_solicitud_datos` y `corregir_mis_datos` valen solo para quien no tiene rol de plataforma y sobre su propio perfil (30 acciones en total en la matriz, con `responder_subsanacion`, `cambiar_contrasena`, `ver_mis_notificaciones`, `ver_alertas` y `revisar_alerta`). Todo es sobre la **propia** cuenta: ninguna ruta recibe el identificador de otra persona (cualquier `usuario_id` en un cuerpo se rechaza o se ignora). Las respuestas con datos personales llevan `Cache-Control: no-store`. Cancelar **no borra nada automáticamente**: los trámites son expediente público con conservación obligatoria; la respuesta del operador explica qué se puede borrar y qué no.
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
@@ -233,9 +233,33 @@ Todas exigen acceso completo y que el rol de plataforma correspondiente tenga el
 | `GET/POST /plataforma/invitaciones/` `{nota?}` | identidades | Lista (`modo_registro`, `invitaciones: [{id, nota, emitida_por, creado_en, vence_en, usada, estado}]`, nunca el código) y emite: `201 {id, codigo_invitacion, vence_en}`, el código **solo en esta respuesta** (`Cache-Control: no-store`) |
 | `POST /plataforma/personas/<id>/bloquear/` `{motivo}` · `…/desbloquear/` · `…/revocar-sesiones/` | seguridad | Bloqueo de cuenta (motivo de 5 a 200 caracteres) y cierre de sesiones |
 | `GET /plataforma/eventos/` | seguridad | Últimos eventos de seguridad |
+| `GET /plataforma/alertas/` `?estado=&limite=1..100&desplazamiento=` | seguridad, auditor (solo lectura) | Alertas ante patrones sospechosos (ver abajo): `{resultados: [Alerta], total, abiertas, limite, desplazamiento}`, las más recientes primero. `estado` es `abierta`, `revisada` o `descartada` (otro valor, `400 datos_invalidos`); `total` cuenta lo que coincide con el filtro y `abiertas`, todas las abiertas. `Cache-Control: no-store` |
+| `POST /plataforma/alertas/<id>/revisar/` `{estado: revisada\|descartada, nota}` | seguridad | Revisa o descarta una alerta **abierta**, una sola vez. La nota (3 a 1000 caracteres) es obligatoria. `404` si no existe, `409 ya_revisada` si ya no está abierta, `400 datos_invalidos {errores[]}` (la nota se valida como los motivos de los trámites: sin caracteres de control ni NUL, con al menos una letra o un número); responde `200 {codigo: alerta_revisada\|alerta_descartada, id, estado}` |
 | `GET/POST /plataforma/aprobaciones/` | identidades (altas de coordinadora), catálogo (altas de institución) | Lista y propone. El tipo sale del rol, nunca del cliente |
 | `POST /plataforma/aprobaciones/<id>/resolver/` `{decision: aprobar\|rechazar}` | el mismo rol, **otra persona** | Aprueba (y aplica el efecto) o rechaza. Quien propuso recibe `403` |
 | `GET/POST /plataforma/secretos/` | custodio de secretos | Estado de los 8 secretos y registro de una rotación (`{secreto, nota}`); nunca valores |
 | `GET /plataforma/infraestructura/` | infraestructura | Salud de la base (respuesta, TLS, tamaño), del proceso y vencimiento del certificado |
+
+### Alertas de seguridad (PT-10, migración 019)
+
+Las crea la base, no la API: `siget.detectar_anomalias()` corre cada 5 minutos (temporizador de systemd, rol `detector_role`) y deja **una alerta abierta por regla, persona e IP** (si el patrón sigue, actualiza `conteo` y `ultima_vez`). La API solo las lista y las revisa. Acciones del PDP: `ver_alertas` (operador de seguridad y auditor, con segundo factor reciente; el auditor, además, nivel 3) y `revisar_alerta` (solo el operador de seguridad, con segundo factor reciente). La matriz y el simulador pasan de 28 a **30 acciones**. Es una ruta de `/plataforma/`: nginx y el proxy de desarrollo ya la dejan pasar.
+
+```json
+{ "id": 7, "regla": "rafaga_login_fallido_ip", "severidad": "media",
+  "persona": null,                      // {id, usuario} si la regla es por persona; nunca cédula ni correo
+  "ip": "198.51.100.23",                // null si la regla es por persona
+  "conteo": 14, "primera_vez": "…", "ultima_vez": "…",
+  "detalle": {"ventana_minutos": 10, "umbral": 10, "por_nombre": {"login_fallido": 11, "cambio_contrasena_fallido": 3}},
+  "estado": "abierta", "revisada_por": null, "revisada_en": null, "nota": null }
+```
+
+| `regla` | Severidad | Se alerta cuando | Eventos que cuenta |
+|---|---|---|---|
+| `rafaga_login_fallido_ip` | media | 10 o más en 10 minutos desde una misma IP | `evento_seguridad.evento` = `login_fallido` o `cambio_contrasena_fallido` |
+| `denegaciones_persona` | media | 5 o más en 10 minutos para una misma persona | `decision_pdp` con `permitido = false` |
+| `reuso_token_refresco` | alta | cualquiera (una alerta por persona mientras esté abierta) | `refresh_reuso` |
+| `bloqueos_repetidos` | alta | 2 o más en 24 horas de una misma cuenta | `cuenta_bloqueada` |
+
+El `detalle` solo lleva contadores y nombres (de evento o de política): nunca contraseñas, tokens, hashes, cédula ni correo. `conteo` es el máximo de eventos en una ventana, y `detalle.por_nombre` cuenta todos los eventos entre `primera_vez` y `ultima_vez` (puede sumar más que `conteo`). Una alerta revisada o descartada no se reabre ni se repite con los mismos eventos: solo cuentan los posteriores a su `ultima_vez`. Cada revisión deja el evento de seguridad `alerta_revisada` (`{alerta, regla, estado}`, sin la nota).
 
 Errores propios: `409 no_a_si_mismo` (nadie actúa sobre su cuenta), `409 conflicto_de_funciones` (quien emitió el código de contraseña de una cuenta no restablece además su segundo factor en 24 horas, ni al revés), `409 ya_resuelta`, `409 no_corresponde`, `400 datos_invalidos {errores[]}`.

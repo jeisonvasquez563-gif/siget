@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api.js'
 import { ACCIONES_EVENTO, ESTADOS, Paginacion, fecha, hace, mensajeDe, useReautenticacion } from './comun.jsx'
+import { PanelAlertas } from './Plataforma.jsx'
 import { Alerta, Avatar, BloquesEsqueleto, Esqueleto, Icono, Insignia, Vacio } from './ui.jsx'
 
 const PESTANAS = [
@@ -8,6 +9,7 @@ const PESTANAS = [
   ['decisiones', 'Decisiones de acceso'],
   ['seguridad', 'Eventos de seguridad'],
   ['tramites', 'Actuaciones en trámites'],
+  ['alertas', 'Alertas de seguridad'],
 ]
 
 export const NOMBRES_EVENTO = {
@@ -44,6 +46,7 @@ export function Auditoria() {
       {pestana === 'decisiones' && <Decisiones />}
       {pestana === 'seguridad' && <Listado ruta="/auditoria/seguridad/" columnas={COLUMNAS_SEGURIDAD} filtro={['evento', 'Evento', 'p. ej. login_fallido']} vacio="No hay eventos de seguridad con ese filtro." />}
       {pestana === 'tramites' && <Listado ruta="/auditoria/tramites/" columnas={COLUMNAS_TRAMITES} filtro={['accion', 'Acción', 'p. ej. cambio_estado']} vacio="No hay actuaciones con ese filtro." />}
+      {pestana === 'alertas' && <PanelAlertas soloLectura />}
       <p className="nota"><Icono nombre="escudo" className="en-linea" /> Quién audita al auditor: cada consulta que haces pasa por el punto de decisión de acceso y queda registrada como una decisión más.</p>
     </>
   )

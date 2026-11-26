@@ -1,0 +1,12 @@
+# SIGET: cada 5 minutos busca patrones sospechosos. Persistent: si la VM estaba apagada, corre al encender.
+# ~/.config/systemd/user/siget-detectar.timer   ->   systemctl --user enable --now siget-detectar.timer
+[Unit]
+Description=SIGET: detección de patrones sospechosos cada 5 minutos
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

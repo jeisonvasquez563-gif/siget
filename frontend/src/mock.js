@@ -61,9 +61,9 @@ const MODULOS = {
   consola_infraestructura: ['Infraestructura', 'Estado de la base de datos y del servicio, y vencimiento del certificado (solo lectura).', 'disponible'],
   consola_identidades: ['Identidades', 'Restablece contraseñas y segundo factor, y da de alta a las coordinadoras con control dual.', 'disponible'],
   consola_catalogo: ['Catálogo', 'Alta de instituciones con control dual.', 'disponible'],
-  consola_seguridad: ['Respuesta a incidentes', 'Bloquea cuentas, revoca sesiones y mira los eventos de seguridad.', 'disponible'],
+  consola_seguridad: ['Respuesta a incidentes', 'Bloquea cuentas, revoca sesiones, mira los eventos de seguridad y revisa las alertas.', 'disponible'],
   consola_secretos: ['Custodia de secretos', 'Registra la rotación de secretos y avisa cuándo toca.', 'disponible'],
-  auditoria: ['Auditoría', 'Consulta del registro inalterable de eventos y de decisiones de acceso.', 'disponible'],
+  auditoria: ['Auditoría', 'Consulta del registro inalterable de eventos y de decisiones de acceso, y de las alertas de seguridad.', 'disponible'],
 }
 const POR_PLATAFORMA = {
   operador_infraestructura: 'consola_infraestructura', operador_identidades: 'consola_identidades', operador_catalogo: 'consola_catalogo',
@@ -206,7 +206,7 @@ export function instalarMock(inicial, opciones = {}) {
   let sesionesAbiertas = 1 // cuántas sesiones ha abierto el cambio de contraseña (da un acceso nuevo distinto cada vez)
   let otrasSesiones = 2 // las demás sesiones abiertas de la cuenta: el cambio las cierra
   const plataforma = plataformaMock({
-    usuarios: USUARIOS, actual: () => actual, hace,
+    usuarios: USUARIOS, actual: () => actual, hace, mfaFresco: () => mfaFresco,
     resp: (e, c) => new Response(JSON.stringify(c), { status: e, headers: { 'Content-Type': 'application/json' } }),
     negado: () => new Response(JSON.stringify({ codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false }), { status: 403, headers: { 'Content-Type': 'application/json' } }),
   })

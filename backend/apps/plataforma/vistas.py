@@ -10,6 +10,7 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -20,6 +21,8 @@ from apps.autenticacion.tokens import SCOPE_COMPLETO
 from apps.autorizacion.pdp import Accion, Recurso
 from apps.autorizacion.permisos import autorizar
 from apps.identidad.models import Aprobacion, SolicitudDerecho, Usuario
+from apps.nucleo.contexto import fijar_contexto
+from apps.tramites.serializacion import entero_positivo, paginacion
 
 from . import servicio
 
@@ -33,6 +36,7 @@ MENSAJES = {
     "ya_resuelta": "Esta propuesta o solicitud ya fue resuelta.",
     "sin_segundo_factor": "Esa cuenta no tiene segundo factor activo.",
     "cuenta_suspendida": "La cuenta está suspendida.",
+    "ya_revisada": "Esta alerta ya fue revisada o descartada.",
 }
 
 
@@ -129,6 +133,46 @@ class EventosSeguridad(_Plataforma):
     def get(self, request):
         autorizar(request, Accion.BLOQUEAR_CUENTA, Recurso(tipo="usuario"))
         return Response({"eventos": servicio.eventos_recientes(request.query_params.get("evento", "")[:60])})
+
+
+# --------------------------------------------------------------------------- alertas ante patrones sospechosos (PT-10)
+
+class Alertas(_Plataforma):
+    """Las alertas que deja el detector (migración 019). El operador de seguridad las ve y las revisa; el auditor solo las ve.
+    Devuelve el identificador y el usuario de la persona involucrada (nunca nombre, cédula ni correo), la IP y contadores."""
+
+    def get(self, request):
+        autorizar(request, Accion.VER_ALERTAS, Recurso(tipo="alerta"))
+        pagina = paginacion(request.query_params)
+        if pagina is None:
+            return Response({"codigo": "paginacion_invalida", "detalle": "limite (1 a 100) y desplazamiento deben ser enteros válidos."}, status=status.HTTP_400_BAD_REQUEST)
+        estado = request.query_params.get("estado", "")
+        if estado and estado not in servicio.ESTADOS_DE_ALERTA:
+            return Response({"codigo": "datos_invalidos", "errores": ["el estado debe ser «abierta», «revisada» o «descartada»"]}, status=status.HTTP_400_BAD_REQUEST)
+        limite, desplazamiento = pagina
+        yo = self.yo(request)
+        if yo.rol_plataforma == "auditor":
+            bd = "auditoria"  # su propia conexión: solo SELECT
+        else:
+            bd = "default"
+            fijar_contexto(yo.pk)  # la seguridad por filas solo muestra las alertas a un operador de seguridad activo
+        cuerpo = servicio.alertas(estado, limite, desplazamiento, bd)
+        respuesta = Response({**cuerpo, "limite": limite, "desplazamiento": desplazamiento})
+        respuesta["Cache-Control"] = "no-store"
+        return respuesta
+
+
+class AlertaRevisar(_Plataforma):
+    def post(self, request, pk):
+        autorizar(request, Accion.REVISAR_ALERTA, Recurso(tipo="alerta"))  # primero el PDP: quien no puede, no se entera de si existe
+        if entero_positivo(pk) is None:
+            raise NotFound()
+        yo = self.yo(request)
+        fijar_contexto(yo.pk)
+        r = servicio.revisar_alerta(yo, pk, request.data, _ip(request))
+        if r.codigo == "no_existe":
+            raise NotFound()
+        return _responder(r)
 
 
 # --------------------------------------------------------------------------- solicitudes sobre datos personales (Ley 81)
