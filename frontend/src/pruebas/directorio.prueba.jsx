@@ -86,6 +86,7 @@ describe('ficha de una institución', () => {
     const f = await ficha('Permiso de construcción')
     expect(within(f).getByText(/Autorización de la Alcaldía para construir/)).toBeInTheDocument()
     expect(within(f).getByText('15 días hábiles')).toBeInTheDocument()
+    expect(within(f).getByRole('note')).toHaveTextContent('Contenido orientativo, pendiente de validación por la institución.')
     expect(within(f).getByRole('heading', { name: 'Documentos necesarios' })).toBeInTheDocument()
     expect(within(f).getAllByRole('listitem').map((l) => l.textContent)).toContain('Paz y salvo municipal del inmueble')
     expect(within(f).getByRole('heading', { name: 'Qué pasa después' })).toBeInTheDocument()

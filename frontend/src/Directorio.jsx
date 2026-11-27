@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from './api.js'
 import { mensajeDe } from './comun.jsx'
-import { Buscador, diasHabiles } from './Tramites.jsx'
+import { AVISO_ORIENTATIVO, Buscador, diasHabiles } from './Tramites.jsx'
 import { Alerta, BloquesEsqueleto, Vacio } from './ui.jsx'
 
 // Directorio de instituciones: qué trámites ofrece cada una, con su plazo, los documentos que hacen falta y qué pasa después. Es información
@@ -16,6 +16,7 @@ function FichaTramite({ tipo, institucion, esPropia, iniciar }) {
   return (
     <article className="ficha-tramite" aria-labelledby={`tramite-${tipo.id}`}>
       <h4 id={`tramite-${tipo.id}`}>{tipo.nombre}</h4>
+      <p className="nota" role="note">{AVISO_ORIENTATIVO}</p>
       {r.descripcion ? <p className="texto-largo">{r.descripcion}</p> : <p className="suave">La institución todavía no describió este trámite.</p>}
       <dl className="datos">
         <dt>Plazo de atención</dt><dd>{diasHabiles(tipo.sla_dias)}</dd>

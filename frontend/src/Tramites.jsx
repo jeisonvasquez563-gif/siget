@@ -172,16 +172,18 @@ export function MisTramites({ yo, abrir, nuevo, filtros: guardados, cambiarFiltr
 
 /* ---------------------------------------------------------------- nuevo trámite */
 
+export const AVISO_ORIENTATIVO = 'Contenido orientativo, pendiente de validación por la institución.'
 export const diasHabiles = (n) => `${n} ${n === 1 ? 'día hábil' : 'días hábiles'}`
 
 // La tarjeta que se lee antes del formulario: para qué sirve el trámite, el plazo, los documentos que hacen falta y qué pasa después. Todo texto
 // que llega del catálogo se dibuja como texto de React (nunca como HTML). Los requisitos los escribe la coordinación de la institución.
-export function AntesDeEmpezar({ tipo, empezado, empezar }) {
+export function AntesDeEmpezar({ tipo, empezado, empezar, aviso = true }) {
   const r = tipo.requisitos || {}
   const documentos = Array.isArray(r.documentos) ? r.documentos : []
   return (
     <section className="panel antes-de-empezar" aria-labelledby="antes-de-empezar">
       <div className="panel-cabecera"><h3 id="antes-de-empezar">Antes de empezar</h3></div>
+      {aviso && <p className="nota" role="note">{AVISO_ORIENTATIVO}</p>}
       {r.descripcion ? <p className="texto-largo">{r.descripcion}</p> : <p className="suave">La institución todavía no describió este trámite.</p>}
       <dl className="datos">
         <dt>Plazo de atención</dt><dd>{diasHabiles(tipo.sla_dias)}</dd>

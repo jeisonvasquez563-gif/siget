@@ -258,7 +258,7 @@ function Editor({ institucion, tipo, alTerminar, alCancelar, alRecargar, ejecuta
         </form>
       </section>
       <VistaPrevia campos={b.campos} />
-      <AntesDeEmpezar tipo={{ sla_dias: Number(b.sla_dias) || 1, requisitos: requisitosDe(b) }} empezado />
+      <AntesDeEmpezar tipo={{ sla_dias: Number(b.sla_dias) || 1, requisitos: requisitosDe(b) }} empezado aviso={false} />
     </>
   )
 }

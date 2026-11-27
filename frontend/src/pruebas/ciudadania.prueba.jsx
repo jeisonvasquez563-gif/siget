@@ -64,6 +64,7 @@ describe('«Antes de empezar»', () => {
     const tarjeta = (await screen.findByRole('heading', { name: 'Antes de empezar' })).closest('section')
     expect(within(tarjeta).getByText(/Autorización de la Alcaldía para construir/)).toBeInTheDocument()
     expect(within(tarjeta).getByText('15 días hábiles')).toBeInTheDocument()
+    expect(within(tarjeta).getByText('Contenido orientativo, pendiente de validación por la institución.')).toBeInTheDocument()
     expect(within(tarjeta).getByRole('heading', { name: 'Documentos que vas a necesitar' })).toBeInTheDocument()
     expect(within(tarjeta).getAllByRole('listitem').map((l) => l.textContent)).toContain('Paz y salvo municipal del inmueble')
     expect(within(tarjeta).getByRole('heading', { name: 'Qué pasa después' })).toBeInTheDocument()
