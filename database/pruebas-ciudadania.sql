@@ -70,8 +70,6 @@ BEGIN
 END $$;
 CREATE FUNCTION pg_temp.n(p_usuario text, p_tipo text, p_tramite text) RETURNS int LANGUAGE sql AS
   $$ SELECT count(*)::int FROM siget.notificacion WHERE usuario_id = pg_temp.id(p_usuario) AND tipo = p_tipo AND tramite_id = pg_temp.id(p_tramite) $$;
-CREATE FUNCTION pg_temp.total(p_usuario text) RETURNS int LANGUAGE sql AS
-  $$ SELECT count(*)::int FROM siget.notificacion WHERE usuario_id = pg_temp.id(p_usuario) $$;
 
 -- ---------------------------------------------------------------------------
 -- Preparacion (como el duenio, sin contexto de usuario): dos instituciones, personas y tipos
@@ -410,6 +408,42 @@ BEGIN
                     'desde Aprobado o Rechazado no hay transicion a Desistido (P0001), tampoco para la persona solicitante');
 END $$;
 
+-- La segunda barrera (tramite_valida_solicitante, recreada en la 021 como BEFORE UPDATE sin lista de columnas): tramite_desistir y
+-- tramite_responder_subsanacion se combinan con OR, asi que es lo unico que acota a la persona solicitante en sus filas
+DO $$
+DECLARE
+  v_r jsonb := '{}'::jsonb;
+  v_motivo constant text := 'Ya no necesito este tramite.';
+BEGIN
+  PERFORM pg_temp.r(EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'siget.tramite'::regclass AND tgname = 'tramite_valida_solicitante'
+                              AND tgtype & 2 = 2 AND tgtype & 16 = 16 AND tgattr::text = ''),
+                    'tramite_valida_solicitante es BEFORE UPDATE sin lista de columnas (vigila cualquier cambio de la persona solicitante)');
+  -- Como app_role y con el contexto de la persona solicitante, sobre una fila suya
+  EXECUTE 'SET LOCAL ROLE app_role';
+  v_r := v_r || jsonb_build_object('pendiente_a_tramitacion', pg_temp.estado_de('u_ciud', 'pend', 'En Tramitacion', v_motivo));
+  PERFORM pg_temp.ctx(pg_temp.id('u_ciud'));
+  v_r := v_r || jsonb_build_object(
+    'tramitacion_datos', pg_temp.intenta(format('UPDATE siget.tramite SET datos = %L::jsonb WHERE id = %s', '{"asunto": "otro"}', pg_temp.id('tram'))),
+    'tramitacion_asignado', pg_temp.intenta(format('UPDATE siget.tramite SET funcionario_asignado_id = %s WHERE id = %s', pg_temp.id('u_funcrev'), pg_temp.id('tram'))));
+  PERFORM pg_temp.ctx(NULL);
+  RESET ROLE;
+  -- Sin la seguridad por filas (dueño) y con el contexto de la persona solicitante: tampoco puede tocar otras columnas; el personal si
+  PERFORM pg_temp.ctx(pg_temp.id('u_ciud'));
+  v_r := v_r || jsonb_build_object('dueno_como_solicitante', pg_temp.intenta(format('UPDATE siget.tramite SET escalado_en = now() WHERE id = %s', pg_temp.id('tram'))));
+  PERFORM pg_temp.ctx(pg_temp.id('u_func'));
+  v_r := v_r || jsonb_build_object('dueno_como_personal', pg_temp.intenta(format('UPDATE siget.tramite SET escalado_en = now() WHERE id = %s', pg_temp.id('tram'))));
+  PERFORM pg_temp.ctx(NULL);
+
+  PERFORM pg_temp.r(v_r ->> 'pendiente_a_tramitacion' = 'P0001',
+                    'la persona solicitante no puede pasar su tramite de Pendiente a En Tramitacion (P0001)');
+  PERFORM pg_temp.r(v_r ->> 'tramitacion_datos' = 'P0001',
+                    'la persona solicitante no puede cambiar los datos de un tramite suyo En Tramitacion (P0001)');
+  PERFORM pg_temp.r(v_r ->> 'tramitacion_asignado' = 'P0001',
+                    'la persona solicitante no puede cambiar el funcionario asignado de un tramite suyo En Tramitacion (P0001)');
+  PERFORM pg_temp.r(v_r ->> 'dueno_como_solicitante' = 'P0001' AND v_r ->> 'dueno_como_personal' = 'sin_error',
+                    'cualquier otro cambio de la persona solicitante en su fila se rechaza (P0001); el del personal que no es la solicitante no se ve afectado');
+END $$;
+
 -- ---------------------------------------------------------------------------
 -- 4. Desistir de verdad: auditoria, notificaciones, equipo, escalamiento y documentos
 -- ---------------------------------------------------------------------------
@@ -451,11 +485,13 @@ BEGIN
 
   -- Notificaciones: al funcionario asignado si conserva acceso y cuenta activa; a nadie mas
   PERFORM pg_temp.r(pg_temp.n('u_func', 'tramite_desistido', 'n1') = 1, 'se avisa al funcionario asignado (tramite_desistido)');
-  PERFORM pg_temp.r(pg_temp.n('u_funcrev', 'tramite_desistido', 'n2') = 0 AND pg_temp.total('u_funcrev') = 0,
+  PERFORM pg_temp.r(pg_temp.n('u_funcrev', 'tramite_desistido', 'n2') = 0
+                    AND NOT EXISTS (SELECT 1 FROM siget.notificacion WHERE usuario_id = pg_temp.id('u_funcrev') AND tipo = 'tramite_desistido'),
                     'a quien ya no tiene acceso a la institucion no se le avisa');
-  PERFORM pg_temp.r(pg_temp.n('u_funcsusp', 'tramite_desistido', 'n4') = 0 AND pg_temp.total('u_funcsusp') = 0,
+  PERFORM pg_temp.r(pg_temp.n('u_funcsusp', 'tramite_desistido', 'n4') = 0
+                    AND NOT EXISTS (SELECT 1 FROM siget.notificacion WHERE usuario_id = pg_temp.id('u_funcsusp') AND tipo = 'tramite_desistido'),
                     'a quien tiene la cuenta suspendida no se le avisa');
-  PERFORM pg_temp.r(NOT EXISTS (SELECT 1 FROM siget.notificacion WHERE tramite_id = pg_temp.id('n3'))
+  PERFORM pg_temp.r(NOT EXISTS (SELECT 1 FROM siget.notificacion WHERE tramite_id = pg_temp.id('n3') AND tipo = 'tramite_desistido')
                     AND NOT EXISTS (SELECT 1 FROM siget.notificacion WHERE tipo = 'tramite_desistido'
                                        AND usuario_id IN (pg_temp.id('u_sup'), pg_temp.id('u_coord'), pg_temp.id('u_otra'))),
                     'sin funcionario asignado no se avisa a nadie, y la supervision, la coordinacion y otras personas no reciben nada');

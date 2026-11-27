@@ -113,12 +113,12 @@ describe('«Antes de empezar»', () => {
 
 /* ---------------------------------------------------------------- constancia */
 
-describe('la constancia de presentación', () => {
+describe('la constancia del trámite', () => {
   it('el detalle de la persona tiene el botón «Constancia» y abre la página con todo lo presentado', async () => {
     window.print = vi.fn()
     const { user, llamadas } = await abrirDetalle('ana.ciudadana', 'Mis trámites', 39)
     await user.click(screen.getByRole('button', { name: 'Constancia' }))
-    expect(await screen.findByRole('heading', { name: 'Constancia de presentación' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Constancia del trámite' })).toBeInTheDocument()
     expect(llamadas.some((l) => l.url === '/tramites/39/constancia/' && l.metodo === 'GET')).toBe(true)
     const c = screen.getByRole('article')
     expect(within(c).getByText('#39')).toBeInTheDocument()
@@ -142,7 +142,7 @@ describe('la constancia de presentación', () => {
     await user.type(screen.getByRole('spinbutton', { name: 'Número de empleados' }), '2')
     await user.click(screen.getByRole('button', { name: 'Iniciar trámite' }))
     await user.click(await screen.findByRole('button', { name: 'Ver mi constancia' }))
-    expect(await screen.findByRole('heading', { name: 'Constancia de presentación' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Constancia del trámite' })).toBeInTheDocument()
     expect(screen.getByText('Nombre comercial').nextElementSibling).toHaveTextContent('Panadería Estrella')
   })
 
@@ -169,7 +169,7 @@ describe('la constancia de presentación', () => {
   it('la página es accesible', async () => {
     const { user, container } = await abrirDetalle('ana.ciudadana', 'Mis trámites', 39)
     await user.click(screen.getByRole('button', { name: 'Constancia' }))
-    await screen.findByRole('heading', { name: 'Constancia de presentación' })
+    await screen.findByRole('heading', { name: 'Constancia del trámite' })
     expect(await axe(container, AXE)).toHaveNoViolations()
   })
 })

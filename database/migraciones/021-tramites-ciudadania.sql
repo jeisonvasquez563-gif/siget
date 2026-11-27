@@ -26,7 +26,8 @@
 --   motivo de 10 a 2000 caracteres (siget.motivo, mecanismo de la 017), que queda en evento_auditoria.atributos.
 -- * siget.validar_respuesta_solicitante (reemplazada) amplia lo que la persona solicitante puede hacer: ademas de responder una subsanacion,
 --   pasar a Desistido desde un estado no final, sin tocar al funcionario asignado. validar_cambio_de_datos (017) sigue impidiendo que
---   desistir cambie `datos`.
+--   desistir cambie `datos`. El disparador tramite_valida_solicitante se recrea como BEFORE UPDATE sin lista de columnas: vigila cualquier
+--   cambio que haga la persona solicitante, porque es la unica barrera ante la combinacion OR de tramite_desistir y tramite_responder_subsanacion.
 -- * Politica RLS tramite_desistir (UPDATE, app_role): la fila debe ser del solicitante, en un estado no final, y quedar «Desistido». Se suma
 --   (permisivas: basta una) a tramite_cambiar (personal) y tramite_responder_subsanacion (017).
 -- * Todo lo que enumeraba estados finales: escalar_vencidos (013: un desistido no se escala; se rehace el indice parcial), documento_valida (015:
@@ -217,6 +218,8 @@ END $$;
 -- ---------------------------------------------------------------------------
 -- 4. Requisitos de los tipos sembrados (duenio, sin contexto de usuario: el disparador lo deja pasar y lo valida)
 -- ---------------------------------------------------------------------------
+-- Cada UPDATE filtra tambien por institucion_id (no solo por nombre): solo toca los tipos de las 6 instituciones de la 005 (los 6 de la 005 y
+-- el interinstitucional de la 012 en cada una: 12 tipos), nunca un tipo con el mismo nombre que otra institucion haya creado despues.
 UPDATE siget.tipo_tramite SET requisitos = '{
   "descripcion": "Autorización de la Alcaldía para construir, ampliar, remodelar o demoler una obra dentro del municipio. La obra no debe empezar antes de que el permiso esté aprobado.",
   "documentos": [
@@ -227,7 +230,8 @@ UPDATE siget.tipo_tramite SET requisitos = '{
     "Poder notarial, si el trámite lo presenta otra persona en su nombre"
   ],
   "despues": "Un funcionario de la Alcaldía revisa la solicitud y los planos. Si falta algo o hay algo por corregir, te pedirá una subsanación y verás el motivo aquí. Cuando se resuelva recibirás un aviso en la plataforma."
-}'::jsonb WHERE nombre = 'Permiso de Construcción Municipal';
+}'::jsonb WHERE nombre = 'Permiso de Construcción Municipal'
+  AND institucion_id = (SELECT id FROM siget.institucion WHERE nombre = 'Alcaldía (Municipio de Panamá)');
 
 UPDATE siget.tipo_tramite SET requisitos = '{
   "descripcion": "Presenta una solicitud, queja o denuncia para que la institución la reciba, la registre y le dé seguimiento.",
@@ -236,7 +240,8 @@ UPDATE siget.tipo_tramite SET requisitos = '{
     "Copia de cualquier documento relacionado con los hechos (opcional)"
   ],
   "despues": "Tu solicitud queda registrada con un número de seguimiento y un funcionario la revisa. Puede pedirte más información. Verás cada paso en la plataforma y recibirás un aviso cuando haya una resolución."
-}'::jsonb WHERE nombre = 'Solicitud o denuncia ciudadana';
+}'::jsonb WHERE nombre = 'Solicitud o denuncia ciudadana'
+  AND institucion_id = (SELECT id FROM siget.institucion WHERE nombre = 'Ministerio Público / 311');
 
 UPDATE siget.tipo_tramite SET requisitos = '{
   "descripcion": "Registro simplificado de un pequeño negocio ante AMPYME, para que quede identificado como micro o pequeña empresa.",
@@ -246,7 +251,8 @@ UPDATE siget.tipo_tramite SET requisitos = '{
     "Comprobante de la dirección del negocio (recibo de un servicio público o contrato de alquiler)"
   ],
   "despues": "Un funcionario de AMPYME revisa los datos y los documentos. Si falta algo te pedirá una subsanación. Cuando el registro se apruebe recibirás un aviso en la plataforma."
-}'::jsonb WHERE nombre = 'Registro empresarial simplificado';
+}'::jsonb WHERE nombre = 'Registro empresarial simplificado'
+  AND institucion_id = (SELECT id FROM siget.institucion WHERE nombre = 'AMPYME');
 
 UPDATE siget.tipo_tramite SET requisitos = '{
   "descripcion": "Solicitud formal de información que una institución dirige a otra, en el marco de sus funciones.",
@@ -255,7 +261,8 @@ UPDATE siget.tipo_tramite SET requisitos = '{
     "Cualquier documento que ayude a ubicar la información que se pide"
   ],
   "despues": "La institución destinataria revisa la solicitud y responde dentro del plazo. Si necesita una aclaración te la pedirá por este mismo trámite."
-}'::jsonb WHERE nombre = 'Solicitud interinstitucional de información';
+}'::jsonb WHERE nombre = 'Solicitud interinstitucional de información'
+  AND institucion_id IN (SELECT id FROM siget.institucion WHERE nombre IN ('Alcaldía (Municipio de Panamá)', 'Ministerio Público / 311', 'AMPYME', 'MINSA', 'MOP', 'MiAmbiente'));
 
 UPDATE siget.tipo_tramite SET requisitos = '{
   "descripcion": "Trámite de prueba para conocer cómo funciona la plataforma. No tiene ningún efecto legal.",
@@ -263,7 +270,8 @@ UPDATE siget.tipo_tramite SET requisitos = '{
     "Un archivo de prueba (PDF, PNG o JPEG) de hasta 5 MB, si quieres probar la carga de documentos"
   ],
   "despues": "Un funcionario de demostración lo revisa y lo resuelve. Lo que ocurra aquí no tiene consecuencias fuera de la plataforma."
-}'::jsonb WHERE nombre LIKE 'Trámite de demostración (%)';
+}'::jsonb WHERE nombre LIKE 'Trámite de demostración (%)'
+  AND institucion_id IN (SELECT id FROM siget.institucion WHERE nombre IN ('MINSA', 'MOP', 'MiAmbiente'));
 
 -- ---------------------------------------------------------------------------
 -- 5. Desistir: transiciones, motivo y solo la persona solicitante
@@ -313,6 +321,13 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
+
+-- El disparador de la 017 vigilaba solo `UPDATE OF estado, funcionario_asignado_id, datos`. Como tramite_desistir y
+-- tramite_responder_subsanacion se combinan con OR, esta funcion es la unica barrera sobre lo que hace la persona solicitante: se recrea
+-- sin lista de columnas para que vigile CUALQUIER UPDATE de una fila suya (la logica de la funcion no cambia).
+DROP TRIGGER tramite_valida_solicitante ON siget.tramite;
+CREATE TRIGGER tramite_valida_solicitante BEFORE UPDATE ON siget.tramite
+  FOR EACH ROW EXECUTE FUNCTION siget.validar_respuesta_solicitante();
 
 -- La persona solicitante desiste de una fila suya no final y la deja «Desistido»; el personal sigue amparado por tramite_cambiar
 CREATE POLICY tramite_desistir ON siget.tramite FOR UPDATE TO app_role
