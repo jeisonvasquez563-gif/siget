@@ -113,7 +113,7 @@ def datos_con_etiquetas(formulario, datos):
 
 
 def constancia_a_dict(tramite, documentos, ahora):
-    """Constancia de presentación: lo que consta del trámite al pedirla, para quien lo presentó. `documentos`: los adjuntos (solo sus nombres)."""
+    """Constancia del trámite: lo que consta al pedirla, para quien lo presentó (los `datos` son los VIGENTES a `emitida_en`, no los del envío original). `documentos`: los adjuntos (solo sus nombres)."""
     return {
         "numero": tramite.pk,
         "tipo_tramite": {"id": tramite.tipo_tramite_id, "nombre": tramite.tipo_tramite.nombre},

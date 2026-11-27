@@ -4,7 +4,7 @@ import { Estado, fecha, fechaCorta, mensajeDe } from './comun.jsx'
 import { valorLegible } from './Contenido.jsx'
 import { Alerta, BloquesEsqueleto, Esqueleto, Icono, Logo } from './ui.jsx'
 
-// Constancia de presentación de un trámite: la página que la persona imprime o guarda como PDF desde el navegador (no hay librerías de PDF:
+// Constancia del trámite: la página que la persona imprime o guarda como PDF desde el navegador (no hay librerías de PDF:
 // `window.print()` y una hoja de estilo para impresión que deja solo la constancia, sin menú ni botones). La arma el servidor, solo para quien
 // presentó el trámite, con las etiquetas de la COPIA del formulario con el que se presentó. Todo texto del servidor se dibuja como texto de
 // React (nunca como HTML) y nada de esto se guarda en el navegador ni viaja en la URL.
@@ -35,7 +35,7 @@ export function Constancia({ id, volver }) {
           <Logo className="constancia-logo" />
           <div>
             <p className="constancia-sistema">SIGET · Gestión y trazabilidad de trámites</p>
-            <h2 id="titulo-constancia">Constancia de presentación</h2>
+            <h2 id="titulo-constancia">Constancia del trámite</h2>
           </div>
         </header>
         <dl className="datos constancia-datos">
@@ -48,7 +48,7 @@ export function Constancia({ id, volver }) {
         </dl>
 
         <section aria-labelledby="constancia-datos">
-          <h3 id="constancia-datos">Datos enviados</h3>
+          <h3 id="constancia-datos">Datos vigentes al {fecha(c.emitida_en)}</h3>
           {c.datos.length === 0 ? <p className="suave">Este trámite no tiene datos de formulario.</p> : (
             <dl className="datos datos-solicitud constancia-enviados">
               {c.datos.map((d) => (
@@ -64,8 +64,8 @@ export function Constancia({ id, volver }) {
         </section>
 
         <footer className="constancia-pie">
-          <p>Constancia emitida el {fecha(c.emitida_en)} a nombre de quien presentó el trámite. Acredita que se presentó con los datos y documentos indicados en la fecha y hora
-            señaladas; no es una resolución ni asegura que se apruebe. El estado puede haber cambiado desde entonces: consúltalo siempre en SIGET.</p>
+          <p>Constancia emitida el {fecha(c.emitida_en)} a nombre de quien presentó el trámite. Los datos son los vigentes a esa fecha: si respondiste una subsanación con datos corregidos, aquí figuran los corregidos.
+            Acredita que el trámite se presentó en la fecha y hora señaladas; no es una resolución ni asegura que se apruebe. El estado puede haber cambiado desde entonces: consúltalo siempre en SIGET.</p>
           <p>Contiene los datos que enviaste: guárdala en un lugar seguro.</p>
         </footer>
       </article>
