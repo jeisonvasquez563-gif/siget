@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from apps.autorizacion.pdp import Accion, Entorno, Recurso, Sujeto, decidir
+from apps.autorizacion.pdp import ROLES_PLATAFORMA, Accion, Entorno, Recurso, Sujeto, decidir
 
 AHORA = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
 MOP, MINSA = 3, 2
@@ -334,3 +334,69 @@ class TestIniciarTramites:
 
     def test_ser_personal_de_otra_institucion_no_da_acceso_al_tramite_iniciado(self):
         assert not permite(funcionario(MOP, id=5), Accion.VER_TRAMITE, tramite(MINSA, solicitante_id=6))
+
+
+# --------------------------------------------------------------------------- indicadores de la institución
+
+def indicadores(institucion=MOP):
+    return Recurso(tipo="indicadores", institucion_id=institucion)
+
+
+class TestIndicadoresDeLaInstitucion:
+    def test_la_supervision_y_la_coordinacion_de_esa_institucion_los_ven(self):
+        for s in (supervisor(), coordinador()):
+            d = decidir(s, Accion.VER_INDICADORES_INSTITUCION, indicadores(), entorno())
+            assert d.permitido and d.politica == "supervision_o_coordinacion_ve_indicadores"
+
+    def test_no_piden_segundo_factor_reciente(self):
+        for hace in (None, 600):
+            for rol in (supervisor, coordinador):
+                s = rol(mfa_verificado_en=None if hace is None else mfa(hace))
+                assert permite(s, Accion.VER_INDICADORES_INSTITUCION, indicadores())
+
+    def test_no_los_ve_el_funcionario_ni_la_ciudadania(self):
+        assert not permite(funcionario(), Accion.VER_INDICADORES_INSTITUCION, indicadores())
+        assert not permite(persona(), Accion.VER_INDICADORES_INSTITUCION, indicadores())
+
+    def test_no_los_ve_la_supervision_o_la_coordinacion_de_otra_institucion(self):
+        for rol in (supervisor, coordinador):
+            assert not permite(rol(MINSA), Accion.VER_INDICADORES_INSTITUCION, indicadores(MOP))
+            assert not permite(rol(), Accion.VER_INDICADORES_INSTITUCION, Recurso(tipo="indicadores"))  # sin institución no hay nada que ver
+
+    def test_un_rol_de_plataforma_no_los_ve(self):
+        for rol in sorted(ROLES_PLATAFORMA):
+            assert not permite(persona(rol_plataforma=rol, nivel_aseguramiento=3), Accion.VER_INDICADORES_INSTITUCION, indicadores())
+
+    def test_una_cuenta_no_activa_no_los_ve(self):
+        for estado in ("bloqueada", "suspendida"):
+            d = decidir(supervisor(estado_cuenta=estado), Accion.VER_INDICADORES_INSTITUCION, indicadores(), entorno())
+            assert not d.permitido and d.politica == "cuenta_no_activa"
+
+    def test_otro_tipo_de_recurso_no_sirve(self):
+        for tipo in ("tramite", "documento", "usuario", "perfil"):
+            assert not permite(supervisor(), Accion.VER_INDICADORES_INSTITUCION, Recurso(tipo=tipo, institucion_id=MOP))
+
+    def test_la_regla_no_da_nada_mas_que_ver_los_indicadores(self):
+        for accion in Accion:
+            if accion != Accion.VER_INDICADORES_INSTITUCION:
+                assert decidir(supervisor(), accion, indicadores(), entorno()).politica != "supervision_o_coordinacion_ve_indicadores", accion
+
+
+class TestMisDocumentos:
+    """«Mis documentos» usa `ver_documento` sobre un recurso propio: no hay acción nueva."""
+
+    def propio(self, de=5):
+        return Recurso(tipo="documento", solicitante_id=de)
+
+    def test_cualquier_cuenta_sin_rol_de_plataforma_ve_los_suyos(self):
+        for s in (persona(id=5), funcionario(id=5), supervisor(id=5), coordinador(id=5)):
+            assert permite(s, Accion.VER_DOCUMENTO, self.propio()), s
+
+    def test_no_los_de_otra_persona(self):
+        for s in (persona(id=5), funcionario(id=5)):
+            assert not permite(s, Accion.VER_DOCUMENTO, self.propio(de=6))
+
+    def test_un_rol_de_plataforma_no_accede_a_documentos(self):
+        for rol in sorted(ROLES_PLATAFORMA):
+            d = decidir(operador(rol, id=5, nivel_aseguramiento=3), Accion.VER_DOCUMENTO, self.propio(), entorno())
+            assert not d.permitido and d.politica == "plataforma_sin_acceso_a_tramites"

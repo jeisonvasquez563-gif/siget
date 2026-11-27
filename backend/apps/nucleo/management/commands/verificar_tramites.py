@@ -864,6 +864,9 @@ class Command(BaseCommand):
         # ---------------------------------------------------------------- reasignar a personal con la membresía revocada (se rechaza)
         self._reasignacion_a_revocado(mop, tipo_mop, coord, super_mop, ana, func_minsa)
 
+        # ---------------------------------------------------------------- mis documentos
+        self._mis_documentos(tipo_mop, inter_minsa, ana, beto, func_mop, operador, tok)
+
         # ---------------------------------------------------------------- decisiones registradas
         negadas = [d for d in DECISIONES if d[2] is False]
         permitidas = [d for d in DECISIONES if d[2] is True]
@@ -879,3 +882,71 @@ class Command(BaseCommand):
             c.execute("select current_user, (select rolsuper from pg_roles where rolname = current_user)")
             usuario_bd, es_super = c.fetchone()
         self._paso("todo se ejecutó como app_role, sin superusuario", usuario_bd == "app_role" and not es_super)
+
+    # ------------------------------------------------------------------ mis documentos (lo propio, en una sola lista)
+
+    def _mis_documentos(self, tipo_mop, inter_minsa, ana, beto, func_mop, operador, tok):
+        """`GET /tramites/mis-documentos/`: cada persona recibe SOLO los documentos que adjuntó en sus trámites. Crea trámites y documentos propios (se
+        revierte todo) y guarda los archivos en una carpeta temporal con una clave aleatoria, como el bloque de documentos del recorrido."""
+        pdf = b"%PDF-1.7\n%verificacion SIGET mis documentos\n%%EOF\n"
+        ruta = "/tramites/mis-documentos/"
+        with tempfile.TemporaryDirectory() as carpeta, override_settings(SIGET_DOCS_KEY=os.urandom(32), SIGET_DOCS_DIR=carpeta):
+            def subir(persona, tramite, nombre):
+                cab = dict(HOST, HTTP_AUTHORIZATION=f"Bearer {tok(persona)}")
+                r = self.cliente.post(f"/tramites/{tramite}/documentos/", {"archivo": SimpleUploadedFile(nombre, pdf)}, format="multipart", secure=True, **cab)
+                cache.clear()
+                transaction.set_rollback(False)
+                return r.json().get("id") if r.status_code == 201 else None
+
+            def tramite_de(persona, tipo):
+                r = self._http("post", "/tramites/", tok(persona), {"tipo_tramite": tipo.pk, "datos": datos_de_ejemplo(tipo.formulario)})
+                return r.json().get("id")
+
+            t_ana, t_beto = tramite_de(ana, tipo_mop), tramite_de(beto, tipo_mop)
+            t_func = tramite_de(func_mop, inter_minsa)  # el personal también inicia trámites, en OTRA institución
+            d_ana = [subir(ana, t_ana, "mis-docs-ana-1.pdf"), subir(ana, t_ana, "mis-docs-ana-2.pdf")]
+            d_beto = subir(beto, t_beto, "mis-docs-beto.pdf")
+            d_func = subir(func_mop, t_func, "mis-docs-func.pdf")
+            self._paso("(preparación) los trámites y los documentos de la prueba se crearon", all([t_ana, t_beto, t_func, *d_ana, d_beto, d_func]), (t_ana, t_beto, t_func))
+
+            r = self._http("get", ruta, tok(ana))
+            cuerpo = r.json() if r.status_code == 200 else {}
+            ids = [d["id"] for d in cuerpo.get("resultados", [])]
+            self._paso("la ciudadana recibe sus documentos (200), con `total`", r.status_code == 200 and set(d_ana) <= set(ids) and cuerpo.get("total") == len(ids) >= 2, r.status_code)
+            self._paso("y solo los suyos: ni el de otra persona ni el del personal", d_beto not in ids and d_func not in ids)
+            self._paso("cada uno lleva el número del trámite, su tipo y su institución",
+                       all(set(d["tramite"]) == {"id", "tipo_tramite", "institucion"} for d in cuerpo.get("resultados", []))
+                       and {d["tramite"]["id"] for d in cuerpo.get("resultados", []) if d["id"] in d_ana} == {t_ana})
+            self._paso("sin datos del personal ni la huella del archivo", all(set(d) == {"id", "nombre", "tipo", "tamano", "creado_en", "tramite"} for d in cuerpo.get("resultados", [])))
+            self._paso("no se guarda en caché", r["Cache-Control"] == "no-store")
+            ids_beto = [d["id"] for d in self._http("get", ruta, tok(beto)).json().get("resultados", [])]
+            self._paso("el otro ciudadano recibe solo el suyo", d_beto in ids_beto and not set(d_ana) & set(ids_beto) and d_func not in ids_beto)
+
+            # El personal ve los documentos de los trámites de SU institución por la ruta de cada trámite, pero en «Mis documentos» solo lo que adjuntó él
+            ids_func = [d["id"] for d in self._http("get", ruta, tok(func_mop)).json().get("resultados", [])]
+            self._paso("el personal ve en «Mis documentos» solo lo que adjuntó él, no lo de los trámites que atiende",
+                       d_func in ids_func and not set(d_ana) & set(ids_func) and d_beto not in ids_func, ids_func)
+            self._paso("(y por la ruta del trámite sí ve los de la ciudadana: son dos vistas distintas)",
+                       self._http("get", f"/tramites/{t_ana}/documentos/", tok(func_mop)).status_code == 200)
+
+            pagina = self._http("get", ruta + "?limite=1", tok(ana)).json()
+            segunda = self._http("get", ruta + "?limite=1&desplazamiento=1", tok(ana)).json()
+            self._paso("se pagina y `total` no cambia", len(pagina["resultados"]) == 1 and pagina["total"] == cuerpo["total"] and segunda["resultados"][0]["id"] != pagina["resultados"][0]["id"])
+            self._paso("una paginación inválida da 400", self._http("get", ruta + "?limite=0", tok(ana)).status_code == 400)
+            encontrados = [d["id"] for d in self._http("get", ruta + "?q=mis-docs-ana-2", tok(ana)).json().get("resultados", [])]
+            self._paso("la búsqueda por nombre devuelve el documento", encontrados == [d_ana[1]], encontrados)
+            self._paso("la búsqueda por número de trámite devuelve sus documentos", {d["id"] for d in self._http("get", ruta + f"?q=%23{t_ana}", tok(ana)).json().get("resultados", [])} >= set(d_ana))
+            self._paso("la búsqueda no cruza personas (el nombre de un documento ajeno no devuelve nada)", self._http("get", ruta + "?q=mis-docs-beto", tok(ana)).json().get("total") == 0)
+            self._paso("una búsqueda de más de 100 caracteres da 400", self._http("get", ruta + "?q=" + "a" * 101, tok(ana)).status_code == 400)
+
+            r = self._http("get", f"/tramites/{t_ana}/documentos/{d_ana[0]}/", tok(ana))
+            self._paso("la descarga va por la ruta de cada trámite y vuelve idéntica", r.status_code == 200 and r.content == pdf and r["Content-Disposition"].startswith("attachment"))
+            self._paso("el documento de otra persona no se descarga (404: para ella no existe)", self._http("get", f"/tramites/{t_beto}/documentos/{d_beto}/", tok(ana)).status_code == 404)
+
+            self._paso("sin token se responde 401", self._http("get", ruta).status_code == 401)
+            self._paso("un token de enrolamiento no sirve", self._http("get", ruta, self._token(ana, tokens.SCOPE_ENROLAR_MFA)).status_code == 403)
+            self._paso("un rol de plataforma no accede (403)", self._http("get", ruta, tok(operador)).status_code == 403)
+
+            # Como app_role con el contexto de la ciudadana y SIN instituciones: la base misma solo le deja ver lo suyo (la API además filtra)
+            error, visibles = self._bd(ana, [], lambda: Documento.objects.count())
+            self._paso("la base le muestra a la ciudadana exactamente los documentos que la API le lista (solo los suyos)", error is None and visibles == cuerpo["total"], (error, visibles))

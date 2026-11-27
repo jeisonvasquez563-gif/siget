@@ -2387,3 +2387,108 @@ Cambio de código, de nginx y de interfaz. **No hay migración**: la base no se 
 - **Cambiados en código:** el aviso de privacidad (`derechos.py`) sin la frase «entorno de demostración académica» (la versión `AVISO_VERSION` **no** se subió: la frase no cambia ninguna obligación; si se quiere que quien ya aceptó lo vuelva a aceptar, hay que subirla); el formulario de alta de instituciones ya no ofrece el tipo «Demostración» (siempre «real»).
 - **Se dejan como opción configurable:** `SIGET_AVISO_DEMOSTRACION` (el aviso «Demostración académica» de la pantalla de acceso; apagado en producción) y, solo en desarrollo, el modo de ejemplo `?mock=`.
 - **Dato de la base (no tocado):** las instituciones MINSA, MOP y MiAmbiente tienen `tipo = 'demostracion'` (migración 005) y de ahí sale la etiqueta «Demostración» de «Iniciar un trámite» (`Tramites.jsx`, que no se toca en este cambio) y de la consola de catálogo; los trámites «Trámite de demostración (MINSA|MOP|MiAmbiente)» (migraciones 005 y 017). Actualización sugerida, como `siget_owner`, **en una migración numerada** (021) con respaldo previo: `UPDATE siget.institucion SET tipo = 'real' WHERE nombre IN ('MINSA','MOP','MiAmbiente');`. Renombrar los trámites exige además cambiar la clave del formulario en `apps/tramites/formulario.py` (`FORMULARIOS["Trámite de demostración (%)"]`, que enlaza por nombre) y la migración 017: hacerlo juntas, no solo con un `UPDATE`.
+
+
+## 47. Mis documentos, indicadores de la institución y ayuda: aplicar la migración 022
+
+**Estado: implementado, sin aplicar en producción.** La migración, `database/pruebas-indicadores.sql` y los pasos nuevos de `verificar_equipo` y `verificar_tramites` se escribieron **sin poder ejecutarlos contra PostgreSQL** (no había una base disponible): se prueban al aplicarla, siguiendo este orden. Si algo falla, revisar primero si es un error de la prueba y no de la base (lección de 40.9 y 44.3).
+
+### 47.1 Qué cambia y en qué orden hay que aplicarlo
+
+La migración [`022-indicadores-institucion.sql`](../database/migraciones/022-indicadores-institucion.sql) (una sola transacción, como `siget_owner`) **no cambia ninguna tabla**: crea `siget.indicadores_institucion(p_institucion int) RETURNS jsonb`, `SECURITY DEFINER`, con la ruta de búsqueda fija (`siget, pg_temp`), `EXECUTE` revocado a `PUBLIC` y concedido solo a `app_role`.
+
+- **Solo agregados:** conteo por estado (los cinco de siempre, en 0 si no hay, y cualquier otro que exista, como «Desistido» de la 021), abiertos, vencidos, escalados abiertos, sin asignar, resueltos y tiempo promedio de resolución en días de los últimos 90 días (de la creación del trámite al evento de cambio a `Aprobado` o `Rechazado` en `evento_auditoria`) y trámites abiertos por funcionario (`usuario_id`, `usuario` y conteo, solo de **personal** de esa institución). Sin ids de trámites, sin personas solicitantes, sin contenido.
+- **Quién pregunta se comprueba adentro:** `siget.ctx_usuario()` debe ser `supervisor` o `coordinador_institucional` de `p_institucion` con la membresía **no revocada** y la cuenta `activa`. Sin contexto, con una institución nula o inexistente, o sin ese rol: `42501` y ningún dato. Es la segunda defensa; la primera es el PDP (`ver_indicadores_institucion`, sin segundo factor reciente).
+- **Por qué una función y no una consulta:** la coordinación no ve trámites (`ctx_instituciones` solo incluye los roles que atienden), igual que con `siget.tramites_abiertos_de()` (011, 44).
+- «Abierto» es todo estado distinto de `Aprobado`, `Rechazado` y `Desistido`. La comparación es por texto (`estado` es `varchar`), así que **no depende de que la 021 ya esté aplicada**: antes de la 021 «Desistido» no existe y no cuenta nada.
+
+**La base va primero, el código después.** El backend nuevo llama a la función: sin la migración, `GET /equipo/<id>/indicadores/` daría error 500. «Mis documentos» **no necesita migración** (usa la tabla `documento` y su seguridad por filas de la 015). La interfaz nueva sin el backend nuevo muestra «Mis documentos» e «Indicadores» con un error (las rutas no existen); la «Ayuda» es estática y funciona sola. El backend **viejo** funciona con la base ya migrada (no cambia ninguna tabla).
+
+**No hay ruta de primer nivel nueva:** `/tramites/` y `/equipo/` ya están en la lista de `location` de `infra/podman/vm1-app-backend/nginx.conf` y en `frontend/vite.config.js`. El ensayo comprueba que atraviesan nginx (lección de 42.9).
+
+**Acciones nuevas del PDP:** una, `ver_indicadores_institucion` (supervisión o coordinación de esa institución, sin segundo factor reciente). «Mis documentos» **no** agrega acción: usa `ver_documento` sobre un recurso propio. Con la nueva, el PDP pasa de **30 a 31** acciones; `tests/ejemplos_pdp.py` y las pruebas que cuentan acciones ya esperan 31 (integrado con la limpieza del runbook 45).
+
+### 47.2 Respaldo previo, verificado
+
+Igual que 44.2: `systemctl start siget-respaldo.service` en VM2, comprobar que terminó bien, y un respaldo manual con sello `pre-022` que la retención de 14 días no borra:
+
+```bash
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/pre-022-tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+No seguir si el respaldo no se pudo restaurar. Los archivos tienen permisos 600 y **no van al repositorio**.
+
+### 47.3 Ensayo con `ROLLBACK`, junto con las pruebas
+
+La migración es una sola transacción: para ensayarla con sus pruebas se cambia su `COMMIT;` final por `RESET ROLE;` (las pruebas corren como superusuario y cambian de rol por su cuenta) y se pegan las pruebas sin su propio `BEGIN;` (ya terminan en `ROLLBACK;`):
+
+```bash
+{ sed -e 's/^COMMIT;$/RESET ROLE;/' database/migraciones/022-indicadores-institucion.sql
+  sed '1,/^BEGIN;$/d' database/pruebas-indicadores.sql; } > /tmp/022-ensayo.sql
+cat /tmp/022-ensayo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Debe terminar en `ROLLBACK` sin errores y con `RESUMEN: N de N comprobaciones PASAN, 0 FALLAN` (N es **30**: 10 de quién puede y quién no, 7 de cifras, 5 de «solo agregados» y 8 de permisos y definición). Después, confirmar que no quedó nada: `\df siget.indicadores_institucion` debe decir que no hay función.
+
+Las pruebas crean sus propias instituciones (`p022_inst_*`), personas (`p022_*`) y trámites (insertados ya en su estado, así que no intervienen los disparadores de transición ni de notificaciones) y comprueban **como `app_role` con el contexto de cada persona** (`set_config('app.usuario_id', …)`). Cubren: la supervisión y la coordinación de la institución sí; el funcionario, la ciudadanía, la supervisión y la coordinación de otra institución, una coordinación revocada, una supervisión con la cuenta suspendida, un rol de plataforma, la falta de contexto y una institución nula o inexistente, no (`42501`); cifras exactas con datos propios de la prueba (incluido un tiempo promedio de 15,0 días con un resuelto hace más de 90 días que no cuenta y un trámite asignado por error a una persona de la ciudadanía que **no** sale en la carga por funcionario); que la respuesta no trae ninguna clave de más ni a las personas solicitantes; y los permisos (`EXECUTE` solo `app_role`, ninguno para `PUBLIC`, `SECURITY DEFINER`, dueño y ruta de búsqueda fija). **Correr las pruebas consume secuencias aunque terminen en `ROLLBACK`** (ids de usuario, trámite, evento…): quedan huecos, no borrados.
+
+Puntos donde más conviene mirar si algo falla: el `UNION` de estados con `LEFT JOIN` (tipos `varchar` y `text`), `round(avg(extract(epoch …)))` con `numeric`, los `INSERT` directos de trámites en estado final y de `evento_auditoria` con `creado_en` antiguo (hechos como dueño: no hay `FORCE ROW LEVEL SECURITY`), y que `pg_temp.intenta` reciba `42501` y no otro código.
+
+### 47.4 Migración real y pruebas de la base
+
+```bash
+cat database/migraciones/022-indicadores-institucion.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+cat database/pruebas-indicadores.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Todas deben decir `PASA`. Después, la **regresión de las pruebas de base anteriores**, que no deben cambiar (la 022 no toca ninguna tabla ni disparador, así que los números son los de siempre):
+
+```bash
+for p in catalogo escalamiento notificaciones alertas; do
+  cat database/pruebas-$p.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'FALLA|RESUMEN|ERROR'
+done
+```
+
+Esperado: catálogo 82/82, escalamiento 10/10, notificaciones 36/36 y alertas 57/57 (44.9). Comprobar además con un login real de `app_role` (regla del README de migraciones): `select has_function_privilege('app_role', 'siget.indicadores_institucion(int)', 'EXECUTE');` debe dar `t`, y para `auditor_role`, `pgadmin_lectura`, `escalador_role`, `detector_role` y `checkpoint_app`, `f`. Como `app_role` **sin contexto**, `select siget.indicadores_institucion(3);` debe fallar con `42501`.
+
+Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
+
+### 47.5 Imagen candidata y verificaciones (VM1)
+
+Con la base ya migrada, en VM1: guardar la imagen en uso (`podman tag localhost/siget-backend:dev localhost/siget-backend:respaldo-AAAA-MM-DD`, ver 39.10), reconstruir con el código nuevo y correr cada comando contra la base real (todos se revierten) **antes de reiniciar**:
+
+1. `verificar_esquema`: sin cambios (no hay modelos nuevos).
+2. `verificar_equipo`: trae el método nuevo `_indicadores`: la supervisión y la coordinación piden los indicadores (200); el funcionario, la ciudadanía, un operador de plataforma, la coordinación de otra institución y una supervisión revocada reciben 403, una cuenta suspendida 401, y una institución inexistente responde **igual** que una ajena; sin segundo factor reciente igual se ven; las cifras coinciden con lo que la supervisión ve en su bandeja (por estado, abiertos, vencidos, escalados, sin asignar y la carga de un funcionario); la coordinación recibe exactamente las mismas; la respuesta solo trae agregados y no nombra a la persona solicitante; y sondeos directos como `app_role` comprueban que la base responde a quien corresponde y da `42501` a los demás, y los permisos de la función. **Es la primera vez que corre contra la base real**: si falla, revisar primero si es un error del paso.
+3. `verificar_tramites`: trae el método nuevo `_mis_documentos` (crea trámites y documentos propios con una clave y una carpeta temporales, como el bloque de documentos): cada persona recibe solo lo suyo; el personal ve en «Mis documentos» lo que adjuntó él y no lo de los trámites que atiende; paginación, búsqueda por nombre y por número, 400 por paginación o búsqueda inválida, descarga por la ruta del trámite, 401, token de enrolamiento y rol de plataforma (403), y la base (como `app_role` con el contexto de la ciudadana y sin instituciones) muestra exactamente lo que la API lista.
+4. `verificar_politicas` (ahora **31** acciones, no 30: ajustar el conteo al integrar), `verificar_plataforma`, `verificar_autenticacion`, `verificar_auditoria` y `verificar_integracion` como regresión.
+
+Sus decisiones del PDP se capturan en memoria, así que no dejan ninguna negación real en `decision_pdp`. Si algún paso falla, **no desplegar**.
+
+### 47.6 Despliegue y ensayo
+
+1. `desplegar.sh` (backend e interfaz; devuelve la inactividad a 10 minutos, ver 34.2). Hay tres módulos nuevos en el menú: «Mis documentos» (todas las cuentas sin rol de plataforma), «Indicadores» (supervisión y coordinación) y «Ayuda» (todas).
+2. El ensayo (`demo/ensayo.py`): trae **tres comprobaciones nuevas, todas de solo lectura y todas 200** (Ana pide `/tramites/mis-documentos/`; la coordinadora y el supervisor del MOP piden `/equipo/<id>/indicadores/`, ambas atravesando nginx); el total pasa de 117 (tras el runbook 45) a **120**. **No suma ninguna negación del PDP a ninguna cuenta**, así que ninguna llega a 5 en 10 minutos (migración 019). No crea datos.
+3. Probar a mano: con la supervisión y su segundo factor, abrir «Indicadores» y comparar un par de cifras con la bandeja; con la coordinadora, comprobar que ve las mismas cifras sin ver trámites; con una ciudadana con documentos, abrir «Mis documentos», buscar uno, descargarlo y volver al trámite; y recorrer la «Ayuda» con el teclado (Tab y Enter sobre las preguntas).
+
+### 47.7 Qué hacer si algo sale mal
+
+- **La migración falla:** al ser una transacción, no queda nada a medias; se corrige y se repite el ensayo.
+- **Hay que volver atrás el código:** `podman tag localhost/siget-backend:respaldo-AAAA-MM-DD localhost/siget-backend:dev`, reiniciar el backend (como `siget`) y restaurar la interfaz desde su respaldo. La base migrada funciona con el backend anterior.
+- **Si la función diera problemas**, se corrige hacia adelante (`CREATE OR REPLACE` en una migración nueva); revertir la base es la última opción (restaurar `pre-022`, perdiendo todo lo posterior: avisar antes). Como la 022 no cambia tablas, también se puede quitar sin riesgo con `DROP FUNCTION siget.indicadores_institucion(int);` como `siget_owner` (la pantalla de indicadores daría error, nada más).
+
+### 47.8 Gotchas y riesgos aceptados
+
+1. **Las cifras son una foto del momento** (`generado_en`): no se guardan ni hay histórico. «Actualizar» vuelve a pedirlas. No se cachean (`Cache-Control: no-store`).
+2. **El tiempo de resolución sale de `evento_auditoria`,** no de `tramite` (que no guarda cuándo se resolvió). Un trámite resuelto cuenta una vez, por su cambio a `Aprobado` o `Rechazado`; los desistidos no cuentan como resueltos.
+3. **La carga por funcionario ignora a quien no es personal** de esa institución (un trámite asignado por error a alguien de la ciudadanía no lo nombra; sí cuenta en «abiertos»). Exige membresía vigente: el personal con la membresía revocada que aún tenga trámites abiertos asignados no se nombra en la carga (esos trámites sí cuentan en «abiertos»).
+4. **La institución nula o inexistente da `42501`,** como una ajena: la API responde 403 antes de llegar a la base, así que no se revela qué instituciones existen.
+5. **El PDP no pide segundo factor reciente** para los indicadores (son agregados de lectura); sí lo piden las acciones que cambian cosas. Si se quisiera endurecer, bastaría agregarlo en `_indicadores_de_la_institucion` de `pdp.py`.
+6. **«Mis documentos» no es un listado de la institución:** el personal solo ve lo que adjuntó él (en otras instituciones). Los documentos de los trámites que atiende siguen en el detalle de cada trámite. El filtro es doble, por el solicitante del trámite y por quien subió el archivo, además de la seguridad por filas.
+7. **La búsqueda de «Mis documentos» usa `icontains`** (`UPPER()` de la base): con una configuración regional `C`, las diferencias solo de mayúsculas en letras con tilde no se detectan.
+8. **La coordinación ve conteos agregados chicos** (por ejemplo, 1 trámite en un estado), sin ids, sin datos por trámite y sin datos de la ciudadanía. Con pocos trámites un conteo podría permitir inferir algo de un caso conocido por otras vías; se evaluó como riesgo bajo y se acepta sin umbral mínimo de agrupación.
+9. **Los estados se comparan por texto** (`estado::text`) en toda la función: la migración 022 se aplica antes o después de la 021 (`Desistido`) sin errores de tipo. Las pruebas de la base omiten solo la comprobación con un trámite desistido si el enum aún no tiene ese valor.
+10. **La «Ayuda» es texto fijo en la interfaz:** si cambia un flujo (por ejemplo, la recuperación del segundo factor), hay que actualizar `frontend/src/Ayuda.jsx` y su prueba.
+
+### 47.9 Registro de la aplicación
+
+*(Pendiente: completar al aplicar, con fecha, respaldo, resultado del ensayo de la 022, de la migración real, de la regresión, de las verificaciones y del ensayo completo, como en 44.9.)*

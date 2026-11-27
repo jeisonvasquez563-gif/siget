@@ -8,6 +8,9 @@ import { etiquetaDeRol } from './comun.jsx'
 import { agrupar, iconoDe } from './modulos.js'
 import { CatalogoInstitucion } from './Catalogo.jsx'
 import { Equipo } from './Equipo.jsx'
+import { Ayuda } from './Ayuda.jsx'
+import { Indicadores } from './Indicadores.jsx'
+import { MisDocumentos } from './MisDocumentos.jsx'
 import { LimiteDeError } from './ErrorBoundary.jsx'
 import { Campana } from './Notificaciones.jsx'
 import { Inicio, Proximamente, PruebaAcceso, Seguridad } from './Otras.jsx'
@@ -90,6 +93,9 @@ export default function App() {
     case 'equipo': contenido = <Equipo />; break
     case 'catalogo_institucion': contenido = <CatalogoInstitucion yo={yo} />; break
     case 'mis_datos': contenido = <MisDatos yo={yo} />; break
+    case 'mis_documentos': contenido = <MisDocumentos abrir={abrir} />; break
+    case 'indicadores': contenido = <Indicadores yo={yo} />; break
+    case 'ayuda': contenido = <Ayuda yo={yo} />; break
     case 'seguridad': contenido = <Seguridad yo={yo} />; break
     case 'auditoria': contenido = <Auditoria />; break
     case 'mfa': contenido = <SegundoFactor yo={yo} refrescar={refrescarYo} />; break

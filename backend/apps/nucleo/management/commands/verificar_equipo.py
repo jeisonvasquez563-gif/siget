@@ -1,7 +1,7 @@
 """Gestión del equipo de una institución contra la base real, en una transacción que se revierte.
 
 Los trámites se crean y se reasignan POR LA API (PDP, RLS y auditoría reales). También cubre la gestión del catálogo de la institución
-(migración 020), por la API y con sondeos directos a la base como app_role. Las decisiones del PDP se capturan en memoria (la tabla es
+(migración 020) y los indicadores de la institución (migración 022), por la API y con sondeos directos a la base como app_role. Las decisiones del PDP se capturan en memoria (la tabla es
 inalterable y esto no debe dejar nada). No deja ningún dato.
 """
 import json
@@ -255,6 +255,7 @@ class Command(BaseCommand):
         self._paso("todo se ejecutó como app_role, sin superusuario", usuario_bd == "app_role" and es_super is False, usuario_bd)
 
         self._catalogo(inst, otra, coord, coord_b, sup, f1, ciud, op, asignador)
+        self._indicadores(inst, otra, coord, coord_b, sup, f1, ciud, op, asignador)
 
     # ------------------------------------------------------------------ catálogo de la institución (migración 020)
     def _catalogo(self, inst, otra, coord, coord_b, sup, f1, ciud, op, asignador):
@@ -442,3 +443,85 @@ class Command(BaseCommand):
         self._paso("pgadmin_lectura, escalador_role, detector_role y checkpoint_app no tienen ningún permiso sobre el historial",
                    len(sin_acceso) == 4 and not any(sin_acceso.values()), sin_acceso)
         self._paso("app_role solo lee el historial y puede cambiar `activo` pero no `institucion_id`", permisos_app == (True, True), permisos_app)
+
+    # ------------------------------------------------------------------ indicadores de la institución (migración 022)
+    def _indicadores(self, inst, otra, coord, coord_b, sup, f1, ciud, op, asignador):
+        ruta, ruta_otra = f"/equipo/{inst.pk}/indicadores/", f"/equipo/{otra.pk}/indicadores/"
+        sup_rev = self._persona("ind_sup_rev")
+        susp = self._persona("ind_sup_susp")
+        for persona in (sup_rev, susp):
+            Membresia.todas.create(usuario=persona, institucion=inst, rol="supervisor", asignado_por=asignador)
+        Membresia.todas.filter(usuario=sup_rev, institucion=inst).update(revocada_en=timezone.now(), revocada_por=asignador)
+        Usuario.objects.filter(pk=susp.pk).update(estado_cuenta="suspendida")
+
+        # ------------------------------------------------------------ quién puede verlos
+        r_sup = self._http(sup, "get", ruta)
+        r_coord = self._http(coord, "get", ruta)
+        self._paso("la supervisión pide los indicadores de su institución (200)", r_sup.status_code == 200 and r_sup.json().get("institucion") == inst.pk, r_sup.status_code)
+        self._paso("la coordinación también, aunque no ve trámites (200)", r_coord.status_code == 200, r_coord.status_code)
+        for nombre, persona in (("el funcionario", f1), ("la ciudadanía", ciud), ("un operador de plataforma", op),
+                                ("la coordinación de OTRA institución", coord_b), ("una supervisión con la membresía revocada", sup_rev)):
+            self._paso(f"{nombre} no recibe los indicadores (403)", self._http(persona, "get", ruta).status_code == 403)
+        self._paso("una cuenta suspendida no entra (401)", self._http(susp, "get", ruta).status_code == 401)
+        self._paso("la supervisión de esta institución no ve la de otra (403)", self._http(sup, "get", ruta_otra).status_code == 403)
+        r = self._http(coord, "get", "/equipo/999999999/indicadores/")
+        self._paso("una institución que no existe responde igual que una ajena (403: no se revela cuáles existen)",
+                   r.status_code == 403 and r.json() == self._http(coord, "get", ruta_otra).json(), r.status_code)
+        r = self._http(coord_b, "get", ruta_otra, factor_reciente=False)
+        self._paso("sin segundo factor reciente igual se ven (son cifras de lectura, sin datos de personas)", r.status_code == 200, r.status_code)
+
+        # ------------------------------------------------------------ las cifras coinciden con lo que la supervisión ve en su bandeja
+        listado = self._http(sup, "get", "/tramites/?limite=100").json()
+        filas = listado["resultados"]
+        cuerpo = r_sup.json()
+        if listado["total"] > len(filas):
+            self._paso("las cifras contra la bandeja de la supervisión", True, "omitido: hay más de 100 trámites y la lista no alcanza")
+        else:
+            abiertos = [t for t in filas if t["estado"] not in ("Aprobado", "Rechazado", "Desistido")]
+            self._paso("el conteo por estado suma todos los trámites de la institución", sum(cuerpo["por_estado"].values()) == listado["total"],
+                       (sum(cuerpo["por_estado"].values()), listado["total"]))
+            self._paso("y cada estado coincide con el de la bandeja",
+                       all(cuerpo["por_estado"].get(e, 0) == sum(1 for t in filas if t["estado"] == e) for e in {t["estado"] for t in filas} | set(cuerpo["por_estado"])))
+            self._paso("abiertos, vencidos, escalados abiertos y sin asignar coinciden con la bandeja",
+                       cuerpo["abiertos"] == len(abiertos) and cuerpo["vencidos"] == sum(1 for t in abiertos if t["vencido"])
+                       and cuerpo["escalados_abiertos"] == sum(1 for t in abiertos if t["escalado"])
+                       and cuerpo["sin_asignar"] == sum(1 for t in abiertos if not t["funcionario_asignado_id"]),
+                       {k: cuerpo[k] for k in ("abiertos", "vencidos", "escalados_abiertos", "sin_asignar")})
+            carga = {f["usuario_id"]: f for f in cuerpo["por_funcionario"]}
+            propios = sum(1 for t in abiertos if t["funcionario_asignado_id"] == f1.pk)
+            self._paso("la carga de un funcionario coincide con sus trámites abiertos asignados",
+                       propios >= 1 and carga.get(f1.pk, {}).get("abiertos") == propios and carga[f1.pk]["usuario"] == "eq_f1", (propios, carga.get(f1.pk)))
+        self._paso("las cifras son números (el promedio, nulo si no hay resueltos recientes)",
+                   all(isinstance(cuerpo[k], int) for k in ("abiertos", "vencidos", "escalados_abiertos", "sin_asignar", "resueltos_90_dias"))
+                   and (cuerpo["dias_promedio_resolucion"] is None or isinstance(cuerpo["dias_promedio_resolucion"], (int, float))))
+        comparable = lambda c: {k: v for k, v in c.items() if k != "generado_en"}  # noqa: E731
+        self._paso("la coordinación recibe las mismas cifras que la supervisión", comparable(r_coord.json()) == comparable(cuerpo))
+        self._paso("la respuesta no se guarda en caché", r_sup["Cache-Control"] == "no-store")
+
+        # ------------------------------------------------------------ sin datos de la ciudadanía
+        self._paso("la respuesta solo trae agregados: ni ids de trámites ni datos de quien los pidió",
+                   set(cuerpo) == {"institucion", "generado_en", "por_estado", "abiertos", "vencidos", "escalados_abiertos", "sin_asignar",
+                                   "resueltos_90_dias", "dias_promedio_resolucion", "por_funcionario"}
+                   and all(set(f) == {"usuario_id", "usuario", "abiertos"} for f in cuerpo["por_funcionario"]))
+        self._paso("no aparece el nombre de la ciudadana que inició el trámite", ciud.username not in r_sup.content.decode() and ciud.username not in r_coord.content.decode())
+        nombres_del_personal = {p["usuario"] for e in self._http(coord, "get", "/equipo/").json()["equipos"] if e["institucion"]["id"] == inst.pk for p in e["personal"]}
+        self._paso("todo el que sale en la carga por funcionario es personal de la institución", {f["usuario"] for f in cuerpo["por_funcionario"]} <= nombres_del_personal)
+
+        # ------------------------------------------------------------ lo que impone la base (como app_role, saltándose la API)
+        pedir = lambda i: self._sql("select siget.indicadores_institucion(%s)", [i])  # noqa: E731
+        self._paso("la base responde a la supervisión y a la coordinación de la institución",
+                   self._sondeo(sup, pedir(inst.pk)) is None and self._sondeo(coord, pedir(inst.pk)) is None)
+        for nombre, persona in (("el funcionario", f1), ("la ciudadanía", ciud), ("la coordinación de otra institución", coord_b),
+                                ("una supervisión revocada", sup_rev), ("una supervisión con la cuenta suspendida", susp), ("quien no tiene contexto de sesión", None)):
+            self._paso(f"la base no responde a {nombre} (42501)", self._sondeo(persona, pedir(inst.pk)) == "42501")
+        self._paso("ni con una institución nula o inexistente (42501)",
+                   self._sondeo(sup, self._sql("select siget.indicadores_institucion(NULL)")) == "42501" and self._sondeo(sup, pedir(999999999)) == "42501")
+        with connection.cursor() as c:
+            c.execute("select r.rolname, has_function_privilege(r.rolname, 'siget.indicadores_institucion(int)', 'EXECUTE') from pg_roles r "
+                      "where r.rolname in ('app_role', 'auditor_role', 'pgadmin_lectura', 'escalador_role', 'detector_role', 'checkpoint_app')")
+            ejecuta = dict(c.fetchall())
+            c.execute("select prosecdef and proconfig = array['search_path=siget, pg_temp'] from pg_proc where oid = 'siget.indicadores_institucion(int)'::regprocedure")
+            definida = c.fetchone()[0]
+        self._paso("solo la aplicación ejecuta la función, y es SECURITY DEFINER con la ruta de búsqueda fija",
+                   ejecuta == {"app_role": True, "auditor_role": False, "pgadmin_lectura": False, "escalador_role": False, "detector_role": False, "checkpoint_app": False}
+                   and definida is True, ejecuta)

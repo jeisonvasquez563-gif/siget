@@ -55,6 +55,8 @@ def _recursos(accion, rol, sujeto):
                 Recurso(**comunes, institucion_id=AJENA, solicitante_id=OTRA_PERSONA))
     if accion == Accion.GESTIONAR_USUARIOS_INSTITUCION:
         return Recurso(tipo="usuario", institucion_id=PROPIA), Recurso(tipo="usuario", institucion_id=AJENA)
+    if accion == Accion.VER_INDICADORES_INSTITUCION:
+        return Recurso(tipo="indicadores", institucion_id=PROPIA), Recurso(tipo="indicadores", institucion_id=AJENA)
     if accion == Accion.GESTIONAR_CATALOGO_INSTITUCION:
         return Recurso(tipo="tipo_tramite", institucion_id=PROPIA), Recurso(tipo="tipo_tramite", institucion_id=AJENA)
     if accion in {Accion.PROPONER_ALTA, Accion.APROBAR_ALTA}:

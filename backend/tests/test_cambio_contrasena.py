@@ -71,7 +71,7 @@ def test_otro_tipo_de_recurso_no_sirve():
 
 def test_el_pdp_la_calcula_para_los_diez_roles():
     M = ejemplos_pdp.construir()
-    assert len(M["acciones"]) == len(Accion) == 30
+    assert len(M["acciones"]) == len(Accion) == 31
     for rol in M["matriz"].values():
         celda = rol["cambiar_contrasena"]
         assert celda["favorable"]["permitido"] and not celda["desfavorable"]["permitido"] and celda["exige_segundo_factor"] is True

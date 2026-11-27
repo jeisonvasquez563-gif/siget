@@ -1,0 +1,43 @@
+/* Mis documentos, Indicadores de la institución y Ayuda. Sin estilos en línea: la CSP de nginx no los admite (las barras son SVG con atributos). */
+
+/* ---------- mis documentos ---------- */
+.barra-busqueda-documentos { align-items: flex-end; }
+.barra-busqueda-documentos .campo { flex: 1 1 18rem; margin-bottom: 0; }
+.enlace-tramite { background: none; border: 0; padding: 0; font: inherit; font-weight: 650; color: var(--agua); text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.enlace-tramite:hover { color: var(--agua-media); }
+.enlace-tramite:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; border-radius: var(--radio-s); }
+
+/* ---------- indicadores ---------- */
+.indicadores-pie { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
+.indicador .indicador-ayuda { display: block; margin-top: 0.35rem; color: var(--tinta-tenue); font-size: var(--t-xs, 0.8rem); }
+.campo-institucion { max-width: 24rem; }
+.barras { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.barras-fila { display: grid; grid-template-columns: minmax(8rem, 11rem) 1fr minmax(6rem, 8rem); align-items: center; gap: 0.75rem; }
+.barras-etiqueta { font-weight: 600; }
+.barras-grafico { width: 100%; height: 0.9rem; display: block; }
+.barras-pista { fill: var(--superficie-3); }
+.barras-relleno { fill: var(--agua-media); }
+.barras-relleno.e-pendiente { fill: var(--tinta-tenue); }
+.barras-relleno.e-tramitacion { fill: var(--agua-media); }
+.barras-relleno.e-subsanacion { fill: var(--ambar); }
+.barras-relleno.e-aprobado { fill: var(--sello-verde); }
+.barras-relleno.e-rechazado { fill: var(--sello-rojo); }
+.barras-valor { text-align: right; white-space: nowrap; }
+@media (max-width: 560px) {
+  .barras-fila { grid-template-columns: 1fr auto; }
+  .barras-grafico { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* ---------- ayuda ---------- */
+.ayuda-seccion h3 { margin-top: 0; }
+.ayuda-pregunta { border-top: 1px solid var(--borde); }
+.ayuda-pregunta:first-of-type { border-top: 0; }
+.ayuda-pregunta summary { cursor: pointer; padding: 0.85rem 0.25rem; font-weight: 650; list-style-position: inside; }
+.ayuda-pregunta summary:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; border-radius: var(--radio-s); }
+.ayuda-pregunta[open] summary { color: var(--agua); }
+.ayuda-respuesta { padding: 0 0.25rem 1rem 1.25rem; max-width: 70ch; }
+.ayuda-respuesta p, .ayuda-respuesta ul { margin: 0 0 0.7rem; }
+.ayuda-respuesta a { color: var(--agua); text-decoration: underline; text-underline-offset: 3px; }
+.ayuda-definiciones { margin: 0 0 0.7rem; display: grid; gap: 0.5rem; }
+.ayuda-definiciones dt { font-weight: 700; }
+.ayuda-definiciones dd { margin: 0; color: var(--tinta-suave); }

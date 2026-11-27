@@ -80,7 +80,7 @@ def test_la_regla_no_da_nada_mas_que_ver_las_notificaciones():
 
 def test_el_pdp_la_calcula_para_los_diez_roles_sin_exigir_segundo_factor():
     M = ejemplos_pdp.construir()
-    assert len(M["acciones"]) == len(Accion) == 30
+    assert len(M["acciones"]) == len(Accion) == 31
     for rol in ROLES:
         celda = M["matriz"][rol]["ver_mis_notificaciones"]
         assert celda["favorable"]["permitido"] and celda["favorable"]["politica"] == "titular_ve_sus_notificaciones"
