@@ -674,7 +674,7 @@ class Command(BaseCommand):
         self._paso("el catálogo público lleva los requisitos de cada trámite (un objeto)",
                    r.status_code == 200 and len(publico) > 0 and all(isinstance(x.get("requisitos"), dict) for x in publico), r.status_code)
         sembrado = next((x.get("requisitos") for x in publico if x["id"] == tipo_mop.pk), {})
-        self._paso("el trámite de demostración sembrado por la 021 trae la descripción, los documentos y qué pasa después",
+        self._paso("el trámite del MOP sembrado trae la descripción, los documentos y qué pasa después",
                    bool(isinstance(sembrado.get("descripcion"), str) and sembrado["descripcion"] and isinstance(sembrado.get("documentos"), list)
                         and sembrado["documentos"] and isinstance(sembrado.get("despues"), str) and sembrado["despues"]), sembrado)
         nuevos = {"descripcion": "Prueba de requisitos.", "documentos": ["Cédula", "Croquis de la zona"], "despues": "Se revisa y se avisa aquí."}
@@ -846,11 +846,47 @@ class Command(BaseCommand):
         self._paso("la constancia de un trámite ya presentado sigue con las etiquetas del formulario con el que nació",
                    r.status_code == 200 and [d["etiqueta"] for d in r.json()["datos"]] == esperadas, r.status_code)
 
+    def _directorio(self, ana, tok):
+        """Directorio de instituciones (migración 023): el catálogo público trae las instituciones reales con sus trámites y los de demostración ya no."""
+        nuevas = ("Registro Público de Panamá", "Ministerio de Comercio e Industrias (Panamá Emprende)", "ATTT", "MEDUCA", "IDAAN", "Municipio de San Miguelito")
+        r = self._http("get", "/catalogo/instituciones/", tok(ana))
+        instituciones = r.json() if r.status_code == 200 else []
+        por_nombre = {i["nombre"]: i for i in instituciones}
+        self._paso("el catálogo público trae las seis instituciones nuevas (y al menos 12 en total)",
+                   r.status_code == 200 and set(nuevas) <= set(por_nombre) and len(instituciones) >= 12, len(instituciones))
+        self._paso("ninguna institución del catálogo es de tipo demostración (MINSA, MOP y MiAmbiente son reales)",
+                   all(i["tipo"] == "real" for i in instituciones) and all(por_nombre[n]["tipo"] == "real" for n in ("MINSA", "MOP", "MiAmbiente")),
+                   sorted({i["tipo"] for i in instituciones}))
+        todos = []
+        for nombre in nuevas:
+            r = self._http("get", f"/catalogo/tipos-tramite/?institucion={por_nombre[nombre]['id']}", tok(ana)) if nombre in por_nombre else None
+            tipos = r.json() if r is not None and r.status_code == 200 else []
+            todos.extend(tipos)
+            ciudadania = [t for t in tipos if t["audiencia"] == "ciudadania"]
+            requisitos = [t.get("requisitos") or {} for t in ciudadania]
+            self._paso(f"{nombre}: ofrece 1 o 2 trámites para la ciudadanía, cada uno con descripción, documentos y qué pasa después, y su solicitud interinstitucional",
+                       1 <= len(ciudadania) <= 2 and all(q.get("descripcion") and q.get("documentos") and q.get("despues") for q in requisitos)
+                       and any(t["audiencia"] == "institucion" for t in tipos), len(ciudadania))
+        self._paso("ningún formulario de los trámites nuevos pide cédula, nombre ni correo",
+                   not [c["id"] for t in todos for c in t["formulario"] if c["id"] in {"cedula", "nombre", "apellidos", "correo", "email", "telefono"}])
+        r = self._http("get", "/catalogo/tipos-tramite/", tok(ana))
+        publicos = r.json() if r.status_code == 200 else []
+        self._paso("el catálogo público no muestra ningún «Trámite de demostración» (están inactivos)",
+                   r.status_code == 200 and publicos and not [t for t in publicos if t["nombre"].startswith("Trámite de demostración")])
+        demo = list(TipoTramite.objects.filter(nombre__startswith="Trámite de demostración"))
+        self._paso("los tres «Trámite de demostración» siguen en la base, inactivos (no se borraron ni se renombraron)",
+                   len(demo) == 3 and not any(t.activo for t in demo), [(t.nombre, t.activo) for t in demo])
+        antes = Tramite.objects.count()
+        rechazos = [self._http("post", "/tramites/", tok(ana), {"tipo_tramite": t.pk, "datos": {"asunto": "Intento sobre un trámite inactivo"}}) for t in demo]
+        self._paso("y ninguno admite trámites nuevos (400, tipo_tramite_inactivo) ni se crea nada",
+                   all(x.status_code == 400 and x.json().get("codigo") == "tipo_tramite_inactivo" for x in rechazos) and Tramite.objects.count() == antes,
+                   [x.status_code for x in rechazos])
+
     def _recorrer(self):
         mop = Institucion.objects.get(nombre="MOP")
         minsa = Institucion.objects.get(nombre="MINSA")
-        tipo_mop = TipoTramite.objects.get(institucion=mop, audiencia="ciudadania")
-        tipo_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="ciudadania")
+        tipo_mop = TipoTramite.objects.get(institucion=mop, audiencia="ciudadania", activo=True)
+        tipo_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="ciudadania", activo=True)
         inter_mop = TipoTramite.objects.get(institucion=mop, audiencia="institucion")
         inter_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="institucion")
 
@@ -1081,6 +1117,9 @@ class Command(BaseCommand):
 
         # ---------------------------------------------------------------- reasignar a personal con la membresía revocada (se rechaza)
         self._reasignacion_a_revocado(mop, tipo_mop, coord, super_mop, ana, func_minsa)
+
+        # ---------------------------------------------------------------- directorio de instituciones (migración 023)
+        self._directorio(ana, tok)
 
         # ---------------------------------------------------------------- trámites de la ciudadanía (migración 021)
         self._ciudadania(mop, tipo_mop, coordinador, ana, beto, func_mop, super_mop, func_minsa, operador)
