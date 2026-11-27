@@ -17,7 +17,7 @@ Esquema `siget`, con 16 migraciones (002–017), seguridad por filas (RLS), disp
 
 | # | Módulo | Tabla | Estado |
 |---|---|---|---|
-| 1 | Instituciones | `institucion` | ✅ 6 sembradas (3 reales y 3 de demostración) |
+| 1 | Instituciones | `institucion` | ✅ 12 en el catálogo, todas de tipo `real`: 6 sembradas (005) y 6 agregadas por la migración 023 (runbook 48); ninguna de demostración |
 | 2 | Identidad (atributos del sujeto) | `usuario` | ✅ con campos del segundo factor y del bloqueo |
 | 3 | Permisos por institución | `membresia` | ✅ |
 | 4 | Catálogo de trámites | `tipo_tramite` | ✅ 6 sembrados con su SLA |
@@ -52,7 +52,7 @@ PostgreSQL, el backend y nginx corren como contenedores Podman rootless gestiona
 |---|---|---|---|
 | 1 | Autenticación (`autenticacion`) | Registro, Argon2, JWT de vida corta, refresco de un solo uso, MFA TOTP, reautenticación escalonada, bloqueo, actividad de seguridad propia | ✅ runbook 25 |
 | 2 | Autorización (`autorizacion`) | **PDP** (ABAC, niega por defecto, *fail closed*), módulos por rol (la matriz de permisos, el simulador y la vista de la base se retiraron en el runbook 45) | ✅ runbook 30, 31, 45 |
-| 3 | Catálogo (`catalogo`) | Instituciones y tipos de trámite con su SLA | ✅ runbook 26 |
+| 3 | Catálogo (`catalogo`) | Instituciones y tipos de trámite con su SLA y sus requisitos; el directorio de la ciudadanía lee de aquí (runbook 48) | ✅ runbook 26, 48 |
 | 4 | Trámites (`tramites`) | Crear, listar, ver, cambiar de estado, reasignar e historial, con RLS y auditoría en la misma transacción | ✅ runbook 26 |
 | 5 | Identidad y equipo (`identidad`) | Usuarios, membresías y el equipo de cada institución | ✅ runbook 27 |
 | 6 | Auditoría (`auditoria`) | Consola de solo lectura con **su propio rol de base de datos**; registra cada consulta | ✅ runbook 28 |
@@ -73,6 +73,7 @@ Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ mód
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | **Mis trámites** | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | 4 |
 | **Iniciar un trámite** | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | 4 |
+| **Directorio** | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | 4 |
 | **Mis datos** | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | 4 |
 | **Bandeja de la institución** | ✅ | — | ✅ | ✅ | — | — | — | — | — | — | — | 2 |
 | **Supervisión** | ✅ | — | — | ✅ | — | — | — | — | — | — | — | 1 |
@@ -86,7 +87,7 @@ Matriz **módulo × rol** de los 10 roles (✅ lo ve · — no lo ve · ⏳ mód
 | **Respuesta a incidentes** | ✅ | — | — | — | — | — | — | — | ✅ | — | — | 1 |
 | **Custodia de secretos** | ✅ | — | — | — | — | — | — | — | — | ✅ | — | 1 |
 | **Auditoría** | ✅ | — | — | — | — | — | — | — | — | — | ✅ | 1 |
-| **Módulos que ve** | | 5 | 6 | 8 | 6 | 4 | 4 | 4 | 4 | 4 | 4 | |
+| **Módulos que ve** | | 6 | 7 | 9 | 7 | 4 | 4 | 4 | 4 | 4 | 4 | |
 
 Lectura rápida: un rol llega a varios módulos (el supervisor ve 8) y un módulo lo comparten varios roles (los dos de transparencia —Mi seguridad y Segundo factor— los ven los diez). Los cinco roles de plataforma comparten el mismo patrón: su consola + «Acceso a trámites» + transparencia, y ninguno ve trámites.
 

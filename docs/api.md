@@ -165,9 +165,11 @@ Nunca se notifica a quien hizo el cambio. Al personal (asignado y supervisión) 
 
 | Ruta | Respuesta |
 |---|---|
-| `GET /catalogo/instituciones/` | `[{id, nombre, tipo}]` |
+| `GET /catalogo/instituciones/` | `[{id, nombre, tipo}]` (`tipo`: `real`; desde la migración 023 ninguna institución del catálogo es de `demostracion`). Es lo que lee el módulo «Directorio» de la ciudadanía |
 | `GET /catalogo/tipos-tramite/?institucion=<id>` | `[{id, nombre, sla_dias, audiencia, formulario: [Campo], requisitos: {descripcion?, documentos?, despues?}, institucion: {id, nombre}}]` (`requisitos`, migración 021: qué es el trámite, qué documentos hacen falta y qué pasa después; un objeto vacío si la coordinación no escribió nada) (`audiencia`: `ciudadania`, `institucion` o `ambas`; quién puede iniciarlo). **No trae los tipos desactivados** (migración 020); la coordinación los ve en su propio listado |
 | `GET /equipo/` | `{equipos: [{institucion: {id, nombre}, personal: [{usuario_id, usuario, rol}]}]}` — coordinación y supervisión de esa institución |
+
+**Directorio de instituciones (módulo `directorio`, migración 023).** No agrega rutas ni acciones del PDP: la pantalla lee el catálogo público con `GET /catalogo/instituciones/` y `GET /catalogo/tipos-tramite/` (sin `?institucion`: todos los tipos activos, con sus requisitos). Son los mismos datos que ya ve quien inicia un trámite (qué trámites hay, plazo, documentos y qué pasa después): nada de nadie, sin PDP, con acceso completo y límite de tasa como el resto de `/catalogo/` (nginx y vite ya lo dejan pasar). Los tipos desactivados no aparecen (los tres «Trámite de demostración» quedaron así). La interfaz filtra por `audiencia` igual que «Iniciar un trámite»; lo que decide quién puede iniciar qué sigue siendo el PDP y la base.
 
 ## Auditoría (`/auditoria/`) — solo rol `auditor`, nivel 3 y segundo factor reciente
 

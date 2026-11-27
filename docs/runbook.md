@@ -2467,3 +2467,91 @@ Con la base migrada: guardar la imagen en uso (`podman tag …:dev …:respaldo-
 4. **Constancia y personal:** el personal de la institución recibe `403` (decisión del PDP registrada) y no `404`, porque la seguridad por filas sí le deja ver el trámite.
 5. **Conteos del PDP, la matriz y el simulador:** el PDP pasa a **31** acciones (`desistir_tramite`); la matriz y el simulador siguen listando 30 hasta que se fusionen con la baja de «Roles y permisos». Ver el informe de la rama.
 6. **Los requisitos se escriben a mano por la coordinación:** son texto de la institución, no un compromiso legal; se muestran como texto plano (nunca HTML).
+
+## 48. Directorio de instituciones: aplicar la migración 023 (instituciones panameñas reales y sus trámites)
+
+**Estado: implementado, sin aplicar en producción.**
+
+### 48.1 Qué cambia y en qué orden hay que aplicarlo
+
+La migración [`023-directorio-instituciones.sql`](../database/migraciones/023-directorio-instituciones.sql) es **solo datos**, **una sola transacción** como `siget_owner` y **va después de la 021** (usa `tipo_tramite.requisitos`; la 022 vive en otra rama y no se toca):
+
+- `MINSA`, `MOP` y `MiAmbiente` pasan a `tipo = 'real'`: desaparece la etiqueta «Demostración» de «Iniciar un trámite».
+- Los tres «Trámite de demostración (X)» se **desactivan** (`activo = false`); no se renombran ni se borran, porque en producción hay trámites reales de esos tipos y cada uno guarda la copia de su formulario. Los existentes siguen su curso (020); lo nuevo se rechaza. Efecto visible: suben una versión y `catalogo_cambio` anota `desactivado` con actor nulo.
+- Seis instituciones nuevas: Registro Público de Panamá, Ministerio de Comercio e Industrias (Panamá Emprende), ATTT, MEDUCA, IDAAN y Municipio de San Miguelito, cada una con 1 o 2 trámites para la ciudadanía y su «Solicitud interinstitucional de información» (audiencia `institucion`, como la 012).
+- Un trámite real en lugar del de demostración para MINSA (permiso sanitario de operación), MOP (permiso de uso de servidumbre vial) y MiAmbiente (evaluación de estudio de impacto ambiental categoría I). En total **14 trámites para la ciudadanía** y 12 instituciones.
+- **El contenido es ilustrativo.** Los nombres son reales y públicos; los requisitos, formularios y plazos son genéricos y razonables, **no** la normativa vigente ni un compromiso de la institución. Antes de darlo por oficial, cada institución lo valida con su coordinación (que lo ajusta desde «Catálogo de la institución»; cada cambio sube la versión y queda en el historial).
+- `institucion.tipo` **conserva `demostracion` en su `CHECK`**: el modelo, el alta de instituciones y las pruebas anteriores (013, 018, 020, 021, `verificar_*`) lo usan para sus datos de prueba. Quitarlo rompe esas pruebas sin ganar nada; lo que importa (ninguna institución del catálogo real con ese tipo) lo comprueba `database/pruebas-directorio.sql`.
+- Ningún formulario pide cédula, nombre ni correo (minimización, Ley 81). **El formulario del MOP lleva `asunto` y `descripcion` como primeros campos** (los demás, opcionales): las verificaciones y el ensayo crean trámites del MOP con esos datos.
+
+**La base va primero, el código después.** El backend nuevo no necesita columnas nuevas: sin la migración el «Directorio» solo mostraría las seis instituciones de antes, y `sembrar_demo`, `verificar_*` y el ensayo siguen funcionando con el tipo de demostración (piden el activo para la ciudadanía). Al revés (migración con el código viejo): el menú viejo no tiene «Directorio», «Iniciar un trámite» deja de ofrecer los de demostración y los scripts viejos que piden «el» tipo del MOP sin filtrar por `activo` se confundirían con dos; por eso se despliega el código nuevo enseguida.
+
+**No hay ruta de primer nivel nueva ni acción nueva del PDP** (siguen 31): el directorio lee `GET /catalogo/instituciones/` y `GET /catalogo/tipos-tramite/`, que ya están en `location` de nginx y en `frontend/vite.config.js`.
+
+### 48.2 Respaldo previo, verificado
+
+Igual que 46.2 con sello `pre-023`: `systemctl start siget-respaldo.service` en VM2, comprobar que terminó bien y
+
+```bash
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/pre-023-tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+### 48.3 Ensayo con `ROLLBACK`, junto con las pruebas (después de la 021)
+
+La 021 ya debe estar aplicada (46.3 y 46.4). La 023 es **una sola** transacción: para ensayarla con sus pruebas se cambia su `COMMIT;` final por `RESET ROLE;` y se pegan las pruebas sin su propio `BEGIN;` (ya terminan en `ROLLBACK;`):
+
+```bash
+{ sed -e 's/^COMMIT;$/RESET ROLE;/' database/migraciones/023-directorio-instituciones.sql
+  sed '1,/^BEGIN;$/d' database/pruebas-directorio.sql; } > /tmp/023-ensayo.sql
+cat /tmp/023-ensayo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Debe terminar en `ROLLBACK` sin errores y con `RESUMEN: 23 de 23 comprobaciones PASAN, 0 FALLAN`. Después, confirmar que no quedó nada: `select count(*) from siget.institucion;` debe seguir en 6 (o las que hubiera) y `select count(*) from siget.tipo_tramite where activo and nombre like 'Trámite de demostración%';` debe seguir en 3. **Es la primera vez que corre contra PostgreSQL**: si algo falla, mirar primero si es un error de la prueba. Los puntos de más riesgo: los literales con `$f$…$f$` y `$r$…$r$` dentro del `VALUES` (el tipo de la columna se resuelve con `::jsonb` en el `SELECT`), el `ON CONFLICT (institucion_id, nombre)` (existe desde la 005), el `INSERT … SELECT` del dueño bajo los disparadores `tipo_tramite_valida` y `tipo_tramite_registra`, y el `INSERT` de un trámite como `app_role` con contexto en la prueba de los tipos inactivos. Correr las pruebas consume secuencias (ids de `tipo_tramite`, `catalogo_cambio`, `usuario`): quedan huecos, no borrados.
+
+### 48.4 Migración real y pruebas de la base
+
+```bash
+cat database/migraciones/023-directorio-instituciones.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+cat database/pruebas-directorio.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Todas deben decir `PASA` (23 de 23). Después, la **regresión de todas las pruebas de la base anteriores**, que no deben cambiar (la 023 solo agrega filas y desactiva tres tipos):
+
+```bash
+for f in escalamiento notificaciones alertas catalogo ciudadania; do
+  cat database/pruebas-$f.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+done
+```
+
+Esperado: escalamiento 10/10, notificaciones 36/36, alertas 57/57, catálogo 82/82 y ciudadanía con los números de 46.4. Comprobar además con una consulta como `app_role` (login real): `select count(*) from siget.institucion;` debe dar 12, `select count(*) from siget.institucion where tipo = 'demostracion';` debe dar 0 y `select count(*) from siget.tipo_tramite where activo and audiencia = 'ciudadania';` debe dar **17** (los 14 nuevos más los de Alcaldía, Ministerio Público y AMPYME). Marcar la migración como aplicada (fecha) en `database/migraciones/README.md`.
+
+### 48.5 Imagen candidata y verificaciones (VM1)
+
+Con la base migrada: guardar la imagen en uso (`podman tag localhost/siget-backend:dev localhost/siget-backend:respaldo-AAAA-MM-DD`, ver 39.10), reconstruir con el código nuevo y correr cada comando contra la base real (todos se revierten) **antes de reiniciar**:
+
+1. `verificar_esquema` (no cambia: no hay columnas nuevas).
+2. `verificar_tramites`: trae el método nuevo `_directorio` (catálogo público con las seis instituciones nuevas y sus trámites con requisitos, ninguna institución de demostración, el catálogo sin «Trámite de demostración», y los tres inactivos que rechazan trámites con `400 tipo_tramite_inactivo` sin crear nada). Todos los pasos anteriores deben seguir en verde con el tipo real del MOP y del MINSA (piden el activo para la ciudadanía).
+3. `verificar_equipo` (usa el tipo activo del MOP para crear un trámite de prueba), `verificar_autenticacion`, `verificar_politicas`, `verificar_auditoria` y `verificar_plataforma`: sin cambios.
+4. `sembrar_demo --ensayo` (dentro de una transacción revertida): debe crear sus trámites con los tipos reales del MOP y del MINSA.
+
+### 48.6 Despliegue y ensayo
+
+1. `desplegar.sh` (backend e interfaz). La interfaz nueva con el backend viejo no muestra el «Directorio» (el menú lo calcula el servidor) y lo demás sigue igual.
+2. `demo/ensayo.py`: las secciones 1 a 4 crean ahora sus trámites con el tipo real del MOP, y la 1 suma **4 comprobaciones livianas** (≥ 12 instituciones en el directorio, ninguna de demostración, el catálogo sin «Trámite de demostración» y documentos en cada trámite de la ciudadanía), sin crear datos. El menú de Ana incluye «Directorio». Esperadas: **133** con las 129 del 46 (anotar la cifra real al desplegar). No agrega negaciones del PDP (el catálogo público no pasa por el PDP): ninguna cuenta se acerca a las 5 denegaciones en 10 minutos que disparan la alerta.
+3. Probar a mano: abrir «Directorio», buscar «agua» o «licencia», abrir una institución, leer la ficha y pulsar «Iniciar este trámite»: debe abrir «Iniciar un trámite» con la institución y el trámite elegidos y la tarjeta «Antes de empezar». Con una cuenta del personal, comprobar que en su propia institución solo aparece la nota y no el botón.
+
+### 48.7 Qué hacer si algo sale mal
+
+- **La migración falla:** es una transacción, no queda nada a medias; se corrige y se repite (idempotente: `ON CONFLICT` y `UPDATE` con la misma condición).
+- **Hay que volver atrás el código:** `podman tag …respaldo… …:dev`, reiniciar el backend y restaurar la interfaz; la base migrada funciona con el código anterior (ver 48.1).
+- **Reactivar un «Trámite de demostración»:** la coordinación de la institución lo reactiva desde «Catálogo de la institución» (`{activo: true}`); no hace falta tocar la base.
+- **Quitar un trámite agregado por error:** no se borra (el catálogo no admite `DELETE`): se desactiva. Una institución sin trámites para la persona aparece en el directorio como «Sin trámites para ti».
+
+### 48.8 Gotchas y riesgos aceptados
+
+1. **Contenido ilustrativo:** requisitos, formularios y plazos son genéricos; nadie debe tomarlos como la normativa de la institución hasta que su coordinación los valide. Las fichas lo dicen al pie («La información la publica cada institución y puede cambiar»).
+2. **Las instituciones nuevas no tienen personal ni coordinación todavía:** los trámites de la ciudadanía se pueden iniciar y quedan `Pendiente` hasta que el operador de identidades dé de alta a su coordinación (control dual) y esta arme el equipo. Conviene dar de alta a la coordinación antes de anunciar el directorio.
+3. **`demostracion` sigue siendo un valor válido** de `institucion.tipo` (ver 48.1); la consola del operador de catálogo no lo ofrece desde el runbook 45.
+4. **Plazos:** `sla_dias` cuenta días hábiles con los feriados de la tabla `feriado` (013, 2026 y 2027); son parámetros de diseño, no plazos legales.
+5. **MOP, MINSA y MiAmbiente tienen un solo trámite para la ciudadanía a propósito:** `verificar_tramites` pide «el» tipo activo de la ciudadanía de MOP y MINSA con `.get()`. Si la coordinación agrega un segundo, esa verificación falla por `MultipleObjectsReturned` (no es un error de la plataforma).
+6. **Los trámites ya iniciados de los tipos de demostración** conservan su copia del formulario y siguen su curso; en el directorio y en «Iniciar un trámite» ya no aparecen.
