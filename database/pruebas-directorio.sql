@@ -159,8 +159,8 @@ BEGIN
                     'los tres «Tramite de demostracion» siguen existiendo (no se renombran ni se borran)');
   PERFORM pg_temp.r((SELECT count(*) FROM siget.tipo_tramite WHERE nombre LIKE 'Trámite de demostración (%)' AND NOT activo) = 3,
                     'los tres «Tramite de demostracion» estan inactivos (activo = false)');
-  PERFORM pg_temp.r((SELECT bool_and(version >= 2) FROM siget.tipo_tramite WHERE nombre LIKE 'Trámite de demostración (%)'),
-                    'al desactivarlos la version de cada uno subio');
+  PERFORM pg_temp.r((SELECT bool_and(version >= 3) FROM siget.tipo_tramite WHERE nombre LIKE 'Trámite de demostración (%)'),
+                    'al desactivarlos la version de cada uno subio (1 al crearlo, 2 con la 021, 3 con la 023)');
   PERFORM pg_temp.r((SELECT count(DISTINCT c.tipo_tramite_id) FROM siget.catalogo_cambio c JOIN siget.tipo_tramite t ON t.id = c.tipo_tramite_id
                       WHERE t.nombre LIKE 'Trámite de demostración (%)' AND c.accion = 'desactivado' AND c.actor_id IS NULL) = 3,
                     'catalogo_cambio guarda la desactivacion de cada uno (accion desactivado, sin actor: la hizo el duenio al migrar)');
@@ -169,8 +169,8 @@ BEGIN
   INSERT INTO siget.usuario (username, password_hash) VALUES ('p023_ciud', '!') RETURNING id INTO v_ciud;
   EXECUTE 'RESET ROLE';
   v_inst := (SELECT id FROM siget.institucion WHERE nombre = 'MOP');
-  v_demo := (SELECT id FROM siget.tipo_tramite WHERE nombre = 'Trámite de demostración (MOP)');
-  v_real := (SELECT id FROM siget.tipo_tramite WHERE nombre = 'Permiso de uso de servidumbre vial');
+  v_demo := (SELECT id FROM siget.tipo_tramite WHERE institucion_id = v_inst AND nombre = 'Trámite de demostración (MOP)');
+  v_real := (SELECT id FROM siget.tipo_tramite WHERE institucion_id = v_inst AND nombre = 'Permiso de uso de servidumbre vial');
   v_inter := (SELECT id FROM siget.tipo_tramite WHERE institucion_id = v_inst AND nombre = 'Solicitud interinstitucional de información');
 
   EXECUTE 'SET LOCAL ROLE app_role';

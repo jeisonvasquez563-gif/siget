@@ -21,7 +21,8 @@
 --   nulo (queda como evidencia). En su lugar, MINSA, MOP y MiAmbiente reciben un tramite real para la ciudadania.
 -- * Seis instituciones nuevas con 1 o 2 tramites para la ciudadania, y cada una con su «Solicitud interinstitucional de informacion»
 --   (audiencia 'institucion', como la 012 y con el mismo formulario y requisitos de la 017 y la 021).
--- * Ningun formulario pide cedula, nombre ni correo (ya estan en el perfil: minimizacion de datos, Ley 81). Formularios y requisitos
+-- * Ningun formulario pide cedula, nombre ni correo (ya estan en el perfil: minimizacion de datos, Ley 81). En Panama el numero de licencia de
+--   conducir es el de la cedula: por eso la renovacion y el duplicado de la ATTT no lo piden (la ATTT lo obtiene del perfil). Formularios y requisitos
 --   cumplen lo que valida la base (formulario_invalido de la 020 y requisitos_invalido de la 021: el disparador tipo_tramite_valida los
 --   revisa al insertar) y la API (apps.tramites.formulario y apps.catalogo.gestion; lo verifica una prueba unitaria sobre este archivo).
 -- * El tramite del MOP lleva `asunto` y `descripcion` como primeros campos (igual que el tramite de demostracion que reemplaza): las
@@ -40,7 +41,9 @@ UPDATE siget.institucion SET tipo = 'real' WHERE nombre IN ('MINSA', 'MOP', 'MiA
 -- 2. Los «Tramite de demostracion» se desactivan (no se renombran ni se borran)
 -- ---------------------------------------------------------------------------
 UPDATE siget.tipo_tramite SET activo = false
- WHERE nombre IN ('Trámite de demostración (MINSA)', 'Trámite de demostración (MOP)', 'Trámite de demostración (MiAmbiente)') AND activo;
+ WHERE nombre IN ('Trámite de demostración (MINSA)', 'Trámite de demostración (MOP)', 'Trámite de demostración (MiAmbiente)')
+   AND institucion_id IN (SELECT id FROM siget.institucion WHERE nombre IN ('MINSA', 'MOP', 'MiAmbiente'))
+   AND activo;
 
 -- ---------------------------------------------------------------------------
 -- 3. Instituciones nuevas
@@ -184,7 +187,6 @@ FROM (VALUES
   -- ATTT ---------------------------------------------------------------------
   ('ATTT', 'Renovación de licencia de conducir', 10, $f$[
     {"id": "tipo_licencia", "etiqueta": "Tipo de licencia", "tipo": "seleccion", "obligatorio": true, "opciones": ["Particular", "Profesional", "Motocicleta"]},
-    {"id": "numero_licencia", "etiqueta": "Número de la licencia actual", "tipo": "texto", "obligatorio": true, "max": 30, "ayuda": "Figura en el carné."},
     {"id": "situacion", "etiqueta": "Situación de la licencia", "tipo": "seleccion", "obligatorio": true, "opciones": ["Vigente (próxima a vencer)", "Vencida"]},
     {"id": "provincia_atencion", "etiqueta": "Provincia donde quieres retirarla", "tipo": "seleccion", "obligatorio": true, "opciones": ["Bocas del Toro", "Chiriquí", "Coclé", "Colón", "Darién", "Herrera", "Los Santos", "Panamá", "Panamá Oeste", "Veraguas"]}
   ]$f$, $r${
@@ -199,7 +201,6 @@ FROM (VALUES
   }$r$),
   ('ATTT', 'Duplicado de licencia de conducir', 5, $f$[
     {"id": "motivo_duplicado", "etiqueta": "Motivo", "tipo": "seleccion", "obligatorio": true, "opciones": ["Pérdida", "Robo", "Deterioro"]},
-    {"id": "numero_licencia", "etiqueta": "Número de la licencia, si lo recuerdas", "tipo": "texto", "obligatorio": false, "max": 30},
     {"id": "fecha_hechos", "etiqueta": "Fecha de la pérdida o del robo", "tipo": "fecha", "obligatorio": false, "ayuda": "No puede ser una fecha futura."},
     {"id": "observaciones", "etiqueta": "Observaciones", "tipo": "texto_largo", "obligatorio": false, "max": 500}
   ]$f$, $r${

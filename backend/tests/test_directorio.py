@@ -24,8 +24,8 @@ TIPOS = [(i, n, int(s), json.loads(f), json.loads(r))
 NUEVAS = ["Registro Público de Panamá", "Ministerio de Comercio e Industrias (Panamá Emprende)", "ATTT", "MEDUCA", "IDAAN", "Municipio de San Miguelito"]
 ANTIGUAS = ["MINSA", "MOP", "MiAmbiente"]
 IDS = [f"{i} / {n}" for i, n, *_ in TIPOS]
-PROHIBIDOS = {"cedula", "nombre", "apellidos", "apellido", "correo", "email", "telefono", "celular", "fecha_nacimiento"}
-MAL_PEDIDO = ("cédula", "cedula", "correo", "teléfono", "telefono", "apellido")
+PROHIBIDOS = {"cedula", "nombre", "apellidos", "apellido", "correo", "email", "telefono", "celular", "fecha_nacimiento", "numero_licencia", "licencia"}
+MAL_PEDIDO = ("cédula", "cedula", "correo", "teléfono", "telefono", "apellido", "número de la licencia", "numero de la licencia", "número de licencia")  # en Panamá el número de licencia es el de la cédula
 
 
 def test_la_migracion_trae_los_tramites_de_las_nueve_instituciones():
@@ -55,7 +55,7 @@ def test_ninguna_institucion_queda_ni_se_crea_como_demostracion():
 
 def test_los_tramites_de_demostracion_se_desactivan_sin_renombrar_ni_borrar():
     sin_comentarios = "\n".join(l for l in SQL.splitlines() if not l.lstrip().startswith("--"))
-    desactivar = re.search(r"UPDATE siget\.tipo_tramite SET activo = false\s+WHERE nombre IN \((.*?)\) AND activo;", sin_comentarios, re.S).group(1)
+    desactivar = re.search(r"UPDATE siget\.tipo_tramite SET activo = false\s+WHERE nombre IN \((.*?)\)\s+AND institucion_id IN \(SELECT id FROM siget\.institucion WHERE nombre IN \(\'MINSA\', \'MOP\', \'MiAmbiente\'\)\)\s+AND activo;", sin_comentarios, re.S).group(1)
     assert re.findall(r"'([^']+)'", desactivar) == [f"Trámite de demostración ({i})" for i in ANTIGUAS]
     assert "DELETE" not in sin_comentarios.upper() and "SET nombre" not in sin_comentarios
 
