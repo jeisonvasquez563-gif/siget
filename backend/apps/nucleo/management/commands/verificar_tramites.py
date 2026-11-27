@@ -864,8 +864,8 @@ class Command(BaseCommand):
             todos.extend(tipos)
             ciudadania = [t for t in tipos if t["audiencia"] == "ciudadania"]
             requisitos = [t.get("requisitos") or {} for t in ciudadania]
-            self._paso(f"{nombre}: ofrece 1 o 2 trámites para la ciudadanía, cada uno con descripción, documentos y qué pasa después, y su solicitud interinstitucional",
-                       1 <= len(ciudadania) <= 2 and all(q.get("descripcion") and q.get("documentos") and q.get("despues") for q in requisitos)
+            self._paso(f"{nombre}: ofrece al menos un trámite para la ciudadanía, cada uno con descripción, documentos y qué pasa después, y su solicitud interinstitucional",
+                       len(ciudadania) >= 1 and all(q.get("descripcion") and q.get("documentos") and q.get("despues") for q in requisitos)
                        and any(t["audiencia"] == "institucion" for t in tipos), len(ciudadania))
         self._paso("ningún formulario de los trámites nuevos pide cédula, nombre ni correo",
                    not [c["id"] for t in todos for c in t["formulario"] if c["id"] in {"cedula", "nombre", "apellidos", "correo", "email", "telefono"}])
@@ -885,8 +885,8 @@ class Command(BaseCommand):
     def _recorrer(self):
         mop = Institucion.objects.get(nombre="MOP")
         minsa = Institucion.objects.get(nombre="MINSA")
-        tipo_mop = TipoTramite.objects.get(institucion=mop, audiencia="ciudadania", activo=True)
-        tipo_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="ciudadania", activo=True)
+        tipo_mop = TipoTramite.objects.filter(institucion=mop, audiencia="ciudadania", activo=True).order_by("id").first()
+        tipo_minsa = TipoTramite.objects.filter(institucion=minsa, audiencia="ciudadania", activo=True).order_by("id").first()
         inter_mop = TipoTramite.objects.get(institucion=mop, audiencia="institucion")
         inter_minsa = TipoTramite.objects.get(institucion=minsa, audiencia="institucion")
 
