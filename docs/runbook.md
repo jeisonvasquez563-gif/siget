@@ -2353,6 +2353,8 @@ Aplicado el **26 de noviembre de 2026**, a las 13:22. Evidencia en `docs/sdlc/ev
 
 **Volver atrás:** imagen `respaldo-2026-11-26b` como `dev` y reiniciar el backend; interfaz desde `frontend.respaldo-2026-11-26b`. Revertir la base solo restaurando `pre-020-…` (perdiendo lo posterior).
 
+---
+
 ## 45. Plataforma final: se retira «Roles y permisos» (sin migración)
 
 Cambio de código, de nginx y de interfaz. **No hay migración**: la base no se toca (la pantalla solo leía el catálogo de PostgreSQL y el PDP).
@@ -2387,3 +2389,81 @@ Cambio de código, de nginx y de interfaz. **No hay migración**: la base no se 
 - **Cambiados en código:** el aviso de privacidad (`derechos.py`) sin la frase «entorno de demostración académica» (la versión `AVISO_VERSION` **no** se subió: la frase no cambia ninguna obligación; si se quiere que quien ya aceptó lo vuelva a aceptar, hay que subirla); el formulario de alta de instituciones ya no ofrece el tipo «Demostración» (siempre «real»).
 - **Se dejan como opción configurable:** `SIGET_AVISO_DEMOSTRACION` (el aviso «Demostración académica» de la pantalla de acceso; apagado en producción) y, solo en desarrollo, el modo de ejemplo `?mock=`.
 - **Dato de la base (no tocado):** las instituciones MINSA, MOP y MiAmbiente tienen `tipo = 'demostracion'` (migración 005) y de ahí sale la etiqueta «Demostración» de «Iniciar un trámite» (`Tramites.jsx`, que no se toca en este cambio) y de la consola de catálogo; los trámites «Trámite de demostración (MINSA|MOP|MiAmbiente)» (migraciones 005 y 017). Actualización sugerida, como `siget_owner`, **en una migración numerada** (021) con respaldo previo: `UPDATE siget.institucion SET tipo = 'real' WHERE nombre IN ('MINSA','MOP','MiAmbiente');`. Renombrar los trámites exige además cambiar la clave del formulario en `apps/tramites/formulario.py` (`FORMULARIOS["Trámite de demostración (%)"]`, que enlaza por nombre) y la migración 017: hacerlo juntas, no solo con un `UPDATE`.
+
+---
+
+## 46. Trámites de la ciudadanía: aplicar la migración 021 (requisitos, constancia y desistir)
+
+**Estado: implementado, sin aplicar en producción.**
+
+### 46.1 Qué cambia y en qué orden hay que aplicarlo
+
+La migración [`021-tramites-ciudadania.sql`](../database/migraciones/021-tramites-ciudadania.sql) son **dos transacciones** (como `siget_owner`):
+
+- **A:** `ALTER TYPE siget.estado_tramite ADD VALUE 'Desistido'`. PostgreSQL no deja usar un valor de enum agregado en la misma transacción y agregarlo **no se puede deshacer**: por eso va aparte y es inocuo (ninguna fila lo usa hasta que alguien desista).
+- **B:** `tipo_tramite.requisitos` (jsonb `NOT NULL DEFAULT '{}'`, objeto) con `siget.requisitos_invalido()` (claves `descripcion`, `documentos` y `despues`; textos de hasta 1000, hasta 15 documentos de hasta 200) y `UPDATE (requisitos)` para `app_role`; reemplaza `tipo_tramite_valida` y `tipo_tramite_registra` (los requisitos entran en la validación, la versión y el historial); carga los requisitos de los 12 tipos sembrados (los 6 de la 005 y el interinstitucional de la 012 en cada una de las 6 instituciones; cada `UPDATE` filtra por nombre **y** por `institucion_id`) **por el dueño sin contexto** (suben a la versión 2 y `catalogo_cambio` guarda el cambio con actor nulo); transiciones `Pendiente`, `En Tramitacion` y `En Subsanacion` → `Desistido`; reemplaza `validar_transicion` (a `Desistido` solo pasa la persona solicitante, con motivo) y `validar_respuesta_solicitante` (la persona solicitante puede además desistir); política `tramite_desistir` y recrea el disparador `tramite_valida_solicitante` como `BEFORE UPDATE` **sin lista de columnas** (la 017 lo limitaba a `UPDATE OF estado, funcionario_asignado_id, datos`; con las políticas `tramite_desistir` y `tramite_responder_subsanacion` combinadas por `OR`, es la única barrera sobre lo que puede hacer la persona solicitante, y ahora vigila cualquier cambio suyo en su fila; la lógica de la función no cambia); rehace el índice `tramite_vencidos_sin_escalar` y reemplaza `escalar_vencidos`, `documento_valida`, `tramites_abiertos_de` y `generar_notificaciones` (tipo nuevo `tramite_desistido` en el `CHECK` de `notificacion`).
+
+**La base va primero, el código después.** El backend nuevo lee `requisitos`: sin la migración, el catálogo daría `500`. **El backend viejo funciona con la base migrada** (se razonó leyendo el código, no se ejecutó): las columnas tienen valor por defecto, nadie desiste sin la API nueva y por eso no existe ningún trámite `Desistido` que el viejo no sepa dibujar (su interfaz fallaría en el detalle del personal con un estado desconocido). No hay ruta de primer nivel nueva: todo va bajo `/tramites/` y `/catalogo/`, que ya están en nginx y en `vite.config.js`.
+
+### 46.2 Respaldo previo, verificado
+
+Igual que 44.2 con sello `pre-021`: `systemctl start siget-respaldo.service` en VM2, comprobar que terminó bien y
+
+```bash
+sudo -u postgres pg_dump -Fc -d tramites_demo -f /var/backups/siget/pre-021-tramites_demo-AAAAMMDD-HHMM.dump
+```
+
+### 46.3 Ensayo con `ROLLBACK`, junto con las pruebas
+
+El bloque A **no se puede ensayar con `ROLLBACK`** (ver 46.1): se aplica de verdad (es inocuo) y el bloque B sí se ensaya con sus pruebas en una transacción revertida:
+
+```bash
+sed -n '1,/^COMMIT;$/p' database/migraciones/021-tramites-ciudadania.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+{ sed '1,/^COMMIT;$/d' database/migraciones/021-tramites-ciudadania.sql | sed -e 's/^COMMIT;$/RESET ROLE;/'
+  sed '1,/^BEGIN;$/d' database/pruebas-ciudadania.sql; } > /tmp/021-ensayo.sql
+cat /tmp/021-ensayo.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+**El ensayo toma bloqueos exclusivos sobre `tramite`, `tipo_tramite` y `notificacion` mientras dura** (la transacción queda abierta hasta el `ROLLBACK`): correrlo en una ventana sin tráfico y lejos de los minutos múltiplos de 5, cuando corre el detector. Debe terminar en `ROLLBACK` sin errores y con `RESUMEN: N de N comprobaciones PASAN, 0 FALLAN`. Después, `\d siget.tipo_tramite` no debe tener `requisitos` y `\df siget.requisitos_invalido` no debe existir. **Es la primera vez que corre contra PostgreSQL**: si algo falla, mirar primero si es un error de la prueba. Los puntos de más riesgo: el nombre del `CHECK` de `notificacion` (la migración lo busca por su contenido), `GET STACKED DIAGNOSTICS` en el ayudante `estado_de`, que `RLS` oculte la fila al desistir desde un estado final (`filas0`) y el orden en que se evalúan los disparadores. Las pruebas corren `escalar_vencidos()` sobre toda la base: correrlas fuera de la hora en punto (advertencias en el encabezado del script). **Consumen secuencias aunque se reviertan** (huecos en los ids).
+
+### 46.4 Migración real y pruebas de la base
+
+```bash
+cat database/migraciones/021-tramites-ciudadania.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1
+cat database/pruebas-ciudadania.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+```
+
+Si el bloque A ya se aplicó en el ensayo, repetirlo es seguro (`ADD VALUE IF NOT EXISTS`). Después, la **regresión de todas las pruebas de la base anteriores**, que no deben cambiar (la 021 reemplaza funciones de la 011, 013, 015, 017 y 018):
+
+```bash
+for f in escalamiento notificaciones alertas catalogo; do
+  cat database/pruebas-$f.sql | /tmp/psql-contenedor.sh -d tramites_demo -v ON_ERROR_STOP=1 2>&1 | grep -E 'PASA|FALLA|RESUMEN|ERROR'
+done
+```
+
+Esperado: escalamiento 10/10, notificaciones 36/36, alertas 57/57 y catálogo 82/82 (los de 44.9). Excepción esperable: `select min(version), max(version) from siget.tipo_tramite` ya no da `1, 1`, porque los tipos sembrados subieron a 2. Comprobar con un login real de `app_role`: `has_column_privilege('app_role', 'siget.tipo_tramite', 'requisitos', 'UPDATE')` debe dar `t` y `select count(*) from siget.tipo_tramite where requisitos = '{}'` debe dar `0` para los sembrados. Marcar la migración como aplicada en `database/migraciones/README.md`.
+
+### 46.5 Imagen candidata y verificaciones (VM1)
+
+Con la base migrada: guardar la imagen en uso (`podman tag …:dev …:respaldo-AAAA-MM-DD`), reconstruir y correr cada comando contra la base real **antes de reiniciar**: `verificar_esquema` (el modelo `TipoTramite.requisitos` y los estados), `verificar_tramites` (trae el método nuevo `_ciudadania`: requisitos por la API y la base, constancia propia y ajena, desistir desde cada estado no final, el personal que no puede poner `Desistido`, avisos y documentos), `verificar_equipo`, `verificar_integracion`, `verificar_politicas`, `verificar_plataforma`, `verificar_autenticacion` y `verificar_auditoria`. **`verificar_tramites` no se pudo ejecutar al escribirlo**: si falla, revisar primero si es un error del paso. Si algún paso falla, **no desplegar**.
+
+### 46.6 Despliegue y ensayo
+
+1. `desplegar.sh` (backend e interfaz; devuelve la inactividad a 10 minutos). La interfaz nueva sin el backend nuevo muestra la tarjeta sin requisitos y falla al pedir la constancia.
+2. `demo/ensayo.py`: trae la **sección 7** con 12 comprobaciones nuevas (**129 esperadas** en total con las 117 del 45; anotar la cifra real al desplegar) (requisitos visibles en el catálogo, constancia de un trámite propio y de uno ajeno, desistir de un trámite creado por el propio ensayo). La única negación nueva del PDP es ninguna: lo ajeno da `404` por seguridad por filas y lo demás son `400` y `409` que pasan el PDP; **ninguna cuenta nueva se acerca a 5 negaciones en 10 minutos** (migración 019). El ensayo crea un trámite más (el desistido) y no desiste de ninguno real.
+3. Probar a mano: iniciar un trámite y leer «Antes de empezar»; en «Catálogo de la institución», editar los requisitos de un tipo de prueba; pedir la constancia, imprimirla o guardarla como PDF desde el navegador y revisar que no salgan menú ni botones; desistir de un trámite de prueba con el segundo factor y comprobar el aviso al funcionario asignado.
+
+### 46.7 Qué hacer si algo sale mal
+
+- **La migración falla:** el bloque B es una transacción, no queda nada a medias; se corrige y se repite. El bloque A, si ya corrió, queda y no estorba.
+- **Hay que volver atrás el código:** `podman tag …respaldo… …:dev`, reiniciar el backend y restaurar la interfaz. Con trámites `Desistido` ya creados, la interfaz vieja no los dibuja bien en el detalle del personal: avisar antes.
+- **Un enum no se puede quitar:** revertir la base es restaurar `pre-021` (perdiendo todo lo posterior; última opción).
+
+### 46.8 Gotchas y riesgos aceptados
+
+1. **`Desistido` no se puede deshacer** y lo pone solo la persona solicitante; ni el personal ni el dueño sin contexto (`validar_transicion`). Quien necesite corregir un desistimiento hecho por error debe pedirle a la persona que inicie un trámite nuevo.
+2. **El motivo del desistimiento lo leen la persona y el personal** (texto libre; riesgo aceptado como en 40.9).
+3. **La constancia es un documento sin firma ni código de verificación:** acredita lo que SIGET muestra, no es un acto administrativo. Pide el estado vigente en la plataforma.
+4. **Constancia y personal:** el personal de la institución recibe `403` (decisión del PDP registrada) y no `404`, porque la seguridad por filas sí le deja ver el trámite.
+5. **Conteos del PDP, la matriz y el simulador:** el PDP pasa a **31** acciones (`desistir_tramite`); la matriz y el simulador siguen listando 30 hasta que se fusionen con la baja de «Roles y permisos». Ver el informe de la rama.
+6. **Los requisitos se escriben a mano por la coordinación:** son texto de la institución, no un compromiso legal; se muestran como texto plano (nunca HTML).

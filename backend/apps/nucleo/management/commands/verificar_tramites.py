@@ -60,6 +60,8 @@ class Command(BaseCommand):
             cabeceras["HTTP_AUTHORIZATION"] = f"Bearer {token}"
         if metodo == "get":
             r = self.cliente.get(ruta, secure=True, **cabeceras)
+        elif metodo == "patch":
+            r = self.cliente.patch(ruta, datos, format="json", secure=True, **cabeceras)
         else:
             r = self.cliente.post(ruta, datos, format="json", secure=True, **cabeceras)
         cache.clear()
@@ -628,6 +630,222 @@ class Command(BaseCommand):
         r = reasignar(func_minsa.pk)
         self._paso("la respuesta es la misma que para cualquier destino inválido (personal de otra institución)", r.status_code == 400 and r.json() == rechazo, r.status_code)
 
+    # ------------------------------------------------------------------ trámites de la ciudadanía (migración 021)
+
+    def _ciudadania(self, mop, tipo_mop, coordinador, ana, beto, func_mop, super_mop, func_minsa, operador):
+        """Requisitos antes de iniciar, constancia de presentación y desistir. Ana desiste de trámites PROPIOS que crea aquí; nada de lo que ya
+        existía se toca. El escalamiento de un desistido (`escalar_vencidos()`, que app_role no puede ejecutar) lo prueba
+        database/pruebas-ciudadania.sql. Todo se revierte con la transacción de la prueba."""
+        reciente = lambda: timezone.now() - timedelta(minutes=1)  # noqa: E731
+        Usuario.objects.filter(pk__in=[ana.pk, beto.pk, func_mop.pk, super_mop.pk, coordinador.pk]).update(mfa_verificado_en=reciente())
+        t = {u.pk: self._token(u) for u in (ana, beto, func_mop, super_mop, coordinador, func_minsa, operador)}
+        h = lambda metodo, ruta, persona, datos=None: self._http(metodo, ruta, t[persona.pk], datos)  # noqa: E731
+        MOTIVO = "Ya no necesito este trámite."
+
+        def tramite(pk):
+            fijar_contexto(func_mop.pk, [mop.pk])
+            return Tramite.objects.get(pk=pk)
+
+        def eventos(pk):
+            fijar_contexto(func_mop.pk, [mop.pk])
+            return list(EventoAuditoria.objects.filter(tramite_id=pk).order_by("id"))
+
+        def leer_sql(persona, consulta, parametros=()):
+            """Una consulta directa a la base como `persona` (su contexto de seguridad por filas, sin pasar por la API)."""
+            fijar_contexto(persona.pk, [])
+            with connection.cursor() as c:
+                c.execute(consulta, parametros)
+                return c.fetchall()
+
+        def crear():
+            return h("post", "/tramites/", ana, {"tipo_tramite": tipo_mop.pk, "datos": datos_de_ejemplo(tipo_mop.formulario)}).json()["id"]
+
+        def llevar(pk, estado):
+            """El funcionario lleva el trámite hasta `estado` (En Tramitacion, En Subsanacion o Aprobado)."""
+            h("post", f"/tramites/{pk}/estado/", func_mop, {"estado": "En Tramitacion"})
+            if estado != "En Tramitacion":
+                cuerpo = {"estado": estado, "motivo": "Falta el plano firmado del terreno."} if estado == "En Subsanacion" else {"estado": estado}
+                h("post", f"/tramites/{pk}/estado/", func_mop, cuerpo)
+
+        # ---------------------------------------------------------------- requisitos antes de iniciar
+        ruta_tipo = f"/catalogo/institucion/{mop.pk}/tipos/{tipo_mop.pk}/"
+        r = h("get", f"/catalogo/tipos-tramite/?institucion={mop.pk}", ana)
+        publico = r.json() if r.status_code == 200 else []
+        self._paso("el catálogo público lleva los requisitos de cada trámite (un objeto)",
+                   r.status_code == 200 and len(publico) > 0 and all(isinstance(x.get("requisitos"), dict) for x in publico), r.status_code)
+        sembrado = next((x.get("requisitos") for x in publico if x["id"] == tipo_mop.pk), {})
+        self._paso("el trámite de demostración sembrado por la 021 trae la descripción, los documentos y qué pasa después",
+                   bool(isinstance(sembrado.get("descripcion"), str) and sembrado["descripcion"] and isinstance(sembrado.get("documentos"), list)
+                        and sembrado["documentos"] and isinstance(sembrado.get("despues"), str) and sembrado["despues"]), sembrado)
+        nuevos = {"descripcion": "Prueba de requisitos.", "documentos": ["Cédula", "Croquis de la zona"], "despues": "Se revisa y se avisa aquí."}
+        actual = TipoTramite.objects.get(pk=tipo_mop.pk)
+        r = h("patch", ruta_tipo, coordinador, {"requisitos": nuevos, "version": actual.version})
+        self._paso("la coordinación de la institución cambia los requisitos de su trámite y la versión sube",
+                   r.status_code == 200 and r.json()["requisitos"] == nuevos and r.json()["version"] == actual.version + 1, r.status_code)
+        r = h("get", f"/catalogo/tipos-tramite/?institucion={mop.pk}", ana)
+        self._paso("y el catálogo público ya muestra los requisitos nuevos",
+                   r.status_code == 200 and next((x["requisitos"] for x in r.json() if x["id"] == tipo_mop.pk), None) == nuevos)
+        r = h("get", f"/catalogo/institucion/{mop.pk}/cambios/?limite=1", coordinador)
+        ultimo = r.json()["resultados"][0] if r.status_code == 200 and r.json()["resultados"] else {}
+        self._paso("el historial del catálogo anota el cambio, con solo los requisitos y a nombre de la coordinación",
+                   ultimo.get("accion") == "cambio" and ultimo.get("despues") == {"requisitos": nuevos} and (ultimo.get("actor") or {}).get("usuario") == coordinador.username, ultimo)
+        r = h("patch", ruta_tipo, coordinador, {"requisitos": {"documentos": ["", "Cédula"]}, "version": actual.version + 1})
+        self._paso("requisitos mal formados se rechazan con 400 y el error por campo",
+                   r.status_code == 400 and "requisitos.documentos.0" in r.json().get("errores", {}), r.status_code)
+        r = h("patch", ruta_tipo, coordinador, {"requisitos": {"nada": 1}, "version": actual.version + 1})
+        self._paso("una clave desconocida en los requisitos también", r.status_code == 400 and "requisitos" in r.json().get("errores", {}), r.status_code)
+        r = h("patch", ruta_tipo, coordinador, {"requisitos": nuevos, "version": actual.version})
+        self._paso("con una versión vieja se responde 409 y no se pisa lo que otra persona cambió", r.status_code == 409, r.status_code)
+        self._paso("el personal de la institución no cambia requisitos (403)", h("patch", ruta_tipo, func_mop, {"requisitos": nuevos, "version": actual.version + 1}).status_code == 403)
+        self._paso("ni la supervisión (403): solo la coordinación gestiona el catálogo",
+                   h("patch", ruta_tipo, super_mop, {"requisitos": nuevos, "version": actual.version + 1}).status_code == 403)
+        error, _ = self._bd(coordinador, [], lambda: TipoTramite.objects.filter(pk=tipo_mop.pk).update(requisitos={"otra": 1}))
+        self._paso("la base rechaza requisitos mal formados aunque la aplicación fallara (P0001)", self._dice(error, "requisitos invalidos") and self._sqlstate(error) == "P0001", str(error)[:80])
+        for nombre, persona, instituciones in (("el personal", func_mop, [mop.pk]), ("la ciudadanía", ana, [])):
+            error, _ = self._bd(persona, instituciones, lambda: TipoTramite.objects.filter(pk=tipo_mop.pk).update(requisitos=nuevos))
+            self._paso(f"la base no deja a {nombre} escribir los requisitos (42501)", error is not None and self._sqlstate(error) == "42501", str(error)[:80])
+
+        # ---------------------------------------------------------------- constancia de presentación
+        pdf = b"%PDF-1.7\n%constancia SIGET\n%%EOF\n"
+        datos1 = datos_de_ejemplo(tipo_mop.formulario)
+        esperadas = [f["etiqueta"] for f in tipo_mop.formulario if f["id"] in datos1]
+        t1 = crear()
+        with tempfile.TemporaryDirectory() as carpeta, override_settings(SIGET_DOCS_KEY=os.urandom(32), SIGET_DOCS_DIR=carpeta):
+            def subir(pk):
+                cab = dict(HOST, HTTP_AUTHORIZATION=f"Bearer {t[ana.pk]}")
+                resp = self.cliente.post(f"/tramites/{pk}/documentos/", {"archivo": SimpleUploadedFile("croquis.pdf", pdf)}, format="multipart", secure=True, **cab)
+                cache.clear()
+                transaction.set_rollback(False)
+                return resp
+            adjunto = subir(t1)
+            doc_id = adjunto.json().get("id") if adjunto.status_code == 201 else None
+            self._paso("la ciudadana adjunta un documento a su trámite (para la constancia)", adjunto.status_code == 201, adjunto.status_code)
+            r = h("get", f"/tramites/{t1}/constancia/", ana)
+            c = r.json() if r.status_code == 200 else {}
+            self._paso("la ciudadana obtiene la constancia de su trámite y no se guarda en caché (no-store)", r.status_code == 200 and r["Cache-Control"] == "no-store", r.status_code)
+            self._paso("lleva el número, el tipo, la institución, el estado y las tres fechas",
+                       c.get("numero") == t1 and (c.get("tipo_tramite") or {}).get("id") == tipo_mop.pk and (c.get("institucion") or {}).get("id") == mop.pk
+                       and c.get("estado") == "Pendiente" and all(c.get(k) for k in ("presentado_en", "fecha_limite", "emitida_en")), c)
+            self._paso("los datos enviados van con las etiquetas de la copia del formulario del trámite",
+                       bool(esperadas) and [d["etiqueta"] for d in c.get("datos", [])] == esperadas and all(d["valor"] == datos1[d["id"]] for d in c.get("datos", []) if d["tipo"] in ("texto", "texto_largo", "seleccion")))
+            self._paso("y los nombres de los documentos adjuntos, y nada más de ellos", c.get("documentos") == [{"id": doc_id, "nombre": "croquis.pdf"}], c.get("documentos"))
+            self._paso("no lleva datos de otras personas (ni quién atiende, ni la sensibilidad, ni el identificador de la persona)",
+                       not {"solicitante_id", "funcionario_asignado_id", "sensibilidad", "asignado"} & set(c))
+            self._paso("otra ciudadana recibe 404 al pedir la constancia ajena (para ella el trámite no existe)", h("get", f"/tramites/{t1}/constancia/", beto).status_code == 404)
+            self._paso("el personal de otra institución también (404)", h("get", f"/tramites/{t1}/constancia/", func_minsa).status_code == 404)
+            self._paso("y un rol de plataforma (404: la seguridad por filas lo oculta antes del PDP)", h("get", f"/tramites/{t1}/constancia/", operador).status_code == 404)
+            r = h("get", f"/tramites/{t1}/constancia/", func_mop)
+            self._paso("el personal de la institución NO recibe la constancia: es solo de quien presentó el trámite (403)", r.status_code == 403, r.status_code)
+            self._paso("sin sesión se responde 401", self._http("get", f"/tramites/{t1}/constancia/").status_code == 401)
+            self._paso("un trámite que no existe, o un número que no lo es, da 404",
+                       h("get", "/tramites/99999999/constancia/", ana).status_code == 404 and h("get", "/tramites/abc/constancia/", ana).status_code == 404)
+            self._paso("la constancia solo responde a GET (405)", h("post", f"/tramites/{t1}/constancia/", ana, {}).status_code == 405)
+
+            # ------------------------------------------------------------ desistir
+            antes_de_desistir = len(DECISIONES)  # solo las de aquí: el resto de la prueba cuenta con las anteriores
+            t2 = crear()
+            Usuario.objects.filter(pk=ana.pk).update(mfa_verificado_en=timezone.now() - timedelta(minutes=20))
+            r = h("post", f"/tramites/{t2}/desistir/", ana, {"motivo": MOTIVO})
+            self._paso("con el segundo factor vencido (20 min) no desiste y se sugiere reautenticar", r.status_code == 403 and r.json().get("reautenticacion_sugerida") is True, r.status_code)
+            Usuario.objects.filter(pk=ana.pk).update(mfa_verificado_en=reciente())
+            self._paso("otra ciudadana recibe 404 al desistir de un trámite ajeno", h("post", f"/tramites/{t2}/desistir/", beto, {"motivo": MOTIVO}).status_code == 404)
+            self._paso("un rol de plataforma también (404)", h("post", f"/tramites/{t2}/desistir/", operador, {"motivo": MOTIVO}).status_code == 404)
+            self._paso("el personal y la supervisión de la institución no desisten del trámite de otra persona (403)",
+                       h("post", f"/tramites/{t2}/desistir/", func_mop, {"motivo": MOTIVO}).status_code == 403
+                       and h("post", f"/tramites/{t2}/desistir/", super_mop, {"motivo": MOTIVO}).status_code == 403)
+            self._paso("y nada cambió: el trámite sigue Pendiente", tramite(t2).estado == "Pendiente")
+            fallas = []
+            for cuerpo in ({}, {"motivo": None}, {"motivo": ""}, {"motivo": "   "}, {"motivo": "corto"}, {"motivo": "x" * 2001}, {"motivo": 123456789012}, {"motivo": ["Ya no"]}):
+                r = h("post", f"/tramites/{t2}/desistir/", ana, cuerpo)
+                if r.status_code != 400 or "motivo" not in r.json().get("errores", {}):
+                    fallas.append(cuerpo)
+            self._paso("sin motivo, o con uno corto, enorme o que no es texto, se rechaza con 400 y el error en el campo", not fallas, fallas)
+            self._paso("y el trámite sigue Pendiente", tramite(t2).estado == "Pendiente")
+            r = h("post", f"/tramites/{t2}/desistir/", ana, {"motivo": f"  {MOTIVO}  ", "estado": "Aprobado", "solicitante_id": beto.pk})
+            self._paso("la ciudadana desiste de su trámite Pendiente, con motivo (lo demás del cuerpo se ignora)",
+                       r.status_code == 200 and r.json()["estado"] == "Desistido" and r.json()["vencido"] is False, r.status_code)
+            cambio = [e for e in eventos(t2) if e.accion == "cambio_estado"][-1]
+            self._paso("queda en el historial: Pendiente a Desistido, a nombre de ella y con el motivo sin espacios de los bordes",
+                       cambio.estado_anterior == "Pendiente" and cambio.estado_nuevo == "Desistido" and cambio.actor_id == ana.pk and cambio.atributos.get("motivo") == MOTIVO)
+            r = h("get", f"/tramites/{t2}/historial/", ana)
+            self._paso("ella lee su propio motivo en el historial, sin saber quién del personal actuó",
+                       r.status_code == 200 and r.json()["eventos"][-1]["motivo"] == MOTIVO and "actor_id" not in r.json()["eventos"][-1])
+            propias = [d for d in DECISIONES[antes_de_desistir:] if d[1] == "desistir_tramite"]
+            self._paso("las decisiones del PDP quedaron registradas: la de ella permitida y las del personal negadas",
+                       (ana.pk, "desistir_tramite", True, "solicitante_desiste") in propias
+                       and (func_mop.pk, "desistir_tramite", False, "sin_regla_que_permita") in propias
+                       and (super_mop.pk, "desistir_tramite", False, "sin_regla_que_permita") in propias, propias)
+            r = h("post", f"/tramites/{t2}/desistir/", ana, {"motivo": MOTIVO})
+            self._paso("desistir de nuevo, con el trámite ya resuelto, responde 409", r.status_code == 409 and r.json()["codigo"] == "tramite_resuelto", r.status_code)
+            r = h("get", f"/tramites/{t2}/", ana)
+            self._paso("el detalle muestra el estado Desistido y que no corre contra el reloj", r.status_code == 200 and r.json()["estado"] == "Desistido" and r.json()["vencido"] is False)
+            r = h("get", f"/tramites/{t2}/constancia/", ana)
+            self._paso("la constancia de un trámite desistido también se emite y muestra el estado", r.status_code == 200 and r.json()["estado"] == "Desistido")
+            self._paso("la lista de la ciudadana incluye el desistido, con su estado",
+                       any(x["id"] == t2 and x["estado"] == "Desistido" for x in h("get", "/tramites/?limite=100", ana).json()["resultados"]))
+            r = subir(t2)
+            self._paso("un trámite desistido no admite documentos (409)", r.status_code == 409 and r.json()["codigo"] == "tramite_cerrado", r.status_code)
+            error, _ = self._bd(ana, [], lambda: Documento.objects.create(tramite_id=t2, institucion_id=mop.pk, subido_por=ana, nombre="otro.pdf", tipo_mime="application/pdf",
+                                                                           tamano=10, sha256="a" * 64, ubicacion="c" * 32))
+            self._paso("y la base tampoco, aunque la aplicación fallara", self._dice(error, "no admite documentos"), str(error)[:80])
+        r = h("post", f"/tramites/{t2}/estado/", func_mop, {"estado": "En Tramitacion"})
+        self._paso("el personal no reabre un trámite desistido (Desistido es final: 403)", r.status_code == 403, r.status_code)
+
+        # Desde En Tramitacion, con quien lo atiende y su aviso
+        t3 = crear()
+        llevar(t3, "En Tramitacion")
+        r = h("post", f"/tramites/{t3}/reasignar/", super_mop, {"funcionario_id": func_mop.pk})
+        self._paso("la supervisión asigna el trámite a un funcionario", r.status_code == 200 and tramite(t3).funcionario_asignado_id == func_mop.pk, r.status_code)
+        r = h("post", f"/tramites/{t3}/desistir/", ana, {"motivo": MOTIVO})
+        self._paso("la ciudadana desiste de un trámite En Tramitacion", r.status_code == 200 and r.json()["estado"] == "Desistido", r.status_code)
+        avisos = [f[0] for f in leer_sql(func_mop, "SELECT tipo FROM siget.notificacion WHERE tramite_id = %s ORDER BY id", [t3])]
+        self._paso("el funcionario asignado recibe el aviso «tramite_desistido»", avisos == ["tramite_desistido"], avisos)
+        avisos_ana = [f[0] for f in leer_sql(ana, "SELECT tipo FROM siget.notificacion WHERE tramite_id = %s ORDER BY id", [t3])]
+        self._paso("y ella no se avisa a sí misma (solo recibió el de que lo tomaron)", "tramite_desistido" not in avisos_ana and avisos_ana == ["tramite_en_atencion"], avisos_ana)
+
+        # Desde En Subsanacion
+        t4 = crear()
+        llevar(t4, "En Subsanacion")
+        self._paso("el trámite quedó En Subsanacion", tramite(t4).estado == "En Subsanacion")
+        r = h("post", f"/tramites/{t4}/desistir/", ana, {"motivo": MOTIVO})
+        self._paso("la ciudadana desiste de un trámite En Subsanacion", r.status_code == 200 and r.json()["estado"] == "Desistido", r.status_code)
+        r = h("post", f"/tramites/{t4}/subsanacion/", ana, {"respuesta": "Adjunto el plano firmado del terreno."})
+        self._paso("y ya no puede responder esa subsanación (409)", r.status_code == 409 and r.json()["codigo"] == "no_en_subsanacion", r.status_code)
+
+        # El personal no pone Desistido, ni por la API ni por la base
+        t5 = crear()
+        r = h("post", f"/tramites/{t5}/estado/", func_mop, {"estado": "Desistido", "motivo": MOTIVO})
+        self._paso("el personal no pone Desistido por la API de cambio de estado (403) y el trámite sigue Pendiente", r.status_code == 403 and tramite(t5).estado == "Pendiente", r.status_code)
+        error, _ = self._bd(func_mop, [mop.pk], lambda: Tramite.objects.filter(pk=t5).update(estado="Desistido"), motivo=MOTIVO)
+        self._paso("y la base lo rechaza si lo intentara con un UPDATE directo: solo la persona solicitante desiste",
+                   self._dice(error, "solo la persona que solicito") and self._sqlstate(error) == "P0001", str(error)[:80])
+        error, filas = self._bd(beto, [], lambda: Tramite.objects.filter(pk=t5).update(estado="Desistido"), motivo=MOTIVO)
+        self._paso("otra persona no ve una fila que pueda desistir: ni error ni cambio", error is None and filas == 0 and tramite(t5).estado == "Pendiente", (error, filas))
+        error, _ = self._bd(ana, [], lambda: Tramite.objects.filter(pk=t5).update(estado="Desistido"))
+        self._paso("sin motivo la base no deja desistir ni a la propia persona solicitante (P0001)", self._dice(error, "exige un motivo") and tramite(t5).estado == "Pendiente", str(error)[:80])
+        error, _ = self._bd(ana, [], lambda: Tramite.objects.filter(pk=t5).update(estado="Desistido", funcionario_asignado_id=func_mop.pk), motivo=MOTIVO)
+        self._paso("ni desistir y de paso cambiar a quien atiende el trámite", self._sqlstate(error) == "P0001" and tramite(t5).estado == "Pendiente", str(error)[:80])
+        error, _ = self._bd(ana, [], lambda: Tramite.objects.filter(pk=t5).update(estado="En Tramitacion"), motivo=MOTIVO)
+        self._paso("la persona solicitante solo puede desistir o responder una subsanación: tomar su propio trámite se rechaza", self._sqlstate(error) == "P0001", str(error)[:80])
+
+        # Desde un estado final no se desiste
+        t6 = crear()
+        llevar(t6, "Aprobado")
+        self._paso("el trámite quedó Aprobado", tramite(t6).estado == "Aprobado")
+        r = h("post", f"/tramites/{t6}/desistir/", ana, {"motivo": MOTIVO})
+        self._paso("desistir de un trámite Aprobado responde 409", r.status_code == 409 and r.json()["codigo"] == "tramite_resuelto", r.status_code)
+        error, filas = self._bd(ana, [], lambda: Tramite.objects.filter(pk=t6).update(estado="Desistido"), motivo=MOTIVO)
+        self._paso("y la base no le deja ninguna fila que desistir (seguridad por filas): sigue Aprobado", error is None and filas == 0 and tramite(t6).estado == "Aprobado", (error, filas))
+
+        # La copia del formulario mantiene la constancia aunque la coordinación cambie el formulario después
+        actual = TipoTramite.objects.get(pk=tipo_mop.pk)
+        nuevo_formulario = [{"id": "campo_nuevo", "etiqueta": "Etiqueta nueva", "tipo": "texto", "obligatorio": False, "max": 50}]
+        r = h("patch", ruta_tipo, coordinador, {"formulario": nuevo_formulario, "version": actual.version})
+        self._paso("la coordinación cambia el formulario del trámite", r.status_code == 200, r.status_code)
+        r = h("get", f"/tramites/{t1}/constancia/", ana)
+        self._paso("la constancia de un trámite ya presentado sigue con las etiquetas del formulario con el que nació",
+                   r.status_code == 200 and [d["etiqueta"] for d in r.json()["datos"]] == esperadas, r.status_code)
+
     def _recorrer(self):
         mop = Institucion.objects.get(nombre="MOP")
         minsa = Institucion.objects.get(nombre="MINSA")
@@ -863,6 +1081,9 @@ class Command(BaseCommand):
 
         # ---------------------------------------------------------------- reasignar a personal con la membresía revocada (se rechaza)
         self._reasignacion_a_revocado(mop, tipo_mop, coord, super_mop, ana, func_minsa)
+
+        # ---------------------------------------------------------------- trámites de la ciudadanía (migración 021)
+        self._ciudadania(mop, tipo_mop, coordinador, ana, beto, func_mop, super_mop, func_minsa, operador)
 
         # ---------------------------------------------------------------- decisiones registradas
         negadas = [d for d in DECISIONES if d[2] is False]

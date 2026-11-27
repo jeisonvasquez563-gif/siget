@@ -17,6 +17,7 @@ export const TEXTOS = {
   tramite_rechazado: (id) => `Rechazaron tu trámite #${id}`,
   subsanacion_respondida: (id) => `La persona respondió la corrección del trámite #${id}`,
   tramite_escalado: (id) => `El trámite #${id} pasó su plazo y quedó en supervisión`,
+  tramite_desistido: (id) => `La persona desistió del trámite #${id}`,
 }
 export const textoDe = (n) => (TEXTOS[n.tipo] || ((id) => `Hay novedades en el trámite #${id}`))(n.tramite_id)
 

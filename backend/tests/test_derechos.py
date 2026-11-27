@@ -379,7 +379,7 @@ def celda(rol, accion, caso="favorable"):
 def test_el_pdp_cubre_las_acciones_de_datos_personales():
     ids = {a["id"] for a in M["acciones"]}
     assert {"ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"} <= ids
-    assert len(M["acciones"]) == len(Accion) == 30
+    assert len(M["acciones"]) == len(Accion) == 31
 
 
 @pytest.mark.parametrize("rol", ["ciudadano", "funcionario", "supervisor", "coordinador_institucional"])

@@ -211,6 +211,7 @@ describe('acciones sobre un trámite', () => {
     await irA(user, 'Iniciar un trámite')
     await user.click(await screen.findByRole('radio', { name: /^MINSA/ }))
     await user.click(await screen.findByRole('radio', { name: /Solicitud interinstitucional/ }))
+    await user.click(await screen.findByRole('button', { name: 'Empezar' }))
     await user.type(await screen.findByRole('textbox', { name: 'Información solicitada' }), 'Padrón de contribuyentes de la zona norte')
     await user.click(screen.getByRole('button', { name: 'Iniciar trámite' }))
     expect(await screen.findByRole('img', { name: 'Recorrido del trámite: Recepción' })).toBeInTheDocument()

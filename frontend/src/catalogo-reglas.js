@@ -18,6 +18,11 @@ export const MAX_CAMPOS = 30
 export const ETIQUETA_MAX = 120
 export const OPCIONES_MAX = 30
 export const AYUDA_MAX = 300
+// Requisitos antes de iniciar (migración 021): qué es el trámite, qué documentos hacen falta y qué pasa después
+export const DESCRIPCION_MAX = 1000
+export const DESPUES_MAX = 1000
+export const DOCUMENTOS_MAX = 15
+export const DOCUMENTO_MAX = 200
 export const ID_VALIDO = /^[a-z][a-z0-9_]{0,39}$/
 
 // Largo (o valor) máximo con el que arranca cada tipo de campo al elegirlo
@@ -69,13 +74,28 @@ export function campoAServidor(c) {
   return salida
 }
 
-export const borradorVacio = () => ({ nombre: '', sla_dias: '10', audiencia: 'ciudadania', campos: [] })
+export const borradorVacio = () => ({ nombre: '', sla_dias: '10', audiencia: 'ciudadania', campos: [], descripcion: '', documentos: '', despues: '' })
 
+// Los documentos se editan como texto, uno por línea
 export const borradorDesde = (tipo) => ({
   nombre: tipo.nombre, sla_dias: String(tipo.sla_dias), audiencia: tipo.audiencia, campos: (tipo.formulario || []).map(campoDesdeServidor),
+  descripcion: tipo.requisitos?.descripcion ?? '', documentos: (tipo.requisitos?.documentos ?? []).join('\n'), despues: tipo.requisitos?.despues ?? '',
 })
 
-export const cuerpoDe = (b) => ({ nombre: b.nombre.trim(), sla_dias: b.sla_dias.trim() === '' ? null : Number(b.sla_dias), audiencia: b.audiencia, formulario: b.campos.map(campoAServidor) })
+// Los requisitos como los espera la API: lo que no se escribió no se manda
+export function requisitosDe(b) {
+  const r = {}
+  if (b.descripcion.trim()) r.descripcion = b.descripcion.trim()
+  const documentos = lineasDe(b.documentos)
+  if (documentos.length) r.documentos = documentos
+  if (b.despues.trim()) r.despues = b.despues.trim()
+  return r
+}
+
+export const cuerpoDe = (b) => ({
+  nombre: b.nombre.trim(), sla_dias: b.sla_dias.trim() === '' ? null : Number(b.sla_dias), audiencia: b.audiencia, formulario: b.campos.map(campoAServidor),
+  requisitos: requisitosDe(b),
+})
 
 /* ---------------------------------------------------------------- validación del lado del cliente */
 
@@ -88,6 +108,12 @@ export function validarBorrador(b) {
   const sla = b.sla_dias.trim()
   if (!/^\d+$/.test(sla) || Number(sla) < SLA_MIN || Number(sla) > SLA_MAX) e.sla_dias = `Indica un número entero de ${SLA_MIN} a ${SLA_MAX} días hábiles.`
   if (b.campos.length > MAX_CAMPOS) e.formulario = `Un trámite admite hasta ${MAX_CAMPOS} campos.`
+  if (b.descripcion.trim().length > DESCRIPCION_MAX) e['requisitos.descripcion'] = `La descripción no puede superar los ${DESCRIPCION_MAX} caracteres.`
+  if (b.despues.trim().length > DESPUES_MAX) e['requisitos.despues'] = `Lo que pasa después no puede superar los ${DESPUES_MAX} caracteres.`
+  const documentos = lineasDe(b.documentos)
+  if (documentos.length > DOCUMENTOS_MAX) e['requisitos.documentos'] = `Hasta ${DOCUMENTOS_MAX} documentos.`
+  else if (documentos.some((d) => d.length > DOCUMENTO_MAX)) e[`requisitos.documentos.${documentos.findIndex((d) => d.length > DOCUMENTO_MAX)}`] = `Cada documento admite hasta ${DOCUMENTO_MAX} caracteres.`
+  else if (new Set(documentos).size !== documentos.length) e['requisitos.documentos'] = 'Hay documentos repetidos.'
   const vistos = new Set()
   b.campos.forEach((c, i) => {
     const k = `formulario.${i}`
@@ -136,6 +162,10 @@ export function encabezadoDeError(clave) {
   if (partes[0] === 'formulario' && /^\d+$/.test(partes[1] ?? '')) {
     const campo = `Campo ${Number(partes[1]) + 1}`
     return partes[2] ? `${campo} · ${ATRIBUTOS[partes[2]] ?? partes[2]}` : campo
+  }
+  if (partes[0] === 'requisitos') {
+    if (partes[1] === 'documentos' && /^\d+$/.test(partes[2] ?? '')) return `Documento ${Number(partes[2]) + 1}`
+    return { descripcion: 'Descripción', documentos: 'Documentos', despues: 'Qué pasa después' }[partes[1]] ?? 'Requisitos'
   }
   return ENCABEZADOS[clave] ?? ''
 }

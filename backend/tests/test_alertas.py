@@ -89,7 +89,7 @@ def test_una_cuenta_bloqueada_no_las_ve():
 
 def test_el_pdp_calcula_las_dos_acciones_nuevas_y_siguen_sin_existir_superusuarios():
     M = ejemplos_pdp.construir()
-    assert len(M["acciones"]) == len(Accion) == 30
+    assert len(M["acciones"]) == len(Accion) == 31
     permitidos = lambda rol, a: M["matriz"][rol][a]["favorable"]["permitido"]  # noqa: E731
     assert [r for r in ejemplos_pdp.ROLES if permitidos(r, "ver_alertas")] == ["operador_seguridad", "auditor"]
     assert [r for r in ejemplos_pdp.ROLES if permitidos(r, "revisar_alerta")] == ["operador_seguridad"]

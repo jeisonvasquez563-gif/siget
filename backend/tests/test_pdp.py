@@ -334,3 +334,54 @@ class TestIniciarTramites:
 
     def test_ser_personal_de_otra_institucion_no_da_acceso_al_tramite_iniciado(self):
         assert not permite(funcionario(MOP, id=5), Accion.VER_TRAMITE, tramite(MINSA, solicitante_id=6))
+
+
+# --------------------------------------------------------------------------- desistir (migración 021)
+
+class TestDesistir:
+    def test_la_persona_solicitante_desiste_de_su_tramite_con_segundo_factor_reciente(self):
+        r = tramite(solicitante_id=5, estado="En Tramitacion", estado_destino="Desistido")
+        d = decidir(persona(id=5), Accion.DESISTIR_TRAMITE, r, entorno())
+        assert d.permitido and d.politica == "solicitante_desiste"
+
+    def test_sin_segundo_factor_reciente_no_desiste_porque_no_se_deshace(self):
+        r = tramite(solicitante_id=5, estado_destino="Desistido")
+        assert not permite(persona(id=5, mfa_verificado_en=mfa(600)), Accion.DESISTIR_TRAMITE, r)
+        assert not permite(persona(id=5, mfa_verificado_en=None), Accion.DESISTIR_TRAMITE, r)
+        assert permite(persona(id=5, mfa_verificado_en=mfa(14)), Accion.DESISTIR_TRAMITE, r)  # dentro de la ventana de 15 minutos
+
+    def test_no_desiste_del_tramite_de_otra_persona(self):
+        assert not permite(persona(id=5), Accion.DESISTIR_TRAMITE, tramite(solicitante_id=6, estado_destino="Desistido"))
+
+    @pytest.mark.parametrize("quien", [funcionario, supervisor, coordinador])
+    def test_el_personal_de_la_institucion_no_desiste_del_tramite_ajeno(self, quien):
+        assert not permite(quien(), Accion.DESISTIR_TRAMITE, tramite(solicitante_id=99, estado_destino="Desistido"))
+
+    @pytest.mark.parametrize("quien", [funcionario, supervisor])
+    def test_el_personal_no_pone_desistido_por_cambiar_estado(self, quien):
+        for estado in ("Pendiente", "En Tramitacion", "En Subsanacion"):
+            assert not permite(quien(), Accion.CAMBIAR_ESTADO, tramite(estado=estado, estado_destino="Desistido")), estado
+
+    def test_el_personal_sigue_haciendo_las_demas_transiciones(self):
+        assert permite(funcionario(), Accion.CAMBIAR_ESTADO, tramite(estado="Pendiente", estado_destino="En Tramitacion"))
+        assert permite(supervisor(), Accion.CAMBIAR_ESTADO, tramite(estado="En Tramitacion", estado_destino="Rechazado"))
+
+    def test_la_cuenta_bloqueada_no_desiste(self):
+        assert not permite(persona(id=5, estado_cuenta="bloqueada"), Accion.DESISTIR_TRAMITE, tramite(solicitante_id=5, estado_destino="Desistido"))
+
+    @pytest.mark.parametrize("rol", ["operador_infraestructura", "operador_identidades", "operador_catalogo", "operador_seguridad", "custodio_secretos", "auditor"])
+    def test_ningun_rol_de_plataforma_desiste(self, rol):
+        assert not permite(operador(rol, nivel_aseguramiento=3), Accion.DESISTIR_TRAMITE, tramite(solicitante_id=10, estado_destino="Desistido"))
+
+    def test_quien_es_personal_pero_pidio_el_tramite_en_otra_institucion_si_desiste_del_suyo(self):
+        s = funcionario(institucion=MINSA, id=7)
+        assert permite(s, Accion.DESISTIR_TRAMITE, tramite(institucion=MOP, solicitante_id=7, estado_destino="Desistido"))
+
+    def test_desistido_es_final_como_aprobado_y_rechazado(self):
+        from apps.autorizacion.pdp import TRANSICIONES
+        assert TRANSICIONES["Desistido"] == set() and TRANSICIONES["Aprobado"] == set() and TRANSICIONES["Rechazado"] == set()
+        assert all("Desistido" in TRANSICIONES[e] for e in ("Pendiente", "En Tramitacion", "En Subsanacion"))
+        assert not any("Desistido" in TRANSICIONES[e] for e in ("Aprobado", "Rechazado", "Desistido"))
+
+    def test_la_accion_nueva_es_la_numero_31_y_se_llama_desistir_tramite(self):
+        assert Accion.DESISTIR_TRAMITE.value == "desistir_tramite" and len(Accion) == 31

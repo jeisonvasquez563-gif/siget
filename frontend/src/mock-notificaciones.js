@@ -1,7 +1,7 @@
 // Simulador (solo desarrollo y pruebas) de las notificaciones, con estado en memoria. Respeta las reglas del servidor real (migración 018):
 // cada persona ve y marca solo las suyas (lo ajeno es 404), una ya leída no se vuelve a marcar y las genera el cambio del trámite:
 //  - al solicitante: Pendiente -> En Tramitacion, -> En Subsanacion, -> Aprobado y -> Rechazado;
-//  - al funcionario asignado, cuando QUIEN ACTUALIZA ES EL SOLICITANTE y cierra la subsanación (si cierra el personal, no);
+//  - al funcionario asignado, cuando QUIEN ACTUALIZA ES EL SOLICITANTE y cierra la subsanación (si cierra el personal, no) o desiste del trámite (migración 021);
 //  - a la supervisión, cuando se escala un trámite (aquí, las de partida: el temporizador no corre en el simulador).
 // Nunca se notifica al propio actor. No lleva texto: la interfaz lo arma según el tipo.
 
@@ -49,6 +49,8 @@ export function notificacionesMock({ tramites, visibles, resp, paginar, paginaci
       if (tipo && t.solicitante_id !== actorId) agregar(t.solicitante_id, tipo, t.id)
       if (antes === 'En Subsanacion' && t.estado === 'En Tramitacion' && actorId === t.solicitante_id
           && t.funcionario_asignado_id !== null && t.funcionario_asignado_id !== actorId) agregar(t.funcionario_asignado_id, 'subsanacion_respondida', t.id)
+      // Al desistir la persona solicitante se avisa a quien atendía el trámite (a ella no: es quien actúa)
+      if (t.estado === 'Desistido' && actorId === t.solicitante_id && t.funcionario_asignado_id !== null && t.funcionario_asignado_id !== actorId) agregar(t.funcionario_asignado_id, 'tramite_desistido', t.id)
     },
     manejar(u, camino, metodo, p) {
       if (camino === '/notificaciones/' && metodo === 'GET') {

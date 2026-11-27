@@ -10,6 +10,7 @@ ESTADOS = [
     ("En Subsanacion", "En Subsanación"),
     ("Aprobado", "Aprobado"),
     ("Rechazado", "Rechazado"),
+    ("Desistido", "Desistido"),
 ]
 
 

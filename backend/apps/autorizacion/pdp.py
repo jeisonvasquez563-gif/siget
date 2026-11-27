@@ -50,16 +50,20 @@ class Accion(str, Enum):
     VER_MIS_NOTIFICACIONES = "ver_mis_notificaciones"
     VER_ALERTAS = "ver_alertas"
     REVISAR_ALERTA = "revisar_alerta"
+    DESISTIR_TRAMITE = "desistir_tramite"
 
 
 # Transiciones válidas de un trámite (espejo de siget.transicion en la base, que es la autoridad).
 TRANSICIONES = {
-    "Pendiente": {"En Tramitacion"},
-    "En Tramitacion": {"En Subsanacion", "Aprobado", "Rechazado"},
-    "En Subsanacion": {"En Tramitacion"},
+    "Pendiente": {"En Tramitacion", "Desistido"},
+    "En Tramitacion": {"En Subsanacion", "Aprobado", "Rechazado", "Desistido"},
+    "En Subsanacion": {"En Tramitacion", "Desistido"},
     "Aprobado": set(),
     "Rechazado": set(),
+    "Desistido": set(),
 }
+# Destinos que solo toma la persona solicitante (migración 021: la base los rechaza si quien actualiza no es ella). El personal nunca los pone.
+DESTINOS_DE_LA_PERSONA_SOLICITANTE = {"Desistido"}
 
 ROLES_PLATAFORMA = {
     "operador_infraestructura", "operador_identidades", "operador_catalogo",
@@ -186,6 +190,10 @@ def _ciudadano(s, a, r, e):
         # Solo quien pidió el trámite, y sin segundo factor reciente (igual que adjuntar documentos): es la persona respondiendo
         # a la administración. Que el trámite esté «En Subsanacion» lo comprueba la vista (409) y la base lo impone (RLS y trigger).
         return Decision(True, "solicitante_responde_subsanacion")
+    if a == Accion.DESISTIR_TRAMITE and r.tipo == "tramite" and r.solicitante_id == s.id and _mfa_reciente(s, e):
+        # Solo quien pidió el trámite (sin rol de plataforma: lo exige `_es_ciudadano`) y con segundo factor reciente, porque no se deshace. Que el
+        # trámite no esté ya resuelto lo comprueba la vista (409) y la base lo impone (transiciones, política RLS y disparadores de la 021).
+        return Decision(True, "solicitante_desiste")
 
 
 def _personal_de_tramites(s, a, r, e):
@@ -197,7 +205,8 @@ def _personal_de_tramites(s, a, r, e):
     if not _mfa_reciente(s, e):
         return None  # las acciones que cambian el trámite exigen segundo factor reciente
     if a == Accion.CAMBIAR_ESTADO:
-        destino_valido = r.estado in TRANSICIONES and r.estado_destino in TRANSICIONES[r.estado]
+        destino_valido = (r.estado in TRANSICIONES and r.estado_destino in TRANSICIONES[r.estado]
+                          and r.estado_destino not in DESTINOS_DE_LA_PERSONA_SOLICITANTE)
         if not destino_valido:
             return None
         if "supervisor" in roles:

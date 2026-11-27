@@ -64,11 +64,11 @@ describe('«Mis trámites»', () => {
     const { user } = await abrirComo('ana.ciudadana', 'Mis trámites')
     await user.click(boton(/Siguiente/))
     const buscador = screen.getByRole('searchbox')
-    await user.type(buscador, 'aprobado')
-    expect(buscador).toHaveValue('aprobado')
-    // «aprobado» deja 13 de sus 28 trámites: caben en una página
+    await user.type(buscador, 'certificado')
+    expect(buscador).toHaveValue('certificado')
+    // «certificado» deja 1 de sus 28 trámites (se busca por número o nombre del trámite): cabe en una página
     expect(screen.queryByRole('navigation', { name: 'Paginación' })).not.toBeInTheDocument() // cabe en una sola página: sin controles
-    expect(filasDeDatos()).toHaveLength(13)
+    expect(filasDeDatos()).toHaveLength(1)
     await user.clear(buscador)
     expect(estado()).toHaveTextContent('Mostrando 1 a 20 de 28 trámites · Página 1 de 2') // volvió a la primera, no se quedó en la 2
   })

@@ -93,13 +93,40 @@ export function validarTextoLibre(valor, minimo, maximo) {
   return null
 }
 
-// Qué motivo ve la persona que pidió el trámite (el personal los ve todos): solo los de rechazar, pedir una subsanación y cerrarla
-// (su propia respuesta o el cierre del personal). Los demás son comentarios internos.
+// Qué motivo ve la persona que pidió el trámite (el personal los ve todos): solo los de rechazar, pedir una subsanación, cerrarla
+// (su propia respuesta o el cierre del personal) y desistir (son sus palabras). Los demás son comentarios internos.
 export function motivoParaLaPersona(evento) {
   if (evento.accion !== 'cambio_estado') return null
-  const paraElla = evento.estado_nuevo === 'Rechazado' || evento.estado_nuevo === 'En Subsanacion'
+  const paraElla = evento.estado_nuevo === 'Rechazado' || evento.estado_nuevo === 'En Subsanacion' || evento.estado_nuevo === 'Desistido'  // el último, sus propias palabras
   const cierre = evento.estado_anterior === 'En Subsanacion' && evento.estado_nuevo === 'En Tramitacion'
   return paraElla || cierre ? evento.motivo : null
+}
+
+// Los requisitos de los tipos de ejemplo (migración 021): qué es el trámite, qué documentos hacen falta y qué pasa después
+export const REQUISITOS_CONSTRUCCION = {
+  descripcion: 'Autorización de la Alcaldía para construir, ampliar, remodelar o demoler una obra dentro del municipio. La obra no debe empezar antes de que el permiso esté aprobado.',
+  documentos: ['Certificación del Registro Público de la finca, vigente', 'Planos de la obra firmados por un profesional idóneo', 'Paz y salvo municipal del inmueble'],
+  despues: 'Un funcionario de la Alcaldía revisa la solicitud y los planos. Si falta algo, te pedirá una subsanación y verás el motivo aquí.',
+}
+export const REQUISITOS_DEMOSTRACION = {
+  descripcion: 'Trámite de prueba para conocer cómo funciona la plataforma. No tiene ningún efecto legal.',
+  documentos: ['Un archivo de prueba (PDF, PNG o JPEG) de hasta 5 MB, si quieres probar la carga de documentos'],
+  despues: 'Un funcionario de demostración lo revisa y lo resuelve. Lo que ocurra aquí no tiene consecuencias fuera de la plataforma.',
+}
+export const REQUISITOS_DENUNCIA = {
+  descripcion: 'Presenta una solicitud, queja o denuncia para que la institución la reciba, la registre y le dé seguimiento.',
+  documentos: [],
+  despues: 'Tu solicitud queda registrada con un número de seguimiento y un funcionario la revisa. Puede pedirte más información.',
+}
+export const REQUISITOS_EMPRESA = {
+  descripcion: 'Registro simplificado de un pequeño negocio ante AMPYME.',
+  documentos: ['Copia de la cédula de la persona que registra el negocio', 'Comprobante de la dirección del negocio'],
+  despues: '',
+}
+export const REQUISITOS_INTERINSTITUCIONAL = {
+  descripcion: 'Solicitud formal de información que una institución dirige a otra, en el marco de sus funciones.',
+  documentos: ['Nota o resolución que respalde la solicitud, si la hay'],
+  despues: 'La institución destinataria revisa la solicitud y responde dentro del plazo.',
 }
 
 export const respuestaDatosInvalidos = (errores) => ({ codigo: 'datos_invalidos', detalle: 'Hay datos que corregir.', errores })

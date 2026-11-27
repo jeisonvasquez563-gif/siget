@@ -14,7 +14,8 @@ import { Inicio, Proximamente, PruebaAcceso, Seguridad } from './Otras.jsx'
 import { MisDatos } from './MisDatos.jsx'
 import { Privacidad } from './Privacidad.jsx'
 import { ConsolaCatalogo, ConsolaIdentidades, ConsolaInfraestructura, ConsolaSecretos, ConsolaSeguridad } from './Plataforma.jsx'
-import { Bandeja, Detalle, MisTramites, NuevoTramite } from './Tramites.jsx'
+import { Constancia } from './Constancia.jsx'
+import { Bandeja, Detalle, MisTramites, NuevoTramite, SIN_FILTROS } from './Tramites.jsx'
 import { Avatar, Icono, Logo, useUI } from './ui.jsx'
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
   const [yo, setYo] = useState(null)
   const [vista, setVista] = useState({ modulo: 'inicio' })
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [filtrosMis, setFiltrosMis] = useState(SIN_FILTROS) // los filtros de «Mis trámites» sobreviven a abrir un trámite y volver; al salir se olvidan
   const { tema, alternarTema, avisar } = useUI()
 
   const [motivo, setMotivo] = useState('')
@@ -45,7 +47,7 @@ export default function App() {
   // Vuelve a pedir quién soy (p. ej. tras verificar el segundo factor) sin cambiar de pantalla
   const refrescarYo = useCallback(async () => { setYo(await api('/auth/yo/')) }, [])
 
-  const salirDelTodo = useCallback((porque = '') => { olvidarToken(); setYo(null); setMotivo(porque); setFase('login') }, [])
+  const salirDelTodo = useCallback((porque = '') => { olvidarToken(); setYo(null); setMotivo(porque); setFiltrosMis(SIN_FILTROS); setFase('login') }, [])
 
   useEffect(() => {
     // El servidor rechazó renovar la sesión (venció, se revocó o estuvo inactiva demasiado tiempo)
@@ -75,15 +77,18 @@ export default function App() {
   if (fase === 'enrolar') return <><EnrolarMfa usuario={yo.usuario} alTerminar={cargarYo} alSalir={salir} />{restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}</>
 
   const ir = (modulo) => { setVista({ modulo }); setMenuAbierto(false); window.scrollTo({ top: 0 }) }
-  const abrir = (id) => { setVista({ modulo: 'detalle', id, desde: vista.modulo }); window.scrollTo({ top: 0 }) }
+  // `extra`: `{ nuevo: true }` al terminar de iniciar un trámite (el detalle ofrece entonces la constancia)
+  const abrir = (id, extra = {}) => { setVista({ modulo: 'detalle', id, desde: vista.modulo, ...extra }); window.scrollTo({ top: 0 }) }
+  const verConstancia = (id) => { setVista({ modulo: 'constancia', id, desde: vista.modulo === 'detalle' ? vista.desde : vista.modulo }); window.scrollTo({ top: 0 }) }
   const actual = yo.modulos.find((m) => m.id === vista.modulo)
-  const origen = vista.modulo === 'detalle' ? yo.modulos.find((m) => m.id === vista.desde) : null
-  const titulo = vista.modulo === 'inicio' ? 'Inicio' : vista.modulo === 'detalle' ? `Trámite #${vista.id}` : actual?.nombre
+  const deUnTramite = vista.modulo === 'detalle' || vista.modulo === 'constancia'
+  const origen = deUnTramite ? yo.modulos.find((m) => m.id === vista.desde) : null
+  const titulo = vista.modulo === 'inicio' ? 'Inicio' : vista.modulo === 'detalle' ? `Trámite #${vista.id}` : vista.modulo === 'constancia' ? `Constancia del trámite #${vista.id}` : actual?.nombre
 
   let contenido
   switch (vista.modulo) {
     case 'inicio': contenido = <Inicio yo={yo} ir={ir} abrir={abrir} />; break
-    case 'mis_tramites': contenido = <MisTramites yo={yo} abrir={abrir} nuevo={() => ir('nuevo_tramite')} />; break
+    case 'mis_tramites': contenido = <MisTramites yo={yo} abrir={abrir} nuevo={() => ir('nuevo_tramite')} filtros={filtrosMis} cambiarFiltros={setFiltrosMis} />; break
     case 'nuevo_tramite': contenido = <NuevoTramite yo={yo} abrir={abrir} />; break
     case 'bandeja': contenido = <Bandeja yo={yo} abrir={abrir} modo="bandeja" />; break
     case 'supervision': contenido = <Bandeja yo={yo} abrir={abrir} modo="supervision" />; break
@@ -99,7 +104,8 @@ export default function App() {
     case 'consola_seguridad': contenido = <ConsolaSeguridad yo={yo} />; break
     case 'consola_secretos': contenido = <ConsolaSecretos />; break
     case 'consola_infraestructura': contenido = <ConsolaInfraestructura />; break
-    case 'detalle': contenido = <Detalle id={vista.id} yo={yo} volver={() => ir(vista.desde || 'inicio')} volverA={origen?.nombre || 'Inicio'} />; break
+    case 'detalle': contenido = <Detalle id={vista.id} yo={yo} volver={() => ir(vista.desde || 'inicio')} volverA={origen?.nombre || 'Inicio'} constancia={verConstancia} nuevo={vista.nuevo} />; break
+    case 'constancia': contenido = <Constancia id={vista.id} volver={() => { setVista({ modulo: 'detalle', id: vista.id, desde: vista.desde }); window.scrollTo({ top: 0 }) }} />; break
     default: contenido = actual ? <Proximamente modulo={actual} /> : <Inicio yo={yo} ir={ir} abrir={abrir} />
   }
 
@@ -117,7 +123,7 @@ export default function App() {
             <div className="nav-grupo" key={g.titulo}>
               <h4>{g.titulo}</h4>
               {g.modulos.map((m) => (
-                <button key={m.id} className="nav-item" aria-current={vista.modulo === m.id || (vista.modulo === 'detalle' && vista.desde === m.id) ? 'page' : undefined} onClick={() => ir(m.id)}>
+                <button key={m.id} className="nav-item" aria-current={vista.modulo === m.id || (deUnTramite && vista.desde === m.id) ? 'page' : undefined} onClick={() => ir(m.id)}>
                   <Icono nombre={iconoDe(m.id)} />{m.nombre}
                   {m.estado === 'proximamente' && <span className="pronto">pronto</span>}
                 </button>
