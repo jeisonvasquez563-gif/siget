@@ -170,7 +170,7 @@ _, yo = ana.pedir("GET", "/auth/yo/")
 inactividad = yo.get("inactividad_minutos")
 paso(isinstance(inactividad, int) and 1 <= inactividad <= 15, "el servidor informa el tiempo de inactividad (la interfaz no lo escribe a mano)", f"{inactividad} min")
 ids = [m["id"] for m in yo["modulos"]]
-paso(ids == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa", "roles_permisos"], "su menú es el de la ciudadanía (con «Mis datos», PT-15)", ids)
+paso(ids == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa"], "su menú es el de la ciudadanía (con «Mis datos», PT-15)", ids)
 _, lista = ana.pedir("GET", "/tramites/?limite=100")
 # Pasa por nginx de verdad: el 24-nov la ruta nueva /notificaciones/ estaba lista en Django pero nginx no la dejaba pasar (404)
 e, d = ana.pedir("GET", "/notificaciones/?limite=5")
@@ -192,10 +192,8 @@ e, _ = ana.pedir("POST", f"/tramites/{tramite}/estado/", {"estado": "En Tramitac
 paso(e == 403, "no puede cambiar el estado (403)", e)
 e, _ = ana.pedir("GET", "/equipo/")
 paso(e == 403, "no ve el equipo (403)", e)
-e, m = ana.pedir("GET", "/politicas/matriz/")
-paso(e == 200 and m["ningun_rol_puede_todo"] is True, "ve la matriz de permisos: no hay superusuario")
-e, _ = ana.pedir("GET", "/politicas/base-de-datos/")
-paso(e == 403, "los permisos de la base de datos (información técnica) no son para la ciudadanía (403)", e)
+e, _ = ana.pedir("GET", "/politicas/matriz/")
+paso(e == 404, "la pantalla «Roles y permisos» ya no existe: /politicas/matriz/ responde 404 a través de nginx", e)
 
 # --------------------------------------------------------------------------- 2. funcionario
 titulo("2. Fabio (funcionario del MOP): bandeja, cambiar estado, conflicto de interés")
@@ -323,14 +321,12 @@ paso("login_ok" in eventos and "mfa_verificado" in eventos, "su actividad de seg
 _, yo = fabio.pedir("GET", "/auth/yo/")
 paso(yo["mfa_activo"] and yo["mfa_obligatorio"], "el estado de MFA: activo y obligatorio")
 
-# --------------------------------------------------------------------------- 8. roles, permisos y simulador
-titulo("8. Roles y permisos, base de datos y simulador")
-e, bd = saul.pedir("GET", "/politicas/base-de-datos/")
-paso(e == 200 and bd["ningun_rol_de_aplicacion_es_superusuario"], "la base de datos: ningún rol de la aplicación es superusuario")
-e, s1 = saul.pedir("POST", "/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado", "solicitante": "yo"})
-paso(e == 200 and s1["decision"]["politica"] == "conflicto_de_interes", "simulador: el conflicto de interés se niega con su política")
-e, s2 = saul.pedir("POST", "/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado", "segundo_factor": "vencido"})
-paso(e == 200 and any(a["variable"] == "segundo_factor" and a["valor"] == "reciente" and a["permitido"] for a in s2["alternativas"]), "simulador: con el factor vencido se niega y dice qué lo arreglaría")
+# --------------------------------------------------------------------------- 8. rutas retiradas
+titulo("8. Rutas de «Roles y permisos» retiradas")
+e, _ = saul.pedir("GET", "/politicas/base-de-datos/")
+paso(e == 404, "la vista de permisos de la base de datos ya no existe (404)", e)
+e, _ = saul.pedir("POST", "/politicas/simular/", {"rol": "funcionario", "accion": "cambiar_estado"})
+paso(e == 404, "el simulador ya no existe (404)", e)
 
 # --------------------------------------------------------------------------- cierre
 titulo("9. Cierre de sesión y token")

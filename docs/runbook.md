@@ -2355,6 +2355,43 @@ Aplicado el **26 de noviembre de 2026**, a las 13:22. Evidencia en `docs/sdlc/ev
 
 ---
 
+## 45. Plataforma final: se retira «Roles y permisos» (sin migración)
+
+Cambio de código, de nginx y de interfaz. **No hay migración**: la base no se toca (la pantalla solo leía el catálogo de PostgreSQL y el PDP).
+
+### 45.1 Qué cambia
+
+1. **Backend:** se eliminan `apps/autorizacion/{matriz,simulador,vistas,urls}.py` y la línea `path("politicas/", ...)` de `config/urls.py`. `/politicas/matriz/`, `/politicas/simular/` y `/politicas/base-de-datos/` pasan a **404** (no hay ruta). El módulo `roles_permisos` sale del catálogo de `modulos.py`: `/auth/yo/` ya no lo incluye para ningún rol. **`pdp.py` no cambia.**
+2. **nginx:** `politicas` sale de la lista de `location` (`infra/podman/vm1-app-backend/nginx.conf`). Sin la ruta, `/politicas/` cae en `location / { return 404; }` y ni llega a Django (doble cierre).
+3. **Interfaz:** se eliminan `Permisos.jsx`, `Simulador.jsx`, `escenarios.json`, los datos de ejemplo `matriz.json`, `simulador.json` y `base-de-datos.json`, sus pruebas y `simulador.css`. `politicas` sale del proxy de `vite.config.js`. La sección del menú «Seguridad y permisos» pasa a llamarse **«Seguridad»** (queda «Mi seguridad» y «Segundo factor (MFA)»).
+4. **Textos de plataforma final:** el aviso de privacidad ya no dice «entorno de demostración académica» y el alta de instituciones ya no ofrece el tipo «Demostración» (ver 45.5).
+
+### 45.2 Decisión sobre `matriz.py`, `simulador.py` y `verificar_politicas`
+
+- **`matriz.py` y `simulador.py` se eliminaron.** Solo los usaban las rutas retiradas y sus pruebas. Pero varias pruebas del PDP se apoyaban en la matriz para garantizar «ningún rol puede todo», «cada acción la hace alguien», «cada rol tiene solo su área» y la coherencia de las acciones nuevas (alertas, notificaciones, cambio de contraseña, derechos). Esas garantías **se conservan** sobre el PDP directamente: `tests/ejemplos_pdp.py` (solo para pruebas; evalúa `decidir()` para los diez roles y todas las acciones) y `tests/test_pdp_garantias.py` (antes `test_matriz.py`). Se eliminaron las pruebas de lo que ya no existe (el simulador, las etiquetas y grupos de la matriz, la vista por módulo).
+- **`verificar_politicas` se conserva con el mismo nombre** (lo llaman `ejecutar-comando.sh`, el runbook y las evidencias). Ahora: (a) comprueba que `/politicas/matriz/`, `/politicas/base-de-datos/`, `/politicas/simular/` y `/politicas/` responden 404 con y sin sesión; (b) mantiene todas las comprobaciones de la base real, que ahora leen el catálogo de PostgreSQL con su propia consulta (antes pasaban por la ruta); (c) comprueba una decisión del PDP evaluado directamente; (d) conserva la actividad de seguridad propia. Se retiran los pasos del simulador y de la matriz.
+
+### 45.3 Despliegue (producción)
+
+1. **Sin migración ni respaldo de base** (no hay cambio de esquema). Igualmente, respaldo de la imagen y de la interfaz de VM1 (`respaldo-AAAA-MM-DD`).
+2. **Imagen candidata** del backend verificada **antes de reiniciar**: `verificar_politicas` (con los pasos nuevos de 404), `verificar_autenticacion`, `verificar_plataforma`, `verificar_tramites`, `verificar_equipo`, `verificar_auditoria`, `verificar_integracion` y `verificar_esquema`. Solo con todas en verde se etiqueta como `dev`.
+3. **nginx de producción, editado en el mismo inodo** (el archivo está montado en el contenedor; ver 35.3 y 42.9). Respaldo primero (`nginx.conf.respaldo-AAAA-MM-DD`), después editar **sin reemplazar el archivo** (por ejemplo `sudo sh -c 'cat nuevo.conf > /home/siget/config/nginx.conf'`; nada de `mv` ni `sed -i`, que cambian el inodo y el contenedor seguiría viendo el viejo). Quitar `politicas|` de la lista del `location ~ ^/(auth|...)`. Luego `nginx -t` dentro del contenedor y `nginx -s reload` (no corta conexiones).
+4. **Interfaz** (`desplegar.sh`). Backend e interfaz pueden ir juntos o separados: la interfaz vieja con el backend nuevo mostraría «Roles y permisos» con un error (la ruta ya no existe); la interfaz nueva con el backend viejo funciona (solo no pide esas rutas).
+5. **Ensayo** (`demo/ensayo.py`): el menú de la ciudadanía ya no espera `roles_permisos`; hay una comprobación que confirma que `/politicas/matriz/` responde 404 **a través de nginx** y la sección 8 pasa a comprobar los 404 de `/politicas/base-de-datos/` y `/politicas/simular/`. Son **dos comprobaciones menos** que antes (de 119 a 117 esperadas; anotar la cifra real al desplegar). Los 404 no son denegaciones del PDP: no suman al umbral de 5 en 10 minutos de `denegaciones_persona`.
+
+### 45.4 Qué hacer si algo sale mal
+
+- **Volver atrás el código:** `podman tag localhost/siget-backend:respaldo-AAAA-MM-DD localhost/siget-backend:dev`, reiniciar el backend y restaurar la interfaz desde su respaldo. Como no hay migración, la base sirve con ambas versiones.
+- **nginx no recarga o responde mal:** restaurar con `sudo sh -c 'cat /home/siget/config/nginx.conf.respaldo-AAAA-MM-DD > /home/siget/config/nginx.conf'` y `nginx -s reload`.
+
+### 45.5 Rastros de la demostración (inventario)
+
+- **Cambiados en código:** el aviso de privacidad (`derechos.py`) sin la frase «entorno de demostración académica» (la versión `AVISO_VERSION` **no** se subió: la frase no cambia ninguna obligación; si se quiere que quien ya aceptó lo vuelva a aceptar, hay que subirla); el formulario de alta de instituciones ya no ofrece el tipo «Demostración» (siempre «real»).
+- **Se dejan como opción configurable:** `SIGET_AVISO_DEMOSTRACION` (el aviso «Demostración académica» de la pantalla de acceso; apagado en producción) y, solo en desarrollo, el modo de ejemplo `?mock=`.
+- **Dato de la base (no tocado):** las instituciones MINSA, MOP y MiAmbiente tienen `tipo = 'demostracion'` (migración 005) y de ahí sale la etiqueta «Demostración» de «Iniciar un trámite» (`Tramites.jsx`, que no se toca en este cambio) y de la consola de catálogo; los trámites «Trámite de demostración (MINSA|MOP|MiAmbiente)» (migraciones 005 y 017). Actualización sugerida, como `siget_owner`, **en una migración numerada** (021) con respaldo previo: `UPDATE siget.institucion SET tipo = 'real' WHERE nombre IN ('MINSA','MOP','MiAmbiente');`. Renombrar los trámites exige además cambiar la clave del formulario en `apps/tramites/formulario.py` (`FORMULARIOS["Trámite de demostración (%)"]`, que enlaza por nombre) y la migración 017: hacerlo juntas, no solo con un `UPDATE`.
+
+---
+
 ## 46. Trámites de la ciudadanía: aplicar la migración 021 (requisitos, constancia y desistir)
 
 **Estado: implementado, sin aplicar en producción.**
@@ -2413,7 +2450,7 @@ Con la base migrada: guardar la imagen en uso (`podman tag …:dev …:respaldo-
 ### 46.6 Despliegue y ensayo
 
 1. `desplegar.sh` (backend e interfaz; devuelve la inactividad a 10 minutos). La interfaz nueva sin el backend nuevo muestra la tarjeta sin requisitos y falla al pedir la constancia.
-2. `demo/ensayo.py`: trae la **sección 7** con 12 comprobaciones nuevas (requisitos visibles en el catálogo, constancia de un trámite propio y de uno ajeno, desistir de un trámite creado por el propio ensayo). La única negación nueva del PDP es ninguna: lo ajeno da `404` por seguridad por filas y lo demás son `400` y `409` que pasan el PDP; **ninguna cuenta nueva se acerca a 5 negaciones en 10 minutos** (migración 019). El ensayo crea un trámite más (el desistido) y no desiste de ninguno real.
+2. `demo/ensayo.py`: trae la **sección 7** con 12 comprobaciones nuevas (**129 esperadas** en total con las 117 del 45; anotar la cifra real al desplegar) (requisitos visibles en el catálogo, constancia de un trámite propio y de uno ajeno, desistir de un trámite creado por el propio ensayo). La única negación nueva del PDP es ninguna: lo ajeno da `404` por seguridad por filas y lo demás son `400` y `409` que pasan el PDP; **ninguna cuenta nueva se acerca a 5 negaciones en 10 minutos** (migración 019). El ensayo crea un trámite más (el desistido) y no desiste de ninguno real.
 3. Probar a mano: iniciar un trámite y leer «Antes de empezar»; en «Catálogo de la institución», editar los requisitos de un tipo de prueba; pedir la constancia, imprimirla o guardarla como PDF desde el navegador y revisar que no salgan menú ni botones; desistir de un trámite de prueba con el segundo factor y comprobar el aviso al funcionario asignado.
 
 ### 46.7 Qué hacer si algo sale mal

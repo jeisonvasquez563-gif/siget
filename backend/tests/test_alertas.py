@@ -1,4 +1,4 @@
-"""Alertas ante patrones sospechosos (PT-10, RS-24): reglas del PDP, matriz, simulador, servicio, vistas, comando y migración 019.
+"""Alertas ante patrones sospechosos (PT-10, RS-24): reglas del PDP, servicio, vistas, comando y migración 019.
 
 Sin base de datos: que las reglas detecten lo correcto lo recorre `database/pruebas-alertas.sql` (PostgreSQL, como `detector_role`) y que la API
 liste y revise con la seguridad por filas lo recorre `verificar_plataforma` (contra la base real).
@@ -20,12 +20,12 @@ from django.db import OperationalError
 from django.urls import reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.autorizacion import matriz, simulador
 from apps.autorizacion.pdp import Accion, Entorno, Recurso, Sujeto, decidir
 from apps.nucleo.errores import AccesoDenegado
 from apps.nucleo.management.commands import detectar_anomalias
 from apps.plataforma import servicio, vistas
 from apps.plataforma.models import REGLAS_ALERTA, AlertaSeguridad
+from tests import ejemplos_pdp
 
 AHORA = datetime(2026, 11, 26, 12, 0, tzinfo=timezone.utc)
 BACKEND = Path(__file__).resolve().parent.parent
@@ -85,28 +85,17 @@ def test_una_cuenta_bloqueada_no_las_ve():
     assert not d.permitido and d.politica == "cuenta_no_activa"
 
 
-# --------------------------------------------------------------------------- matriz y simulador
+# --------------------------------------------------------------------------- el PDP evaluado para los diez roles
 
-def test_la_matriz_calcula_las_dos_acciones_nuevas_y_siguen_sin_existir_superusuarios():
-    M = matriz.construir()
-    assert len(M["acciones"]) == 30 and len(Accion) == 31  # la 31.ª, desistir_tramite (021), aún no figura en la matriz (se ajusta al fusionar con la baja de «Roles y permisos»)
+def test_el_pdp_calcula_las_dos_acciones_nuevas_y_siguen_sin_existir_superusuarios():
+    M = ejemplos_pdp.construir()
+    assert len(M["acciones"]) == len(Accion) == 31
     permitidos = lambda rol, a: M["matriz"][rol][a]["favorable"]["permitido"]  # noqa: E731
-    assert [r for r in (x[0] for x in matriz.ROLES) if permitidos(r, "ver_alertas")] == ["operador_seguridad", "auditor"]
-    assert [r for r in (x[0] for x in matriz.ROLES) if permitidos(r, "revisar_alerta")] == ["operador_seguridad"]
+    assert [r for r in ejemplos_pdp.ROLES if permitidos(r, "ver_alertas")] == ["operador_seguridad", "auditor"]
+    assert [r for r in ejemplos_pdp.ROLES if permitidos(r, "revisar_alerta")] == ["operador_seguridad"]
     assert M["matriz"]["operador_seguridad"]["revisar_alerta"]["exige_segundo_factor"] is True
     assert M["matriz"]["auditor"]["ver_alertas"]["exige_segundo_factor"] is True
     assert M["ningun_rol_puede_todo"] is True
-    assert {next(a for a in M["acciones"] if a["id"] == i)["grupo"] for i in ("ver_alertas", "revisar_alerta")} == {"Alertas"}
-
-
-def test_el_simulador_explica_las_dos_acciones():
-    meta = simulador.meta()
-    assert len(meta["variables"]) == 30 and meta["variables"]["revisar_alerta"] == ["segundo_factor", "cuenta"]
-    assert meta["variables"]["ver_alertas"] == ["segundo_factor", "cuenta", "nivel"]
-    ok = simulador.simular(simulador.normalizar({"rol": "operador_seguridad", "accion": "revisar_alerta"})[0], AHORA)
-    assert ok["decision"]["permitido"] and ok["decision"]["politica"] == "operador_seguridad_revisar_alerta"
-    no = simulador.simular(simulador.normalizar({"rol": "auditor", "accion": "revisar_alerta"})[0], AHORA)
-    assert not no["decision"]["permitido"]
 
 
 # --------------------------------------------------------------------------- modelo y servicio

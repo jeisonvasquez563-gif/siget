@@ -7,15 +7,12 @@
 // Usuarios: ana.ciudadana beto.ciudadano fabio.mop flor.mop saul.mop carla.mop felix.minsa ines.infra ivan.identidades
 //           cata.catalogo sergio.seguridad silvia.secretos aldo.auditor
 
-import matrizEjemplo from './mock-datos/matriz.json'
 import { derechosMock, MENSAJE_ACEPTA_AVISO } from './mock-derechos.js'
 import { catalogoMock } from './mock-catalogo.js'
 import { equipoMock } from './mock-equipo.js'
 import { notificacionesMock } from './mock-notificaciones.js'
 import { plataformaMock } from './mock-plataforma.js'
 import { olvidarConfiguracion } from './api.js'
-import bdEjemplo from './mock-datos/base-de-datos.json'
-import simuladorEjemplo from './mock-datos/simulador.json'
 import {
   FORMULARIO_CONSTRUCCION, FORMULARIO_DEMOSTRACION, FORMULARIO_DENUNCIA, FORMULARIO_EMPRESA, FORMULARIO_INTERINSTITUCIONAL,
   REQUISITOS_CONSTRUCCION, REQUISITOS_DEMOSTRACION, REQUISITOS_DENUNCIA, REQUISITOS_EMPRESA, REQUISITOS_INTERINSTITUCIONAL,
@@ -59,7 +56,6 @@ const MODULOS = {
   mis_datos: ['Mis datos', 'Consulta, corrige y descarga tus datos personales (Ley 81) y envía solicitudes sobre ellos.', 'disponible'],
   seguridad: ['Mi seguridad', 'Tu rol, tus instituciones, tu segundo factor y lo que Zero Trust te permite.', 'disponible'],
   mfa: ['Segundo factor (MFA)', 'Cómo se protege tu cuenta con un código que cambia cada 30 segundos, y tu actividad reciente.', 'disponible'],
-  roles_permisos: ['Roles y permisos', 'Quién puede qué en la plataforma, calculado por el propio motor de decisiones, y los permisos de la base de datos.', 'disponible'],
   prueba_acceso: ['Acceso a trámites', 'Comprueba en vivo que tu rol de plataforma no puede ver trámites.', 'disponible'],
   consola_infraestructura: ['Infraestructura', 'Estado de la base de datos y del servicio, y vencimiento del certificado (solo lectura).', 'disponible'],
   consola_identidades: ['Identidades', 'Restablece contraseñas y segundo factor, y da de alta a las coordinadoras con control dual.', 'disponible'],
@@ -75,7 +71,7 @@ const POR_PLATAFORMA = {
 
 function modulosDe(u) {
   let ids
-  if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa', 'roles_permisos']
+  if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa']
   else {
     const roles = u.membresias.map((m) => m.rol)
     ids = ['mis_tramites', 'nuevo_tramite', 'mis_datos']
@@ -83,7 +79,7 @@ function modulosDe(u) {
     if (roles.includes('supervisor')) ids.push('supervision')
     if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('equipo')
     if (roles.includes('coordinador_institucional')) ids.push('catalogo_institucion')
-    ids.push('seguridad', 'mfa', 'roles_permisos')
+    ids.push('seguridad', 'mfa')
   }
   return ids.map((id) => ({ id, nombre: MODULOS[id][0], descripcion: MODULOS[id][1], estado: MODULOS[id][2] }))
 }
@@ -300,16 +296,6 @@ export function instalarMock(inicial, opciones = {}) {
     const negado = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: false })
     const pideCodigo = () => resp(403, { codigo: 'acceso_denegado', detalle: 'No tienes autorización para esta operación.', reautenticacion_sugerida: true })
 
-    if (camino === '/politicas/matriz/') return resp(200, matrizEjemplo)
-    if (camino === '/politicas/base-de-datos/') return resp(200, bdEjemplo)
-    if (camino === '/politicas/simular/') {
-      if (metodo === 'GET') return resp(200, simuladorEjemplo.meta)
-      // Solo responde a los escenarios capturados de la plataforma real; para lo demás avisa que es un ejemplo
-      const clave = (e) => JSON.stringify(Object.entries(e).sort())
-      const caso = simuladorEjemplo.casos.find((c) => clave(c.entrada) === clave(cuerpo))
-      if (caso) return resp(200, caso.respuesta)
-      return resp(200, { entrada: cuerpo, decision: { permitido: false, politica: 'sin_regla_que_permita', motivo: 'ejemplo' }, traza: [], alternativas: [], hipotetico: true, ejemplo: true })
-    }
     if (camino === '/auth/contrasena/' && metodo === 'POST') {
       // Igual que el servidor: segundo factor reciente (PDP), contraseña actual (400 genérico; 3 fallos bloquean), política y cierre de las demás sesiones
       if (!mfaFresco) return pideCodigo()

@@ -1,4 +1,4 @@
-"""Derechos sobre los datos personales (PT-15, Ley 81): plazos, validación, aviso de privacidad, PDP, matriz y migración 016.
+"""Derechos sobre los datos personales (PT-15, Ley 81): plazos, validación, aviso de privacidad, PDP y migración 016.
 
 Sin base de datos: lo que necesita la base real lo recorren `verificar_autenticacion` y `verificar_plataforma`.
 """
@@ -14,7 +14,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from apps.autenticacion import derechos, perfil
 from apps.autenticacion import servicio as auth
 from apps.autenticacion import vistas_derechos
-from apps.autorizacion import matriz, pdp, simulador
+from apps.autorizacion import pdp
 from apps.autorizacion.modulos import modulos_para
 from apps.autorizacion.pdp import Accion, Entorno, Recurso, Sujeto, decidir
 from apps.identidad.models import Perfil, SolicitudDerecho
@@ -22,6 +22,7 @@ from apps.tramites.serializacion import ZONA_PANAMA
 from apps.nucleo.errores import AccesoDenegado
 from apps.nucleo.esquema import columnas_del_modelo
 from apps.plataforma import servicio as plataforma
+from tests import ejemplos_pdp
 
 AHORA = datetime(2026, 11, 17, 12, 0, tzinfo=timezone.utc)  # martes
 MIGRACION = Path(__file__).resolve().parents[2] / "database" / "migraciones" / "016-derechos-datos.sql"
@@ -366,31 +367,29 @@ def test_una_cuenta_bloqueada_no_responde_solicitudes():
     assert not permite(operador(estado_cuenta="bloqueada"), Accion.RESPONDER_SOLICITUD_DATOS, Recurso(tipo="solicitud_derecho"))
 
 
-# --------------------------------------------------------------------------- matriz, simulador y módulos
+# --------------------------------------------------------------------------- el PDP evaluado para los diez roles y los módulos
 
-M = matriz.construir()
+M = ejemplos_pdp.construir()
 
 
 def celda(rol, accion, caso="favorable"):
     return M["matriz"][rol][accion.value][caso]
 
 
-def test_la_matriz_muestra_las_acciones_nuevas_calculadas_por_el_pdp():
+def test_el_pdp_cubre_las_acciones_de_datos_personales():
     ids = {a["id"] for a in M["acciones"]}
     assert {"ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"} <= ids
-    assert len(M["acciones"]) == 30 and len(Accion) == 31  # la 31.ª, desistir_tramite (021), aún no figura en la matriz (se ajusta al fusionar con la baja de «Roles y permisos»)
-    assert all(next(a for a in M["acciones"] if a["id"] == i)["grupo"] == "Datos personales" for i in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos"))
-    assert next(a for a in M["acciones"] if a["id"] == "corregir_mis_datos")["grupo"] == "Datos personales"
+    assert len(M["acciones"]) == len(Accion) == 31
 
 
 @pytest.mark.parametrize("rol", ["ciudadano", "funcionario", "supervisor", "coordinador_institucional"])
-def test_en_la_matriz_toda_persona_corrige_lo_propio_y_no_lo_ajeno_con_segundo_factor(rol):
+def test_en_el_pdp_toda_persona_corrige_lo_propio_y_no_lo_ajeno_con_segundo_factor(rol):
     assert celda(rol, Accion.CORREGIR_MIS_DATOS)["permitido"] is True
     assert celda(rol, Accion.CORREGIR_MIS_DATOS, "desfavorable")["permitido"] is False
     assert M["matriz"][rol]["corregir_mis_datos"]["exige_segundo_factor"] is True
 
 
-def test_en_la_matriz_solo_identidades_atiende_solicitudes_y_con_segundo_factor():
+def test_en_el_pdp_solo_identidades_atiende_solicitudes_y_con_segundo_factor():
     for accion in ACCIONES_SOLICITUDES:
         quienes = {r for r in M["matriz"] if celda(r, accion)["permitido"]}
         assert quienes == {"operador_identidades"}, (accion, quienes)
@@ -398,7 +397,7 @@ def test_en_la_matriz_solo_identidades_atiende_solicitudes_y_con_segundo_factor(
 
 
 @pytest.mark.parametrize("rol", ["ciudadano", "funcionario", "supervisor", "coordinador_institucional"])
-def test_en_la_matriz_toda_persona_ve_y_pide_lo_propio_sin_segundo_factor_y_exporta_con_el(rol):
+def test_en_el_pdp_toda_persona_ve_y_pide_lo_propio_sin_segundo_factor_y_exporta_con_el(rol):
     for accion in (Accion.VER_MIS_DATOS, Accion.CREAR_SOLICITUD_DATOS, Accion.EXPORTAR_MIS_DATOS):
         assert celda(rol, accion)["permitido"] is True and celda(rol, accion, "desfavorable")["permitido"] is False, accion
     assert M["matriz"][rol]["ver_mis_datos"]["exige_segundo_factor"] is False
@@ -406,58 +405,16 @@ def test_en_la_matriz_toda_persona_ve_y_pide_lo_propio_sin_segundo_factor_y_expo
     assert M["matriz"][rol]["exportar_mis_datos"]["exige_segundo_factor"] is True
 
 
-def test_en_la_matriz_ninguna_cuenta_de_plataforma_ejerce_derechos_sobre_perfiles():
-    for rol in (r[0] for r in matriz.ROLES[4:]):
+def test_en_el_pdp_ninguna_cuenta_de_plataforma_ejerce_derechos_sobre_perfiles():
+    for rol in ejemplos_pdp.ROLES_DE_PLATAFORMA:
         for accion in ACCIONES_DEL_TITULAR:
             assert celda(rol, accion)["permitido"] is False, (rol, accion)
 
 
-def test_el_operador_de_identidades_sigue_sin_poder_todo_ni_ver_tramites_en_la_matriz():
+def test_el_operador_de_identidades_sigue_sin_poder_todo_ni_ver_tramites_en_el_pdp():
     assert next(r for r in M["roles"] if r["id"] == "operador_identidades")["acciones_permitidas"] == 8  # alta, aprobación, restablecer MFA, invitar (PT-2), las dos de solicitudes, cambiar su contraseña y ver sus notificaciones
     assert celda("operador_identidades", Accion.VER_TRAMITE)["politica"] == "plataforma_sin_acceso_a_tramites"
     assert M["ningun_rol_puede_todo"] is True
-
-
-def test_el_simulador_conoce_las_acciones_nuevas():
-    meta = simulador.meta()
-    for accion in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos", "corregir_mis_datos", "consultar_solicitudes_datos", "responder_solicitud_datos"):
-        assert accion in meta["variables"]
-    assert len(meta["variables"]) == 30
-    for accion in ("ver_mis_datos", "exportar_mis_datos", "crear_solicitud_datos"):
-        assert "perfil_de" in meta["variables"][accion]
-    assert "perfil_de" in meta["variables"]["corregir_mis_datos"] and "perfil_de" in meta["valores"] and "perfil_de" in meta["defectos"]
-
-
-def simular(**datos):
-    entrada, errores = simulador.normalizar(datos)
-    assert errores == [], errores
-    return simulador.simular(entrada)["decision"]
-
-
-def test_el_simulador_decide_con_el_mismo_pdp():
-    assert simular(rol="ciudadano", accion="corregir_mis_datos")["permitido"] is True
-    assert simular(rol="ciudadano", accion="corregir_mis_datos", perfil_de="otra_persona")["permitido"] is False
-    assert simular(rol="ciudadano", accion="corregir_mis_datos", segundo_factor="vencido")["permitido"] is False
-    assert simular(rol="operador_seguridad", accion="corregir_mis_datos")["permitido"] is False
-    assert simular(rol="operador_identidades", accion="responder_solicitud_datos")["permitido"] is True
-    assert simular(rol="operador_catalogo", accion="responder_solicitud_datos")["permitido"] is False
-    assert simular(rol="operador_identidades", accion="responder_solicitud_datos", segundo_factor="ninguno")["permitido"] is False
-    assert simular(rol="ciudadano", accion="ver_mis_datos", segundo_factor="ninguno")["permitido"] is True
-    assert simular(rol="ciudadano", accion="exportar_mis_datos", segundo_factor="vencido")["permitido"] is False
-    assert simular(rol="ciudadano", accion="exportar_mis_datos")["permitido"] is True
-    assert simular(rol="operador_identidades", accion="crear_solicitud_datos")["permitido"] is False
-    assert simular(rol="ciudadano", accion="crear_solicitud_datos", perfil_de="otra_persona")["permitido"] is False
-
-
-def test_el_simulador_rechaza_un_perfil_de_que_no_esta_en_la_lista():
-    entrada, errores = simulador.normalizar({"rol": "ciudadano", "accion": "corregir_mis_datos", "perfil_de": "todos"})
-    assert entrada is None and any("perfil_de" in e for e in errores)
-
-
-def test_las_alternativas_muestran_que_cambiar_de_titular_o_de_factor_invierte_el_resultado():
-    entrada, _ = simulador.normalizar({"rol": "ciudadano", "accion": "corregir_mis_datos"})
-    variables = {a["variable"] for a in simulador.simular(entrada)["alternativas"]}
-    assert variables == {"perfil_de", "segundo_factor", "cuenta"}
 
 
 def test_mis_datos_es_un_modulo_de_las_personas_y_no_de_las_cuentas_de_plataforma():
@@ -467,8 +424,6 @@ def test_mis_datos_es_un_modulo_de_las_personas_y_no_de_las_cuentas_de_plataform
         assert "mis_datos" not in [m["id"] for m in modulos_para(rol, [])], rol
     # el módulo solo arma el menú: la consola de solicitudes sigue siendo la del operador de identidades
     assert "consola_identidades" in [m["id"] for m in modulos_para("operador_identidades", [])]
-    por_modulo = {m["id"]: m["roles"] for m in M["modulos"]}
-    assert set(por_modulo["mis_datos"]) == {"ciudadano", "funcionario", "supervisor", "coordinador_institucional"}
 
 
 # --------------------------------------------------------------------------- rutas y vistas

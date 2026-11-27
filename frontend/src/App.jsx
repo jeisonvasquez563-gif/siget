@@ -4,7 +4,6 @@ import { Acceso, AvisoDemostracion, EnrolarMfa } from './Acceso.jsx'
 import { Auditoria } from './Auditoria.jsx'
 import { AvisoInactividad, useInactividad } from './inactividad.jsx'
 import { SegundoFactor } from './Mfa.jsx'
-import { RolesPermisos } from './Permisos.jsx'
 import { etiquetaDeRol } from './comun.jsx'
 import { agrupar, iconoDe } from './modulos.js'
 import { CatalogoInstitucion } from './Catalogo.jsx'
@@ -99,7 +98,6 @@ export default function App() {
     case 'seguridad': contenido = <Seguridad yo={yo} />; break
     case 'auditoria': contenido = <Auditoria />; break
     case 'mfa': contenido = <SegundoFactor yo={yo} refrescar={refrescarYo} />; break
-    case 'roles_permisos': contenido = <RolesPermisos yo={yo} />; break
     case 'prueba_acceso': contenido = <PruebaAcceso yo={yo} />; break
     case 'consola_identidades': contenido = <ConsolaIdentidades yo={yo} />; break
     case 'consola_catalogo': contenido = <ConsolaCatalogo yo={yo} />; break

@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from django.conf import settings
 from rest_framework.test import APIClient
 
@@ -64,3 +65,12 @@ def test_la_salud_es_publica_y_no_toca_la_base():
 
 def test_una_ruta_inexistente_no_revela_nada():
     assert APIClient().get("/api/tramites/").status_code == 404
+
+
+def test_las_rutas_de_transparencia_de_permisos_ya_no_existen():
+    """La matriz, el simulador y la vista de la base se retiraron: `/politicas/...` debe responder 404 y no estar en el enrutador."""
+    from django.urls import Resolver404, resolve
+    for ruta in ("/politicas/matriz/", "/politicas/simular/", "/politicas/base-de-datos/", "/politicas/"):
+        with pytest.raises(Resolver404):
+            resolve(ruta)
+        assert APIClient().get(ruta).status_code == 404, ruta

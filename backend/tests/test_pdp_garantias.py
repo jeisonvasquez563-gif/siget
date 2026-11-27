@@ -1,10 +1,11 @@
-"""La matriz de roles y permisos sale del propio PDP: estas pruebas fijan qué debe mostrar y que no pueda mentir."""
+"""Garantías del PDP evaluadas directamente (diez roles x todas las acciones): ningún rol puede todo, cada acción la hace alguien y cada rol tiene solo su área."""
 import pytest
 
-from apps.autorizacion import matriz, pdp
+from apps.autorizacion import pdp
 from apps.autorizacion.pdp import Accion
+from tests import ejemplos_pdp
 
-M = matriz.construir()
+M = ejemplos_pdp.construir()
 
 
 def celda(rol, accion, caso="favorable"):
@@ -12,7 +13,7 @@ def celda(rol, accion, caso="favorable"):
 
 
 def test_cubre_a_los_diez_roles_y_a_todas_las_acciones_del_pdp():
-    assert [r["id"] for r in M["roles"]] == [r[0] for r in matriz.ROLES] and len(M["roles"]) == 10
+    assert [r["id"] for r in M["roles"]] == ejemplos_pdp.ROLES and len(M["roles"]) == 10
     # Si alguien agrega una Accion al PDP y no la documenta en la matriz, esta prueba falla
     assert {a["id"] for a in M["acciones"]} == {a.value for a in Accion}
     for rol in M["matriz"].values():
@@ -33,11 +34,11 @@ def test_toda_accion_la_puede_hacer_al_menos_un_rol():
 def test_la_prueba_detecta_un_superusuario_si_alguien_lo_introdujera(monkeypatch):
     monkeypatch.setattr(pdp, "PERMISOS", [*pdp.PERMISOS, lambda s, a, r, e: pdp.Decision(True, "dios")])
     # el superusuario no se salta las denegaciones, pero cualquier regla que permita todo se nota en la matriz
-    peligrosa = matriz.construir()
+    peligrosa = ejemplos_pdp.construir()
     assert max(r["acciones_permitidas"] for r in peligrosa["roles"]) > max(r["acciones_permitidas"] for r in M["roles"])
 
 
-@pytest.mark.parametrize("rol", [r[0] for r in matriz.ROLES[4:]])
+@pytest.mark.parametrize("rol", ejemplos_pdp.ROLES_DE_PLATAFORMA)
 def test_un_rol_de_plataforma_nunca_toca_tramites_ni_documentos(rol):
     for a in (Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Accion.REASIGNAR_TRAMITE, Accion.ESCALAR_TRAMITE, Accion.ADJUNTAR_DOCUMENTO, Accion.RESPONDER_SUBSANACION, Accion.VER_DOCUMENTO):
         for caso in ("favorable", "desfavorable"):
@@ -109,38 +110,13 @@ def test_las_acciones_de_plataforma_exigen_segundo_factor():
         assert M["matriz"][rol][accion.value]["exige_segundo_factor"] is True
 
 
-def test_cada_rol_trae_sus_modulos_y_las_politicas_que_explican_cada_decision():
-    por_rol = {r["id"]: [m["id"] for m in r["modulos"]] for r in M["roles"]}
-    assert "bandeja" in por_rol["funcionario"] and "bandeja" not in por_rol["ciudadano"]
-    assert "auditoria" in por_rol["auditor"] and "mis_tramites" not in por_rol["auditor"]
+def test_cada_decision_trae_la_politica_que_la_explica():
     for rol in M["matriz"].values():
         for a in rol.values():
             assert a["favorable"]["politica"] and a["desfavorable"]["politica"]
 
 
-def test_la_vista_por_modulo_es_la_inversa_exacta_de_la_vista_por_rol():
-    from apps.autorizacion.modulos import CATALOGO
-    assert [m["id"] for m in M["modulos"]] == list(CATALOGO)
-    for modulo in M["modulos"]:
-        esperado = [r["id"] for r in M["roles"] if modulo["id"] in [x["id"] for x in r["modulos"]]]
-        assert modulo["roles"] == esperado
-    por_modulo = {m["id"]: m["roles"] for m in M["modulos"]}
-    # Un rol llega a varios módulos y un módulo lo comparten varios roles
-    assert len([m for m in M["modulos"] if "supervisor" in m["roles"]]) > 1
-    assert len(por_modulo["seguridad"]) == 10 and "ciudadano" in por_modulo["seguridad"]
-    # Los módulos operativos de trámites no los toca ningún rol de plataforma
-    assert por_modulo["bandeja"] == ["funcionario", "supervisor"]
-    assert por_modulo["supervision"] == ["supervisor"]
-    assert por_modulo["equipo"] == ["supervisor", "coordinador_institucional"]
-    assert por_modulo["catalogo_institucion"] == ["coordinador_institucional"]
-    assert por_modulo["auditoria"] == ["auditor"]
-    # Todo módulo del catálogo lo ve al menos un rol (no hay módulos huérfanos)
-    assert all(m["roles"] for m in M["modulos"])
-
-
-def test_las_reglas_de_denegacion_documentadas_existen_en_el_pdp():
-    nombres = {d["politica"] for d in M["denegaciones"]}
-    assert {"cuenta_no_activa", "plataforma_sin_acceso_a_tramites", "conflicto_de_interes", "control_dual", "sin_regla_que_permita"} <= nombres
+def test_las_reglas_de_denegacion_existen_en_el_pdp():
     en_el_pdp = {r.__name__ for r in pdp.DENEGACIONES}
     assert {"_cuenta_activa", "_plataforma_sin_tramites", "_conflicto_de_interes", "_control_dual"} <= en_el_pdp
 
@@ -148,9 +124,9 @@ def test_las_reglas_de_denegacion_documentadas_existen_en_el_pdp():
 # --------------------------------------------------------------------------- la ventana del segundo factor es la configuración real
 
 def test_la_matriz_informa_la_ventana_configurada_y_el_vencido_siempre_la_supera():
-    assert matriz.vencido_hace(15) == 60 and matriz.vencido_hace(30) == 75 and matriz.vencido_hace(90) == 135
+    assert ejemplos_pdp.vencido_hace(15) == 60 and ejemplos_pdp.vencido_hace(30) == 75 and ejemplos_pdp.vencido_hace(90) == 135
     for ventana in (2, 15, 30, 90):
-        m = matriz.construir(ventana=ventana)
+        m = ejemplos_pdp.construir(ventana=ventana)
         assert m["ventana_minutos"] == ventana
         # lo que exige segundo factor reciente no depende de cuánto dure la ventana, sino de que exista
         assert m["matriz"]["funcionario"]["cambiar_estado"]["exige_segundo_factor"] is True

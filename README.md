@@ -30,7 +30,7 @@ Las contraseñas **no están en el repositorio**; se las pides al responsable (J
 | **Coordinación** | Ve al equipo y los roles de su institución, **sin** acceso a los datos de los trámites |
 | **Plataforma** | Cinco roles (infraestructura, identidades, catálogo, seguridad, secretos) con **control dual** y sin acceso a trámites |
 | **Auditoría** | Lee el registro inalterable con un rol de base de datos de solo lectura; cada consulta queda registrada |
-| **Transparencia** | Matriz de roles y permisos **calculada por el propio motor de decisiones**, permisos reales de PostgreSQL y un **simulador de «qué pasaría si…»** |
+| **Transparencia** | Cada persona ve su propia seguridad (rol, instituciones, segundo factor y actividad reciente); todas las decisiones de acceso quedan registradas y las consulta el auditor |
 | **Segundo factor** | TOTP obligatorio, anti-repetición, bloqueo por intentos, reautenticación escalonada y actividad de seguridad propia |
 
 **No existe un superusuario:** ninguno de los 10 roles puede las 21 acciones del sistema (el que más puede, el supervisor, hace 7).
@@ -68,7 +68,7 @@ flowchart LR
 .
 ├── backend/              # Django + DRF: apps autenticacion, autorizacion (PDP), tramites, catalogo,
 │                         #   identidad, auditoria, nucleo; comandos verificar_* y sembrar_demo
-├── frontend/             # React + Vite: pantallas por rol, sistema de diseño, pruebas, simulador de desarrollo
+├── frontend/             # React + Vite: pantallas por rol, sistema de diseño, pruebas, servidor de ejemplo de desarrollo
 ├── database/             # Esquema, diseño de roles, migraciones 002–007, pruebas SQL
 ├── infra/
 │   ├── podman/           # Unidades Quadlet y nginx.conf de VM1 y VM2
