@@ -49,6 +49,7 @@ const NOMBRES = Object.fromEntries(Object.entries(USUARIOS).map(([n, u]) => [u.i
 const MODULOS = {
   mis_tramites: ['Mis trámites', 'Consulta el estado y el historial de los trámites que iniciaste.', 'disponible'],
   nuevo_tramite: ['Iniciar un trámite', 'Elige una institución y un trámite del catálogo.', 'disponible'],
+  directorio: ['Directorio', 'Instituciones y los trámites que ofrecen: plazo, documentos necesarios y qué pasa después.', 'disponible'],
   bandeja: ['Bandeja de la institución', 'Trámites de tu institución: revisarlos y cambiar su estado.', 'disponible'],
   supervision: ['Supervisión', 'Reasigna trámites y atiende los escalados de tu institución.', 'disponible'],
   equipo: ['Equipo de la institución', 'Personal y roles de tu institución.', 'disponible'],
@@ -74,7 +75,7 @@ function modulosDe(u) {
   if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa']
   else {
     const roles = u.membresias.map((m) => m.rol)
-    ids = ['mis_tramites', 'nuevo_tramite', 'mis_datos']
+    ids = ['mis_tramites', 'nuevo_tramite', 'directorio', 'mis_datos']
     if (roles.some((r) => r === 'funcionario' || r === 'supervisor')) ids.push('bandeja')
     if (roles.includes('supervisor')) ids.push('supervision')
     if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('equipo')
@@ -85,8 +86,8 @@ function modulosDe(u) {
 }
 
 const INSTITUCIONES = [
-  { id: 1, nombre: 'Alcaldía (Municipio de Panamá)', tipo: 'real' }, { id: 2, nombre: 'MINSA', tipo: 'demostracion' },
-  { id: 3, nombre: 'MOP', tipo: 'demostracion' }, { id: 4, nombre: 'MiAmbiente', tipo: 'demostracion' },
+  { id: 1, nombre: 'Alcaldía (Municipio de Panamá)', tipo: 'real' }, { id: 2, nombre: 'MINSA', tipo: 'real' },
+  { id: 3, nombre: 'MOP', tipo: 'real' }, { id: 4, nombre: 'MiAmbiente', tipo: 'real' },
   { id: 5, nombre: 'Ministerio Público / 311', tipo: 'real' }, { id: 6, nombre: 'AMPYME', tipo: 'real' },
 ]
 const TIPOS = [

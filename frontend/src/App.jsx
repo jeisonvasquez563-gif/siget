@@ -15,6 +15,7 @@ import { MisDatos } from './MisDatos.jsx'
 import { Privacidad } from './Privacidad.jsx'
 import { ConsolaCatalogo, ConsolaIdentidades, ConsolaInfraestructura, ConsolaSecretos, ConsolaSeguridad } from './Plataforma.jsx'
 import { Constancia } from './Constancia.jsx'
+import { Directorio } from './Directorio.jsx'
 import { Bandeja, Detalle, MisTramites, NuevoTramite, SIN_FILTROS } from './Tramites.jsx'
 import { Avatar, Icono, Logo, useUI } from './ui.jsx'
 
@@ -77,6 +78,8 @@ export default function App() {
   if (fase === 'enrolar') return <><EnrolarMfa usuario={yo.usuario} alTerminar={cargarYo} alSalir={salir} />{restante !== null && <AvisoInactividad restante={restante} seguir={seguirConectado} salir={salir} />}</>
 
   const ir = (modulo) => { setVista({ modulo }); setMenuAbierto(false); window.scrollTo({ top: 0 }) }
+  // Del «Directorio» a «Iniciar un trámite» con la institución y el trámite ya elegidos (ids)
+  const iniciar = (institucion, tipo) => { setVista({ modulo: 'nuevo_tramite', preseleccion: { institucion, tipo } }); setMenuAbierto(false); window.scrollTo({ top: 0 }) }
   // `extra`: `{ nuevo: true }` al terminar de iniciar un trámite (el detalle ofrece entonces la constancia)
   const abrir = (id, extra = {}) => { setVista({ modulo: 'detalle', id, desde: vista.modulo, ...extra }); window.scrollTo({ top: 0 }) }
   const verConstancia = (id) => { setVista({ modulo: 'constancia', id, desde: vista.modulo === 'detalle' ? vista.desde : vista.modulo }); window.scrollTo({ top: 0 }) }
@@ -89,7 +92,8 @@ export default function App() {
   switch (vista.modulo) {
     case 'inicio': contenido = <Inicio yo={yo} ir={ir} abrir={abrir} />; break
     case 'mis_tramites': contenido = <MisTramites yo={yo} abrir={abrir} nuevo={() => ir('nuevo_tramite')} filtros={filtrosMis} cambiarFiltros={setFiltrosMis} />; break
-    case 'nuevo_tramite': contenido = <NuevoTramite yo={yo} abrir={abrir} />; break
+    case 'nuevo_tramite': contenido = <NuevoTramite yo={yo} abrir={abrir} preseleccion={vista.preseleccion} />; break
+    case 'directorio': contenido = <Directorio yo={yo} iniciar={iniciar} />; break
     case 'bandeja': contenido = <Bandeja yo={yo} abrir={abrir} modo="bandeja" />; break
     case 'supervision': contenido = <Bandeja yo={yo} abrir={abrir} modo="supervision" />; break
     case 'equipo': contenido = <Equipo />; break

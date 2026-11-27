@@ -4,7 +4,7 @@ import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Paginacion, Plazo, SIGUIENTE
 import { CamposFormulario, DatosSolicitud, ModalMotivo, ResponderSubsanacion, ResumenErrores, armarDatos, erroresDe, ultimoMotivoDeSubsanacion, validarCliente, valoresIniciales } from './Contenido.jsx'
 import { Documentos } from './Documentos.jsx'
 import { Seguimiento } from './Seguimiento.jsx'
-import { Alerta, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
+import { Alerta, Esqueleto, Icono, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
 
 const LOTE = 100 // lo máximo que admite el servidor por petición
 const MAX_LOTES = 50 // tope de seguridad: 5000 trámites; si hubiera más se avisa en pantalla
@@ -54,7 +54,7 @@ function coincide(t, q) {
   return q.toLowerCase().split(/\s+/).every((p) => texto.includes(p))
 }
 
-function Buscador({ valor, cambiar, etiqueta = 'Buscar por número, trámite o institución' }) {
+export function Buscador({ valor, cambiar, etiqueta = 'Buscar por número, trámite o institución' }) {
   return (
     <div className="buscador">
       <Icono nombre="buscar" />
@@ -172,7 +172,7 @@ export function MisTramites({ yo, abrir, nuevo, filtros: guardados, cambiarFiltr
 
 /* ---------------------------------------------------------------- nuevo trámite */
 
-const diasHabiles = (n) => `${n} ${n === 1 ? 'día hábil' : 'días hábiles'}`
+export const diasHabiles = (n) => `${n} ${n === 1 ? 'día hábil' : 'días hábiles'}`
 
 // La tarjeta que se lee antes del formulario: para qué sirve el trámite, el plazo, los documentos que hacen falta y qué pasa después. Todo texto
 // que llega del catálogo se dibuja como texto de React (nunca como HTML). Los requisitos los escribe la coordinación de la institución.
@@ -200,13 +200,15 @@ export function AntesDeEmpezar({ tipo, empezado, empezar }) {
   )
 }
 
-export function NuevoTramite({ yo, abrir }) {
+// `preseleccion` ({ institucion, tipo }: ids) la manda el «Directorio»: se aplica una sola vez, cuando llegan el catálogo y los trámites de esa institución
+export function NuevoTramite({ yo, abrir, preseleccion = null }) {
   const [instituciones, setInstituciones] = useState(null)
   const [tipos, setTipos] = useState(null)
   const [institucion, setInstitucion] = useState(null)
   const [tipo, setTipo] = useState(null)
   const [empezado, setEmpezado] = useState(false) // leyó «Antes de empezar» y pidió el formulario
   const formulario = useRef(null)
+  const pendiente = useRef(preseleccion)
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(false)
   const [valores, setValores] = useState({})
@@ -217,13 +219,27 @@ export function NuevoTramite({ yo, abrir }) {
   const esPersonal = yo.membresias.length > 0
   const propias = useMemo(() => new Set(yo.membresias.map((m) => m.institucion_id)), [yo.membresias])
 
-  useEffect(() => { api('/catalogo/instituciones/').then((l) => setInstituciones(l.filter((i) => !propias.has(i.id)))).catch((e) => setError(mensajeDe(e))) }, [propias])
+  useEffect(() => {
+    api('/catalogo/instituciones/').then((l) => {
+      const lista = l.filter((i) => !propias.has(i.id))
+      setInstituciones(lista)
+      const elegida = pendiente.current && lista.find((i) => i.id === pendiente.current.institucion)
+      if (elegida) setInstitucion(elegida)
+      else pendiente.current = null
+    }).catch((e) => setError(mensajeDe(e)))
+  }, [propias])
   useEffect(() => {
     setTipo(null)
     setEmpezado(false)
     setTipos(null)
     if (!institucion) return
-    api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then((l) => setTipos(l.filter((t) => t.audiencia === 'ambas' || t.audiencia === (esPersonal ? 'institucion' : 'ciudadania')))).catch((e) => setError(mensajeDe(e)))
+    api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then((l) => {
+      const lista = l.filter((t) => t.audiencia === 'ambas' || t.audiencia === (esPersonal ? 'institucion' : 'ciudadania'))
+      setTipos(lista)
+      const elegido = pendiente.current && lista.find((t) => t.id === pendiente.current.tipo)
+      pendiente.current = null
+      if (elegido) { setTipo(elegido); setValores(valoresIniciales(elegido.formulario || [])) } // lo que llega del directorio: se lee «Antes de empezar» antes del formulario
+    }).catch((e) => setError(mensajeDe(e)))
   }, [institucion, esPersonal])
 
   // Cada tipo trae su formulario: al cambiar de trámite se parte de un formulario limpio
@@ -278,7 +294,6 @@ export function NuevoTramite({ yo, abrir }) {
                   <button key={i.id} className="opcion" role="radio" aria-checked={institucion?.id === i.id} onClick={() => setInstitucion(i)}>
                     <span className="marca-opcion">{institucion?.id === i.id && <Icono nombre="check" />}</span>
                     <span className="cuerpo-opcion"><strong>{i.nombre}</strong></span>
-                    {i.tipo === 'demostracion' && <Insignia punto={false}>Demostración</Insignia>}
                   </button>
                 ))}
               </div>
