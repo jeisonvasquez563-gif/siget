@@ -45,14 +45,21 @@ def titulo(t):
     print(f"\n== {t}")
 
 
+PREFIJO_ENSAYO = "[Ensayo] "
+
+
 def datos_para(tipo, **cambios):
     """Un contenido válido para el formulario que publica el catálogo (`tipo["formulario"]`): los campos obligatorios con valores de prueba."""
     datos = {}
+    marcado = False
     for campo in tipo["formulario"]:
         if not campo["obligatorio"]:
             continue
         if campo["tipo"] in ("texto", "texto_largo"):
-            datos[campo["id"]] = ("Ensayo: " + campo["etiqueta"])[: campo.get("max", 200)]
+            # el primer campo de texto lleva el prefijo «[Ensayo] »: así se reconocen en la bandeja, los indicadores y el escalamiento
+            # los trámites que el ensayo crea en producción
+            datos[campo["id"]] = ((PREFIJO_ENSAYO if not marcado else "Ensayo: ") + campo["etiqueta"])[: campo.get("max", 200)]
+            marcado = True
         elif campo["tipo"] == "numero":
             datos[campo["id"]] = min(10, campo.get("max", 10))
         elif campo["tipo"] == "fecha":
@@ -250,8 +257,8 @@ paso(e == 403, "Fabio no mueve lo asignado a Flor (403)", e)
 
 # --------------------------------------------------------------------------- 3b. subsanación
 titulo("3b. Subsanación: Ana crea con datos, Fabio pide corregir con un motivo, Ana responde y Fabio aprueba")
-e, sub_t = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0], asunto="Ensayo: falta un documento")})
-paso(e == 201 and sub_t["datos"]["asunto"] == "Ensayo: falta un documento", "Ana crea un trámite con sus datos", f"#{sub_t.get('id')}")
+e, sub_t = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0], asunto="[Ensayo] falta un documento")})
+paso(e == 201 and sub_t["datos"]["asunto"] == "[Ensayo] falta un documento", "Ana crea un trámite con sus datos", f"#{sub_t.get('id')}")
 st = sub_t["id"]
 e, _ = fabio.pedir("POST", f"/tramites/{st}/estado/", {"estado": "En Tramitacion"})
 paso(e == 200, "Fabio lo pasa a «En tramitación»", e)
@@ -266,8 +273,8 @@ e, _ = ana.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "corta"})
 paso(e == 400, "una respuesta demasiado corta se rechaza (400)", e)
 e, _ = fabio.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "Respondo yo por la persona, que no corresponde."})
 paso(e == 403, "el funcionario no responde por la persona (403)", e)
-e, r = ana.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "Adjunto el plano y corrijo el asunto.", "datos": datos_para(tipos[0], asunto="Ensayo: documento completo")})
-paso(e == 200 and r["estado"] == "En Tramitacion" and r["datos"]["asunto"] == "Ensayo: documento completo", "Ana responde: vuelve a «En tramitación» con los datos corregidos", e)
+e, r = ana.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "Adjunto el plano y corrijo el asunto.", "datos": datos_para(tipos[0], asunto="[Ensayo] documento completo")})
+paso(e == 200 and r["estado"] == "En Tramitacion" and r["datos"]["asunto"] == "[Ensayo] documento completo", "Ana responde: vuelve a «En tramitación» con los datos corregidos", e)
 e, r = fabio.pedir("POST", f"/tramites/{st}/estado/", {"estado": "Aprobado"})
 paso(e == 200 and r["estado"] == "Aprobado", "Fabio lo aprueba", e)
 e, h = fabio.pedir("GET", f"/tramites/{st}/historial/")
@@ -477,7 +484,7 @@ e, _ = Sesion("ana.ciudadana").pedir("GET", f"/tramites/{st}/constancia/")
 paso(e == 401, "sin sesión la constancia responde 401", e)
 e, r = ana.pedir("POST", f"/tramites/{st}/desistir/", {"motivo": "Intento desistir de un trámite ya aprobado."})
 paso(e == 409 and (r or {}).get("codigo") == "tramite_resuelto", "desistir de un trámite ya resuelto responde 409 y no cambia nada", e)
-e, des = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0], asunto="Ensayo: trámite para desistir")})
+e, des = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0], asunto="[Ensayo] trámite para desistir")})
 paso(e == 201, "Ana crea un trámite propio del ensayo para desistir de él", f"#{(des or {}).get('id')}")
 dt = des["id"]
 e, r = ana.pedir("POST", f"/tramites/{dt}/desistir/", {})
