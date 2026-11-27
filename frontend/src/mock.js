@@ -15,6 +15,7 @@ import { plataformaMock } from './mock-plataforma.js'
 import { olvidarConfiguracion } from './api.js'
 import {
   FORMULARIO_CONSTRUCCION, FORMULARIO_DEMOSTRACION, FORMULARIO_DENUNCIA, FORMULARIO_EMPRESA, FORMULARIO_INTERINSTITUCIONAL,
+  REQUISITOS_CONSTRUCCION, REQUISITOS_DEMOSTRACION, REQUISITOS_DENUNCIA, REQUISITOS_EMPRESA, REQUISITOS_INTERINSTITUCIONAL,
   motivoParaLaPersona, respuestaDatosInvalidos, validarDatos, validarTextoLibre,
 } from './mock-contenido.js'
 
@@ -48,6 +49,7 @@ const NOMBRES = Object.fromEntries(Object.entries(USUARIOS).map(([n, u]) => [u.i
 const MODULOS = {
   mis_tramites: ['Mis trámites', 'Consulta el estado y el historial de los trámites que iniciaste.', 'disponible'],
   nuevo_tramite: ['Iniciar un trámite', 'Elige una institución y un trámite del catálogo.', 'disponible'],
+  directorio: ['Directorio', 'Instituciones y los trámites que ofrecen: plazo, documentos necesarios y qué pasa después.', 'disponible'],
   bandeja: ['Bandeja de la institución', 'Trámites de tu institución: revisarlos y cambiar su estado.', 'disponible'],
   supervision: ['Supervisión', 'Reasigna trámites y atiende los escalados de tu institución.', 'disponible'],
   equipo: ['Equipo de la institución', 'Personal y roles de tu institución.', 'disponible'],
@@ -73,7 +75,7 @@ function modulosDe(u) {
   if (u.plataforma !== 'ninguno') ids = [POR_PLATAFORMA[u.plataforma], 'prueba_acceso', 'seguridad', 'mfa']
   else {
     const roles = u.membresias.map((m) => m.rol)
-    ids = ['mis_tramites', 'nuevo_tramite', 'mis_datos']
+    ids = ['mis_tramites', 'nuevo_tramite', 'directorio', 'mis_datos']
     if (roles.some((r) => r === 'funcionario' || r === 'supervisor')) ids.push('bandeja')
     if (roles.includes('supervisor')) ids.push('supervision')
     if (roles.some((r) => r === 'supervisor' || r === 'coordinador_institucional')) ids.push('equipo')
@@ -84,8 +86,8 @@ function modulosDe(u) {
 }
 
 const INSTITUCIONES = [
-  { id: 1, nombre: 'Alcaldía (Municipio de Panamá)', tipo: 'real' }, { id: 2, nombre: 'MINSA', tipo: 'demostracion' },
-  { id: 3, nombre: 'MOP', tipo: 'demostracion' }, { id: 4, nombre: 'MiAmbiente', tipo: 'demostracion' },
+  { id: 1, nombre: 'Alcaldía (Municipio de Panamá)', tipo: 'real' }, { id: 2, nombre: 'MINSA', tipo: 'real' },
+  { id: 3, nombre: 'MOP', tipo: 'real' }, { id: 4, nombre: 'MiAmbiente', tipo: 'real' },
   { id: 5, nombre: 'Ministerio Público / 311', tipo: 'real' }, { id: 6, nombre: 'AMPYME', tipo: 'real' },
 ]
 const TIPOS = [
@@ -100,8 +102,10 @@ TIPOS.forEach((t) => { t.audiencia = 'ciudadania' })
 // Los formularios son los de la migración 017 (el catálogo de ejemplo usa otros nombres, pero la misma forma)
 const FORMULARIOS_BASE = [FORMULARIO_CONSTRUCCION, FORMULARIO_DEMOSTRACION, FORMULARIO_DEMOSTRACION, FORMULARIO_DEMOSTRACION, FORMULARIO_DENUNCIA, FORMULARIO_EMPRESA]
 FORMULARIOS_BASE.forEach((f, i) => { TIPOS[i].formulario = f })
+// Lo que la ciudadanía lee antes de iniciar cada trámite (migración 021)
+;[REQUISITOS_CONSTRUCCION, REQUISITOS_DEMOSTRACION, REQUISITOS_DEMOSTRACION, REQUISITOS_DEMOSTRACION, REQUISITOS_DENUNCIA, REQUISITOS_EMPRESA].forEach((r, i) => { TIPOS[i].requisitos = r })
 // Cada institución recibe también solicitudes de otras instituciones (audiencia «institucion»)
-for (const base of TIPOS.slice(0, 6)) TIPOS.push({ id: TIPOS.length + 1, nombre: 'Solicitud interinstitucional de información', sla_dias: 5, institucion: base.institucion, audiencia: 'institucion', formulario: FORMULARIO_INTERINSTITUCIONAL })
+for (const base of TIPOS.slice(0, 6)) TIPOS.push({ id: TIPOS.length + 1, nombre: 'Solicitud interinstitucional de información', sla_dias: 5, institucion: base.institucion, audiencia: 'institucion', formulario: FORMULARIO_INTERINSTITUCIONAL, requisitos: REQUISITOS_INTERINSTITUCIONAL })
 
 const T = (id, tipo, estado, solicitante, asignado, creadoDias, sla, extra = {}) => {
   const t = TIPOS[tipo - 1]
@@ -369,12 +373,40 @@ export function instalarMock(inicial, opciones = {}) {
       EVENTOS[t.id].push({ ...ev(Date.now(), t.id, 'documento_adjuntado', t.estado, t.estado, u.id, 0), atributos: { documento: nuevo.id } })
       return resp(201, nuevo)
     }
-    const m = camino.match(/^\/tramites\/(\d+)\/(estado\/|reasignar\/|historial\/|subsanacion\/)?$/)
+    const m = camino.match(/^\/tramites\/(\d+)\/(estado\/|reasignar\/|historial\/|subsanacion\/|desistir\/|constancia\/)?$/)
     if (m) {
       const t = TRAMITES.find((x) => x.id === Number(m[1]))
       if (!t || !visibles(u, t)) return resp(404, { detalle: 'No encontrado.' })
       const sub = m[2]
       if (!sub) return resp(200, conContenido(dto(u, t), t))
+      if (sub === 'constancia/') {
+        // Solo para quien pidió el trámite (el personal de la institución, 403); lleva los datos con las etiquetas de la COPIA del formulario del trámite
+        if (metodo !== 'GET') return resp(405, { codigo: 'metodo_no_permitido' })
+        if (t.solicitante_id !== u.id) return negado()
+        const datos = DATOS[t.id] || {}
+        return resp(200, {
+          numero: t.id, tipo_tramite: t.tipo_tramite, institucion: { id: t.institucion.id, nombre: t.institucion.nombre }, presentado_en: t.creado_en, fecha_limite: t.fecha_limite,
+          estado: t.estado, emitida_en: new Date().toISOString(),
+          datos: formularioDe(t).filter((c) => c.id in datos).map((c) => ({ id: c.id, etiqueta: c.etiqueta, tipo: c.tipo, valor: datos[c.id] })),
+          documentos: (DOCUMENTOS[t.id] || []).map((d) => ({ id: d.id, nombre: d.nombre })),
+        })
+      }
+      if (sub === 'desistir/') {
+        // Solo quien pidió el trámite y con segundo factor reciente; motivo de 10 a 2000 caracteres; 409 si ya está resuelto
+        if (metodo !== 'POST') return resp(405, { codigo: 'metodo_no_permitido' })
+        if (t.solicitante_id !== u.id) return negado()
+        if (!mfaFresco) return pideCodigo()
+        if (['Aprobado', 'Rechazado', 'Desistido'].includes(t.estado)) return resp(409, { codigo: 'tramite_resuelto', detalle: 'El trámite ya está resuelto: no se puede desistir de él.' })
+        if (cuerpo.motivo === undefined || cuerpo.motivo === null) return resp(400, { codigo: 'motivo_obligatorio', detalle: 'Indica el `motivo` (10 a 2000 caracteres) por el que desistes.', errores: { motivo: 'Este campo es obligatorio.' } })
+        const falla = validarTextoLibre(cuerpo.motivo, 10, 2000)
+        if (falla) return resp(400, respuestaDatosInvalidos({ motivo: falla }))
+        const antes = t.estado
+        t.estado = 'Desistido'
+        t.vencido = false
+        notificaciones.avisar(t, antes, u.id)
+        EVENTOS[t.id].push(ev(Date.now(), t.id, 'cambio_estado', antes, 'Desistido', u.id, 500, cuerpo.motivo.trim()))
+        return resp(200, conContenido(dto(u, t), t))
+      }
       if (sub === 'historial/') return resp(200, { tramite: t.id, eventos: EVENTOS[t.id].map((e) => (esPersonal(u, t) ? e : { id: e.id, accion: e.accion, estado_anterior: e.estado_anterior, estado_nuevo: e.estado_nuevo, institucion_id: e.institucion_id, creado_en: e.creado_en, motivo: motivoParaLaPersona(e) })) })
       if (sub === 'subsanacion/') {
         // La responde quien pidió el trámite, sin segundo factor reciente (igual que adjuntar documentos)

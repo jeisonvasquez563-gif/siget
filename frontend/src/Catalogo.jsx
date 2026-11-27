@@ -3,9 +3,11 @@ import { api, ApiError } from './api.js'
 import { Paginacion, fecha, hace, mensajeDe, useReautenticacion } from './comun.jsx'
 import { CamposFormulario, ResumenErrores } from './Contenido.jsx'
 import {
-  AUDIENCIAS, AYUDA_MAX, ETIQUETA_MAX, MAX_CAMPOS, NOMBRE_AUDIENCIA, NOMBRE_MAX, SLA_MAX, SLA_MIN, TIPOS_CAMPO, borradorDesde, borradorVacio,
-  campoVacio, camposDeVista, cuerpoDe, idDesde, MAX_POR_DEFECTO, resumenDeErrores, usaMaximo, validarBorrador,
+  AUDIENCIAS, AYUDA_MAX, DESCRIPCION_MAX, DESPUES_MAX, DOCUMENTOS_MAX, DOCUMENTO_MAX, ETIQUETA_MAX, MAX_CAMPOS, NOMBRE_AUDIENCIA, NOMBRE_MAX, SLA_MAX, SLA_MIN,
+  TIPOS_CAMPO, borradorDesde, borradorVacio, campoVacio, camposDeVista, cuerpoDe, encabezadoDeError, idDesde, MAX_POR_DEFECTO, requisitosDe, resumenDeErrores,
+  usaMaximo, validarBorrador,
 } from './catalogo-reglas.js'
+import { AntesDeEmpezar } from './Tramites.jsx'
 import { Alerta, BloquesEsqueleto, Icono, Insignia, Vacio, useUI } from './ui.jsx'
 
 // Catálogo de la institución: la coordinación crea, edita, activa y desactiva los trámites que ofrece su institución y mira quién cambió qué.
@@ -130,6 +132,13 @@ function Editor({ institucion, tipo, alTerminar, alCancelar, alRecargar, ejecuta
   const [trabajando, setTrabajando] = useState(false)
 
   const cambiarDatos = (parche, ...claves) => { setB((x) => ({ ...x, ...parche })); setErrores((e) => sinClave(e, ...claves)) }
+  // Los errores de un requisito salen al escribir en él (por su prefijo: `requisitos.documentos` y `requisitos.documentos.<i>`) y el general de `requisitos`
+  const cambiarRequisito = (parche, prefijo) => {
+    setB((x) => ({ ...x, ...parche }))
+    setErrores((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith(prefijo) && k !== 'requisitos')))
+  }
+  const errorDeDocumentos = errores['requisitos.documentos']
+    ?? (Object.entries(errores).filter(([k]) => k.startsWith('requisitos.documentos.')).map(([k, m]) => `${encabezadoDeError(k)}: ${m}`).join(' ') || undefined)
   const cambiarCampo = (i, parche) => {
     setB((x) => ({
       ...x,
@@ -218,6 +227,20 @@ function Editor({ institucion, tipo, alTerminar, alCancelar, alRecargar, ejecuta
               )}
             </Etiquetado>
           </div>
+          <fieldset className="editor-campos editor-requisitos">
+            <legend>Antes de empezar: lo que lee la ciudadanía</legend>
+            <p className="nota">Se muestra en «Iniciar un trámite», antes del formulario. Todo es opcional, pero ayuda a que la persona llegue con lo que hace falta.</p>
+            {errores.requisitos && <Alerta>{errores.requisitos}</Alerta>}
+            <Etiquetado etiqueta="Para qué sirve el trámite" ayuda={`Hasta ${DESCRIPCION_MAX} caracteres.`} error={errores['requisitos.descripcion']}>
+              {(p) => <textarea className="entrada" {...p} rows={3} maxLength={DESCRIPCION_MAX} value={b.descripcion} onChange={(e) => cambiarRequisito({ descripcion: e.target.value }, 'requisitos.descripcion')} />}
+            </Etiquetado>
+            <Etiquetado etiqueta="Documentos que hay que adjuntar" ayuda={`Un documento por línea: hasta ${DOCUMENTOS_MAX}, de ${DOCUMENTO_MAX} caracteres cada uno.`} error={errorDeDocumentos}>
+              {(p) => <textarea className="entrada" {...p} rows={4} value={b.documentos} onChange={(e) => cambiarRequisito({ documentos: e.target.value }, 'requisitos.documentos')} />}
+            </Etiquetado>
+            <Etiquetado etiqueta="Qué pasa después de presentarlo" ayuda={`Hasta ${DESPUES_MAX} caracteres.`} error={errores['requisitos.despues']}>
+              {(p) => <textarea className="entrada" {...p} rows={3} maxLength={DESPUES_MAX} value={b.despues} onChange={(e) => cambiarRequisito({ despues: e.target.value }, 'requisitos.despues')} />}
+            </Etiquetado>
+          </fieldset>
           <fieldset className="editor-campos">
             <legend>Datos que pide el trámite</legend>
             {errores.formulario && <Alerta>{errores.formulario}</Alerta>}
@@ -235,6 +258,7 @@ function Editor({ institucion, tipo, alTerminar, alCancelar, alRecargar, ejecuta
         </form>
       </section>
       <VistaPrevia campos={b.campos} />
+      <AntesDeEmpezar tipo={{ sla_dias: Number(b.sla_dias) || 1, requisitos: requisitosDe(b) }} empezado aviso={false} />
     </>
   )
 }
@@ -272,6 +296,15 @@ function ListaTipos({ tipos, alEditar, alCambiarActivo }) {
 
 /* ---------------------------------------------------------------- el historial */
 
+// «descripción, 2 documentos, qué pasa después» o «sin requisitos»: solo lo que hay, sin copiar los textos
+function requisitosResumidos(r) {
+  const partes = []
+  if (r?.descripcion) partes.push('descripción')
+  if (Array.isArray(r?.documentos) && r.documentos.length) partes.push(plural(r.documentos.length, 'documento', 'documentos'))
+  if (r?.despues) partes.push('qué pasa después')
+  return partes.length ? partes.join(', ') : 'sin requisitos'
+}
+
 // Qué hizo un cambio, en lenguaje llano. Solo texto: nada de lo que viene del servidor se interpreta como HTML.
 export function describirCambio(c) {
   const nombre = c.tipo_tramite?.nombre ?? 'el trámite'
@@ -288,6 +321,7 @@ export function describirCambio(c) {
   if ('sla_dias' in despues) lineas.push(`Cambió el plazo de «${nombre}»: ${antes.sla_dias} → ${despues.sla_dias} días hábiles.`)
   if ('audiencia' in despues) lineas.push(`Cambió para quién es «${nombre}»: ${NOMBRE_AUDIENCIA[antes.audiencia] ?? antes.audiencia} → ${NOMBRE_AUDIENCIA[despues.audiencia] ?? despues.audiencia}.`)
   if ('formulario' in despues) lineas.push(`Cambió el formulario de «${nombre}»: ${campos(antes.formulario)} → ${campos(despues.formulario)}.`)
+  if ('requisitos' in despues) lineas.push(`Cambió lo que la ciudadanía lee antes de empezar «${nombre}»: ${requisitosResumidos(antes.requisitos)} → ${requisitosResumidos(despues.requisitos)}.`)
   if ('activo' in despues) lineas.push(despues.activo ? `Activó «${nombre}».` : `Desactivó «${nombre}».`)
   return lineas.length ? lineas : [`Cambió «${nombre}».`]
 }

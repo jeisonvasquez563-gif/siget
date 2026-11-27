@@ -33,6 +33,7 @@ export const ESTADOS = {
   'En Subsanacion': { texto: 'En subsanación', clase: 'e-subsanacion' },
   Aprobado: { texto: 'Aprobado', clase: 'e-aprobado' },
   Rechazado: { texto: 'Rechazado', clase: 'e-rechazado' },
+  Desistido: { texto: 'Desistido', clase: 'e-desistido' },
 }
 export function etiquetaDeRol(yo) {
   if (yo.rol_plataforma !== 'ninguno') return ROLES_PLATAFORMA[yo.rol_plataforma]
@@ -40,7 +41,8 @@ export function etiquetaDeRol(yo) {
   return roles.length ? roles.join(' · ') : 'Ciudadanía'
 }
 
-export const FINALES = ['Aprobado', 'Rechazado']
+// Estados finales: Desistido es el de la persona que presentó el trámite y decidió retirarlo (migración 021)
+export const FINALES = ['Aprobado', 'Rechazado', 'Desistido']
 
 // Solo una ayuda para mostrar los botones: la transición válida la decide el servidor (y la base de datos).
 export const SIGUIENTES = {
@@ -49,6 +51,7 @@ export const SIGUIENTES = {
   'En Subsanacion': ['En Tramitacion'],
   Aprobado: [],
   Rechazado: [],
+  Desistido: [],
 }
 
 export const ACCIONES_EVENTO = {
@@ -94,6 +97,7 @@ export function hace(iso) {
 
 // Cuánto del plazo ya pasó y cómo decirlo. Un trámite resuelto ya no corre contra el reloj.
 export function plazoDe(t) {
+  if (t.estado === 'Desistido') return { texto: 'Cerrado por desistimiento', clase: '', valor: 1 }
   if (FINALES.includes(t.estado)) return { texto: 'Resuelto', clase: '', valor: 1 }
   const inicio = new Date(t.creado_en).getTime()
   const fin = new Date(t.fecha_limite).getTime()

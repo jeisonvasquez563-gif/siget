@@ -115,7 +115,7 @@ class Command(BaseCommand):
         return r
 
     def _crear(self, usuario, institucion):
-        tipo = TipoTramite.objects.filter(institucion__nombre=institucion).order_by("id").first()
+        tipo = TipoTramite.objects.filter(institucion__nombre=institucion, activo=True, audiencia="ciudadania").order_by("id").first()  # no los «Trámite de demostración» (inactivos desde la 023)
         r = self._http("post", "/tramites/", usuario, {"tipo_tramite": tipo.pk, "datos": datos_de_ejemplo(tipo.formulario)})
         if not (r.status_code == 201):
             raise CommandError(f"respuesta inesperada de la API: {usuario, r.status_code, r.content[:200]}")

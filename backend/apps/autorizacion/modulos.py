@@ -8,6 +8,7 @@ DISPONIBLE, PROXIMAMENTE = "disponible", "proximamente"
 CATALOGO = {
     "mis_tramites": ("Mis trámites", "Consulta el estado y el historial de los trámites que iniciaste.", DISPONIBLE),
     "nuevo_tramite": ("Iniciar un trámite", "Elige una institución y un trámite del catálogo.", DISPONIBLE),
+    "directorio": ("Directorio", "Instituciones y los trámites que ofrecen: plazo, documentos necesarios y qué pasa después.", DISPONIBLE),
     "bandeja": ("Bandeja de la institución", "Trámites de tu institución: revisarlos y cambiar su estado.", DISPONIBLE),
     "supervision": ("Supervisión", "Reasigna trámites y atiende los escalados de tu institución.", DISPONIBLE),
     "equipo": ("Equipo de la institución", "Personal y roles de tu institución.", DISPONIBLE),
@@ -50,7 +51,7 @@ def modulos_para(rol_plataforma, roles_en_instituciones):
         ids = _POR_ROL_PLATAFORMA.get(rol_plataforma, []) + ["prueba_acceso", *_TRANSPARENCIA]
         return [_entrada(i) for i in ids]
     roles = set(roles_en_instituciones)
-    ids = ["mis_tramites", "nuevo_tramite", "mis_datos"]  # las cuentas de plataforma no tienen perfil de persona: no lo ven
+    ids = ["mis_tramites", "nuevo_tramite", "directorio", "mis_datos"]  # las cuentas de plataforma no tienen perfil de persona: no lo ven
     if roles & {"funcionario", "supervisor"}:
         ids.append("bandeja")
     if "supervisor" in roles:

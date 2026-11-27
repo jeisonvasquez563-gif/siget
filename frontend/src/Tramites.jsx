@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError } from './api.js'
 import { ACCIONES_EVENTO, ESTADOS, Estado, FINALES, Paginacion, Plazo, SIGUIENTES, fecha, fechaCorta, hace, mensajeDe, usePagina, useReautenticacion } from './comun.jsx'
 import { CamposFormulario, DatosSolicitud, ModalMotivo, ResponderSubsanacion, ResumenErrores, armarDatos, erroresDe, ultimoMotivoDeSubsanacion, validarCliente, valoresIniciales } from './Contenido.jsx'
 import { Documentos } from './Documentos.jsx'
 import { Seguimiento } from './Seguimiento.jsx'
-import { Alerta, Esqueleto, Icono, Insignia, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
+import { Alerta, Esqueleto, Icono, BloquesEsqueleto, Vacio, useUI } from './ui.jsx'
 
 const LOTE = 100 // lo máximo que admite el servidor por petición
 const MAX_LOTES = 50 // tope de seguridad: 5000 trámites; si hubiera más se avisa en pantalla
@@ -54,7 +54,7 @@ function coincide(t, q) {
   return q.toLowerCase().split(/\s+/).every((p) => texto.includes(p))
 }
 
-function Buscador({ valor, cambiar, etiqueta = 'Buscar por número, trámite o institución' }) {
+export function Buscador({ valor, cambiar, etiqueta = 'Buscar por número, trámite o institución' }) {
   return (
     <div className="buscador">
       <Icono nombre="buscar" />
@@ -97,12 +97,33 @@ function Indicador({ valor, texto, clase = '' }) {
 
 /* ---------------------------------------------------------------- mis trámites */
 
-export function MisTramites({ yo, abrir, nuevo }) {
+export const SIN_FILTROS = { q: '', estado: '', institucion: '' }
+
+// «Mis trámites» se busca por número (con o sin «#») o por el nombre del trámite
+export function coincideMio(t, q) {
+  const palabras = q.toLowerCase().replace(/#/g, '').split(/\s+/).filter(Boolean)
+  const texto = `${t.id} ${t.tipo_tramite.nombre}`.toLowerCase()
+  return palabras.every((p) => texto.includes(p))
+}
+
+// Búsqueda, estado e institución se combinan. Se filtra sobre la lista COMPLETA y después se pagina (de a 20, en el navegador): los totales del
+// paginador son los de lo filtrado. `filtros` y `cambiarFiltros` los puede guardar quien llama (para conservarlos al volver del detalle);
+// sin ellos, la pantalla los lleva sola.
+export function MisTramites({ yo, abrir, nuevo, filtros: guardados, cambiarFiltros }) {
   const { filas, truncado, error } = useTramites()
-  const [q, setQ] = useState('')
+  const [propios, setPropios] = useState(SIN_FILTROS)
+  const filtros = guardados ?? propios
+  const poner = cambiarFiltros ?? setPropios
+  const { q, estado, institucion } = filtros
+  const cambiar = (parche) => poner({ ...filtros, ...parche })
   const mios = useMemo(() => (filas || []).filter((t) => esMio(t, yo)), [filas, yo])
-  const coinciden = useMemo(() => mios.filter((t) => coincide(t, q)), [mios, q])
-  const { pagina, setPagina, visibles, total } = usePagina(coinciden, undefined, q)
+  const instituciones = useMemo(() => [...new Map(mios.map((t) => [t.institucion.id, t.institucion.nombre])).entries()].sort((a, b) => a[1].localeCompare(b[1], 'es')), [mios])
+  const coinciden = useMemo(
+    () => mios.filter((t) => coincideMio(t, q) && (!estado || t.estado === estado) && (!institucion || String(t.institucion.id) === institucion)),
+    [mios, q, estado, institucion],
+  )
+  const { pagina, setPagina, visibles, total } = usePagina(coinciden, undefined, `${q}|${estado}|${institucion}`)
+  const hayFiltros = Boolean(q.trim() || estado || institucion)
   const enCurso = mios.filter(esAbierto)
   const vencen = enCurso.filter((t) => t.vencido).length
   return (
@@ -124,8 +145,23 @@ export function MisTramites({ yo, abrir, nuevo }) {
             <Vacio titulo="Todavía no iniciaste ningún trámite" texto="Elige una institución y un trámite del catálogo. Podrás seguir cada etapa desde aquí." accion={<button className="btn" onClick={nuevo}><Icono nombre="mas" />Iniciar un trámite</button>} />
           ) : (
             <>
-              <div className="barra-herramientas"><Buscador valor={q} cambiar={setQ} /></div>
-              {total ? <><Tabla filas={visibles} yo={yo} abrir={abrir} /><Paginacion total={total} pagina={pagina} cambiar={setPagina} unidad="trámites" /></> : <Vacio titulo="Nada coincide con tu búsqueda" texto="Prueba con otro número o con el nombre del trámite." />}
+              <div className="barra-herramientas" role="group" aria-label="Buscar y filtrar mis trámites">
+                <Buscador valor={q} cambiar={(v) => cambiar({ q: v })} etiqueta="Buscar por número o nombre del trámite" />
+                <select className="seleccion filtro" aria-label="Estado" value={estado} onChange={(e) => cambiar({ estado: e.target.value })}>
+                  <option value="">Todos los estados</option>
+                  {Object.entries(ESTADOS).map(([clave, e]) => <option key={clave} value={clave}>{e.texto}</option>)}
+                </select>
+                <select className="seleccion filtro" aria-label="Institución" value={institucion} onChange={(e) => cambiar({ institucion: e.target.value })}>
+                  <option value="">Todas las instituciones</option>
+                  {instituciones.map(([id, nombre]) => <option key={id} value={String(id)}>{nombre}</option>)}
+                </select>
+                {hayFiltros && <button type="button" className="btn btn-sec btn-s" onClick={() => poner(SIN_FILTROS)}>Quitar filtros</button>}
+                {hayFiltros && <span className="suave" role="status">{total} de {mios.length} {mios.length === 1 ? 'trámite' : 'trámites'}</span>}
+              </div>
+              {total ? <><Tabla filas={visibles} yo={yo} abrir={abrir} /><Paginacion total={total} pagina={pagina} cambiar={setPagina} unidad="trámites" /></> : (
+                <Vacio titulo="Nada coincide con tu búsqueda" texto="Prueba con otro número o nombre del trámite, o cambia los filtros."
+                  accion={<button type="button" className="btn btn-sec" onClick={() => poner(SIN_FILTROS)}>Ver todos mis trámites</button>} />
+              )}
             </>
           )}
         </>
@@ -136,11 +172,45 @@ export function MisTramites({ yo, abrir, nuevo }) {
 
 /* ---------------------------------------------------------------- nuevo trámite */
 
-export function NuevoTramite({ yo, abrir }) {
+export const AVISO_ORIENTATIVO = 'Contenido orientativo, pendiente de validación por la institución.'
+export const diasHabiles = (n) => `${n} ${n === 1 ? 'día hábil' : 'días hábiles'}`
+
+// La tarjeta que se lee antes del formulario: para qué sirve el trámite, el plazo, los documentos que hacen falta y qué pasa después. Todo texto
+// que llega del catálogo se dibuja como texto de React (nunca como HTML). Los requisitos los escribe la coordinación de la institución.
+export function AntesDeEmpezar({ tipo, empezado, empezar, aviso = true }) {
+  const r = tipo.requisitos || {}
+  const documentos = Array.isArray(r.documentos) ? r.documentos : []
+  return (
+    <section className="panel antes-de-empezar" aria-labelledby="antes-de-empezar">
+      <div className="panel-cabecera"><h3 id="antes-de-empezar">Antes de empezar</h3></div>
+      {aviso && <p className="nota" role="note">{AVISO_ORIENTATIVO}</p>}
+      {r.descripcion ? <p className="texto-largo">{r.descripcion}</p> : <p className="suave">La institución todavía no describió este trámite.</p>}
+      <dl className="datos">
+        <dt>Plazo de atención</dt><dd>{diasHabiles(tipo.sla_dias)}</dd>
+      </dl>
+      <h4>Documentos que vas a necesitar</h4>
+      {documentos.length ? (
+        <>
+          <ul className="lista-requisitos">{documentos.map((d, i) => <li key={i}>{d}</li>)}</ul>
+          <p className="nota">Los adjuntas desde el trámite ya iniciado, en PDF, PNG o JPEG de hasta 5 MB cada uno.</p>
+        </>
+      ) : <p className="suave">La institución no pide documentos para este trámite.</p>}
+      <h4>Qué pasa después</h4>
+      <p className="texto-largo">{r.despues || 'Recibirás un número de seguimiento y verás aquí cada paso del trámite.'}</p>
+      {!empezado && <div className="fila-botones inicio"><button type="button" className="btn" onClick={empezar}>Empezar</button></div>}
+    </section>
+  )
+}
+
+// `preseleccion` ({ institucion, tipo }: ids) la manda el «Directorio»: se aplica una sola vez, cuando llegan el catálogo y los trámites de esa institución
+export function NuevoTramite({ yo, abrir, preseleccion = null }) {
   const [instituciones, setInstituciones] = useState(null)
   const [tipos, setTipos] = useState(null)
   const [institucion, setInstitucion] = useState(null)
   const [tipo, setTipo] = useState(null)
+  const [empezado, setEmpezado] = useState(false) // leyó «Antes de empezar» y pidió el formulario
+  const formulario = useRef(null)
+  const pendiente = useRef(preseleccion)
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(false)
   const [valores, setValores] = useState({})
@@ -151,22 +221,43 @@ export function NuevoTramite({ yo, abrir }) {
   const esPersonal = yo.membresias.length > 0
   const propias = useMemo(() => new Set(yo.membresias.map((m) => m.institucion_id)), [yo.membresias])
 
-  useEffect(() => { api('/catalogo/instituciones/').then((l) => setInstituciones(l.filter((i) => !propias.has(i.id)))).catch((e) => setError(mensajeDe(e))) }, [propias])
+  useEffect(() => {
+    api('/catalogo/instituciones/').then((l) => {
+      const lista = l.filter((i) => !propias.has(i.id))
+      setInstituciones(lista)
+      const elegida = pendiente.current && lista.find((i) => i.id === pendiente.current.institucion)
+      if (elegida) setInstitucion(elegida)
+      else pendiente.current = null
+    }).catch((e) => setError(mensajeDe(e)))
+  }, [propias])
   useEffect(() => {
     setTipo(null)
+    setEmpezado(false)
     setTipos(null)
     if (!institucion) return
-    api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then((l) => setTipos(l.filter((t) => t.audiencia === 'ambas' || t.audiencia === (esPersonal ? 'institucion' : 'ciudadania')))).catch((e) => setError(mensajeDe(e)))
+    api(`/catalogo/tipos-tramite/?institucion=${institucion.id}`).then((l) => {
+      const lista = l.filter((t) => t.audiencia === 'ambas' || t.audiencia === (esPersonal ? 'institucion' : 'ciudadania'))
+      setTipos(lista)
+      const elegido = pendiente.current && lista.find((t) => t.id === pendiente.current.tipo)
+      pendiente.current = null
+      if (elegido) { setTipo(elegido); setValores(valoresIniciales(elegido.formulario || [])) } // lo que llega del directorio: se lee «Antes de empezar» antes del formulario
+    }).catch((e) => setError(mensajeDe(e)))
   }, [institucion, esPersonal])
 
   // Cada tipo trae su formulario: al cambiar de trámite se parte de un formulario limpio
   const campos = tipo?.formulario || []
   const elegirTipo = (t) => {
     setTipo(t)
+    setEmpezado(false)
     setValores(valoresIniciales(t.formulario || []))
     setErrores({})
     setGeneral('')
   }
+
+  // Al pulsar «Empezar» el foco pasa al primer dato del formulario (o al formulario mismo si no pide ninguno)
+  useEffect(() => {
+    if (empezado) (formulario.current?.querySelector('input, select, textarea') ?? formulario.current)?.focus()
+  }, [empezado])
 
   async function crear(ev) {
     ev.preventDefault()
@@ -179,7 +270,7 @@ export function NuevoTramite({ yo, abrir }) {
     try {
       const t = await api('/tramites/', { metodo: 'POST', cuerpo: { tipo_tramite: tipo.id, datos: armarDatos(campos, valores) } })
       avisar(`Tu trámite #${t.id} quedó registrado.`)
-      abrir(t.id)
+      abrir(t.id, { nuevo: true }) // el detalle ofrece la constancia de presentación
     } catch (e) {
       const porCampo = erroresDe(e)
       if (porCampo) {
@@ -205,7 +296,6 @@ export function NuevoTramite({ yo, abrir }) {
                   <button key={i.id} className="opcion" role="radio" aria-checked={institucion?.id === i.id} onClick={() => setInstitucion(i)}>
                     <span className="marca-opcion">{institucion?.id === i.id && <Icono nombre="check" />}</span>
                     <span className="cuerpo-opcion"><strong>{i.nombre}</strong></span>
-                    {i.tipo === 'demostracion' && <Insignia punto={false}>Demostración</Insignia>}
                   </button>
                 ))}
               </div>
@@ -226,8 +316,9 @@ export function NuevoTramite({ yo, abrir }) {
               )}
             </section>
           )}
-          {tipo && (
-            <form id="form-nuevo-tramite" onSubmit={crear} noValidate aria-labelledby={campos.length ? 'datos-nuevo' : undefined}>
+          {tipo && <AntesDeEmpezar tipo={tipo} empezado={empezado} empezar={() => setEmpezado(true)} />}
+          {tipo && empezado && (
+            <form id="form-nuevo-tramite" ref={formulario} tabIndex={-1} onSubmit={crear} noValidate aria-labelledby={campos.length ? 'datos-nuevo' : undefined}>
               <ResumenErrores campos={campos} errores={errores} general={general} />
               {campos.length > 0 && (
                 <section className="panel">
@@ -247,8 +338,12 @@ export function NuevoTramite({ yo, abrir }) {
                 <dt>Trámite</dt><dd>{tipo.nombre}</dd>
                 <dt>Plazo</dt><dd>{tipo.sla_dias} días</dd>
               </dl>
-              <button className="btn btn-ancho" type="submit" form="form-nuevo-tramite" disabled={trabajando}>{trabajando ? 'Iniciando…' : 'Iniciar trámite'}</button>
-              <p className="nota">Quedará registrado a tu nombre y podrás seguir cada paso, con quién lo hizo y cuándo.</p>
+              {empezado ? (
+                <>
+                  <button className="btn btn-ancho" type="submit" form="form-nuevo-tramite" disabled={trabajando}>{trabajando ? 'Iniciando…' : 'Iniciar trámite'}</button>
+                  <p className="nota">Quedará registrado a tu nombre y podrás seguir cada paso, con quién lo hizo y cuándo.</p>
+                </>
+              ) : <p className="nota">Lee lo anterior y pulsa «Empezar» para llenar el formulario.</p>}
             </>
           ) : <p className="suave">Elige una institución y un trámite para ver el resumen.</p>}
         </aside>
@@ -370,12 +465,13 @@ export function Bandeja({ yo, abrir, modo }) {
 function mensajeDeDecision(e) {
   const porCampo = erroresDe(e)
   if (porCampo && Object.keys(porCampo).length) return Object.values(porCampo).join(' ')
+  if (e instanceof ApiError && e.codigo === 'tramite_resuelto') return e.message  // el servidor dice que ya está resuelto: se le cree
   return mensajeDe(e)
 }
 
 const ICONO_EVENTO = { creacion: 'mas', cambio_estado: 'flujo', reasignacion: 'reasignar', escalamiento: 'alerta', documento_adjuntado: 'documento' }
 
-export function Detalle({ id, yo, volver, volverA }) {
+export function Detalle({ id, yo, volver, volverA, constancia, nuevo }) {
   const [tramite, setTramite] = useState(null)
   const [eventos, setEventos] = useState([])
   const [personal, setPersonal] = useState([])
@@ -434,11 +530,14 @@ export function Detalle({ id, yo, volver, volverA }) {
   // Rechazar, pedir una subsanación y cerrarla piden un motivo: el servidor y la base lo vuelven a exigir
   const claveMotivo = (estado) => (estado === 'Rechazado' || estado === 'En Subsanacion' ? estado : tramite.estado === 'En Subsanacion' ? 'cierre' : null)
 
-  const enviarMotivo = (motivo) => accion(
-    () => api(`/tramites/${id}/estado/`, { metodo: 'POST', cuerpo: { estado: pidiendoMotivo === 'cierre' ? 'En Tramitacion' : pidiendoMotivo, motivo } }),
-    `El trámite pasó a «${ESTADOS[pidiendoMotivo === 'cierre' ? 'En Tramitacion' : pidiendoMotivo].texto}».`,
-    true,
-  )
+  // Desistir lo hace solo la persona que presentó el trámite (otra ruta, otra acción del servidor): no cambia el estado «a la fuerza»
+  const enviarMotivo = (motivo) => (pidiendoMotivo === 'desistir'
+    ? accion(() => api(`/tramites/${id}/desistir/`, { metodo: 'POST', cuerpo: { motivo } }), 'Desististe del trámite: quedó cerrado y registrado en su historial.', true)
+    : accion(
+      () => api(`/tramites/${id}/estado/`, { metodo: 'POST', cuerpo: { estado: pidiendoMotivo === 'cierre' ? 'En Tramitacion' : pidiendoMotivo, motivo } }),
+      `El trámite pasó a «${ESTADOS[pidiendoMotivo === 'cierre' ? 'En Tramitacion' : pidiendoMotivo].texto}».`,
+      true,
+    ))
 
   async function cambiar(estado) {
     const clave = claveMotivo(estado)
@@ -473,6 +572,8 @@ export function Detalle({ id, yo, volver, volverA }) {
   }
 
   const puedeResponder = tramite.estado === 'En Subsanacion' && (!esPersonal || esPropio)
+  const esDeLaPersona = !esPersonal // quien lo presentó (el servidor solo da `solicitante_id` al personal de la institución)
+  const puedeDesistir = esDeLaPersona && !FINALES.includes(tramite.estado)
   const quien = (uid) => (uid === yo.id ? 'ti' : nombres[uid] || `persona #${uid}`)
   return (
     <>
@@ -483,9 +584,18 @@ export function Detalle({ id, yo, volver, volverA }) {
           <h2>{tramite.tipo_tramite.nombre}</h2>
           <p className="suave">{tramite.institucion.nombre}</p>
         </div>
-        <div className="estado-grande"><Estado valor={tramite.estado} /></div>
+        <div className="estado-grande">
+          <Estado valor={tramite.estado} />
+          {esDeLaPersona && constancia && <button type="button" className="btn btn-sec" onClick={() => constancia(tramite.id)}><Icono nombre="documento" />Constancia</button>}
+        </div>
       </div>
       <Alerta>{error}</Alerta>
+      {nuevo && esDeLaPersona && constancia && (
+        <Alerta tipo="ok">
+          Guarda la constancia de presentación de tu trámite: la puedes imprimir o guardar como PDF.
+          {' '}<button type="button" className="btn btn-sec btn-s" onClick={() => constancia(tramite.id)}>Ver mi constancia</button>
+        </Alerta>
+      )}
 
       <section className="panel recorrido" aria-label="Recorrido del trámite">
         <Seguimiento estado={tramite.estado} />
@@ -516,7 +626,7 @@ export function Detalle({ id, yo, volver, volverA }) {
           {esPersonal && !esPropio && (
             <div className="acciones">
               <h4>Acciones</h4>
-              {SIGUIENTES[tramite.estado].length === 0 ? <p className="suave">Este trámite ya tiene una resolución final: no admite más cambios.</p> : (
+              {SIGUIENTES[tramite.estado].length === 0 ? <p className="suave">{tramite.estado === 'Desistido' ? 'La persona que presentó este trámite desistió de él: ya no admite cambios.' : 'Este trámite ya tiene una resolución final: no admite más cambios.'}</p> : (
                 <div className="fila-botones inicio">
                   {SIGUIENTES[tramite.estado].map((s) => (
                     <button key={s} className={`btn ${s === 'Rechazado' ? 'btn-peligro' : s === 'En Subsanacion' ? 'btn-sec' : ''}`} onClick={() => cambiar(s)}>
@@ -539,6 +649,13 @@ export function Detalle({ id, yo, volver, volverA }) {
             </div>
           )}
           {esPropio && <Alerta tipo="info">Este trámite lo iniciaste tú: por conflicto de interés no puedes gestionarlo como funcionario.</Alerta>}
+          {puedeDesistir && (
+            <div className="acciones">
+              <h4>Tu trámite</h4>
+              <button type="button" className="btn btn-peligro" onClick={() => { setErrorMotivo(''); setPidiendoMotivo('desistir') }}>Desistir del trámite</button>
+              <p className="nota">Si ya no lo necesitas, puedes retirarlo. Queda cerrado y no se puede deshacer.</p>
+            </div>
+          )}
         </section>
 
         <section className="panel">

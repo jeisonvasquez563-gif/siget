@@ -123,7 +123,7 @@ class Command(BaseCommand):
     def _recorrer(self):
         inst = Institucion.objects.get(nombre="MOP")
         otra = Institucion.objects.exclude(pk=inst.pk).order_by("id").first()
-        tipo = TipoTramite.objects.filter(institucion=inst).order_by("id").first()
+        tipo = TipoTramite.objects.filter(institucion=inst, activo=True, audiencia="ciudadania").order_by("id").first()  # el de demostración está inactivo desde la 023
         asignador = Usuario.objects.create(username="eq_asig", password_hash=contrasenas.hashear(CLAVE), estado_cuenta="suspendida")
         coord, coord_b, sup, f1, x, ciud, op = (self._persona(n, r) for n, r in (
             ("eq_coord", "ninguno"), ("eq_coord_b", "ninguno"), ("eq_sup", "ninguno"), ("eq_f1", "ninguno"), ("eq_x", "ninguno"), ("eq_ciud", "ninguno"), ("eq_op", "operador_identidades")))

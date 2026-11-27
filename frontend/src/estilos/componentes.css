@@ -66,6 +66,7 @@
 .e-subsanacion { background: var(--ambar-fondo); color: var(--ambar); }
 .e-aprobado { background: var(--sello-verde-fondo); color: var(--sello-verde); }
 .e-rechazado { background: var(--sello-rojo-fondo); color: var(--sello-rojo); }
+.e-desistido { background: var(--superficie-3); color: var(--tinta); box-shadow: inset 0 0 0 1px var(--borde-fuerte); }
 .insignia-boya { background: var(--boya-fondo); color: var(--boya-texto); }
 .insignia-rol { background: var(--agua-fondo); color: var(--agua); }
 :root[data-tema='oscuro'] .insignia-rol { color: var(--agua-media); }

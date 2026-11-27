@@ -524,13 +524,16 @@ describe('las reglas del editor', () => {
       { id: 'c', etiqueta: 'C', tipo: 'numero', obligatorio: false, max: 5, entero: true },
     ]
     const tipo = { nombre: 'Tipo', sla_dias: 7, audiencia: 'ambas', formulario }
-    expect(cuerpoDe(borradorDesde(tipo))).toEqual({ nombre: 'Tipo', sla_dias: 7, audiencia: 'ambas', formulario })
+    expect(cuerpoDe(borradorDesde(tipo))).toEqual({ nombre: 'Tipo', sla_dias: 7, audiencia: 'ambas', formulario, requisitos: {} })
     expect(validarBorrador(borradorDesde(tipo))).toEqual({})
+    const requisitos = { descripcion: 'Sirve para algo.', documentos: ['Cédula', 'Plano'], despues: 'Se revisa.' }
+    expect(cuerpoDe(borradorDesde({ ...tipo, requisitos })).requisitos).toEqual(requisitos)   // los documentos viajan como lista, uno por línea en el editor
+    expect(borradorDesde({ ...tipo, requisitos }).documentos).toBe('Cédula\nPlano')
   })
 
   it('valida lo evidente con las mismas claves de error que usa el servidor', () => {
     expect(Object.keys(validarBorrador(borradorVacio()))).toEqual(['nombre'])
-    const b = { nombre: 'ab', sla_dias: '0', audiencia: 'ambas', campos: [
+    const b = { ...borradorVacio(), nombre: 'ab', sla_dias: '0', audiencia: 'ambas', campos: [
       { ...campoVacio(), etiqueta: '', id: 'Mal' }, { ...campoVacio(), etiqueta: 'x', id: 'dos', tipo: 'seleccion', opciones: 'a\na', max: '' },
       { ...campoVacio(), etiqueta: 'y', id: 'dos', max: 'abc' },
     ] }

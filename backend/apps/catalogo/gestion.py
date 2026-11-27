@@ -11,7 +11,7 @@ import re
 from apps.tramites import formulario as fm
 
 AUDIENCIAS = ("ciudadania", "institucion", "ambas")
-CAMPOS_EDITABLES = ("nombre", "sla_dias", "audiencia", "formulario", "activo")
+CAMPOS_EDITABLES = ("nombre", "sla_dias", "audiencia", "formulario", "activo", "requisitos")
 NOMBRE_MIN, NOMBRE_MAX = 3, 150
 SLA_MIN, SLA_MAX = 1, 365
 MAX_CAMPOS = 30
@@ -19,6 +19,12 @@ ETIQUETA_MAX = 120
 OPCIONES_MAX = 30
 OPCION_MAX = 120
 AYUDA_MAX = 300
+# Requisitos antes de iniciar (migración 021): qué es el trámite, qué documentos hacen falta y qué pasa después. La base los vuelve a validar
+DESCRIPCION_MAX = 1000
+DESPUES_MAX = 1000
+DOCUMENTOS_MAX = 15
+DOCUMENTO_MAX = 200
+CLAVES_REQUISITOS = ("descripcion", "documentos", "despues")
 MAXIMO_POR_TIPO = {"texto": 500, "texto_largo": 5000, "numero": fm.MAX_NUMERO_DEFECTO}
 # Tamaño de la definición: la base impone 16 384 bytes de jsonb (CHECK `tipo_tramite_formulario_tamano`). jsonb pesa distinto que el JSON de texto
 # (cabeceras por elemento y por clave), así que aquí se corta antes, sobre el JSON compacto, para no llegar al CHECK con un error opaco.
@@ -179,6 +185,54 @@ def validar_formulario(crudo):
     return (None, errores) if errores else (limpio, {})
 
 
+def _texto_de_requisitos(clave, crudo, maximo, errores):
+    """Un texto libre de los requisitos, limpio; `None` si no se dijo (ausente, nulo o en blanco). Los errores van bajo `requisitos.<clave>`."""
+    if crudo is None or (isinstance(crudo, str) and not crudo.strip()):
+        return None
+    texto, error = fm.validar_texto_libre(crudo, 1, maximo)
+    if error:
+        errores[f"requisitos.{clave}"] = error
+    return texto
+
+
+def validar_requisitos(crudo):
+    """`(requisitos_limpios, errores)`. Lo que no se dijo no se guarda: sin nada, el resultado es `{}`. Si hay errores, el primero es `None`.
+
+    Errores por campo: `requisitos` (la forma general), `requisitos.descripcion`, `requisitos.despues`, `requisitos.documentos` (la lista) y
+    `requisitos.documentos.<i>` (un documento)."""
+    if not isinstance(crudo, dict):
+        return None, {"requisitos": "Deben ser un objeto con la descripción, los documentos y lo que pasa después."}
+    errores, limpio = {}, {}
+    if any(not isinstance(k, str) for k in crudo) or set(crudo) - set(CLAVES_REQUISITOS):
+        errores["requisitos"] = "Hay datos que no se admiten: solo la descripción, los documentos y lo que pasa después."
+    descripcion = _texto_de_requisitos("descripcion", crudo.get("descripcion"), DESCRIPCION_MAX, errores)
+    if descripcion:
+        limpio["descripcion"] = descripcion
+    documentos = crudo.get("documentos")
+    if documentos is not None:
+        if not isinstance(documentos, list):
+            errores["requisitos.documentos"] = "Debe ser una lista de documentos."
+        elif len(documentos) > DOCUMENTOS_MAX:
+            errores["requisitos.documentos"] = f"Hasta {DOCUMENTOS_MAX} documentos."
+        else:
+            limpios = []
+            for i, documento in enumerate(documentos):
+                texto, error = fm.validar_texto_corto(documento, 1, DOCUMENTO_MAX)
+                if error:
+                    errores[f"requisitos.documentos.{i}"] = error
+                else:
+                    limpios.append(texto)
+            if not any(k.startswith("requisitos.documentos") for k in errores):
+                if len(set(limpios)) != len(limpios):
+                    errores["requisitos.documentos"] = "Hay documentos repetidos."
+                elif limpios:
+                    limpio["documentos"] = limpios
+    despues = _texto_de_requisitos("despues", crudo.get("despues"), DESPUES_MAX, errores)
+    if despues:
+        limpio["despues"] = despues
+    return (None, errores) if errores else (limpio, {})
+
+
 def validar(datos, parcial=False):
     """Valida lo que se envía al crear (`parcial=False`: nombre y plazo obligatorios) o al cambiar (`parcial=True`: al menos un campo).
 
@@ -187,7 +241,7 @@ def validar(datos, parcial=False):
         return None, {"datos": "El cuerpo debe ser un objeto."}
     errores = {}
     if any(not isinstance(k, str) for k in datos) or set(datos) - set(CAMPOS_EDITABLES):
-        errores["datos"] = "Hay campos que no se pueden indicar ni cambiar: solo el nombre, el plazo, para quién es, el formulario y si está activo."
+        errores["datos"] = "Hay campos que no se pueden indicar ni cambiar: solo el nombre, el plazo, para quién es, el formulario, los requisitos y si está activo."
     if parcial and not set(datos) & set(CAMPOS_EDITABLES):
         errores["datos"] = "Indica al menos un dato para cambiar."
     limpio = {}
@@ -220,6 +274,12 @@ def validar(datos, parcial=False):
             errores.update(fallos)
         else:
             limpio["formulario"] = definicion
+    if "requisitos" in datos or not parcial:
+        requisitos, fallos = validar_requisitos(datos.get("requisitos", {}))
+        if fallos:
+            errores.update(fallos)
+        else:
+            limpio["requisitos"] = requisitos
     if "activo" in datos or not parcial:
         activo = datos.get("activo", True)
         if not isinstance(activo, bool):
@@ -231,7 +291,7 @@ def validar(datos, parcial=False):
 
 def tipo_a_dict(tipo):
     return {"id": tipo.pk, "institucion_id": tipo.institucion_id, "nombre": tipo.nombre, "sla_dias": tipo.sla_dias, "audiencia": tipo.audiencia,
-            "formulario": tipo.formulario, "activo": tipo.activo, "version": tipo.version}
+            "formulario": tipo.formulario, "activo": tipo.activo, "version": tipo.version, "requisitos": tipo.requisitos}
 
 
 def cambio_a_dict(cambio):

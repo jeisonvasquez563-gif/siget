@@ -1,0 +1,12 @@
+/* Directorio de instituciones: la lista a un lado y las fichas de los trámites de la institución elegida al otro */
+.directorio { display: grid; grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.4fr); gap: 1.25rem; align-items: start; }
+.directorio .buscador { max-width: none; margin-bottom: 0.9rem; }
+.lista-directorio { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.lista-directorio .opcion[aria-pressed='true'] { border-color: var(--agua); background: var(--agua-fondo); box-shadow: 0 0 0 3px color-mix(in srgb, var(--foco) 25%, transparent); }
+.ficha-tramite { padding: 1rem 0; border-top: 1px solid var(--borde); }
+.ficha-tramite:first-of-type { border-top: 0; padding-top: 0; }
+.ficha-tramite h4 { margin: 0 0 0.5rem; font-size: var(--t-m, 1.05rem); }
+.ficha-tramite h5 { margin: 0.9rem 0 0.35rem; font-size: var(--t-base); }
+.ficha-tramite p { margin: 0 0 0.6rem; overflow-wrap: anywhere; }
+.ficha-tramite .datos { margin-bottom: 0.25rem; }
+@media (max-width: 860px) { .directorio { grid-template-columns: minmax(0, 1fr); } }

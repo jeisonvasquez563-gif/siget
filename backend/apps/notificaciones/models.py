@@ -11,6 +11,7 @@ TIPOS = [
     ("tramite_rechazado", "Trámite rechazado"),
     ("subsanacion_respondida", "Subsanación respondida"),
     ("tramite_escalado", "Trámite escalado"),
+    ("tramite_desistido", "Trámite desistido"),
 ]
 
 

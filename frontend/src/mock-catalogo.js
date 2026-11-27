@@ -10,6 +10,7 @@ const MAXIMO_POR_TIPO = { texto: 500, texto_largo: 5000, numero: 1e9 }
 const ATRIBUTOS = ['id', 'etiqueta', 'tipo', 'obligatorio', 'max', 'opciones', 'ayuda', 'entero']
 const ID_VALIDO = /^[a-z][a-z0-9_]{0,39}$/
 const NOMBRE_REPETIDO = 'Ya existe un trámite con ese nombre en esta institución.'
+const CLAVES_REQUISITOS = ['descripcion', 'documentos', 'despues']
 
 const esEntero = (v) => Number.isInteger(v) && typeof v === 'number'
 const largo = (texto) => [...texto].length
@@ -27,6 +28,48 @@ function textoCorto(valor, min, max) {
   if (largo(limpio) > max) return { error: `No puede superar los ${max} caracteres.` }
   if (largo(limpio) < min || !/[\p{L}\p{N}]/u.test(limpio)) return { error: limpio ? 'Debe tener al menos una letra o un número.' : `Debe tener al menos ${min} caracteres.` }
   return { texto: limpio }
+}
+
+// Un texto libre (admite saltos de línea) de 1 a `max` caracteres, como `validar_texto_libre` del servidor
+function textoLibre(valor, max) {
+  if (typeof valor !== 'string') return { error: 'Debe ser un texto.' }
+  const limpio = valor.replace(/\r\n?/g, '\n').normalize('NFC').trim()
+  if ([...limpio].some((c) => { const n = c.codePointAt(0); return (n < 32 && c !== '\n' && c !== '\t') || n === 127 || n === 0x2028 || n === 0x2029 })) return { error: 'Contiene caracteres no permitidos.' }
+  if (largo(limpio) > max) return { error: `No puede superar los ${max} caracteres.` }
+  if (!/[\p{L}\p{N}]/u.test(limpio)) return { error: 'Debe tener al menos una letra o un número.' }
+  return { texto: limpio }
+}
+
+// Igual que `gestion.validar_requisitos`: errores por campo bajo `requisitos`, `requisitos.descripcion`, `requisitos.documentos[.i]` y `requisitos.despues`
+function validarRequisitos(crudo) {
+  if (!crudo || typeof crudo !== 'object' || Array.isArray(crudo)) return { errores: { requisitos: 'Deben ser un objeto con la descripción, los documentos y lo que pasa después.' } }
+  const errores = {}
+  const limpio = {}
+  if (Object.keys(crudo).some((k) => !CLAVES_REQUISITOS.includes(k))) errores.requisitos = 'Hay datos que no se admiten: solo la descripción, los documentos y lo que pasa después.'
+  const libre = (clave, max) => {
+    const v = crudo[clave]
+    if (v == null || (typeof v === 'string' && !v.trim())) return
+    const r = textoLibre(v, max)
+    if (r.error) errores[`requisitos.${clave}`] = r.error
+    else limpio[clave] = r.texto
+  }
+  libre('descripcion', 1000)
+  const docs = crudo.documentos
+  if (docs != null) {
+    if (!Array.isArray(docs)) errores['requisitos.documentos'] = 'Debe ser una lista de documentos.'
+    else if (docs.length > 15) errores['requisitos.documentos'] = 'Hasta 15 documentos.'
+    else {
+      const rs = docs.map((d) => textoCorto(d, 1, 200))
+      rs.forEach((r, i) => { if (r.error) errores[`requisitos.documentos.${i}`] = r.error })
+      if (!rs.some((r) => r.error)) {
+        const textos = rs.map((r) => r.texto)
+        if (new Set(textos).size !== textos.length) errores['requisitos.documentos'] = 'Hay documentos repetidos.'
+        else if (textos.length) limpio.documentos = textos
+      }
+    }
+  }
+  libre('despues', 1000)
+  return Object.keys(errores).length ? { errores } : { limpio }
 }
 
 function validarCampo(i, crudo, errores, vistos) {
@@ -88,9 +131,9 @@ function validarFormulario(crudo) {
 // Igual que `gestion.validar`: `parcial` es el PATCH (al menos un dato) y no el alta (nombre y plazo obligatorios)
 function validar(cuerpo, parcial) {
   if (!cuerpo || typeof cuerpo !== 'object' || Array.isArray(cuerpo)) return { errores: { datos: 'El cuerpo debe ser un objeto.' } }
-  const editables = ['nombre', 'sla_dias', 'audiencia', 'formulario', 'activo']
+  const editables = ['nombre', 'sla_dias', 'audiencia', 'formulario', 'activo', 'requisitos']
   const errores = {}
-  if (Object.keys(cuerpo).some((k) => !editables.includes(k))) errores.datos = 'Hay campos que no se pueden indicar ni cambiar: solo el nombre, el plazo, para quién es, el formulario y si está activo.'
+  if (Object.keys(cuerpo).some((k) => !editables.includes(k))) errores.datos = 'Hay campos que no se pueden indicar ni cambiar: solo el nombre, el plazo, para quién es, el formulario, los requisitos y si está activo.'
   if (parcial && !Object.keys(cuerpo).some((k) => editables.includes(k))) errores.datos = 'Indica al menos un dato para cambiar.'
   const limpio = {}
   if ('nombre' in cuerpo || !parcial) {
@@ -112,6 +155,11 @@ function validar(cuerpo, parcial) {
     if (r.errores) Object.assign(errores, r.errores)
     else limpio.formulario = r.limpio
   }
+  if ('requisitos' in cuerpo || !parcial) {
+    const r = validarRequisitos(cuerpo.requisitos ?? {})
+    if (r.errores) Object.assign(errores, r.errores)
+    else limpio.requisitos = r.limpio
+  }
   if ('activo' in cuerpo || !parcial) {
     const a = cuerpo.activo ?? true
     if (typeof a !== 'boolean') errores.activo = 'Debe ser verdadero o falso.'
@@ -122,7 +170,7 @@ function validar(cuerpo, parcial) {
 
 export function catalogoMock({ usuarios, actual, hace, mfaFresco, tipos, resp, negado, pideCodigo }) {
   const cambios = []
-  const dto = (t) => ({ id: t.id, institucion_id: t.institucion.id, nombre: t.nombre, sla_dias: t.sla_dias, audiencia: t.audiencia, formulario: t.formulario, activo: t.activo !== false, version: t.version ?? 1 })
+  const dto = (t) => ({ id: t.id, institucion_id: t.institucion.id, nombre: t.nombre, sla_dias: t.sla_dias, audiencia: t.audiencia, formulario: t.formulario, activo: t.activo !== false, version: t.version ?? 1, requisitos: t.requisitos ?? {} })
   const registrar = (t, accion, antes, despues, actor, cuando = new Date().toISOString()) => {
     cambios.push({ id: cambios.length + 1, institucion_id: t.institucion.id, accion, creado_en: cuando, tipo_tramite: { id: t.id, nombre: t.nombre }, actor: { id: actor.id, usuario: actor.usuario }, antes, despues })
   }
@@ -132,7 +180,7 @@ export function catalogoMock({ usuarios, actual, hace, mfaFresco, tipos, resp, n
   const carla = { id: usuarios['carla.mop'].id, usuario: 'carla.mop' }
   if (ejemplo) {
     const cuando = (n) => hace((24 - n) * 6 * 3600000)
-    registrar(ejemplo, 'alta', null, { nombre: ejemplo.nombre, sla_dias: ejemplo.sla_dias, audiencia: ejemplo.audiencia, formulario: ejemplo.formulario, activo: true }, carla, cuando(0))
+    registrar(ejemplo, 'alta', null, { nombre: ejemplo.nombre, sla_dias: ejemplo.sla_dias, audiencia: ejemplo.audiencia, formulario: ejemplo.formulario, activo: true, requisitos: ejemplo.requisitos ?? {} }, carla, cuando(0))
     for (let i = 1; i <= 20; i++) registrar(ejemplo, 'cambio', { sla_dias: i % 2 ? 10 : 12 }, { sla_dias: i % 2 ? 12 : 10 }, carla, cuando(i))
     registrar(ejemplo, 'desactivado', { activo: true }, { activo: false }, carla, cuando(21))
     registrar(ejemplo, 'activado', { activo: false }, { activo: true }, carla, cuando(22))
@@ -178,7 +226,7 @@ export function catalogoMock({ usuarios, actual, hace, mfaFresco, tipos, resp, n
         if (repetido(limpio.nombre)) return resp(400, { codigo: 'datos_invalidos', detalle: NOMBRE_REPETIDO, errores: { nombre: NOMBRE_REPETIDO } })
         const nuevo = { id: Math.max(0, ...tipos().map((t) => t.id)) + 1, institucion: { id: institucionId, nombre: institucion }, ...limpio, version: 1 }
         tipos().push(nuevo)
-        registrar(nuevo, 'alta', null, { nombre: nuevo.nombre, sla_dias: nuevo.sla_dias, audiencia: nuevo.audiencia, formulario: nuevo.formulario, activo: nuevo.activo }, actor)
+        registrar(nuevo, 'alta', null, { nombre: nuevo.nombre, sla_dias: nuevo.sla_dias, audiencia: nuevo.audiencia, formulario: nuevo.formulario, activo: nuevo.activo, requisitos: nuevo.requisitos }, actor)
         return resp(201, dto(nuevo))
       }
 

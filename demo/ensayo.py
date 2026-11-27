@@ -45,14 +45,21 @@ def titulo(t):
     print(f"\n== {t}")
 
 
+PREFIJO_ENSAYO = "[Ensayo] "
+
+
 def datos_para(tipo, **cambios):
     """Un contenido válido para el formulario que publica el catálogo (`tipo["formulario"]`): los campos obligatorios con valores de prueba."""
     datos = {}
+    marcado = False
     for campo in tipo["formulario"]:
         if not campo["obligatorio"]:
             continue
         if campo["tipo"] in ("texto", "texto_largo"):
-            datos[campo["id"]] = ("Ensayo: " + campo["etiqueta"])[: campo.get("max", 200)]
+            # el primer campo de texto lleva el prefijo «[Ensayo] »: así se reconocen en la bandeja, los indicadores y el escalamiento
+            # los trámites que el ensayo crea en producción
+            datos[campo["id"]] = ((PREFIJO_ENSAYO if not marcado else "Ensayo: ") + campo["etiqueta"])[: campo.get("max", 200)]
+            marcado = True
         elif campo["tipo"] == "numero":
             datos[campo["id"]] = min(10, campo.get("max", 10))
         elif campo["tipo"] == "fecha":
@@ -170,17 +177,23 @@ _, yo = ana.pedir("GET", "/auth/yo/")
 inactividad = yo.get("inactividad_minutos")
 paso(isinstance(inactividad, int) and 1 <= inactividad <= 15, "el servidor informa el tiempo de inactividad (la interfaz no lo escribe a mano)", f"{inactividad} min")
 ids = [m["id"] for m in yo["modulos"]]
-paso(ids == ["mis_tramites", "nuevo_tramite", "mis_datos", "seguridad", "mfa"], "su menú es el de la ciudadanía (con «Mis datos», PT-15)", ids)
+paso(ids == ["mis_tramites", "nuevo_tramite", "directorio", "mis_datos", "seguridad", "mfa"], "su menú es el de la ciudadanía (con el «Directorio» y «Mis datos»)", ids)
 _, lista = ana.pedir("GET", "/tramites/?limite=100")
 # Pasa por nginx de verdad: el 24-nov la ruta nueva /notificaciones/ estaba lista en Django pero nginx no la dejaba pasar (404)
 e, d = ana.pedir("GET", "/notificaciones/?limite=5")
 paso(e == 200 and isinstance((d or {}).get("no_leidas"), int), "la campana: /notificaciones/ responde con la sesión de la persona (atraviesa nginx)", e)
 antes = len(lista["resultados"])
 paso(antes >= 3 and all("solicitante_id" not in t for t in lista["resultados"]), "ve sus trámites y ningún dato interno del personal", antes)
-_, instituciones = ana.pedir("GET", "/catalogo/instituciones/")
+e, instituciones = ana.pedir("GET", "/catalogo/instituciones/")
+paso(e == 200 and len(instituciones) >= 12, "el directorio (catálogo público) trae al menos 12 instituciones, con las reales nuevas", len(instituciones))
+paso(all(i["tipo"] != "demostracion" for i in instituciones), "ninguna institución del catálogo es de tipo demostración")
 mop = next(i["id"] for i in instituciones if i["nombre"] == "MOP")
 minsa = next(i["id"] for i in instituciones if i["nombre"] == "MINSA")
+e, todos_los_tipos = ana.pedir("GET", "/catalogo/tipos-tramite/")
+paso(e == 200 and todos_los_tipos and not any(t["nombre"].startswith("Trámite de demostración") for t in todos_los_tipos), "el catálogo público ya no ofrece ningún «Trámite de demostración» (inactivos)", e)
+paso(all((t.get("requisitos") or {}).get("documentos") for t in todos_los_tipos if t["audiencia"] == "ciudadania"), "cada trámite de la ciudadanía trae en el directorio sus documentos necesarios")
 _, tipos = ana.pedir("GET", f"/catalogo/tipos-tramite/?institucion={mop}")
+tipos = [t for t in tipos if t["audiencia"] == "ciudadania"]  # el trámite real del MOP (el de demostración está inactivo desde la 023)
 e, nuevo = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0])})
 paso(e == 201 and nuevo["estado"] == "Pendiente" and nuevo["datos"] == datos_para(tipos[0]), "inicia un trámite del MOP con los datos de su formulario", f"#{nuevo.get('id')}")
 e, malo = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": {}})
@@ -211,7 +224,7 @@ paso(e == 200 and r["estado"] == "Aprobado", "lo aprueba", e)
 e, r = fabio.pedir("POST", f"/tramites/{tramite}/estado/", {"estado": "Rechazado"})
 paso(e == 403, "un estado final no admite más cambios (403)", e)
 _, tipos_mop = fabio.pedir("GET", f"/catalogo/tipos-tramite/?institucion={mop}")
-e, _ = fabio.pedir("POST", "/tramites/", {"tipo_tramite": tipos_mop[0]["id"]})
+e, _ = fabio.pedir("POST", "/tramites/", {"tipo_tramite": next(t for t in tipos_mop if t["audiencia"] == "ciudadania")["id"]})
 paso(e == 403, "no puede iniciar un trámite en su propia institución (el MOP no se hace trámites a sí mismo)", e)
 _, tipos_minsa = fabio.pedir("GET", f"/catalogo/tipos-tramite/?institucion={minsa}")
 inter = next(t for t in tipos_minsa if t["audiencia"] == "institucion")
@@ -244,8 +257,8 @@ paso(e == 403, "Fabio no mueve lo asignado a Flor (403)", e)
 
 # --------------------------------------------------------------------------- 3b. subsanación
 titulo("3b. Subsanación: Ana crea con datos, Fabio pide corregir con un motivo, Ana responde y Fabio aprueba")
-e, sub_t = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0], asunto="Ensayo: falta un documento")})
-paso(e == 201 and sub_t["datos"]["asunto"] == "Ensayo: falta un documento", "Ana crea un trámite con sus datos", f"#{sub_t.get('id')}")
+e, sub_t = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0], asunto="[Ensayo] falta un documento")})
+paso(e == 201 and sub_t["datos"]["asunto"] == "[Ensayo] falta un documento", "Ana crea un trámite con sus datos", f"#{sub_t.get('id')}")
 st = sub_t["id"]
 e, _ = fabio.pedir("POST", f"/tramites/{st}/estado/", {"estado": "En Tramitacion"})
 paso(e == 200, "Fabio lo pasa a «En tramitación»", e)
@@ -260,8 +273,8 @@ e, _ = ana.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "corta"})
 paso(e == 400, "una respuesta demasiado corta se rechaza (400)", e)
 e, _ = fabio.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "Respondo yo por la persona, que no corresponde."})
 paso(e == 403, "el funcionario no responde por la persona (403)", e)
-e, r = ana.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "Adjunto el plano y corrijo el asunto.", "datos": datos_para(tipos[0], asunto="Ensayo: documento completo")})
-paso(e == 200 and r["estado"] == "En Tramitacion" and r["datos"]["asunto"] == "Ensayo: documento completo", "Ana responde: vuelve a «En tramitación» con los datos corregidos", e)
+e, r = ana.pedir("POST", f"/tramites/{st}/subsanacion/", {"respuesta": "Adjunto el plano y corrijo el asunto.", "datos": datos_para(tipos[0], asunto="[Ensayo] documento completo")})
+paso(e == 200 and r["estado"] == "En Tramitacion" and r["datos"]["asunto"] == "[Ensayo] documento completo", "Ana responde: vuelve a «En tramitación» con los datos corregidos", e)
 e, r = fabio.pedir("POST", f"/tramites/{st}/estado/", {"estado": "Aprobado"})
 paso(e == 200 and r["estado"] == "Aprobado", "Fabio lo aprueba", e)
 e, h = fabio.pedir("GET", f"/tramites/{st}/historial/")
@@ -454,7 +467,41 @@ paso(e == 401 and mala_puerta["codigo"] == "credenciales_invalidas", "una puerta
 e, sin_filtrar = ivan.pedir("POST", "/auth/login/", {"username": "fabio.mop", "password": "contraseña-equivocada-1234", "canal": "ciudadania"})
 paso(e == 401 and sin_filtrar["codigo"] == "credenciales_invalidas" and "acceso_correcto" not in sin_filtrar, "equivocarse de puerta sin credenciales válidas no revela quién es personal de una institución", e)
 
+# --------------------------------------------------------------------------- 7. trámites de la ciudadanía (migración 021)
+titulo("11. Requisitos, constancia y desistir (sin tocar trámites reales: solo los que el propio ensayo creó)")
+# Ana cerró sesión en la sección 9 (su token quedó revocado): entra de nuevo, lo que además deja su segundo factor reciente para desistir
+e, _ = ana.entrar()
+paso(e == 200, "Ana vuelve a entrar con su segundo factor", e)
+# Sin negaciones nuevas del PDP: lo ajeno se oculta por seguridad por filas (404, no pasa por el PDP) y lo demás son 400 y 409 que sí pasan el PDP
+e, publico = ana.pedir("GET", f"/catalogo/tipos-tramite/?institucion={mop}")
+paso(e == 200 and len(publico) >= 1 and all(isinstance(t.get("requisitos"), dict) for t in publico), "el catálogo público lleva los requisitos de cada trámite", e)
+e, c = ana.pedir("GET", f"/tramites/{st}/constancia/")
+paso(e == 200 and c["numero"] == st and c["estado"] == "Aprobado" and c["tipo_tramite"]["id"] == tipos[0]["id"] and c["datos"] and all({"etiqueta", "valor"} <= set(d) for d in c["datos"]),
+     "Ana obtiene la constancia de su trámite #%s: /tramites/<id>/constancia/ atraviesa nginx" % st, e)
+e, _ = felix.pedir("GET", f"/tramites/{st}/constancia/")
+paso(e == 404, "la constancia de un trámite ajeno da 404 (Félix: lo del MOP no existe para él; sin negación nueva del PDP)", e)
+e, _ = Sesion("ana.ciudadana").pedir("GET", f"/tramites/{st}/constancia/")
+paso(e == 401, "sin sesión la constancia responde 401", e)
+e, r = ana.pedir("POST", f"/tramites/{st}/desistir/", {"motivo": "Intento desistir de un trámite ya aprobado."})
+paso(e == 409 and (r or {}).get("codigo") == "tramite_resuelto", "desistir de un trámite ya resuelto responde 409 y no cambia nada", e)
+e, des = ana.pedir("POST", "/tramites/", {"tipo_tramite": tipos[0]["id"], "datos": datos_para(tipos[0], asunto="[Ensayo] trámite para desistir")})
+paso(e == 201, "Ana crea un trámite propio del ensayo para desistir de él", f"#{(des or {}).get('id')}")
+dt = des["id"]
+e, r = ana.pedir("POST", f"/tramites/{dt}/desistir/", {})
+paso(e == 400 and (r or {}).get("codigo") == "motivo_obligatorio", "desistir sin motivo se rechaza (400)", e)
+e, r = ana.pedir("POST", f"/tramites/{dt}/desistir/", {"motivo": "corto"})
+paso(e == 400 and "motivo" in (r or {}).get("errores", {}), "con un motivo demasiado corto también (400, con el error en el campo)", e)
+e, r = ana.pedir("POST", f"/tramites/{dt}/desistir/", {"motivo": "Prueba del ensayo: ya no necesito este trámite."})
+paso(e == 200 and r["estado"] == "Desistido" and r["vencido"] is False, "con motivo, Ana desiste: el trámite queda «Desistido»", e)
+e, r = ana.pedir("POST", f"/tramites/{dt}/desistir/", {"motivo": "Prueba del ensayo: ya no necesito este trámite."})
+paso(e == 409, "desistir otra vez responde 409", e)
+e, h = ana.pedir("GET", f"/tramites/{dt}/historial/")
+paso(e == 200 and h["eventos"][-1]["estado_nuevo"] == "Desistido" and h["eventos"][-1]["motivo"] == "Prueba del ensayo: ya no necesito este trámite." and "actor_id" not in h["eventos"][-1],
+     "el historial guarda el desistimiento con su motivo, sin revelar quién del personal actuó")
+e, c = ana.pedir("GET", f"/tramites/{dt}/constancia/")
+paso(e == 200 and c["estado"] == "Desistido", "la constancia de un trámite desistido muestra su estado", e)
+
 malos = resultados.count(False)
 print(f"\nENSAYO: {len(resultados) - malos} de {len(resultados)} comprobaciones correctas" + ("" if not malos else f"  ← {malos} FALLARON"))
-print(f"Se creó el trámite #{tramite} (aprobado), el #{st} (con subsanación, aprobado) y el #{t2['id']} (asignado a Flor) durante el ensayo; la solicitud interinstitucional #{solicitud['id']} es de Fabio.")
+print(f"Se creó el trámite #{tramite} (aprobado), el #{st} (con subsanación, aprobado) el #{t2['id']} (asignado a Flor) y el #{dt} (desistido por Ana) durante el ensayo; la solicitud interinstitucional #{solicitud['id']} es de Fabio.")
 sys.exit(1 if malos else 0)

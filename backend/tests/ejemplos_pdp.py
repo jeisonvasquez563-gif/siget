@@ -17,7 +17,7 @@ ROLES = [
 ]
 ROLES_DE_PLATAFORMA = ROLES[4:]
 
-_TRAMITE = {Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Accion.REASIGNAR_TRAMITE, Accion.ESCALAR_TRAMITE, Accion.RESPONDER_SUBSANACION}
+_TRAMITE = {Accion.VER_TRAMITE, Accion.CREAR_TRAMITE, Accion.CAMBIAR_ESTADO, Accion.REASIGNAR_TRAMITE, Accion.ESCALAR_TRAMITE, Accion.RESPONDER_SUBSANACION, Accion.DESISTIR_TRAMITE}
 _DOCUMENTO = {Accion.ADJUNTAR_DOCUMENTO, Accion.VER_DOCUMENTO}
 _PERFIL = {Accion.VER_MIS_DATOS, Accion.EXPORTAR_MIS_DATOS, Accion.CREAR_SOLICITUD_DATOS, Accion.CORREGIR_MIS_DATOS}
 _CUENTA = {Accion.CAMBIAR_CONTRASENA}
@@ -47,8 +47,8 @@ def _recursos(accion, rol, sujeto):
                         Recurso(**comunes, institucion_id=PROPIA, solicitante_id=sujeto.id, audiencia="institucion"))
             return (Recurso(**comunes, institucion_id=PROPIA, solicitante_id=sujeto.id),
                     Recurso(**comunes, institucion_id=PROPIA, solicitante_id=OTRA_PERSONA))
-        if accion == Accion.RESPONDER_SUBSANACION and es_personal:
-            # El personal responde por la vía de la ciudadanía: un trámite PROPIO en OTRA institución (en la suya no atiende lo que pidió)
+        if accion in {Accion.RESPONDER_SUBSANACION, Accion.DESISTIR_TRAMITE} and es_personal:
+            # El personal responde o desiste por la vía de la ciudadanía: un trámite PROPIO en OTRA institución (en la suya no lo atiende ni lo tramita)
             return (Recurso(**comunes, institucion_id=AJENA, solicitante_id=sujeto.id),
                     Recurso(**comunes, institucion_id=AJENA, solicitante_id=OTRA_PERSONA))
         return (Recurso(**comunes, institucion_id=PROPIA, solicitante_id=solicitante),
