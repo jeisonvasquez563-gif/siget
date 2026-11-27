@@ -455,7 +455,10 @@ e, sin_filtrar = ivan.pedir("POST", "/auth/login/", {"username": "fabio.mop", "p
 paso(e == 401 and sin_filtrar["codigo"] == "credenciales_invalidas" and "acceso_correcto" not in sin_filtrar, "equivocarse de puerta sin credenciales válidas no revela quién es personal de una institución", e)
 
 # --------------------------------------------------------------------------- 7. trámites de la ciudadanía (migración 021)
-titulo("7. Requisitos, constancia y desistir (sin tocar trámites reales: solo los que el propio ensayo creó)")
+titulo("11. Requisitos, constancia y desistir (sin tocar trámites reales: solo los que el propio ensayo creó)")
+# Ana cerró sesión en la sección 9 (su token quedó revocado): entra de nuevo, lo que además deja su segundo factor reciente para desistir
+e, _ = ana.entrar()
+paso(e == 200, "Ana vuelve a entrar con su segundo factor", e)
 # Sin negaciones nuevas del PDP: lo ajeno se oculta por seguridad por filas (404, no pasa por el PDP) y lo demás son 400 y 409 que sí pasan el PDP
 e, publico = ana.pedir("GET", f"/catalogo/tipos-tramite/?institucion={mop}")
 paso(e == 200 and len(publico) >= 1 and all(isinstance(t.get("requisitos"), dict) for t in publico), "el catálogo público lleva los requisitos de cada trámite", e)
