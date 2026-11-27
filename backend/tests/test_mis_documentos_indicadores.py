@@ -140,6 +140,13 @@ def test_una_busqueda_vacia_no_filtra_y_una_larga_da_400(documentos):
     assert r.status_code == 400 and r.data["codigo"] == "filtro_invalido"
 
 
+def test_una_busqueda_con_caracteres_de_control_da_400_y_no_consulta(documentos):
+    for crudo in ("%00", "a%00b", "a%0Ab", "%7F", "a%1Fb"):
+        r = llamar(mis_documentos.MisDocumentos, f"/x/?q={crudo}")
+        assert r.status_code == 400 and r.data["codigo"] == "filtro_invalido"
+    assert all(not args for args, _ in documentos.filtros)  # solo el filtro base: ningun criterio de busqueda
+
+
 def test_si_el_pdp_niega_no_se_consulta_nada(documentos, monkeypatch):
     def negar(request, accion, recurso, registrar_permitidas=True):
         raise AccesoDenegado({"codigo": "acceso_denegado", "detalle": "No tienes autorización para esta operación.", "reautenticacion_sugerida": False})
@@ -305,6 +312,16 @@ def test_la_funcion_verifica_adentro_quien_pregunta_y_solo_devuelve_agregados():
     assert "solicitante" not in devuelto and "t.id" not in devuelto and "tramite_id" not in devuelto
     carga = codigo[codigo.index("SELECT coalesce(jsonb_agg"):codigo.index("RETURN jsonb_build_object")]
     assert "m.rol IN ('funcionario', 'supervisor')" in carga and "solicitante" not in carga
+    assert "m.revocada_en IS NULL" in carga  # solo personal con la membresia vigente
+
+
+def test_la_funcion_compara_el_estado_siempre_como_texto():
+    codigo = sin_comentarios(SQL)
+    # Desistido lo agrega la 021 al enum y puede no existir todavia: ningun literal se compara contra el enum
+    assert not re.search(r"(?<![:\w])estado\s+(NOT\s+)?IN\s*\(", codigo)
+    assert len(re.findall(r"estado::text NOT IN \('Aprobado', 'Rechazado', 'Desistido'\)", codigo)) == 5
+    assert "e.estado_nuevo::text IN ('Aprobado', 'Rechazado')" in codigo
+    assert "UNION SELECT DISTINCT estado::text" in codigo and "('Pendiente'::text)" in codigo
 
 
 def test_la_migracion_no_cambia_tablas():

@@ -2480,12 +2480,14 @@ Sus decisiones del PDP se capturan en memoria, así que no dejan ninguna negaci�
 
 1. **Las cifras son una foto del momento** (`generado_en`): no se guardan ni hay histórico. «Actualizar» vuelve a pedirlas. No se cachean (`Cache-Control: no-store`).
 2. **El tiempo de resolución sale de `evento_auditoria`,** no de `tramite` (que no guarda cuándo se resolvió). Un trámite resuelto cuenta una vez, por su cambio a `Aprobado` o `Rechazado`; los desistidos no cuentan como resueltos.
-3. **La carga por funcionario ignora a quien no es personal** de esa institución (un trámite asignado por error a alguien de la ciudadanía no lo nombra; sí cuenta en «abiertos»). Sí incluye al personal con la membresía revocada que aún tiene trámites abiertos asignados: es justo lo que la supervisión necesita ver para reasignarlos.
+3. **La carga por funcionario ignora a quien no es personal** de esa institución (un trámite asignado por error a alguien de la ciudadanía no lo nombra; sí cuenta en «abiertos»). Exige membresía vigente: el personal con la membresía revocada que aún tenga trámites abiertos asignados no se nombra en la carga (esos trámites sí cuentan en «abiertos»).
 4. **La institución nula o inexistente da `42501`,** como una ajena: la API responde 403 antes de llegar a la base, así que no se revela qué instituciones existen.
 5. **El PDP no pide segundo factor reciente** para los indicadores (son agregados de lectura); sí lo piden las acciones que cambian cosas. Si se quisiera endurecer, bastaría agregarlo en `_indicadores_de_la_institucion` de `pdp.py`.
 6. **«Mis documentos» no es un listado de la institución:** el personal solo ve lo que adjuntó él (en otras instituciones). Los documentos de los trámites que atiende siguen en el detalle de cada trámite. El filtro es doble, por el solicitante del trámite y por quien subió el archivo, además de la seguridad por filas.
 7. **La búsqueda de «Mis documentos» usa `icontains`** (`UPPER()` de la base): con una configuración regional `C`, las diferencias solo de mayúsculas en letras con tilde no se detectan.
-8. **La «Ayuda» es texto fijo en la interfaz:** si cambia un flujo (por ejemplo, la recuperación del segundo factor), hay que actualizar `frontend/src/Ayuda.jsx` y su prueba.
+8. **La coordinación ve conteos agregados chicos** (por ejemplo, 1 trámite en un estado), sin ids, sin datos por trámite y sin datos de la ciudadanía. Con pocos trámites un conteo podría permitir inferir algo de un caso conocido por otras vías; se evaluó como riesgo bajo y se acepta sin umbral mínimo de agrupación.
+9. **Los estados se comparan por texto** (`estado::text`) en toda la función: la migración 022 se aplica antes o después de la 021 (`Desistido`) sin errores de tipo. Las pruebas de la base omiten solo la comprobación con un trámite desistido si el enum aún no tiene ese valor.
+10. **La «Ayuda» es texto fijo en la interfaz:** si cambia un flujo (por ejemplo, la recuperación del segundo factor), hay que actualizar `frontend/src/Ayuda.jsx` y su prueba.
 
 ### 47.9 Registro de la aplicación
 

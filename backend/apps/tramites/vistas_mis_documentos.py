@@ -60,6 +60,8 @@ class MisDocumentos(APIView):
             q = q.strip()
             if len(q) > BUSQUEDA_MAXIMA:
                 return _error("filtro_invalido", f"`q` admite hasta {BUSQUEDA_MAXIMA} caracteres.", status.HTTP_400_BAD_REQUEST)
+            if any(ord(c) < 32 or ord(c) == 127 for c in q):
+                return _error("filtro_invalido", "`q` no admite caracteres de control.", status.HTTP_400_BAD_REQUEST)
             if q:
                 criterio = (Q(nombre__icontains=q) | Q(tramite__tipo_tramite__nombre__icontains=q) | Q(tramite__institucion__nombre__icontains=q))
                 numero = q.lstrip("#")

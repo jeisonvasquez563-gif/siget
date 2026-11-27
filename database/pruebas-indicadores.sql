@@ -40,21 +40,22 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Preparacion (como el duenio, sin contexto de usuario). Los tramites se insertan YA en su estado: los disparadores de transicion y de
 -- notificaciones son de UPDATE y no intervienen.
---   Institucion A: 8 tramites. Abiertos 5: t1 Pendiente sin asignar; t2 En Tramitacion vencido (func1); t3 En Tramitacion vencido y escalado
---   (func2); t4 En Subsanacion (func1); t9 En Tramitacion asignado por error a una persona de la ciudadania. Resueltos: t5 Aprobado en 10 dias,
+--   Institucion A: 9 tramites. Abiertos 6: t1 Pendiente sin asignar; t2 En Tramitacion vencido (func1); t3 En Tramitacion vencido y escalado
+--   (func2); t4 En Subsanacion (func1); t9 En Tramitacion asignado por error a una persona de la ciudadania; t10 En Tramitacion asignado a
+--   personal con la membresia REVOCADA (no debe salir en la carga por funcionario). Resueltos: t5 Aprobado en 10 dias,
 --   t6 Rechazado en 20 dias (promedio 15,0) y t7 Aprobado hace 100 dias (fuera de los 90 dias).
 --   Institucion B: un tramite abierto de otra persona, asignado a su funcionario.
 -- ---------------------------------------------------------------------------
 SET LOCAL ROLE siget_owner;
 INSERT INTO siget.institucion (nombre, tipo) VALUES ('p022_inst_a', 'demostracion'), ('p022_inst_b', 'demostracion');
 INSERT INTO siget.usuario (username, password_hash) VALUES
-  ('p022_asig', '!'), ('p022_ciud', '!'), ('p022_ciud2', '!'), ('p022_func1', '!'), ('p022_func2', '!'), ('p022_sup_a', '!'), ('p022_sup_susp', '!'),
+  ('p022_asig', '!'), ('p022_ciud', '!'), ('p022_ciud2', '!'), ('p022_func1', '!'), ('p022_func2', '!'), ('p022_func_rev', '!'), ('p022_sup_a', '!'), ('p022_sup_susp', '!'),
   ('p022_coord_a', '!'), ('p022_coord_rev', '!'), ('p022_func_b', '!'), ('p022_sup_b', '!'), ('p022_coord_b', '!');
 INSERT INTO siget.usuario (username, password_hash, rol_plataforma) VALUES ('p022_opcat', '!', 'operador_catalogo');
 UPDATE siget.usuario SET estado_cuenta = 'suspendida' WHERE username = 'p022_sup_susp';
 INSERT INTO siget.membresia (usuario_id, institucion_id, rol, asignado_por)
   SELECT u.id, i.id, x.rol::siget.rol_membresia, a.id
-    FROM (VALUES ('p022_func1', 'p022_inst_a', 'funcionario'), ('p022_func2', 'p022_inst_a', 'funcionario'), ('p022_sup_a', 'p022_inst_a', 'supervisor'),
+    FROM (VALUES ('p022_func1', 'p022_inst_a', 'funcionario'), ('p022_func2', 'p022_inst_a', 'funcionario'), ('p022_func_rev', 'p022_inst_a', 'funcionario'), ('p022_sup_a', 'p022_inst_a', 'supervisor'),
                  ('p022_sup_susp', 'p022_inst_a', 'supervisor'), ('p022_coord_a', 'p022_inst_a', 'coordinador_institucional'),
                  ('p022_coord_rev', 'p022_inst_a', 'coordinador_institucional'),
                  ('p022_func_b', 'p022_inst_b', 'funcionario'), ('p022_sup_b', 'p022_inst_b', 'supervisor'),
@@ -64,7 +65,7 @@ INSERT INTO siget.membresia (usuario_id, institucion_id, rol, asignado_por)
     JOIN siget.usuario a ON a.username = 'p022_asig';
 UPDATE siget.membresia
    SET revocada_en = now(), revocada_por = (SELECT id FROM siget.usuario WHERE username = 'p022_asig')
- WHERE usuario_id = (SELECT id FROM siget.usuario WHERE username = 'p022_coord_rev');
+ WHERE usuario_id IN (SELECT id FROM siget.usuario WHERE username IN ('p022_coord_rev', 'p022_func_rev'));
 INSERT INTO siget.tipo_tramite (institucion_id, nombre, sla_dias)
   SELECT id, 'p022 tipo ' || right(nombre, 1), 5 FROM siget.institucion WHERE nombre IN ('p022_inst_a', 'p022_inst_b');
 
@@ -75,6 +76,7 @@ INSERT INTO siget.tramite (tipo_tramite_id, institucion_id, solicitante_id, func
                  ('t3', 'En Tramitacion', 'p022_func2',  interval '-1 day',  true,  interval '5 days'),
                  ('t4', 'En Subsanacion', 'p022_func1',  interval '5 days',  false, interval '5 days'),
                  ('t9', 'En Tramitacion', 'p022_ciud2',  interval '5 days',  false, interval '5 days'),
+                 ('t10', 'En Tramitacion', 'p022_func_rev', interval '5 days', false, interval '5 days'),
                  ('t5', 'Aprobado',       'p022_func1',  interval '1 day',   false, interval '10 days'),
                  ('t6', 'Rechazado',      'p022_func2',  interval '1 day',   false, interval '20 days'),
                  ('t7', 'Aprobado',       'p022_func1',  interval '1 day',   false, interval '200 days')) AS x(clave, estado, funcionario, limite, escalado, antiguedad)
@@ -106,7 +108,7 @@ DECLARE
   v_uid int;
   v_r jsonb := '{}'::jsonb;
 BEGIN
-  IF (SELECT count(*) FROM siget.tramite WHERE institucion_id = v_a) <> 8 OR (SELECT count(*) FROM siget.tramite WHERE institucion_id = v_b) <> 1 THEN
+  IF (SELECT count(*) FROM siget.tramite WHERE institucion_id = v_a) <> 9 OR (SELECT count(*) FROM siget.tramite WHERE institucion_id = v_b) <> 1 THEN
     RAISE EXCEPTION 'La preparacion de la prueba fallo: tramites de A = %, de B = %',
       (SELECT count(*) FROM siget.tramite WHERE institucion_id = v_a), (SELECT count(*) FROM siget.tramite WHERE institucion_id = v_b);
   END IF;
@@ -173,17 +175,21 @@ BEGIN
   v_jb := siget.indicadores_institucion(v_b);
   EXECUTE 'RESET ROLE';
 
-  PERFORM pg_temp.r(v_ja -> 'por_estado' = '{"Pendiente": 1, "En Tramitacion": 3, "En Subsanacion": 1, "Aprobado": 2, "Rechazado": 1}'::jsonb,
-                    'conteo por estado de la institucion A: 1, 3, 1, 2 y 1 (los estados sin tramites salen en 0)');
-  PERFORM pg_temp.r((v_ja ->> 'abiertos')::int = 5 AND (v_ja ->> 'vencidos')::int = 2 AND (v_ja ->> 'escalados_abiertos')::int = 1
+  PERFORM pg_temp.r(v_ja -> 'por_estado' = '{"Pendiente": 1, "En Tramitacion": 4, "En Subsanacion": 1, "Aprobado": 2, "Rechazado": 1}'::jsonb,
+                    'conteo por estado de la institucion A: 1, 4, 1, 2 y 1 (los estados sin tramites salen en 0)');
+  PERFORM pg_temp.r((v_ja ->> 'abiertos')::int = 6 AND (v_ja ->> 'vencidos')::int = 2 AND (v_ja ->> 'escalados_abiertos')::int = 1
                     AND (v_ja ->> 'sin_asignar')::int = 1,
-                    'abiertos 5, vencidos 2 (los resueltos no cuentan), escalados abiertos 1 y sin asignar 1');
+                    'abiertos 6, vencidos 2 (los resueltos no cuentan), escalados abiertos 1 y sin asignar 1');
   PERFORM pg_temp.r((v_ja ->> 'resueltos_90_dias')::int = 2 AND (v_ja ->> 'dias_promedio_resolucion')::numeric = 15.0,
                     'tiempo promedio de resolucion 15,0 dias con 2 resueltos en 90 dias (el de hace 100 dias no cuenta)');
   PERFORM pg_temp.r(v_ja -> 'por_funcionario' = jsonb_build_array(
                          jsonb_build_object('usuario_id', (SELECT id FROM siget.usuario WHERE username = 'p022_func1'), 'usuario', 'p022_func1', 'abiertos', 2),
                          jsonb_build_object('usuario_id', (SELECT id FROM siget.usuario WHERE username = 'p022_func2'), 'usuario', 'p022_func2', 'abiertos', 1)),
                     'carga por funcionario: func1 con 2 y func2 con 1, de mayor a menor');
+  PERFORM pg_temp.r(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_ja -> 'por_funcionario') f WHERE f ->> 'usuario' = 'p022_func_rev'),
+                    'el personal con la membresia revocada y un tramite abierto asignado no aparece en la carga por funcionario');
+  PERFORM pg_temp.r((SELECT sum(value::int) FROM jsonb_each_text(v_ja -> 'por_estado')) = (SELECT count(*) FROM siget.tramite WHERE institucion_id = v_a),
+                    'contar por estado (varios estados a la vez, con el enum convertido a texto) suma todos los tramites de la institucion');
   PERFORM pg_temp.r(v_jc = v_ja, 'la coordinacion de A recibe exactamente las mismas cifras que la supervision de A');
   PERFORM pg_temp.r((v_jb ->> 'abiertos')::int = 1 AND (v_jb ->> 'vencidos')::int = 0 AND (v_jb ->> 'escalados_abiertos')::int = 0
                     AND (v_jb -> 'por_estado' ->> 'En Tramitacion')::int = 1 AND (v_jb ->> 'resueltos_90_dias')::int = 0 AND v_jb -> 'dias_promedio_resolucion' = 'null'::jsonb,
@@ -224,6 +230,41 @@ BEGIN
                                  WHERE NOT EXISTS (SELECT 1 FROM siget.membresia m
                                                     WHERE m.usuario_id = (f ->> 'usuario_id')::int AND m.institucion_id = v_a AND m.rol IN ('funcionario', 'supervisor'))),
                     'todo lo que sale en la carga por funcionario es personal de la institucion');
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 3b. El valor Desistido (migracion 021) puede existir o no en el enum: la funcion compara por texto y funciona en ambos casos
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_a int := (SELECT id FROM siget.institucion WHERE nombre = 'p022_inst_a');
+  v_sup_a int := (SELECT id FROM siget.usuario WHERE username = 'p022_sup_a');
+  v_hay boolean := EXISTS (SELECT 1 FROM pg_enum e WHERE e.enumtypid = 'siget.estado_tramite'::regtype AND e.enumlabel = 'Desistido');
+  v_antes jsonb;
+  v_despues jsonb;
+BEGIN
+  EXECUTE 'SET LOCAL ROLE app_role';
+  PERFORM pg_temp.ctx(v_sup_a, v_a::text);
+  v_antes := siget.indicadores_institucion(v_a);
+  EXECUTE 'RESET ROLE';
+  PERFORM pg_temp.r(NOT (v_antes -> 'por_estado' ? 'Desistido'),
+                    format('sin tramites desistidos la funcion responde sin error (el enum %s el valor Desistido)', CASE WHEN v_hay THEN 'tiene' ELSE 'no tiene' END));
+  IF v_hay THEN
+    EXECUTE 'SET LOCAL ROLE siget_owner';
+    INSERT INTO siget.tramite (tipo_tramite_id, institucion_id, solicitante_id, estado, fecha_limite)
+      SELECT tt.id, tt.institucion_id, c.id, 'Desistido', now() - interval '1 day'
+        FROM siget.tipo_tramite tt, siget.usuario c WHERE tt.nombre = 'p022 tipo a' AND c.username = 'p022_ciud';
+    EXECUTE 'RESET ROLE';
+    EXECUTE 'SET LOCAL ROLE app_role';
+    PERFORM pg_temp.ctx(v_sup_a, v_a::text);
+    v_despues := siget.indicadores_institucion(v_a);
+    EXECUTE 'RESET ROLE';
+    PERFORM pg_temp.r((v_despues -> 'por_estado' ->> 'Desistido')::int = 1 AND v_despues -> 'abiertos' = v_antes -> 'abiertos'
+                      AND v_despues -> 'vencidos' = v_antes -> 'vencidos' AND v_despues -> 'sin_asignar' = v_antes -> 'sin_asignar',
+                      'un tramite Desistido se cuenta por estado y no es abierto, ni vencido, ni sin asignar');
+  ELSE
+    RAISE NOTICE 'OMITIDA la comprobacion con un tramite Desistido: el enum aun no tiene ese valor (migracion 021 sin aplicar)';
+  END IF;
 END $$;
 
 -- ---------------------------------------------------------------------------
